@@ -1,5 +1,66 @@
-body {
-  margin: 0;
-  font-family: 'Trebuchet MS',
-}
+@import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,100..700;1,100..700&family=Kanit:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playwrite+HU:wght@100..400&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Edu+AU+VIC+WA+NT+Hand:wght@400..700&family=Playwrite+HU:wght@100..400&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap');
 
+
+html {
+    font-size: 1.25rem;
+    font-family: "Ubuntu", sans-serif;
+  }
+  
+  body {
+    margin: 0;
+    background-color: white;
+    font-family: "Ubuntu", sans-serif;
+  }
+  .App {
+    display: flex;
+    flex-direction: row;
+    min-width: 100%;
+  }
+
+  .sidebarArea {
+    min-width: 20%;
+    background-color: #093945;
+    color: white;
+    box-shadow: 5px 0px 10px rgba(0, 0, 0, 0.3);/*border right shade*/
+    height: 100vh;
+    overflow-y: auto;
+  }
+  
+  .sidebarLogoArea {
+    background-color: #CCECFE;
+    min-width: 100%;
+    /*placing logo to the center horizontally and vertically*/
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0px 5px 10px rgba(0, 0, 0, 0.3); /* Bottom border shadow */
+  }
+  .sidebarButtonsArea {
+    cursor: pointer;
+  }
+  .sidebarMainButtons{
+  }
+  .sidebarMainButtons:hover {
+    background-color: #3C6478;
+    /* Light gray border on hover */
+  }
+  .sidebarSideButtons {
+    background-color: #EFD469;
+    color: black;
+  }
+  .sidebarMainButtons, .sidebarSideButtons {
+    padding: 15px 10px 5px 18px;/*top-right-bottom-left*/
+  }
+
+
+  .mainArea {
+    min-width: 80%;
+  }
+
+  .notesArea {
+    font-family: "Edu AU VIC WA NT Hand", cursive;
+  }
