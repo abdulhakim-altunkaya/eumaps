@@ -1,6 +1,9 @@
 import React, {useState} from 'react';
+import { useNavigate } from 'react-router-dom';
 
 function SidebarNav() {
+
+  const navigate = useNavigate();
 
   const [converterToggle, setConverterToggle] = useState(false);
   const [wordToolsToggle, setWordToolsToggle] = useState(false);
@@ -19,8 +22,9 @@ function SidebarNav() {
       <div className='sidebarMainButtons'>Araç Gümrük Vergi Hesaplama</div>
       <div className='sidebarMainButtons'>Motorsiklet Gümrük Vergi Hesaplama</div>
       <div className='sidebarMainButtons'>Kira Yardımı Hesaplama</div>
-      <div className='sidebarMainButtons'>Time Dilation Calculator</div>
-      <div className='sidebarMainButtons'>Investment Return Calculator</div>
+      <div className='sidebarMainButtons' onClick={() => navigate("/speed-of-light-calculator")}>Time Dilation Calculator</div>
+      <div className='sidebarMainButtons' onClick={() => navigate("/investment-return-calculator")}>Investment Return Calculator</div>
+      <div className='sidebarMainButtons'>Free CSS Buttons</div>
       <div onClick={toggleConverters} className='sidebarMainButtons'>Unit Converters &#x25BC;</div>
       {
         converterToggle && (

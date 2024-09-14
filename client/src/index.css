@@ -23,11 +23,22 @@ html {
 
   .sidebarArea {
     min-width: 20%;
+    background-color: #CCECFE;
+    color: black;
+    /*
     background-color: #093945;
     color: white;
+    */
     box-shadow: 5px 0px 10px rgba(0, 0, 0, 0.3);/*border right shade*/
     height: 100vh;
-    overflow-y: auto;
+    overflow-y: auto; /* Content scrolls if overflow */
+    scrollbar-width: none; /* For Firefox */
+    user-select: none;
+}
+
+  /* For WebKit-based browsers (Chrome, Safari) */
+  .sidebarArea::-webkit-scrollbar {
+      display: none; /* Hide scrollbar */
   }
   
   .sidebarLogoArea {
@@ -41,13 +52,19 @@ html {
   }
   .sidebarButtonsArea {
     cursor: pointer;
+    background-color: #5bff85;
   }
   .sidebarMainButtons{
+    box-shadow: 0px 0.4px 3px #b0b0b0; /* Bottom border shadow */
   }
   .sidebarMainButtons:hover {
     background-color: #3C6478;
     /* Light gray border on hover */
   }
+  .sidebarMainButtons:active{
+    background-color: #94b8c9;
+  }
+
   .sidebarSideButtons {
     background-color: #EFD469;
     color: black;
