@@ -7,6 +7,7 @@ function SidebarNav() {
 
   const [converterToggle, setConverterToggle] = useState(false);
   const [wordToolsToggle, setWordToolsToggle] = useState(false);
+  const [mfaCalculatorsToggle, setMfaCalculatorsToggle] = useState(false);
 
   const toggleConverters = () => {
     setConverterToggle(!converterToggle);
@@ -16,12 +17,23 @@ function SidebarNav() {
     setWordToolsToggle(!wordToolsToggle);
   }
 
+  const toggleMFACalculators = () => {
+    setMfaCalculatorsToggle(!mfaCalculatorsToggle);
+  }
+
 
   return (
     <div className='sidebarButtonsArea'>
-      <div className='sidebarMainButtons'>Araç Gümrük Vergi Hesaplama</div>
-      <div className='sidebarMainButtons'>Motorsiklet Gümrük Vergi Hesaplama</div>
-      <div className='sidebarMainButtons'>Kira Yardımı Hesaplama</div>
+      <div onClick={toggleMFACalculators} className='sidebarMainButtons'>MFA Calculators &#x25BC;</div>
+      {
+        mfaCalculatorsToggle && (
+          <>
+            <div className='sidebarSideButtons'>Araç Gümrük Vergi Hesaplama</div>
+            <div className='sidebarSideButtons'>Motorsiklet Gümrük Vergi Hesaplama</div>
+            <div className='sidebarSideButtons' onClick={() => navigate("/kira-yardimi-hesaplama")}>Kira Yardımı Hesaplama</div>
+          </>
+        )
+      }
       <div className='sidebarMainButtons' onClick={() => navigate("/speed-of-light-calculator")}>Time Dilation Calculator</div>
       <div className='sidebarMainButtons' onClick={() => navigate("/investment-return-calculator")}>Investment Return Calculator</div>
       <div className='sidebarMainButtons'>Free CSS Buttons</div>

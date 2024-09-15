@@ -21,7 +21,7 @@ function Investment() {
       alert('Please enter a valid duration');
       return;
     }
-    if (Number(invPercentage2) < 1 || Number(invPercentage2) > 10000 || invAmount2 === '') {
+    if (Number(invPercentage2) < 1 || Number(invPercentage2) > 10000 || invPercentage2 === '') {
       alert('Please enter a valid percentage');
       return;
     }
