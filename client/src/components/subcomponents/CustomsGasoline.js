@@ -7,11 +7,15 @@ function CustomsGasoline() {
 
   // State to track which radio button is selected
   const [selectedForm, setSelectedForm] = useState(null);
+  const [currencyRadio, setCurrencyRadio] = useState(null);
 
-  // Handle radio button change
+  // Handle radio button changes
   const handleRadioChange = (e) => {
     setSelectedForm(e.target.value);
   };
+  const handleRadioCurrency = (e) => {
+    setCurrencyRadio(e.target.value);
+  }
 
   return (
     <div className='customsMainArea'>
@@ -21,7 +25,7 @@ function CustomsGasoline() {
         VERGİ HESAPLAMA</h2>
       </div>
       <h3>BENZİN/DİZEL ARAÇLAR</h3>
-      <div className=''>
+      <div>
         {/* Radio buttons */}
         <div>
           <input
@@ -42,48 +46,37 @@ function CustomsGasoline() {
           />
           <label htmlFor="newCarsRadio">Yeni Araba</label>
         </div>
-
-              {/* Conditionally render the forms based on the selected radio button */}
-              {selectedForm === 'usedCarsRadio' && (
-                <div>
-                  <p>Fatura Bedeli kısmına KDV iadesi almışsanız veya KDV ödememişseniz, KDV hariç bedeli yazınız.</p>
-                  <p>Detaylı bilgi: 
-                    <span className="notesSpan" onClick={()=> navigate("/bedelsiz-arac-ithalati-onemli-notlar")}>Süreç ve 
-                    Önemli Notlar</span></p>
-                  <form>
-                    <label>
-                      Name:
-                      <input type="text" name="name" />
-                    </label>
-                    <br />
-                    <label>
-                      Email:
-                      <input type="email" name="email" />
-                    </label>
-                  </form>
-                </div>
-              )}
-
-              {selectedForm === 'newCarsRadio' && (
-                <div>
-                  <p>Fatura Bedeli kısmına KDV iadesi almışsanız veya KDV ödememişseniz, KDV hariç bedeli yazınız.</p>
-                  <p>Detaylı bilgi: 
-                    <span className="notesSpan" onClick={()=> navigate("/bedelsiz-arac-ithalati-onemli-notlar")}>Süreç ve 
-                    Önemli Notlar</span></p>
-                  <form>
-                    <label>
-                      Address:
-                      <input type="text" name="address" />
-                    </label>
-                    <br />
-                    <label>
-                      Phone:
-                      <input type="tel" name="phone" />
-                    </label>
-                  </form>
-                </div>
-              )}
+          {/* Conditionally render the forms based on the selected radio button */}
+          {selectedForm === 'usedCarsRadio' && (
+            <div>
+              <p>Fatura Bedeli kısmına KDV iadesi almışsanız veya KDV ödememişseniz, KDV hariç bedeli yazınız.</p>
+              <p>Detaylı bilgi: 
+                <span className="notesSpan" onClick={()=> navigate("/bedelsiz-arac-ithalati-onemli-notlar")}>Süreç ve 
+                Önemli Notlar</span></p>
+              <form>
+                <input type="radio" id="dollarRadio" name="formSelectorCurrency" value="dollarRadio" onChange={handleRadioCurrency}/>
+                <label htmlFor="dollarRadio">Dolar</label> <br/>
+                <input type="radio" id="euroRadio" name="formSelectorCurrency" value="euroRadio" onChange={handleRadioCurrency}/>
+                <label htmlFor="euroRadio">Euro</label>
+              </form>
+            </div>
+          )}
+          {selectedForm === 'newCarsRadio' && (
+            <div>
+              <p>Fatura Bedeli kısmına KDV iadesi almışsanız veya KDV ödememişseniz, KDV hariç bedeli yazınız.</p>
+              <p>Detaylı bilgi: 
+                <span className="notesSpan" onClick={()=> navigate("/bedelsiz-arac-ithalati-onemli-notlar")}>Süreç ve 
+                Önemli Notlar</span></p>
+              <form>
+                <input type="radio" id="dollarRadio" name="formSelectorCurrency" value="dollarRadio" onChange={handleRadioCurrency}/>
+                <label htmlFor="dollarRadio">Dolar</label> <br/>
+                <input type="radio" id="euroRadio" name="formSelectorCurrency" value="euroRadio" onChange={handleRadioCurrency}/>
+                <label htmlFor="euroRadio">Euro</label>
+              </form>
+            </div>
+          )}
       </div>
+
 
     </div>
   )
