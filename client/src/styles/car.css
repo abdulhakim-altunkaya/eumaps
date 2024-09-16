@@ -15,6 +15,11 @@
 .customsMainArea {
     display: flex;
     flex-direction: column;
+    margin-left: 12px;
+    font-family: "Maven Pro", 'Trebuchet MS', sans-serif;
+}
+.customsMainArea h1, h2, h3 {
+    font-family: "Comfortaa", 'Trebuchet MS', sans-serif;
 }
 .customsMainPageTitlesArea {
     display: flex;
@@ -23,7 +28,7 @@
     align-items: center; /* Aligns items in the center of the flex container */
     width: 100%; /* Ensure the container takes the full width */
     text-align: center; /* Center the text itself */
-    font-family: "Nunito", 'Trebuchet MS', sans-serif;
+    
 }
 
 
@@ -35,4 +40,11 @@
     border-radius: 4px;
     color: white;
     user-select: none;
+}
+
+.notesSpan {
+    color: red;
+    font-style: italic;
+    font-weight: bold;
+    cursor: pointer;
 }
