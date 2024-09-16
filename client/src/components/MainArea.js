@@ -1,8 +1,12 @@
 import React from 'react';
-import {BrowserRouter as Router, Routes, Route, Link} from "react-router-dom";
+import {Routes, Route} from "react-router-dom";
 import SpeedOfLight from "./subcomponents/SpeedOfLight";
 import Investment from "./subcomponents/Investment";
 import Rent from "./subcomponents/Rent";
+import Customs from "./subcomponents/Customs";
+import CustomsElectric from "./subcomponents/CustomsElectric";
+import CustomsHybrid from "./subcomponents/CustomsHybrid";
+import CustomsGasoline from "./subcomponents/CustomsGasoline";
 import IndexComp from "./subcomponents/IndexComp";
 
 function MainArea() {
@@ -12,6 +16,12 @@ function MainArea() {
         <Route path="/speed-of-light-calculator" element={<SpeedOfLight/>} />
         <Route path="/investment-return-calculator" element={<Investment/>} />
         <Route path="/kira-yardimi-hesaplama" element={<Rent/>} />
+
+        <Route path="/arac-gumruk-vergi-hesaplama" element={<Customs/>} />
+        <Route path="/benzin-dizel-arac-gumruk-vergi-hesaplama" element={<CustomsGasoline/>} />
+        <Route path="/hibrit-arac-gumruk-vergi-hesaplama" element={<CustomsHybrid/>} />
+        <Route path="/elektrikli-arac-gumruk-vergi-hesaplama" element={<CustomsElectric/>} />
+
         <Route path="/" element={<IndexComp/>} />
       </Routes>
     </div> 

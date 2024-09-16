@@ -1,0 +1,38 @@
+@import url('https://fonts.googleapis.com/css2?family=Nerko+One&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lobster&family=Nerko+One&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Acme&family=Lobster&family=Nerko+One&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap'); /*Fredoka One*/
+@import url('https://fonts.googleapis.com/css2?family=Courgette&display=swap'); /*Courgette*/
+@import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@300&display=swap');/*Comfortaa*/
+@import url('https://fonts.googleapis.com/css2?family=Concert+One&family=Righteous&display=swap');/*Concert One*/
+@import url('https://fonts.googleapis.com/css2?family=Righteous&display=swap');/*Righteous*/
+@import url('https://fonts.googleapis.com/css2?family=Concert+One&family=Monda:wght@700&family=Righteous&display=swap');/*Monda*/
+@import url('https://fonts.googleapis.com/css2?family=Maven+Pro&display=swap');/*Maven Pro*/
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@200&display=swap'); /*Nunito*/
+
+@import url('https://fonts.googleapis.com/css2?family=Lobster&family=Nerko+One&display=swap');
+
+.customsMainArea {
+    display: flex;
+    flex-direction: column;
+}
+.customsMainPageTitlesArea {
+    display: flex;
+    flex-direction: column; /* Stack elements vertically if needed */
+    justify-content: center; /* Align the content to the center horizontally */
+    align-items: center; /* Aligns items in the center of the flex container */
+    width: 100%; /* Ensure the container takes the full width */
+    text-align: center; /* Center the text itself */
+    font-family: "Nunito", 'Trebuchet MS', sans-serif;
+}
+
+
+.button2 {
+    font-family: "Lobster";
+    font-size: 20px;
+    width: 20%;
+    background: #8842d5;
+    border-radius: 4px;
+    color: white;
+    user-select: none;
+}
