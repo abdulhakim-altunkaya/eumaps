@@ -85,3 +85,8 @@ html {
   .notesArea {
     font-family: "Edu AU VIC WA NT Hand", cursive;
   }
+
+  .homepageArea {
+    margin-left: 12px;
+    margin-top: 30px;
+  }
