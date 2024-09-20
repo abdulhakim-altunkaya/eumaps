@@ -7,24 +7,48 @@ function CustomsGasoline() {
 
   // State to track which radio button is selected
   const [selectedForm, setSelectedForm] = useState(null);
-  const [currencyRadio, setCurrencyRadio] = useState(null);
+  const [currency, setCurrency] = useState(null);
+  const [resultArea, setResultArea] = useState("");
+
+  const exchangeDollar = 34.04;
+  const exchangeEuro = 37.87;
 
   // Handle radio button changes
   const handleRadioChange = (e) => {
     setSelectedForm(e.target.value);
   };
   const handleRadioCurrency = (e) => {
-    setCurrencyRadio(e.target.value);
+    if(e.target.value === "euroRadio") {
+      setCurrency(exchangeEuro);
+    } else {
+      setCurrency(exchangeDollar);
+    }
+  }
+
+  const calculateTax = (e) => {
+    e.preventDefault(); // prevent form from refreshing page
+    const formData = new FormData(e.target);
+    const invoiceAmount2 = formData.get('invoiceAmount');
+    const invoiceYear2 = formData.get('invoiceYear');
+    const productionYear2 = formData.get('productionYear');
+    const customsRegYear2 = formData.get('customsRegYear');
+    const engineCapacity2 = formData.get('engineCapacity');
+    const navlunAmount2 = formData.get('navlunAmount');
+    setResultArea(currency*2);
+  }
+
+  const clearCarForm = () => {
+    
   }
 
   return (
     <div className='customsMainArea'>
       <div className='customsMainPageTitlesArea'>
-        <h2>EUMAPS.ORG<br />
+        <h3>EUMAPS.ORG<br />
         BEDELSİZ ARAÇ İTHALATI<br />
-        VERGİ HESAPLAMA</h2>
+        VERGİ HESAPLAMA</h3>
       </div>
-      <h3>BENZİN/DİZEL ARAÇLAR</h3>
+      <h4>BENZİN/DİZEL ARAÇLAR</h4>
       <div>
         {/* Radio buttons */}
         <div>
@@ -47,32 +71,82 @@ function CustomsGasoline() {
           <label htmlFor="newCarsRadio">Yeni Araba</label>
         </div>
           {/* Conditionally render the forms based on the selected radio button */}
-          {selectedForm === 'usedCarsRadio' && (
+          {(selectedForm === 'newCarsRadio' || selectedForm === 'usedCarsRadio')  && (
             <div>
               <p>Fatura Bedeli kısmına KDV iadesi almışsanız veya KDV ödememişseniz, KDV hariç bedeli yazınız.</p>
               <p>Detaylı bilgi: 
                 <span className="notesSpan" onClick={()=> navigate("/bedelsiz-arac-ithalati-onemli-notlar")}>Süreç ve 
                 Önemli Notlar</span></p>
-              <form>
-                <input type="radio" id="dollarRadio" name="formSelectorCurrency" value="dollarRadio" onChange={handleRadioCurrency}/>
+              <form onSubmit={calculateTax}>
+                <input type="radio" id="dollarRadio" name="formSelectorCurrency" value="dollarRadio" onChange={handleRadioCurrency} 
+                required />
                 <label htmlFor="dollarRadio">Dolar</label> <br/>
-                <input type="radio" id="euroRadio" name="formSelectorCurrency" value="euroRadio" onChange={handleRadioCurrency}/>
-                <label htmlFor="euroRadio">Euro</label>
+                <input type="radio" id="euroRadio" name="formSelectorCurrency" value="euroRadio" onChange={handleRadioCurrency} 
+                required />
+                <label htmlFor="euroRadio">Euro</label> <br/>
+
+                <input className='input2' type='number' name='invoiceAmount' id='invoiceAmount'
+                  aria-label='Faturada gözüken meblağı küsürat olmadan giriniz.' min="1" max="100000000" required/> &nbsp; &nbsp;
+                <label htmlFor='invoiceAmount'>Fatura Bedeli</label> <br/>
+
+                <input className='input2' type='number' name='invoiceYear' id='invoiceYear'
+                  aria-label='Fatura yılını 4 rakam olarak giriniz.' min="2000" max="2050" required /> &nbsp; &nbsp;
+                <label htmlFor='invoiceYear'>Fatura Yılı</label> <br/>
+
+                <input className='input2' type='number' name='productionYear' id='productionYear'
+                  aria-label='Araç üretim yılını 4 rakam olarak giriniz.' min="2000" max="2050" required /> &nbsp; &nbsp;
+                <label htmlFor='productionYear'>Araç Üretim Yılı</label> <br/>
+
+                <input className='input2' type='number' name='customsRegYear' id='customsRegYear'
+                  aria-label='Arabayı Türkiyeye kaydedeceğiniz yılı 4 rakam olarak giriniz' min="2000" max="2050" required/> &nbsp; &nbsp;
+                <label htmlFor='customsRegYear'>Arabayı Türkiye'ye kaydedeceğiniz Yıl</label> <br/>
+
+                <input className='input2' type='number' name='engineCapacity' id='engineCapacity'
+                  aria-label='Motor hacmini giriniz.' min="100" max="10000" required/> &nbsp; &nbsp;
+                <label htmlFor='engineCapacity'>Motor Hacmi <i>("1500", "2000"... gibi)</i></label> <br/>
+
+                <input className='input2' type='number' name='navlunAmount' id='navlunAmount'
+                  aria-label='Aşağıdaki tabloya göre Navlun ve Sigorta harcını giriniz.' min="100" max="5000" required/> &nbsp; &nbsp;
+                <label htmlFor='navlunAmount'>"Navlun ve sigorta" harcı (aşağıdaki tabloya göre)</label> <br/> <br/>
+
+                <table className="customsTable">
+                    <tbody>
+                      <tr className="customsRow">
+                        <td>AĞIRLIK(kg)</td>
+                        <td>Avrupa Menşeli</td>
+                        <td>ABD/Uzakdoğu Menşeli</td>
+                        <td>Avrupa'dan gelen Uzakdoğu Menşeli</td>
+                      </tr>
+                      <tr className="customsRow">
+                        <td>0-1200</td>
+                        <td>150 €</td>
+                        <td>650 $</td>
+                        <td>300 $ + 150 €</td>
+                      </tr>
+                      <tr className="customsRow">
+                        <td>1200-1600</td>
+                        <td>200 €</td>
+                        <td>700 $</td>
+                        <td>400 $ + 200 €</td>
+                      </tr>
+                      <tr className="customsRow">
+                        <td>1600 üzeri</td>
+                        <td>230 €</td>
+                        <td>800 $</td>
+                        <td>500 $ + 230 €</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <br/>
+                  <button className='button2' type="submit">Hesapla</button>
+                  <button className='button2' onClick={clearCarForm}>Sil</button>
               </form>
-            </div>
-          )}
-          {selectedForm === 'newCarsRadio' && (
-            <div>
-              <p>Fatura Bedeli kısmına KDV iadesi almışsanız veya KDV ödememişseniz, KDV hariç bedeli yazınız.</p>
-              <p>Detaylı bilgi: 
-                <span className="notesSpan" onClick={()=> navigate("/bedelsiz-arac-ithalati-onemli-notlar")}>Süreç ve 
-                Önemli Notlar</span></p>
-              <form>
-                <input type="radio" id="dollarRadio" name="formSelectorCurrency" value="dollarRadio" onChange={handleRadioCurrency}/>
-                <label htmlFor="dollarRadio">Dolar</label> <br/>
-                <input type="radio" id="euroRadio" name="formSelectorCurrency" value="euroRadio" onChange={handleRadioCurrency}/>
-                <label htmlFor="euroRadio">Euro</label>
-              </form>
+              <br/>
+              <p>{resultArea}</p>
+              <br/>
+              <br/>
+              <br/>
+              <br/>
             </div>
           )}
       </div>
