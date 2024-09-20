@@ -34,7 +34,58 @@ function CustomsGasoline() {
     const customsRegYear2 = formData.get('customsRegYear');
     const engineCapacity2 = formData.get('engineCapacity');
     const navlunAmount2 = formData.get('navlunAmount');
-    setResultArea(currency*2);
+
+    const invoiceAmount3 = Number(invoiceAmount2);
+    const invoiceYear3 = Number(invoiceYear2);
+    const productionYear3 = Number(productionYear2);
+    const customsRegYear3 = Number(customsRegYear2);
+    const engineCapacity3 = Number(engineCapacity2);
+    const navlunAmount3 = Number(navlunAmount2);
+
+    if (invoiceAmount3 == "") {
+      alert("Fatura tarihini sadece sene olarak giriniz: 2022 gibi");
+      return;
+    } else if (invoiceYear3 == "") {
+      alert("Üretim tarihini sadece sene olarak giriniz: 2022 gibi");
+      return;
+    } else if (productionYear3 == "") {
+      alert("Gümrüğe kaydetme tarihini sadece sene olarak giriniz: 2022 gibi");
+      return;
+    } else if (customsRegYear3 == "") {
+      alert("Navlun-sigorta bedelini giriniz.");
+      return;
+    } else if (engineCapacity3 == "") {
+      alert("Fatura'daki KDV hariç fiyatı giriniz.");
+      return;
+    } else if (navlunAmount3 == "") {
+      alert("Motor hacmini giriniz.");
+      return;
+    } else if (currency == null) {
+      alert("Para biriminizi Dolar veya Euro seçiniz.");
+      return;
+    };
+
+    var yearDifference = customsRegYear3 - invoiceYear3;
+    if (yearDifference > 6) {
+      yearDifference = 6;
+    } else if (yearDifference < 0) {
+      alert("Gümrüğe kaydetme tarihini veya Fatura tarihini yanlış girdiniz.");
+      return;
+    } else  if (yearDifference == 0) {
+      alert("Bu araçtan vergi indirimi alamazsınız çünkü fatura yılı ve gümrüğe kaydetme yılı aynı")
+    }
+
+    if (selectedForm == "usedCarsRadio") {
+      firstYear = 10*invoiceAmount3/100;
+    } else if(selectedForm == "newCarsRadio") {
+      firstYear = 20*invoiceAmount3/100;
+    }
+    
+    if(invoiceYear3 - productionYear3 >= 1) {
+      alert("Üretim yılı ile fatura yılı arasında fark olan arabalar, yeni olsalar bile, vergileri ikinci el gibi hesaplanır.");
+    }
+
+
   }
 
   const clearCarForm = () => {
