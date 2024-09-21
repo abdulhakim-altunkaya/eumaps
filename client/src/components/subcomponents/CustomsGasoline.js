@@ -8,6 +8,7 @@ function CustomsGasoline() {
   // State to track which radio button is selected
   const [selectedForm, setSelectedForm] = useState(null);
   const [currency, setCurrency] = useState(null);
+  const [currencyName, setCurrencyName] = useState("");
   const [resultArea, setResultArea] = useState("");
 
   const exchangeDollar = 34.04;
@@ -20,8 +21,10 @@ function CustomsGasoline() {
   const handleRadioCurrency = (e) => {
     if(e.target.value === "euroRadio") {
       setCurrency(exchangeEuro);
+      setCurrencyName("Euro");
     } else {
       setCurrency(exchangeDollar);
+      setCurrencyName("Dolar");
     }
   }
 
@@ -42,54 +45,105 @@ function CustomsGasoline() {
     const engineCapacity3 = Number(engineCapacity2);
     const navlunAmount3 = Number(navlunAmount2);
 
-    if (invoiceAmount3 == "") {
+    if (invoiceAmount3 === "") {
       alert("Fatura tarihini sadece sene olarak giriniz: 2022 gibi");
       return;
-    } else if (invoiceYear3 == "") {
+    } else if (invoiceYear3 === "") {
       alert("Üretim tarihini sadece sene olarak giriniz: 2022 gibi");
       return;
-    } else if (productionYear3 == "") {
+    } else if (productionYear3 === "") {
       alert("Gümrüğe kaydetme tarihini sadece sene olarak giriniz: 2022 gibi");
       return;
-    } else if (customsRegYear3 == "") {
+    } else if (customsRegYear3 === "") {
       alert("Navlun-sigorta bedelini giriniz.");
       return;
-    } else if (engineCapacity3 == "") {
+    } else if (engineCapacity3 === "") {
       alert("Fatura'daki KDV hariç fiyatı giriniz.");
       return;
-    } else if (navlunAmount3 == "") {
+    } else if (navlunAmount3 === "") {
       alert("Motor hacmini giriniz.");
       return;
-    } else if (currency == null) {
+    } else if (currency === null) {
       alert("Para biriminizi Dolar veya Euro seçiniz.");
       return;
     };
 
-    var yearDifference = customsRegYear3 - invoiceYear3;
+    if (invoiceYear3 - productionYear3 > 3) {
+      alert("Araba satın aldığınız tarihte 3 yaşından büyük olmamalıdır. Bu aracı ithal edemezsiniz.");
+      return;
+    };
+
+    let yearDifference = customsRegYear3 - invoiceYear3;
     if (yearDifference > 6) {
       yearDifference = 6;
     } else if (yearDifference < 0) {
       alert("Gümrüğe kaydetme tarihini veya Fatura tarihini yanlış girdiniz.");
       return;
-    } else  if (yearDifference == 0) {
-      alert("Bu araçtan vergi indirimi alamazsınız çünkü fatura yılı ve gümrüğe kaydetme yılı aynı")
-    }
-
-    if (selectedForm == "usedCarsRadio") {
-      firstYear = 10*invoiceAmount3/100;
-    } else if(selectedForm == "newCarsRadio") {
-      firstYear = 20*invoiceAmount3/100;
+    } else  if (yearDifference === 0) {
+      alert("Bu araçtan vergi indirimi alamazsınız çünkü fatura yılı ve gümrüğe kaydetme yılı aynı");
+      return;
     }
     
-    if(invoiceYear3 - productionYear3 >= 1) {
-      alert("Üretim yılı ile fatura yılı arasında fark olan arabalar, yeni olsalar bile, vergileri ikinci el gibi hesaplanır.");
+    let firstYear;
+    if (selectedForm === "usedCarsRadio") {
+      firstYear = 0;
+    } else if(selectedForm === "newCarsRadio") {
+      if (invoiceYear3 - productionYear3 >= 1) {
+        alert("Üretim ile fatura yılları arasında fark olan araçlar yeni olsalar bile İkinci el araç olarak muamele görürler.");
+        firstYear = 0;
+      } else {
+        firstYear = 10*invoiceAmount3/100;
+      }
+    } else {
+      alert("Aracın eski  veya yeni olup olmadığı tespit edilemedi");
+      return;
     }
 
+    let discount = 10*yearDifference*invoiceAmount3/100;
+    discount = discount + firstYear;
+    const basePrice = invoiceAmount3 - discount;
+    const basePriceLira = basePrice * currency;
+
+    let percentage;
+    if (engineCapacity3<1601 && basePriceLira<184001) {
+      percentage = 45/100;
+    } else if (engineCapacity3<1601 && basePriceLira<220001) {
+      percentage = 50/100;
+    } else if (engineCapacity3<1601 && basePriceLira<250001) {
+      percentage = 60/100;
+    } else if (engineCapacity3<1601 && basePriceLira<280001) {
+      percentage = 70/100;
+    } else if (engineCapacity3<1601 && basePriceLira>280000) {
+      percentage = 80/100;
+    } else if (engineCapacity3<2001 && basePriceLira<170001) {
+      percentage = 130/100;
+    } else if (engineCapacity3<2001 && basePriceLira>170000) {
+      percentage = 150/100;
+    } else if (engineCapacity3>2000) {
+      percentage = 220/100;
+    }
+
+    const amountOTV = Math.round(basePrice*percentage);
+    const amountKDV = Math.round((amountOTV+basePrice)*20/100);
+    const amountNavlun = Math.round(navlunAmount3);
+    const amountSum = amountKDV + amountOTV + amountNavlun;
+
+    setResultArea(
+      <div>
+        <span>ÖTV meblağı: {amountOTV} {currencyName}</span> <br/>
+        <span>KDV meblağı: {amountKDV} {currencyName}</span> <br/>
+        <span>Navlun ve Sigorta harcı: {amountNavlun} {currencyName}</span> <br/>
+        <span>Toplam vergi: <strong>{amountSum} {currencyName}</strong></span> <br/> <br/>
+        <span>Not: Rakamlar tahminidir.</span> <br/>
+      </div>
+    )
 
   }
 
-  const clearCarForm = () => {
-    
+  const clearCarForm = (e) => {
+    e.preventDefault(); // prevent the form from refreshing the page
+    e.target.closest('form').reset();
+    setResultArea('');
   }
 
   return (
