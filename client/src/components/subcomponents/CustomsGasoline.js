@@ -45,23 +45,23 @@ function CustomsGasoline() {
     const engineCapacity3 = Number(engineCapacity2);
     const navlunAmount3 = Number(navlunAmount2);
 
-    if (invoiceAmount3 === "") {
-      alert("Fatura tarihini sadece sene olarak giriniz: 2022 gibi");
+    if (invoiceAmount3 === "" || invoiceAmount3 < 100 || invoiceAmount3 > 10000000) {
+      alert("Geçersiz meblağ. Fatura'daki KDV hariç fiyatı giriniz.");
       return;
-    } else if (invoiceYear3 === "") {
-      alert("Üretim tarihini sadece sene olarak giriniz: 2022 gibi");
+    } else if (invoiceYear3 === "" || invoiceYear3 < 2000 || invoiceYear3 > 2050) {
+      alert("Geçersiz fatura yılı. Fatura tarihini sadece sene olarak giriniz: 2022 gibi");
       return;
-    } else if (productionYear3 === "") {
-      alert("Gümrüğe kaydetme tarihini sadece sene olarak giriniz: 2022 gibi");
+    } else if (productionYear3 === "" || productionYear3 < 2000 || productionYear3 > 2050) {
+      alert("Geçersiz imalat yılı. Arabanın üretim yılını giriniz: 2022 gibi");
       return;
-    } else if (customsRegYear3 === "") {
-      alert("Navlun-sigorta bedelini giriniz.");
+    } else if (customsRegYear3 === "" || customsRegYear3 < 2000 || customsRegYear3 > 2050) {
+      alert("Gümrüğe kaydetme tarihi geçersiz.Gümrüğe kaydetme tarihini sadece sene olarak giriniz: 2022 gibi");
       return;
-    } else if (engineCapacity3 === "") {
-      alert("Fatura'daki KDV hariç fiyatı giriniz.");
+    } else if (engineCapacity3 === "" || engineCapacity3 < 100 || engineCapacity3 > 10000) {
+      alert("Geçersiz motor gücü. Aracın motor gücünü sadece rakam olarak giriniz.");
       return;
-    } else if (navlunAmount3 === "") {
-      alert("Motor hacmini giriniz.");
+    } else if (navlunAmount3 === "" || navlunAmount3 < 1 || navlunAmount3 > 10000) {
+      alert("Geçersiz navlun bedeli. Navlun-Sigorta bedelini giriniz");
       return;
     } else if (currency === null) {
       alert("Para biriminizi Dolar veya Euro seçiniz.");
@@ -191,23 +191,23 @@ function CustomsGasoline() {
                 <label htmlFor="euroRadio">Euro</label> <br/>
 
                 <input className='input2' type='number' name='invoiceAmount' id='invoiceAmount'
-                  aria-label='Faturada gözüken meblağı küsürat olmadan giriniz.' min="1" max="100000000" required/> &nbsp; &nbsp;
+                  aria-label='Faturada gözüken meblağı küsürat olmadan giriniz.' required/> &nbsp; &nbsp;
                 <label htmlFor='invoiceAmount'>Fatura Bedeli</label> <br/>
 
                 <input className='input2' type='number' name='invoiceYear' id='invoiceYear'
-                  aria-label='Fatura yılını 4 rakam olarak giriniz.' min="2000" max="2050" required /> &nbsp; &nbsp;
+                  aria-label='Fatura yılını 4 rakam olarak giriniz.' required /> &nbsp; &nbsp;
                 <label htmlFor='invoiceYear'>Fatura Yılı</label> <br/>
 
                 <input className='input2' type='number' name='productionYear' id='productionYear'
-                  aria-label='Araç üretim yılını 4 rakam olarak giriniz.' min="2000" max="2050" required /> &nbsp; &nbsp;
+                  aria-label='Araç üretim yılını 4 rakam olarak giriniz.' required /> &nbsp; &nbsp;
                 <label htmlFor='productionYear'>Araç Üretim Yılı</label> <br/>
 
                 <input className='input2' type='number' name='customsRegYear' id='customsRegYear'
-                  aria-label='Arabayı Türkiyeye kaydedeceğiniz yılı 4 rakam olarak giriniz' min="2000" max="2050" required/> &nbsp; &nbsp;
+                  aria-label='Arabayı Türkiyeye kaydedeceğiniz yılı 4 rakam olarak giriniz' required/> &nbsp; &nbsp;
                 <label htmlFor='customsRegYear'>Arabayı Türkiye'ye kaydedeceğiniz Yıl</label> <br/>
 
                 <input className='input2' type='number' name='engineCapacity' id='engineCapacity'
-                  aria-label='Motor hacmini giriniz.' min="100" max="10000" required/> &nbsp; &nbsp;
+                  aria-label='Motor hacmini giriniz.' required/> &nbsp; &nbsp;
                 <label htmlFor='engineCapacity'>Motor Hacmi <i>("1500", "2000"... gibi)</i></label> <br/>
 
                 <input className='input2' type='number' name='navlunAmount' id='navlunAmount'
