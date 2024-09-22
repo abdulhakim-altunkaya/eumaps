@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import "../../styles/car.css"; 
+import "../../styles/CheckboxForm.css"; // External CSS file for styling
 
 function CustomsHybridPlugin() {
   const navigate = useNavigate();
@@ -28,8 +29,21 @@ function CustomsHybridPlugin() {
     }
   }
 
+  // Manage checkbox state. Defaul false means it is unchecked
+  const [isChecked, setIsChecked] = useState(false);
+  // Handle the checkbox change event
+  const handleCheckboxChange = (event) => {
+    setIsChecked(event.target.checked);
+  };
+
   const calculateTax = (e) => {
     e.preventDefault(); // prevent form from refreshing page
+    
+    if (isChecked === false) {
+      alert("CO2 emisyonu 25 gramdan az ve elektrik menzili 70 km'den çok olmayan araçlar Plug-In olarak ithal edilemez");
+      return;
+    }
+    
     const formData = new FormData(e.target);
     const invoiceAmount2 = formData.get('invoiceAmount');
     const invoiceYear2 = formData.get('invoiceYear');
@@ -185,7 +199,12 @@ function CustomsHybridPlugin() {
                 
                 <input type="radio" id="euroRadio" name="formSelectorCurrency" value="euroRadio" onChange={handleRadioCurrency} 
                 required />
-                <label htmlFor="euroRadio">Euro</label> <br/>
+                <label htmlFor="euroRadio">Euro</label> <br/><br/>
+
+                <div class="checkbox-wrapper-13">
+                <input type="checkbox" checked={isChecked} onChange={handleCheckboxChange} />
+                <label >Aracın CO2 emisyonu 25 gramdan az ve elektrik menzili 70 km'den çoktur.</label> <br/>
+                </div>
 
                 <input className='input2' type='number' name='invoiceAmount' id='invoiceAmount'
                   aria-label='Faturada gözüken meblağı küsürat olmadan giriniz.' required/> &nbsp; &nbsp;
