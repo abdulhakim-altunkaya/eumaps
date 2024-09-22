@@ -16,6 +16,7 @@ function Customs() {
         <button className='button2' onClick={()=>navigate("/benzin-dizel-arac-gumruk-vergi-hesaplama")}>Benzin/Dizel</button>
         <button className='button2' onClick={()=>navigate("/elektrikli-arac-gumruk-vergi-hesaplama")}>Elektrik</button>
         <button className='button2' onClick={()=>navigate("/hibrit-arac-gumruk-vergi-hesaplama")}>Hibrit</button>
+        <button className='button2' onClick={()=>navigate("/plug-in-hibrit-arac-gumruk-vergi-hesaplama")}>Plug-In Hibrit</button>
       </div>
     </div>
   );

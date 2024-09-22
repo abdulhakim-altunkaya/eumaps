@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import "../../styles/car.css"; 
 
-function CustomsHybrid() {
+function CustomsHybridPlugin() {
   const navigate = useNavigate();
 
   // State to track which radio button is selected
@@ -35,7 +35,6 @@ function CustomsHybrid() {
     const invoiceYear2 = formData.get('invoiceYear');
     const productionYear2 = formData.get('productionYear');
     const customsRegYear2 = formData.get('customsRegYear');
-    const engineCapacityElectric2 = formData.get('engineCapacityElectric');
     const engineCapacityOil2 = formData.get('engineCapacityOil');
     const navlunAmount2 = formData.get('navlunAmount');
 
@@ -43,7 +42,6 @@ function CustomsHybrid() {
     const invoiceYear3 = Number(invoiceYear2);
     const productionYear3 = Number(productionYear2);
     const customsRegYear3 = Number(customsRegYear2);
-    const engineCapacityElectric3 = Number(engineCapacityElectric2);
     const engineCapacityOil3 = Number(engineCapacityOil2);
     const navlunAmount3 = Number(navlunAmount2);
 
@@ -61,9 +59,6 @@ function CustomsHybrid() {
       return;
     } else if (engineCapacityOil3 === "" || engineCapacityOil3 < 10 || engineCapacityOil3 > 10000) {
       alert("Geçersiz motor gücü. Aracın motor gücünü sadece rakam olarak giriniz.");
-      return;
-    } else if (engineCapacityElectric3 === "" || engineCapacityElectric3 < 10 || engineCapacityElectric3 > 10000) {
-      alert("Geçersiz KW gücü. Aracın KW gücünü sadece rakam olarak giriniz.");
       return;
     } else if (navlunAmount3 === "" || navlunAmount3 < 1 || navlunAmount3 > 10000) {
       alert("Geçersiz navlun bedeli. Navlun-Sigorta bedelini giriniz");
@@ -110,17 +105,14 @@ function CustomsHybrid() {
     const basePriceLira = basePrice * currency;
 
     let percentage;
-    if (engineCapacityElectric3>50 && engineCapacityOil3<1801 && basePriceLira<228001) {
-      percentage = 45/100;
-    } else if (engineCapacityElectric3>50 && engineCapacityOil3<1801 && basePriceLira<350001) {
-      percentage = 50/100;
-    } else if (engineCapacityElectric3>50 && engineCapacityOil3<1801 && basePriceLira>350000) {
-      percentage = 80/100;
-    } else if (engineCapacityElectric3>100 && engineCapacityOil3<2501 && basePriceLira<170001) {
-      percentage = 130/100;
-    } else if (engineCapacityElectric3>100 && engineCapacityOil3<2501 && basePriceLira>170000) {
-      percentage = 150/100;
+    if (engineCapacityOil3<1601 && basePriceLira<1350001) {
+      percentage = 30/100;
+    } else if (engineCapacityOil3<1601 && basePriceLira>1350000) {
+      percentage = 60/100;
+    } else if (engineCapacityOil3<1801 && basePriceLira<1350001) {
+      percentage = 70/100;
     } else {
+      alert("Motor silindir hacmi 1800'ü geçen plug-in hibrit araçların ÖTV matrahı belli değildir. Biz tahminen %220 diyoruz")
       percentage = 220/100;
     }
     
@@ -154,7 +146,7 @@ function CustomsHybrid() {
         BEDELSİZ ARAÇ İTHALATI<br />
         VERGİ HESAPLAMA</h3>
       </div>
-      <h4>HİBRİT ARAÇLAR</h4>
+      <h4>PLUG-IN HİBRİT ARAÇLAR</h4>
       <div>
         {/* Radio buttons */}
         <div>
@@ -180,6 +172,9 @@ function CustomsHybrid() {
           {(selectedForm === 'newCarsRadio' || selectedForm === 'usedCarsRadio')  && (
             <div>
               <p>Fatura Bedeli kısmına KDV iadesi almışsanız veya KDV ödememişseniz, KDV hariç bedeli yazınız.</p>
+              <p>Bu alanda sadece Plug-In Hibrit ("Şarj Edilebilir") araçlar içindir. Kendi kendini şarj eden Hibrit araçlar içinse
+                "Hibrit Araçlar" düğmesine basın.
+              </p>
               <p>Detaylı bilgi: 
                 <span className="notesSpan" onClick={()=> navigate("/bedelsiz-arac-ithalati-onemli-notlar")}>Süreç ve 
                 Önemli Notlar</span></p>
@@ -208,13 +203,9 @@ function CustomsHybrid() {
                   aria-label='Arabayı Türkiyeye kaydedeceğiniz yılı 4 rakam olarak giriniz' required/> &nbsp; &nbsp;
                 <label htmlFor='customsRegYear'>Arabayı Türkiye'ye kaydedeceğiniz Yıl</label> <br/>
 
-                <input className='input2' type='number' name='engineCapacityElectric' id='engineCapacityElectric'
-                  aria-label='Elektrik Motor hacmini giriniz.' required/> &nbsp; &nbsp;
-                <label htmlFor='engineCapacityElectric'>Elektrik Motor Hacmi <i>("75", "120" gibi)</i></label> <br/>
-
                 <input className='input2' type='number' name='engineCapacityOil' id='engineCapacityOil'
                   aria-label='Benzin/Dizel Motor hacmini giriniz.' required/> &nbsp; &nbsp;
-                <label htmlFor='engineCapacityOil'>Benzin/Dizel Motor Hacmi <i>("900", "1200" gibi)</i></label> <br/>
+                <label htmlFor='engineCapacityOil'>Motor Hacmi <i>("900", "1200" gibi)</i></label> <br/>
 
                 <input className='input2' type='number' name='navlunAmount' id='navlunAmount'
                   aria-label='Aşağıdaki tabloya göre Navlun ve Sigorta harcını giriniz.' min="100" max="5000" required/> &nbsp; &nbsp;
@@ -267,4 +258,4 @@ function CustomsHybrid() {
   )
 }
 
-export default CustomsHybrid;
+export default CustomsHybridPlugin;
