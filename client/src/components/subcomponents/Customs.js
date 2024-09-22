@@ -3,7 +3,6 @@ import {useNavigate} from "react-router-dom";
 import "../../styles/car.css"; 
 
 function Customs() {
-
   const navigate = useNavigate(); 
 
   return (
@@ -17,7 +16,6 @@ function Customs() {
         <button className='button2' onClick={()=>navigate("/benzin-dizel-arac-gumruk-vergi-hesaplama")}>Benzin/Dizel</button>
         <button className='button2' onClick={()=>navigate("/elektrikli-arac-gumruk-vergi-hesaplama")}>Elektrik</button>
         <button className='button2' onClick={()=>navigate("/hibrit-arac-gumruk-vergi-hesaplama")}>Hibrit</button>
-        
       </div>
     </div>
   );
