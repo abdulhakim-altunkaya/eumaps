@@ -28,8 +28,8 @@ function SidebarNav() {
       {
         mfaCalculatorsToggle && (
           <>
-            <div className='sidebarSideButtons'onClick={() => navigate("/arac-gumruk-vergi-hesaplama")}>Araç Gümrük Vergi Hesaplama</div>
-            <div className='sidebarSideButtons'>Motorsiklet Gümrük Vergi Hesaplama</div>
+            <div className='sidebarSideButtons' onClick={() => navigate("/arac-gumruk-vergi-hesaplama")}>Araç Gümrük Vergi Hesaplama</div>
+            <div className='sidebarSideButtons' onClick={() => navigate("/motorsiklet-gumruk-vergi-hesaplama")}>Motorsiklet Gümrük Vergi Hesaplama</div>
             <div className='sidebarSideButtons' onClick={() => navigate("/kira-yardimi-hesaplama")}>Kira Yardımı Hesaplama</div>
           </>
         )

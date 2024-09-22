@@ -191,7 +191,7 @@ function CustomsElectric() {
 
                 <input className='input2' type='number' name='productionYear' id='productionYear'
                   aria-label='Araç üretim yılını 4 rakam olarak giriniz.' required /> &nbsp; &nbsp;
-                <label htmlFor='productionYear'>Araç Üretim Yılı</label> <br/>
+                <label htmlFor='productionYear'>Üretim Yılı</label> <br/>
 
                 <input className='input2' type='number' name='customsRegYear' id='customsRegYear'
                   aria-label='Arabayı Türkiyeye kaydedeceğiniz yılı 4 rakam olarak giriniz' required/> &nbsp; &nbsp;

@@ -8,6 +8,7 @@ import CustomsElectric from "./subcomponents/CustomsElectric";
 import CustomsHybrid from "./subcomponents/CustomsHybrid";
 import CustomsGasoline from "./subcomponents/CustomsGasoline";
 import CustomsHybridPlugin from "./subcomponents/CustomsHybridPlugin";
+import CustomsBike from "./subcomponents/CustomsBike";
 import CustomsNotes from "./subcomponents/CustomsNotes";
 import IndexComp from "./subcomponents/IndexComp";
 
@@ -24,6 +25,7 @@ function MainArea() {
         <Route path="/hibrit-arac-gumruk-vergi-hesaplama" element={<CustomsHybrid/>} />
         <Route path="/elektrikli-arac-gumruk-vergi-hesaplama" element={<CustomsElectric/>} />
         <Route path="/plug-in-hibrit-arac-gumruk-vergi-hesaplama" element={<CustomsHybridPlugin/>} />
+        <Route path="/motorsiklet-gumruk-vergi-hesaplama" element={<CustomsBike/>} />
         <Route path="/bedelsiz-arac-ithalati-onemli-notlar" element={<CustomsNotes/>} />
 
         <Route path="/" element={<IndexComp/>} />
