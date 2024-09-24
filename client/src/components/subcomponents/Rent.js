@@ -89,8 +89,8 @@ function Rent() {
         /> &nbsp; &nbsp;
         <label htmlFor='typeCurrency'>Döviz Cinsi</label> <br /><br />
 
-        <button className='button1' type="submit">Hesapla</button>
-        <button className='button1' onClick={clearRentForm}>Sil</button>
+        <button className='button101' type="submit">Hesapla</button>
+        <button className='button101' onClick={clearRentForm}>Sil</button>
       </form>
 
       <div className='resultAreaInvestment' aria-live='polite'>

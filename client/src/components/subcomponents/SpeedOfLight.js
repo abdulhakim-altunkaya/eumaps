@@ -104,8 +104,8 @@ function SpeedOfLight() {
         /> &nbsp; &nbsp;
         <label htmlFor='spaceshipVelocity'>Enter Spaceship velocity (in km/seconds)</label> <br/><br/>
 
-        <button className='button1' type="submit">Calculate</button>
-        <button className='button1' onClick={clearTimeDilationForm}>Clear</button>
+        <button className='button101' type="submit">Calculate</button>
+        <button className='button101' onClick={clearTimeDilationForm}>Clear</button>
       </form>
 
       <div className='resultAreaInvestment' aria-live='polite'>

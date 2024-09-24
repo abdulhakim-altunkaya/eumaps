@@ -12,7 +12,7 @@
 
 /*<button class="button1">COPY ME</button>*/
 @import url('https://fonts.googleapis.com/css2?family=Days+One&display=swap');
-.button1{
+.button101{
     width: 150px;
     height: 55px;
     font-size: 20px;
@@ -26,10 +26,10 @@
     cursor: pointer;
     transition-duration: 0.3s;
 }
-.button1:hover{
+.button101:hover{
     background-color: rgb(171, 3, 3);
 }
-.button1:active {
+.button101:active {
     box-shadow: 0 3px #666;
     transform: translateY(2px);
 }

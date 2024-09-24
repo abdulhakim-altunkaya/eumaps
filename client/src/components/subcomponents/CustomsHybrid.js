@@ -249,8 +249,8 @@ function CustomsHybrid() {
                     </tbody>
                   </table>
                   <br/>
-                  <button className='button2' type="submit">Hesapla</button>
-                  <button className='button2' onClick={clearCarForm}>Sil</button>
+                  <button className='button102' type="submit">Hesapla</button>
+                  <button className='button102' onClick={clearCarForm}>Sil</button>
               </form>
               <br/>
               <p>{resultArea}</p>

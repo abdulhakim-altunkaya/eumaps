@@ -93,8 +93,8 @@ function Investment() {
         /> &nbsp; &nbsp;
         <label htmlFor='invPercentage'>Percentage of return</label> <br /><br />
 
-        <button className='button1' type="submit">Calculate</button>
-        <button className='button1' onClick={clearInvestment}>Clear</button>
+        <button className='button101' type="submit">Calculate</button>
+        <button className='button101' onClick={clearInvestment}>Clear</button>
       </form>
 
       <div className='resultAreaInvestment' aria-live='polite'>
