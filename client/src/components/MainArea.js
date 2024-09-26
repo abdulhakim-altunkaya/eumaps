@@ -10,6 +10,9 @@ import CustomsGasoline from "./subcomponents/CustomsGasoline";
 import CustomsHybridPlugin from "./subcomponents/CustomsHybridPlugin";
 import CustomsBike from "./subcomponents/CustomsBike";
 import CustomsNotes from "./subcomponents/CustomsNotes";
+
+import Weight from "./converters/Weight";
+
 import ButtonsCSS from "./subcomponents/ButtonsCSS";
 import IndexComp from "./subcomponents/IndexComp";
 
@@ -28,6 +31,8 @@ function MainArea() {
         <Route path="/plug-in-hibrit-arac-gumruk-vergi-hesaplama" element={<CustomsHybridPlugin/>} />
         <Route path="/motorsiklet-gumruk-vergi-hesaplama" element={<CustomsBike/>} />
         <Route path="/bedelsiz-arac-ithalati-onemli-notlar" element={<CustomsNotes/>} />
+
+        <Route path="/weight-unit-converter" element={<Weight/>} />
 
         <Route path="/free-css-buttons" element={<ButtonsCSS/>} />
 
