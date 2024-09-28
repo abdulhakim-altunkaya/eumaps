@@ -43,7 +43,7 @@ function SidebarNav() {
           <>
             <div className='sidebarSideButtons' onClick={() => navigate("/weight-units-converter")}>Weight Converter</div>
             <div className='sidebarSideButtons' onClick={() => navigate("/length-units-converter")}>Length Converter</div>
-            <div className='sidebarSideButtons'>Temperature Converter</div>
+            <div className='sidebarSideButtons' onClick={() => navigate("/temperature-units-converter")}>Temperature Converter</div>
             <div className='sidebarSideButtons'>Area Converter</div>
             <div className='sidebarSideButtons'>Volume Converter</div>
             <div className='sidebarSideButtons'>Time Converter</div>

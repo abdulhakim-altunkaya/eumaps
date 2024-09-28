@@ -13,6 +13,7 @@ import CustomsNotes from "./subcomponents/CustomsNotes";
 
 import Weight from "./converters/Weight";
 import Length from "./converters/Length";
+import Temperature from "./converters/Temperature";
 
 import ButtonsCSS from "./subcomponents/ButtonsCSS";
 import IndexComp from "./subcomponents/IndexComp";
@@ -35,6 +36,7 @@ function MainArea() {
 
         <Route path="/weight-units-converter" element={<Weight/>} />
         <Route path="/length-units-converter" element={<Length/>} />
+        <Route path="/temperature-units-converter" element={<Temperature/>} />
 
         <Route path="/free-css-buttons" element={<ButtonsCSS/>} />
 

@@ -1,10 +1,15 @@
 .convertersMainArea {
     margin-left: 12px;
-    background-color: #ffc6aa;
+    /* background-color: #ffc6aa; */
+    /* background-color: #EFD469;  */
     padding: 20px;
     width: auto;
     max-width: 400px; /* Add a maximum width for the container */
     border-radius: 10px; /* Optional: round the corners */
+}
+
+.convertersMainArea h4{
+    font-family: "Monda";
 }
 
 /* Input field styles */
@@ -13,7 +18,9 @@
     width: 130px;
     height: 20px;
     padding: 5px;
-    box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.2); /* Adds the shade to the right */
+    box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2), 4px 4px 10px rgba(0, 0, 0, 0.2); /* Thicker shadow on the right side */
+
+    /* box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.2); /* Adds the shade to the right */
     border: 1px solid #ccc; /* Optional: Border to better see the input field */
     border-radius: 5px;
     transition: box-shadow 0.3s ease-in-out; /* Smooth transition on focus */
