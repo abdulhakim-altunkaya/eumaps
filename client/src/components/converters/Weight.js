@@ -176,9 +176,24 @@ function Weight() {
             });
         }
     };
-    
-    
 
+    // Function to clear all fields
+    const handleClearFields = () => {
+      setValues({
+          milligram: '',
+          gram: '',
+          kilogram: '',
+          ton: '',
+          megaton: '',
+          gigaton: '',
+          uston: '',
+          pound: '',
+          ounce: '',
+          carat: '',
+      });
+    };
+    
+  
   return (
     <div className='convertersMainArea'>
         <h4>WEIGHT UNITS CONVERTER</h4>
@@ -203,6 +218,7 @@ function Weight() {
                 name='ounce' onChange={handleChangeWeightUnits} /> <label>Ounce-oz.</label> <br/>
             <input type='number' className='input101' value={values.carat} 
                 name='carat' onChange={handleChangeWeightUnits} /> <label>Carat</label>
+            <button className='button201' onClick={handleClearFields}>Clear</button>
         </div>
     </div>
   )

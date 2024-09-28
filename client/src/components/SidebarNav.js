@@ -41,8 +41,8 @@ function SidebarNav() {
       {
         converterToggle && (
           <>
-            <div className='sidebarSideButtons' onClick={() => navigate("/weight-unit-converter")}>Weight Converter</div>
-            <div className='sidebarSideButtons'>Length Converter</div>
+            <div className='sidebarSideButtons' onClick={() => navigate("/weight-units-converter")}>Weight Converter</div>
+            <div className='sidebarSideButtons' onClick={() => navigate("/length-units-converter")}>Length Converter</div>
             <div className='sidebarSideButtons'>Temperature Converter</div>
             <div className='sidebarSideButtons'>Area Converter</div>
             <div className='sidebarSideButtons'>Volume Converter</div>

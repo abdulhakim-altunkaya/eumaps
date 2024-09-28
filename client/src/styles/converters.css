@@ -1,7 +1,11 @@
 .convertersMainArea {
     margin-left: 12px;
+    background-color: #ffc6aa;
+    padding: 20px;
+    width: auto;
+    max-width: 400px; /* Add a maximum width for the container */
+    border-radius: 10px; /* Optional: round the corners */
 }
-
 
 /* Input field styles */
 .input101 {
@@ -16,11 +20,27 @@
 }
 
 .input101:focus {
-    background-color: lightsalmon;
+    background-color: #a5f1a5;
     color: black;
     box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.3); /* Increases shadow on focus */
 }
+/* Input field styles */
+.input103 {
+    margin-top: 6px;
+    width: 130px;
+    height: 20px;
+    padding: 5px;
+    box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.2); /* Adds the shade to the right */
+    border: 1px solid #ccc; /* Optional: Border to better see the input field */
+    border-radius: 5px;
+    transition: box-shadow 0.3s ease-in-out; /* Smooth transition on focus */
+}
 
+.input103:focus {
+    background-color: #a5f1a5;
+    color: black;
+    box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.3); /* Increases shadow on focus */
+}
 /* Remove spin buttons for number input fields */
 input::-webkit-outer-spin-button,
 input::-webkit-inner-spin-button {
@@ -43,4 +63,19 @@ input[type=number] {
 .convertersMainArea label  {
     margin-left: 12px;
     margin-top: 12px;
+}
+
+
+.button201 {
+    font-family: "Lobster";
+    font-size: 20px;
+    width: 40%;
+    background: #3960e1;
+    border-radius: 4px;
+    color: white;
+    user-select: none;
+    cursor: pointer;
+}
+.button201 {
+    margin-left: 12px;
 }

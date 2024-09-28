@@ -12,6 +12,7 @@ import CustomsBike from "./subcomponents/CustomsBike";
 import CustomsNotes from "./subcomponents/CustomsNotes";
 
 import Weight from "./converters/Weight";
+import Length from "./converters/Length";
 
 import ButtonsCSS from "./subcomponents/ButtonsCSS";
 import IndexComp from "./subcomponents/IndexComp";
@@ -32,7 +33,8 @@ function MainArea() {
         <Route path="/motorsiklet-gumruk-vergi-hesaplama" element={<CustomsBike/>} />
         <Route path="/bedelsiz-arac-ithalati-onemli-notlar" element={<CustomsNotes/>} />
 
-        <Route path="/weight-unit-converter" element={<Weight/>} />
+        <Route path="/weight-units-converter" element={<Weight/>} />
+        <Route path="/length-units-converter" element={<Length/>} />
 
         <Route path="/free-css-buttons" element={<ButtonsCSS/>} />
 
