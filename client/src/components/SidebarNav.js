@@ -46,7 +46,7 @@ function SidebarNav() {
             <div className='sidebarSideButtons' onClick={() => navigate("/temperature-units-converter")}>Temperature Converter</div>
             <div className='sidebarSideButtons' onClick={() => navigate("/area-units-converter")}>Area Converter</div>
             <div className='sidebarSideButtons' onClick={() => navigate("/volume-units-converter")}>Volume Converter</div>
-            <div className='sidebarSideButtons'>Time Converter</div>
+            <div className='sidebarSideButtons' onClick={() => navigate("/time-units-converter")}>Time Converter</div>
           </>
         )
       }

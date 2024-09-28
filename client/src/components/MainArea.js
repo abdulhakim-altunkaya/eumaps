@@ -3,6 +3,7 @@ import {Routes, Route} from "react-router-dom";
 import SpeedOfLight from "./subcomponents/SpeedOfLight";
 import Investment from "./subcomponents/Investment";
 import Rent from "./subcomponents/Rent";
+
 import Customs from "./subcomponents/Customs";
 import CustomsElectric from "./subcomponents/CustomsElectric";
 import CustomsHybrid from "./subcomponents/CustomsHybrid";
@@ -16,6 +17,7 @@ import Length from "./converters/Length";
 import Temperature from "./converters/Temperature";
 import Area from "./converters/Area";
 import Volume from "./converters/Volume";
+import Time from "./converters/Time";
 
 import ButtonsCSS from "./subcomponents/ButtonsCSS";
 import IndexComp from "./subcomponents/IndexComp";
@@ -41,6 +43,7 @@ function MainArea() {
         <Route path="/temperature-units-converter" element={<Temperature/>} />
         <Route path="/area-units-converter" element={<Area/>} />
         <Route path="/volume-units-converter" element={<Volume/>} />
+        <Route path="/time-units-converter" element={<Time/>} />
 
         <Route path="/free-css-buttons" element={<ButtonsCSS/>} />
 
