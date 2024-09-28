@@ -20,6 +20,7 @@ import Volume from "./converters/Volume";
 import Time from "./converters/Time";
 
 import Counter from "./wordTools/Counter";
+import WordInsulator from "./wordTools/WordInsulator";
 
 import ButtonsCSS from "./subcomponents/ButtonsCSS";
 import IndexComp from "./subcomponents/IndexComp";
@@ -48,7 +49,7 @@ function MainArea() {
         <Route path="/time-units-converter" element={<Time/>} />
 
         <Route path="/character-and-word-counter" element={<Counter/>} />
-
+        <Route path="/word-insulator" element={<WordInsulator/>} />
         
         <Route path="/free-css-buttons" element={<ButtonsCSS/>} />
 
