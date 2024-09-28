@@ -54,7 +54,7 @@ function SidebarNav() {
       {
         wordToolsToggle && (
           <>
-            <div className='sidebarSideButtons'>Character Counter</div>
+            <div className='sidebarSideButtons' onClick={() => navigate("/character-and-word-counter")}>Character & Word Counter</div>
             <div className='sidebarSideButtons'>Sentence Splitter</div>
             <div className='sidebarSideButtons'>Word Insulator</div>
           </>

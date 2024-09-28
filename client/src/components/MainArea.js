@@ -19,6 +19,8 @@ import Area from "./converters/Area";
 import Volume from "./converters/Volume";
 import Time from "./converters/Time";
 
+import Counter from "./wordTools/Counter";
+
 import ButtonsCSS from "./subcomponents/ButtonsCSS";
 import IndexComp from "./subcomponents/IndexComp";
 
@@ -45,6 +47,9 @@ function MainArea() {
         <Route path="/volume-units-converter" element={<Volume/>} />
         <Route path="/time-units-converter" element={<Time/>} />
 
+        <Route path="/character-and-word-counter" element={<Counter/>} />
+
+        
         <Route path="/free-css-buttons" element={<ButtonsCSS/>} />
 
         <Route path="/" element={<IndexComp/>} />

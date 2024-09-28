@@ -86,3 +86,17 @@ input[type=number] {
 .button201 {
     margin-left: 12px;
 }
+
+.button201 {
+    font-family: "Lobster";
+    font-size: 20px;
+    width: 150px;
+    background: #3960e1;
+    border-radius: 4px;
+    color: white;
+    user-select: none;
+    cursor: pointer;
+}
+.button201 {
+    margin-left: 12px;
+}
