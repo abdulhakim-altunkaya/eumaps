@@ -217,7 +217,7 @@ function Weight() {
             <input type='number' className='input101' value={values.ounce} 
                 name='ounce' onChange={handleChangeWeightUnits} /> <label>Ounce-oz.</label> <br/>
             <input type='number' className='input101' value={values.carat} 
-                name='carat' onChange={handleChangeWeightUnits} /> <label>Carat</label>
+                name='carat' onChange={handleChangeWeightUnits} /> <label>Carat</label> <br/><br/>
             <button className='button201' onClick={handleClearFields}>Clear</button>
         </div>
     </div>
