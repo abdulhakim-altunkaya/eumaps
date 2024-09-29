@@ -32,12 +32,12 @@ app.post("/serversavecomment", async (req, res) => {
 
   let client;
   const newComment = req.body;
-  const {provinceId, name, text, date} = newComment;
+  const {pageId, name, text, date} = newComment;
 
   try {
     client = await pool.connect();
     const result = await client.query(
-      `INSERT INTO comments (provinceid, date, name, comment) values ($1, $2, $3, $4)`, [provinceId, date, name, text]
+      `INSERT INTO eumaps_comments (sectionid, date, name, comment) values ($1, $2, $3, $4)`, [pageId, date, name, text]
     );
     res.status(201).json({message: "Yorum kaydedildi"});
   } catch (error) {

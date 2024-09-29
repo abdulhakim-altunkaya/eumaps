@@ -19,17 +19,14 @@ function Comment({pageId}) {
         if (name && text) {
             const date = new Date().toLocaleDateString('en-GB');
             const newComment = {
+                pageId,
                 name,
                 text,
                 date
             } 
             try {
-                console.log(newComment);
-                console.log(pageId);
-                /*
-                const response = await axios.post("/serversavecomment", newComment)
+                const response = await axios.post("http://localhost:5000/serversavecomment", newComment)
                 alert(response.data.message);
-                */
             } catch (error) {
                 if (error.response && error.response.status === 429) {
                     alert("Yeni yorum için biraz bekleyiniz.");
