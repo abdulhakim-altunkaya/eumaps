@@ -1,4 +1,5 @@
-import React from 'react';
+import React, {useEffect} from 'react';
+import axios from 'axios';
 import {Routes, Route} from "react-router-dom";
 import SpeedOfLight from "./subcomponents/SpeedOfLight";
 import Investment from "./subcomponents/Investment";
@@ -27,6 +28,21 @@ import ButtonsCSS from "./subcomponents/ButtonsCSS";
 import IndexComp from "./subcomponents/IndexComp";
 
 function MainArea() {
+
+  useEffect(() => {
+    const getData = async () => {
+      try {
+        // Send the request to log the visitor data without awaiting its completion
+        axios.post("http://localhost:5000/serversavevisitor", {}).catch((error) => {
+          console.error('Error logging visit:', error.message);
+        });
+      } catch (error) {
+        console.log(error.message);
+      }
+    };
+    getData();
+  }, []);
+
   return (
     <div className='mainArea'>
       <Routes>

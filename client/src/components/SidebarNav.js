@@ -24,7 +24,7 @@ function SidebarNav() {
 
   return (
     <div className='sidebarButtonsArea'>
-      <div onClick={toggleMFACalculators} className='sidebarMainButtons'>MFA &#x25BC;</div>
+      <div onClick={toggleMFACalculators} className='sidebarMainButtons'>Hariciye &#x25BC;</div>
       {
         mfaCalculatorsToggle && (
           <>

@@ -22,7 +22,7 @@ function Comment({pageId}) {
                 name,
                 text,
                 date
-            }
+            } 
             try {
                 console.log(newComment);
                 console.log(pageId);
