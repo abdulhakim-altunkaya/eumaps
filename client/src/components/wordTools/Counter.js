@@ -41,10 +41,9 @@ function Counter() {
       <textarea
         value={text}
         onChange={handleTextChange}
-        rows="20"
-        cols="65"
+        rows="16"
+        cols="50"
         placeholder="Enter your text here..."
-        style={{ display: 'block', marginBottom: '10px' }}
       />
       <button onClick={handleCount} className='button201'>Count</button>
       <button onClick={handleClear} className='button201'>Clear</button>

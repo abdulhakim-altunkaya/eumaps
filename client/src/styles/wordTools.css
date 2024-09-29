@@ -5,6 +5,8 @@
 .wordToolsArea textarea {
     border: 2px #112773 solid;
     border-radius: 5px;
+    display: block;
+    margin-bottom: 10px;
     font-family: "Maven Pro";
     font-size: 16px;
     color: #000;  /* Make the text color black for legibility */

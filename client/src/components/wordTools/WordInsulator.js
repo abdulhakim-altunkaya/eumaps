@@ -27,10 +27,9 @@ function WordInsulator() {
       <textarea
         value={text}
         onChange={handleTextChange}
-        rows="20"
-        cols="65"
+        rows="16"
+        cols="50"
         placeholder="Enter your text here..."
-        style={{ display: 'block', marginBottom: '10px', fontSize: '14px' }}
       />
       <button onClick={handleInsulate} className='button201'>Insulate</button>
       <button onClick={handleClear} className='button201'>Clear</button>

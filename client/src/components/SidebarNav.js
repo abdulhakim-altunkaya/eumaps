@@ -56,7 +56,7 @@ function SidebarNav() {
           <>
             <div className='sidebarSideButtons' onClick={() => navigate("/character-and-word-counter")}>Character & Word Counter</div>
             <div className='sidebarSideButtons' onClick={() => navigate("/word-insulator")}>Word Insulator</div>
-            <div className='sidebarSideButtons'>Word Insulator</div>
+            <div className='sidebarSideButtons' onClick={() => navigate("/sentence-splitter")}>Sentence Splitter</div>
           </>
         )
       }
