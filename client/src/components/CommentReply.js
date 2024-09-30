@@ -1,10 +1,8 @@
 import React, {useState} from 'react';
-import { useParams } from 'react-router-dom';
 import axios from "axios";
 import "../styles/Comment.css";
 
-function CommentReply({commentId2}) {
-    const { provinceId } = useParams();
+function CommentReply({commentId2, pageId3}) {
     const [name, setName] = useState("");
     const [text, setText] = useState("");
     
@@ -21,14 +19,14 @@ function CommentReply({commentId2}) {
         if (name && text) {
             const date = new Date().toLocaleDateString('en-GB');
             const newComment = {
-                provinceId: Number(provinceId), 
+                pageId3: Number(pageId3), 
                 name,
                 text,
                 date,
                 commentId: Number(commentId2)
             }
             try {
-                const response = await axios.post("/serversavecommentreply", newComment)
+                const response = await axios.post("http://localhost:5000/serversavecommentreply", newComment)
                 alert(response.data.message);
             } catch (error) {
                 if (error.response && error.response.status === 429) {

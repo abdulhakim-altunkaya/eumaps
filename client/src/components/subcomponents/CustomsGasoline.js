@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import "../../styles/car.css"; 
+import CommentDisplay from '../CommentDisplay'; 
 
 function CustomsGasoline() {
   const navigate = useNavigate();
@@ -252,6 +253,7 @@ function CustomsGasoline() {
               <br/>
               <br/>
               <br/>
+              <div> <CommentDisplay pageId={4}/></div>
             </div>
           )}
       </div>

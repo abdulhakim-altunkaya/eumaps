@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import "../../styles/car.css"; 
 import "../../styles/CheckboxForm.css"; // External CSS file for styling
+import CommentDisplay from '../CommentDisplay'; 
 
 function CustomsHybridPlugin() {
   const navigate = useNavigate();
@@ -268,6 +269,7 @@ function CustomsHybridPlugin() {
               <br/>
               <br/>
               <br/>
+              <div> <CommentDisplay pageId={6}/></div>
             </div>
           )}
       </div>

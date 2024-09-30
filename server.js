@@ -60,14 +60,13 @@ app.post("/serversavecommentreply", async (req, res) => {
 
   let client;
   const newComment = req.body;
-  const {provinceId, name, text, date, commentId} = newComment;
-  console.log(newComment);
+  const {pageId3, name, text, date, commentId} = newComment;
 
   try {
     client = await pool.connect(); 
     const result = await client.query(
-      `INSERT INTO comments (provinceid, date, name, comment, parent_id) values ($1, $2, $3, $4, $5)`, 
-      [provinceId, date, name, text, commentId]
+      `INSERT INTO eumaps_comments (sectionid, date, name, comment, parent_id) values ($1, $2, $3, $4, $5)`, 
+      [pageId3, date, name, text, commentId]
     );
     res.status(201).json({message: "Cevap kaydedildi"});
   } catch (error) {
@@ -84,13 +83,13 @@ app.get("/servergetcomments/:idpro", async (req, res) => {
   try {
     client = await pool.connect();
     const result = await client.query(
-      `SELECT * FROM comments WHERE provinceid = $1 ORDER BY id DESC`, [idpro]
+      `SELECT * FROM eumaps_comments WHERE sectionid = $1 ORDER BY id DESC`, [idpro]
     );
     const allComments = result.rows;
     res.status(200).json(allComments);
   } catch (error) {
     console.log(error.message);
-    res.status(500).json({message: "Error while saving comment"})
+    res.status(500).json({message: "Error while fetching comments"})
   } finally {
     if(client) client.release();
   }

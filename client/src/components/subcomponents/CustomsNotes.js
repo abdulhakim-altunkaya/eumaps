@@ -1,4 +1,5 @@
-import React from 'react'
+import React from 'react';
+import CommentDisplay from '../CommentDisplay'; 
 
 function CustomsNotes() {
   return (
@@ -11,13 +12,17 @@ function CustomsNotes() {
         Tercümeyi arabayı aldığınız ülkedeki Türkiye elçiliği/konsolosluğundan yaptırınız.<br />
         3. Eğer ödediğiniz KDV'yi geri aldığınıza dair belge sunamazsanız, o vakit Fatura bedelinizden ödediğiniz KDV düşülmeyecek,
         Türkiye'de daha fazla vergi ödeyeceksiniz. Bu durumda fatura bedeline kdv miktarını da ekleyip öyle hesaplayın.<br />
-        4. 6 ay veya 24 ay muhabbeti: Yurtdışında yaşayan vatandaşlar arabalarını Türkiye'de yabancı plakasıyla 24 ay kullanabilirler. Ama dikkat edin,
-        "yurtdışında yaşayanlar" deniliyor. Bu özel izne "Turistik Muafiyet" deniyor. Turistik muafiyetten faydalanan vatandaş, arabasını iki sene sonra
+        4. 6 ay veya 24 ay muhabbeti: Yurtdışında yaşayan vatandaşlar arabalarını Türkiye'de yabancı plakasıyla 24 ay 
+        kullanabilirler. Ama dikkat edin,
+        "yurtdışında yaşayanlar" deniliyor. Bu özel izne "Turistik Muafiyet" deniyor. Turistik muafiyetten faydalanan 
+        vatandaş, arabasını iki sene sonra
         gelip gümrüğe kaydedemez. Kaydetmeye kalkışırsa cezası bulunmakta. Cezanın ne olduğu ve ne kadar olduğunu bilmiyoruz.<br />
-        Yurtdışında yaşarken Türkiye'ye kesin dönüş yapan kişiler ise (Görevleri bitip Türkiyeye kesin dönüş yapan memurlar gibi), altı ay içinde arabalarının
-        gümrük işini bitirmeleri gerekiyor. Altı içinde bitirmezlerse, cezası var. Cezanın ne olduğu ve ne kadar olduğunu bilmiyoruz.<br />
-        Türkiye'ye kesin dönüş yapan vatandaşlar ve memurların pasaportlarına iki senelik turistik muafiyet damgası vurulmuş olsa bile, arabanızı altı
-        ay içinde kaydetmeniz gerekiyor.<br />
+        Yurtdışında yaşarken Türkiye'ye kesin dönüş yapan kişiler ise (Görevleri bitip Türkiyeye kesin dönüş yapan 
+        memurlar gibi), altı ay içinde arabalarının
+        gümrük işini bitirmeleri gerekiyor. Altı içinde bitirmezlerse, cezası var. Cezanın ne olduğu ve ne kadar 
+        olduğunu bilmiyoruz.<br />
+        Türkiye'ye kesin dönüş yapan vatandaşlar ve memurların pasaportlarına iki senelik turistik muafiyet damgası 
+        vurulmuş olsa bile, arabanızı altı ay içinde kaydetmeniz gerekiyor.<br />
         5.Daha ilave bilgi için Ticaret Bakanlığının sitesini ziyaret edebilirsiniz: 
         <a href="https://ticaret.gov.tr/gumruk-islemleri/sikca-sorulan-sorular/bireysel/bedelsiz-nakil-vasitasi-ithali" class="customsNotes_color">Ticaret Bakanlığı</a>
 
@@ -32,16 +37,18 @@ function CustomsNotes() {
         Mobil programı üzerinden hemen yapabilirsiniz. Böylece aynı gün işiniz bitebilir. Aynı gün işiniz bitmezse 
         arabayı bir geceliğine gümrüğe bırakmanız gerekiyor.
         Bu da ekstra iş ve maliyet demek. Gecelik gümrük araba parkının 250 tl civarı ücreti var (2021 fiyatı).<br />
-        7.Araç sigortanızı da götürmelisiniz. Türkiye'ye girdiğiniz sınır kapısında yabancı plakalı araçlara sigorta yapan küçük sigorta dükkanları var.
-        Ordan sigorta yapabilirsiniz. Yada yabancı sigortanızı tercüme ettirerek götürebilirsiniz. Groupama sigortanın bu acentesi yabancı plakalı araçlara
-        sigorta yapıyor: +90530 592 4440.<br />
+        7.Araç sigortanızı da götürmelisiniz. Türkiye'ye girdiğiniz sınır kapısında yabancı plakalı araçlara
+         sigorta yapan küçük sigorta dükkanları var.
+        Ordan sigorta yapabilirsiniz. Yada yabancı sigortanızı tercüme ettirerek götürebilirsiniz. Groupama 
+        sigortanın bu acentesi yabancı plakalı araçlara sigorta yapıyor: +90530 592 4440.<br />
         8.Aracınızı da tabiki götürmeniz gerekiyor. Gümrük muayene memuru aracı kontrol ediyor.
         <h4>SÜREÇ</h4>
         1.Randevu almaya gerek yok. Gümrükçülere gerek yok. İşinizi kendiniz halledebilirsiniz. Gümrükler sabah 8'de 
         açılıyor (2021 Şubat itibariyle).<br />
         2.Gümrük işini 6 ay içinde yapmalısınız. Türkiye'ye girerken pasaportunuza iki yıl süre vurulmuş olsa bile 6 ay 
         içinde gümrük işini yapmalısınız.<br />
-        3.Gümrük işleri bittikten sonra TSE'den araç projenizi hazırlatmanız gerekiyor. Bunun için bir araç proje hazırlayan bir firmayla 
+        3.Gümrük işleri bittikten sonra TSE'den araç projenizi hazırlatmanız gerekiyor. Bunun için bir araç proje 
+        hazırlayan bir firmayla 
         irtibata geçmeniz gerekiyor. Ankara'da bu işi yapan firmalardan bir tanesi: Yeni Anıl 
         Mühendislik (Tel: +905338192209). Telefonla arıyorsunuz onları, herşeyi hallediyorlar. Siz sadece en son TSE Kontrol
         Merkezine gidiyorsunuz. Yaklaşık 500-600 tl (2021 fiyatı) gidiyor.<br />
@@ -54,6 +61,7 @@ function CustomsNotes() {
 
 
       </div>
+      <div> <CommentDisplay pageId={7}/></div>
     </div>
   )
 }

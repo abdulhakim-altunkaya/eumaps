@@ -1,12 +1,10 @@
 import React, {useState, useEffect} from 'react';
-import { useParams } from 'react-router-dom';
 import axios from "axios";
 import "../styles/CommentDisplay.css";
 import Comment from "./Comment";
 import CommentReply from "./CommentReply";
 
-function CommentDisplay() {
-  const { provinceId } = useParams();
+function CommentDisplay({pageId}) {
   const [comments, setComments] = useState([]);
   const [error, setError] = useState("");
   const [isReply, setIsReply] = useState(true);
@@ -17,7 +15,7 @@ function CommentDisplay() {
   useEffect(() => {
     const getComments = async () => {
       try {
-        const response = await axios.get(`/servergetcomments/${provinceId}`);
+        const response = await axios.get(`http://localhost:5000/servergetcomments/${pageId}`);
         const fetchedComments = response.data;
         setComments(fetchedComments);
         const replies = fetchedComments.filter(comment => comment.parent_id !== null);
@@ -28,7 +26,7 @@ function CommentDisplay() {
       } 
     }
     getComments();
-  }, [provinceId]);
+  }, [pageId]);
 
   const replyComment = async (replyId) => {
     setRepliedCommentId(replyId);
@@ -43,7 +41,7 @@ function CommentDisplay() {
     
   return (
     <>
-      { isReply ? <Comment /> : <div></div> }
+      { isReply ? <Comment pageId={pageId} /> : <div></div> }
       <div className="comments-list" aria-label="List of comments">
         {error ? <div aria-live="polite">Error fetching comments: {error}</div> : <></>}
         {comments.filter(comment => comment.parent_id === null).map( (comment, index) => (
@@ -65,7 +63,7 @@ function CommentDisplay() {
                   <button className='replyCommentBtn' aria-label="Reply to comment" onClick={() => replyComment(comment.id)}>Cevapla</button>
                   { isCommentReply ? 
                       repliedCommentId === comment.id ?
-                          <CommentReply commentId2={comment.id} /> 
+                          <CommentReply commentId2={comment.id} pageId3={pageId} /> 
                         :
                           null
                       :

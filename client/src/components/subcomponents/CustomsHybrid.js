@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import "../../styles/car.css"; 
+import CommentDisplay from '../CommentDisplay'; 
 
 function CustomsHybrid() {
   const navigate = useNavigate();
@@ -258,6 +259,7 @@ function CustomsHybrid() {
               <br/>
               <br/>
               <br/>
+              <div> <CommentDisplay pageId={5}/></div>
             </div>
           )}
       </div>

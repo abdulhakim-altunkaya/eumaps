@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import '../../styles/investment.css';
+import CommentDisplay from '../CommentDisplay'; 
 
 function Rent() {
 
@@ -96,6 +97,7 @@ function Rent() {
       <div className='resultAreaInvestment' aria-live='polite'>
         {resultArea}
       </div>
+      <div> <CommentDisplay pageId={8}/></div>
     </div>
   )
 }

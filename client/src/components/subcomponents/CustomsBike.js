@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import "../../styles/car.css"; 
+import CommentDisplay from '../CommentDisplay'; 
 
 function CustomsBike() {
   const navigate = useNavigate();
@@ -97,7 +98,7 @@ function CustomsBike() {
     let discount = 10*yearDifference*invoiceAmount3/100;
     discount = discount + firstYear;
     const basePrice = invoiceAmount3 - discount;
-    const basePriceLira = basePrice * currency;//no need for basePriceLira as percentage is not depending on it
+    //const basePriceLira = basePrice * currency;//no need for basePriceLira as percentage is not depending on it
 
     let percentage;
     if (engineCapacity3<251 ) {
@@ -201,6 +202,7 @@ function CustomsBike() {
               <br/>
               <br/>
               <br/>
+              <div> <CommentDisplay pageId={2}/></div>
             </div>
           )}
       </div>

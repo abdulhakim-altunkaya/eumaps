@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import '../../styles/investment.css';
-import Comment from '../Comment';
+import CommentDisplay from '../CommentDisplay'; 
 import { BlockMath } from 'react-katex';
 import 'katex/dist/katex.min.css'; // Import the KaTeX CSS for proper styling of Einstein formula
 
@@ -111,7 +111,7 @@ function SpeedOfLight() {
       <div className='resultAreaInvestment' aria-live='polite'>
         {resultArea}
       </div>
-      <div> <Comment pageId={2}/> </div>
+      <div> <CommentDisplay pageId={11}/></div>
     </div>
   )
 }

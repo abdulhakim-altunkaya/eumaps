@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import "../../styles/car.css"; 
+import CommentDisplay from '../CommentDisplay'; 
 
 function CustomsElectric() {
   const navigate = useNavigate();
@@ -211,6 +212,7 @@ function CustomsElectric() {
               <br/>
               <br/>
               <br/>
+              <div> <CommentDisplay pageId={3}/></div>
             </div>
           )}
       </div>
