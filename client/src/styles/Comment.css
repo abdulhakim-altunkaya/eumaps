@@ -1,10 +1,10 @@
 .comment-container {
   max-width: 600px;
-  margin: 0 auto;
+  margin-left: 12px;
   padding: 20px;
   border: 1px solid #ddd;
   border-radius: 4px;
-  background-color: #f9f9f9;
+  background-color: #f1ec81;
   margin-bottom: 20px;
 }
 
@@ -41,6 +41,7 @@
 }
 
 .comment-container button[type='submit'] {
+  width: 20%;
   padding: 5px;
   background-color: #28a745;
   color: white;

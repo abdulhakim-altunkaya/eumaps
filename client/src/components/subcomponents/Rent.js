@@ -97,6 +97,7 @@ function Rent() {
       <div className='resultAreaInvestment' aria-live='polite'>
         {resultArea}
       </div>
+      <div> <br/><br/><br/><br/><br/><br/><br/> </div>
       <div> <CommentDisplay pageId={8}/></div>
     </div>
   )

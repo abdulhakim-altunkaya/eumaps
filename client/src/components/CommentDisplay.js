@@ -12,6 +12,14 @@ function CommentDisplay({pageId}) {
   const [isCommentReply, setIsCommentReply] = useState(false);
   const [replies, setReplies] = useState([]);
 
+  const [commentTitle4, setCommentTitle4] = useState("Cevapla");
+
+  useEffect(() => {
+      if (Number(pageId) > 9) {
+          setCommentTitle4("Reply");
+      }
+  }, [pageId])
+
   useEffect(() => {
     const getComments = async () => {
       try {
@@ -42,8 +50,9 @@ function CommentDisplay({pageId}) {
   return (
     <>
       { isReply ? <Comment pageId={pageId} /> : <div></div> }
+      {comments.length > 0 && (
       <div className="comments-list" aria-label="List of comments">
-        {error ? <div aria-live="polite">Error fetching comments: {error}</div> : <></>}
+        {/*error ? <div aria-live="polite">Error fetching comments: {error}</div> : <></>*/}
         {comments.filter(comment => comment.parent_id === null).map( (comment, index) => (
             <div key={index} className="comment-item">
                 <div className="comment-header">
@@ -60,7 +69,7 @@ function CommentDisplay({pageId}) {
                       : 
                         null
                   ))}
-                  <button className='replyCommentBtn' aria-label="Reply to comment" onClick={() => replyComment(comment.id)}>Cevapla</button>
+                  <button className='replyCommentBtn' aria-label={commentTitle4} onClick={() => replyComment(comment.id)}>{commentTitle4}</button>
                   { isCommentReply ? 
                       repliedCommentId === comment.id ?
                           <CommentReply commentId2={comment.id} pageId3={pageId} /> 
@@ -73,6 +82,7 @@ function CommentDisplay({pageId}) {
             </div>
         ))}
       </div>
+      )}
     </>
   )
 }

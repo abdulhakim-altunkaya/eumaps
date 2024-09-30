@@ -61,6 +61,7 @@ function CustomsNotes() {
 
 
       </div>
+      
       <div> <CommentDisplay pageId={7}/></div>
     </div>
   )

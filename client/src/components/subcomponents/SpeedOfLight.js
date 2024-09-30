@@ -111,6 +111,9 @@ function SpeedOfLight() {
       <div className='resultAreaInvestment' aria-live='polite'>
         {resultArea}
       </div>
+
+      <div> <br/><br/><br/><br/><br/><br/><br/> </div>
+
       <div> <CommentDisplay pageId={11}/></div>
     </div>
   )

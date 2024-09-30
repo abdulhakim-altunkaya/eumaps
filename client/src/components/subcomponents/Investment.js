@@ -101,6 +101,7 @@ function Investment() {
       <div className='resultAreaInvestment' aria-live='polite'>
         {resultArea}
       </div>
+      <div> <br/><br/><br/><br/><br/><br/><br/> </div>
       <div> <CommentDisplay pageId={10}/></div>
     </div>
   )

@@ -1,10 +1,25 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import axios from "axios";
 import "../styles/Comment.css";
 
 function Comment({pageId}) {
     const [name, setName] = useState("");
     const [text, setText] = useState("");
+
+    const [commentTitle1, setCommentTitle1] = useState("İsim ve Soyisim");
+    const [commentTitle2, setCommentTitle2] = useState("Yorum");
+    const [commentTitle3, setCommentTitle3] = useState("Kaydet")
+
+    useEffect(() => {
+        if (Number(pageId) > 9) {
+            setCommentTitle1("Name and Surname");
+            setCommentTitle2("Comment");
+            setCommentTitle3("Save");
+        }
+    }, [pageId])
+    
+
+
     
     const handleSubmit = async (e) => {
         if (name.length > 30 || text.length > 300) {
@@ -45,19 +60,19 @@ function Comment({pageId}) {
         <div className="comment-container">
             <form className="comment-form" onSubmit={handleSubmit}> 
                 <div className="form-group">
-                    <label htmlFor='name'>İsim ve Soyisim</label>
-                    <input type='text' id='name' required placeholder='İsim ve Soyisim' maxLength={30} 
-                        value={name}
+                    {/* <label htmlFor='name'>{commentTitle1}</label> */}
+                    <input type='text' id='name' required maxLength={30} 
+                        value={name} placeholder={commentTitle1}
                         onChange={ (e) => setName(e.target.value)} aria-label="İsim ve Soyisim" />
                 </div>
                 <div className="form-group">
-                    <label htmlFor='text'>Yorum</label>
-                    <textarea type='text' id='text' required placeholder='Yorum' maxLength={300}
-                        value={text}
+                    {/* <label htmlFor='text'>{commentTitle2}</label> */}
+                    <textarea type='text' id='text' required maxLength={300}
+                        value={text} placeholder={commentTitle2}
                         onChange={ (e) => setText(e.target.value)} aria-label="Yorum" > 
                     </textarea>
                 </div>
-                <button type='submit' aria-label="Yorumu Kaydet">Kaydet</button>
+                <button type='submit' aria-label={commentTitle3}>{commentTitle3}</button>
             </form>
         </div>
     )
