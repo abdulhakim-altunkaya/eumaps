@@ -249,10 +249,7 @@ function CustomsGasoline() {
               </form>
               <br/>
               <p>{resultArea}</p>
-              <br/>
-              <br/>
-              <br/>
-              <br/>
+              <div> <br/><br/><br/><br/><br/><br/><br/> </div>
               <div> <CommentDisplay pageId={4}/></div>
             </div>
           )}

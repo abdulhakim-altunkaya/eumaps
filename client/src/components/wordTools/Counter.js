@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import "../../styles/wordTools.css"; 
+import CommentDisplay from '../CommentDisplay'; 
 
 function Counter() {
   const [text, setText] = useState("");
@@ -67,6 +68,8 @@ function Counter() {
           </p>
         </div>
       )}
+      <div> <br/><br/><br/><br/><br/><br/><br/> </div>
+      <div> <CommentDisplay pageId={14}/></div>
     </div>
   );
 }

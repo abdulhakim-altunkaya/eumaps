@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 import "../../styles/converters.css"; 
+import CommentDisplay from '../CommentDisplay'; 
 
 function Area() {
 
@@ -313,6 +314,8 @@ function Area() {
                 name='barn' onChange={handleChangeAreaUnits} /> <label>Barn (b)</label> <br/><br/>
             <button className='button201' onClick={handleClearFields}>Clear</button>
         </div>
+        <div> <br/><br/><br/><br/><br/><br/><br/> </div>
+        <div> <CommentDisplay pageId={15}/></div>
     </div>
   )
 }

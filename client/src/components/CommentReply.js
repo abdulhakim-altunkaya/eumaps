@@ -2,19 +2,21 @@ import React, {useState, useEffect} from 'react';
 import axios from "axios";
 import "../styles/Comment.css";
 
-function CommentReply({commentId2, pageId3}) {
+function CommentReply({commentId2, pageId3, cancelReply}) {
     const [name, setName] = useState("");
     const [text, setText] = useState("");
 
     const [commentTitle1, setCommentTitle1] = useState("İsim ve Soyisim");
     const [commentTitle2, setCommentTitle2] = useState("Yorum");
     const [commentTitle3, setCommentTitle3] = useState("Kaydet")
+    const [commentTitle4, setCommentTitle4] = useState("İptal")
 
     useEffect(() => {
         if (Number(pageId3) > 9) {
             setCommentTitle1("Name and Surname");
             setCommentTitle2("Comment");
             setCommentTitle3("Save");
+            setCommentTitle4("Cancel");
         }
     }, [pageId3])
     
@@ -54,23 +56,26 @@ function CommentReply({commentId2, pageId3}) {
             alert("Bütün alanları doldurunuz");
         } 
     }
-    return (
-        <div className="comment-container">
-            <form className="comment-form" onSubmit={handleSubmit}> 
-                <div className="form-group">
-                    <label htmlFor='name'>{commentTitle1}</label>
+
+    return ( 
+        <div className="commentReplyFormContainer">
+            <form className="commentReplyForm" onSubmit={handleSubmit}> 
+                <div className="commentReplyFormParts">
                     <input type='text' id='name' required maxLength={30} 
-                        value={name}
+                        value={name} placeholder={commentTitle1}
                         onChange={ (e) => setName(e.target.value)} aria-label={commentTitle1} />
                 </div>
-                <div className="form-group">
-                    <label htmlFor='text'>{commentTitle2}</label>
+                <div className="commentReplyFormParts">
                     <textarea type='text' id='text' required maxLength={300}
-                        value={text}
+                        value={text} placeholder={commentTitle2}
                         onChange={ (e) => setText(e.target.value)} aria-label={commentTitle2} > 
                     </textarea>
                 </div>
-                <button type='submit' aria-label={commentTitle3}>{commentTitle3}</button>
+                <div className='commentReplyFormButtonsDiv'>
+                    <button type='submit' aria-label={commentTitle3}>{commentTitle3}</button>
+                    <button aria-label={commentTitle3} onClick={cancelReply}>{commentTitle4}</button>
+                </div>
+
             </form>
         </div>
     )

@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 import "../../styles/converters.css"; 
+import CommentDisplay from '../CommentDisplay'; 
 
 function Length() {
 
@@ -458,6 +459,8 @@ function Length() {
                 name='lightYear' onChange={handleChangeLengthUnits} /> <label>Light-year</label> <br/><br/>
             <button className='button201' onClick={handleClearFields}>Clear</button>
         </div>
+        <div> <br/><br/><br/><br/><br/><br/><br/> </div>
+        <div> <CommentDisplay pageId={16}/></div>
     </div>
   )
 }

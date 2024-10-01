@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 import "../../styles/converters.css"; 
+import CommentDisplay from '../CommentDisplay'; 
 
 function Time() {
 
@@ -424,6 +425,8 @@ function Time() {
                 name='fortnight' onChange={handleChangeTimeUnits} /> <label>Fortnight</label> <br/><br/>
             <button className='button201' onClick={handleClearFields}>Clear</button>
         </div>
+        <div> <br/><br/><br/><br/><br/><br/><br/> </div>
+        <div> <CommentDisplay pageId={18}/></div>
     </div>
   )
 }

@@ -208,10 +208,7 @@ function CustomsElectric() {
               </form>
               <br/>
               <p>{resultArea}</p>
-              <br/>
-              <br/>
-              <br/>
-              <br/>
+              <div> <br/><br/><br/><br/><br/><br/><br/> </div>
               <div> <CommentDisplay pageId={3}/></div>
             </div>
           )}

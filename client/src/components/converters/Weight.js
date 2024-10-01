@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 import "../../styles/converters.css"; 
+import CommentDisplay from '../CommentDisplay'; 
 
 function Weight() {
 
@@ -220,6 +221,8 @@ function Weight() {
                 name='carat' onChange={handleChangeWeightUnits} /> <label>Carat</label> <br/><br/>
             <button className='button201' onClick={handleClearFields}>Clear</button>
         </div>
+        <div> <br/><br/><br/><br/><br/><br/><br/> </div>
+        <div> <CommentDisplay pageId={20}/></div>
     </div>
   )
 }

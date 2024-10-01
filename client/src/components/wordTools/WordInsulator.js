@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import "../../styles/wordTools.css"; 
+import CommentDisplay from '../CommentDisplay'; 
 
 function WordInsulator() {
   const [text, setText] = useState("");
@@ -40,6 +41,8 @@ function WordInsulator() {
           <p>{insulatedText}</p>
         </div>
       )}
+      <div> <br/><br/><br/><br/><br/><br/><br/> </div>
+      <div> <CommentDisplay pageId={12}/></div>
     </div>
   );
 }

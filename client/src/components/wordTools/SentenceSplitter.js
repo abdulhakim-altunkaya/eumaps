@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import "../../styles/wordTools.css"; 
+import CommentDisplay from '../CommentDisplay'; 
 
 function SentenceSplitter() {
   const [text, setText] = useState("");
@@ -44,6 +45,8 @@ function SentenceSplitter() {
           </ul>
         </div>
       )}
+      <div> <br/><br/><br/><br/><br/><br/><br/> </div>
+      <div> <CommentDisplay pageId={13}/></div>
     </div>
   );
 }

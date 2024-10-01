@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 import "../../styles/converters.css"; 
+import CommentDisplay from '../CommentDisplay'; 
 
 function Temperature() {
 
@@ -105,6 +106,8 @@ function Temperature() {
                 name='reaumur' onChange={handleChangeTemperatureUnits} /> <label>Réaumur (°Re)</label> <br/><br/>
             <button className='button201' onClick={handleClearFields}>Clear</button>
         </div>
+        <div> <br/><br/><br/><br/><br/><br/><br/> </div>
+        <div> <CommentDisplay pageId={17}/></div>
     </div>
   )
 }
