@@ -4,7 +4,7 @@
     /* background-color: #EFD469;  */
     padding: 20px;
     width: auto;
-    max-width: 400px; /* Add a maximum width for the container */
+    max-width: 600px; /* Add a maximum width for the container */
     border-radius: 10px; /* Optional: round the corners */
 }
 
@@ -99,4 +99,19 @@ input[type=number] {
 }
 .button201 {
     margin-left: 12px;
+}
+
+.inputButtonContainer {
+    display: flex;
+    flex-direction: column;
+}
+.inputButtonContainer input, button{
+    height: 30px !important;
+    padding: 4px !important;
+    font-size: 19px !important;
+}
+.inputButtonContainer button {
+    margin-top: 12px;
+    margin-right: 10px !important;
+    margin-left: 0 !important;
 }

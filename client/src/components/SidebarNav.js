@@ -47,6 +47,7 @@ function SidebarNav() {
             <div className='sidebarSideButtons' onClick={() => navigate("/area-units-converter")}>Area Converter</div>
             <div className='sidebarSideButtons' onClick={() => navigate("/volume-units-converter")}>Volume Converter</div>
             <div className='sidebarSideButtons' onClick={() => navigate("/time-units-converter")}>Time Converter</div>
+            <div className='sidebarSideButtons' onClick={() => navigate("/einstein-mass-energy-converter")}>Einstein Mass-Energy Converter</div>
           </>
         )
       }

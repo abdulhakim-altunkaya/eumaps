@@ -19,6 +19,7 @@ import Temperature from "./converters/Temperature";
 import Area from "./converters/Area";
 import Volume from "./converters/Volume";
 import Time from "./converters/Time";
+import MatterToEnergy from "./converters/MatterToEnergy";
 
 import Counter from "./wordTools/Counter";
 import WordInsulator from "./wordTools/WordInsulator";
@@ -64,6 +65,8 @@ function MainArea() {
         <Route path="/area-units-converter" element={<Area/>} />
         <Route path="/volume-units-converter" element={<Volume/>} />
         <Route path="/time-units-converter" element={<Time/>} />
+        <Route path="/einstein-mass-energy-converter" element={<MatterToEnergy/>} />
+        
 
         <Route path="/character-and-word-counter" element={<Counter/>} />
         <Route path="/word-insulator" element={<WordInsulator/>} />
