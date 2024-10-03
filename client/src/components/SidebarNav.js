@@ -51,13 +51,14 @@ function SidebarNav() {
           </>
         )
       }
-      <div onClick={toggleWordTools} className='sidebarMainButtons'>Word Tools &#9660;</div>
+      <div onClick={toggleWordTools} className='sidebarMainButtons'>Text Tools &#9660;</div>
       {
         wordToolsToggle && (
           <>
             <div className='sidebarSideButtons' onClick={() => navigate("/character-and-word-counter")}>Character & Word Counter</div>
             <div className='sidebarSideButtons' onClick={() => navigate("/word-insulator")}>Word Insulator</div>
             <div className='sidebarSideButtons' onClick={() => navigate("/sentence-splitter")}>Sentence Splitter</div>
+            <div className='sidebarSideButtons' onClick={() => navigate("/schengen-visa-calculator")}>Schengen Visa Calculator</div>
           </>
         )
       }

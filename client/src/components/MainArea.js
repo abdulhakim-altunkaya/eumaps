@@ -24,6 +24,7 @@ import MatterToEnergy from "./converters/MatterToEnergy";
 import Counter from "./wordTools/Counter";
 import WordInsulator from "./wordTools/WordInsulator";
 import SentenceSplitter from "./wordTools/SentenceSplitter";
+import SchengenVisa from "./otherTools/SchengenVisa";
 
 import ButtonsCSS from "./subcomponents/ButtonsCSS";
 import IndexComp from "./subcomponents/IndexComp";
@@ -71,6 +72,7 @@ function MainArea() {
         <Route path="/character-and-word-counter" element={<Counter/>} />
         <Route path="/word-insulator" element={<WordInsulator/>} />
         <Route path="/sentence-splitter" element={<SentenceSplitter/>} />
+        <Route path="/schengen-visa-calculator" element={<SchengenVisa/>} />
 
         <Route path="/free-css-buttons" element={<ButtonsCSS/>} />
 

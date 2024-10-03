@@ -44,7 +44,7 @@ const MatterToEnergy = () => {
 
   return (
     <div className='convertersMainArea'>
-      <h2>Convert Matter to Energy (E = mc²)</h2>
+      <h2>Convert Mass to Energy (E = mc²)</h2>
       <div className='inputButtonContainer'>
         <div>
           <input type="number" className='input2'
