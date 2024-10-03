@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import "../../styles/converters.css"; 
+import "../../styles/car.css"; 
 import CommentDisplay from '../CommentDisplay'; 
 
 const MatterToEnergy = () => {
@@ -45,11 +46,11 @@ const MatterToEnergy = () => {
     <div className='convertersMainArea'>
       <h2>Convert Matter to Energy (E = mc²)</h2>
       <div className='inputButtonContainer'>
-        <input 
-          type="number" className='input101'
-          value={grams} onChange={(e) => setGrams(e.target.value)} 
-          placeholder="Enter mass in grams" 
-        />
+        <div>
+          <input type="number" className='input2'
+            value={grams} onChange={(e) => setGrams(e.target.value)} />
+          <label>Enter Mass in Grams</label>
+        </div>
         <div>
           <button onClick={handleConvert} className='button201'>Convert</button>
           <button onClick={clearFields} className='button201'>Clear</button>
