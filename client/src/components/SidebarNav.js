@@ -11,6 +11,7 @@ function SidebarNav() {
 
   const toggleConverters = () => {
     setConverterToggle(!converterToggle);
+    navigate("/converters-calculators");
   }
 
   const toggleWordTools = () => {

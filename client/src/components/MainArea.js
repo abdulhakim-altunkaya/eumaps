@@ -4,6 +4,7 @@ import {Routes, Route} from "react-router-dom";
 import SpeedOfLight from "./subcomponents/SpeedOfLight";
 import Investment from "./subcomponents/Investment";
 import Rent from "./subcomponents/Rent";
+import ConvertersMain from './ConvertersMain';
 
 import Customs from "./subcomponents/Customs";
 import CustomsElectric from "./subcomponents/CustomsElectric";
@@ -29,6 +30,7 @@ import SchengenVisa from "./otherTools/SchengenVisa";
 import ButtonsCSS from "./subcomponents/ButtonsCSS";
 import IndexComp from "./subcomponents/IndexComp";
 
+
 function MainArea() {
 
   useEffect(() => {
@@ -48,6 +50,8 @@ function MainArea() {
   return (
     <div className='mainArea'>
       <Routes>
+        <Route path="/converters-calculators" element={<ConvertersMain/>} />
+      
         <Route path="/speed-of-light-calculator" element={<SpeedOfLight/>} />
         <Route path="/investment-return-calculator" element={<Investment/>} />
         <Route path="/kira-yardimi-hesaplama" element={<Rent/>} />
