@@ -1,14 +1,14 @@
 .button_plus {
-  position: absolute;
-  width: 35px;
-  height: 35px;
+  position: relative; /* Change from absolute to relative */
+  width: 40px;
+  height: 35px !important;
   background: #fff;
   cursor: pointer;
-  border: 2px solid #095776;
-
-  /* Remove these lines to prevent centering */
-  /* top: 50%; */
-  /* left: 50%; */
+  border: 3px solid #095776;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .button_plus:after {
@@ -42,4 +42,61 @@
 .button_plus:hover {
   background-color: #095776;
   transition: 0.2s;
+}
+
+
+.dateInputAreas {
+  height: 30px;
+  border-radius: 5px;
+  border: 2px solid red;
+}
+
+
+/* Flexbox container for the inputs and button to align them horizontally */
+.flex-container {
+  display: flex;
+  gap: 15px; /* Space between inputs and button */
+}
+.inputAreaContainer2 {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.date-input-wrapper {
+  position: relative; /* Establishes a relative position so the icon can be absolutely positioned inside this container */
+  display: inline-block; /* Ensures the wrapper behaves like an inline element and doesn't take up the full width */
+}
+/* Positioning the custom calendar icon inside the input */
+.custom-calendar-icon {
+  position: absolute; /* Positions the icon absolutely within the .date-input-wrapper */
+  right: 4px; /* Aligns the icon 10px from the right edge of the input */
+  top: 50%; /* Aligns the icon vertically by placing it halfway down the input */
+  transform: translateY(-50%); /* Corrects vertical alignment by pulling the icon up by 50% of its height, centering it vertically */
+  pointer-events: none; /* Ensures the icon doesn't interfere with input field interactions (e.g., clicking or focusing) */
+  width: 25px; /* Sets the width of the icon to 20px */
+  height: 25px; /* Sets the height of the icon to 20px */
+}
+
+
+.resultText1{
+  font-size: 17px;
+}
+
+ul {
+  list-style: none; /* Remove default bullets */
+}
+
+ul li::before {
+  content: "\2022"; /* Unicode for a small bullet • */
+  color: #666; /* Make the bullet a light gray color */
+  font-size: 13px; /* Reduce the bullet size */
+  margin-right: 10px; /* Add some space between the bullet and the text */
+}
+
+.arrowIcon {
+  font-size: 20px; /* Increase the size of the arrow */
+  color: #333; /* Set a subtle dark color */
+  margin: 0 10px; /* Add space around the arrow */
+  transform: translateY(1px); /* Slightly adjust vertical alignment */
 }
