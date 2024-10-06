@@ -56,13 +56,13 @@ const SchengenVisa = () => {
           <div className="date-input-wrapper">
             Entry Date:&nbsp;&nbsp;
             <input type="date" value={entryDate} className='dateInputAreas' onChange={(e) => setEntryDate(e.target.value)} />
-            <img src="/calendar1.png" className="custom-calendar-icon" alt="Calendar Icon" />
+            <img src="/icons/calendar1.png" className="custom-calendar-icon" alt="Calendar Icon" />
           </div>
 
           <div className="date-input-wrapper">
             Exit Date:&nbsp;&nbsp;
             <input type="date" value={exitDate} className='dateInputAreas' onChange={(e) => setExitDate(e.target.value)} />
-            <img src="/calendar1.png" className="custom-calendar-icon" alt="Calendar Icon" />
+            <img src="/icons/calendar1.png" className="custom-calendar-icon" alt="Calendar Icon" />
           </div>
         </div>&nbsp;&nbsp;&nbsp;&nbsp;
         <button onClick={addTrip} className='button_plus'></button>

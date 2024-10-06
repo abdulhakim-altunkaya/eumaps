@@ -16,6 +16,7 @@ function SidebarNav() {
 
   const toggleWordTools = () => {
     setWordToolsToggle(!wordToolsToggle);
+    navigate("/tools");
   }
 
   const toggleMFACalculators = () => {
@@ -38,7 +39,7 @@ function SidebarNav() {
       <div className='sidebarMainButtons' onClick={() => navigate("/speed-of-light-calculator")}>Time Dilation Calculator</div>
       <div className='sidebarMainButtons' onClick={() => navigate("/investment-return-calculator")}>Investment Return Calculator</div>
       <div className='sidebarMainButtons' onClick={() => navigate("/free-css-buttons")}>Free CSS Buttons</div>
-      <div onClick={toggleConverters} className='sidebarMainButtons'>Unit Converters &#x25BC;</div>
+      <div onClick={toggleConverters} className='sidebarMainButtons'>Converters & Calculators &#x25BC;</div>
       {
         converterToggle && (
           <>
@@ -52,7 +53,7 @@ function SidebarNav() {
           </>
         )
       }
-      <div onClick={toggleWordTools} className='sidebarMainButtons'>Text Tools &#9660;</div>
+      <div onClick={toggleWordTools} className='sidebarMainButtons'>Tools &#9660;</div>
       {
         wordToolsToggle && (
           <>

@@ -29,6 +29,7 @@ import SchengenVisa from "./otherTools/SchengenVisa";
 
 import ButtonsCSS from "./subcomponents/ButtonsCSS";
 import IndexComp from "./subcomponents/IndexComp";
+import ToolsMain from './ToolsMain';
 
 
 function MainArea() {
@@ -80,6 +81,7 @@ function MainArea() {
 
         <Route path="/free-css-buttons" element={<ButtonsCSS/>} />
 
+        <Route path="/tools" element={<ToolsMain/>} />
         <Route path="/" element={<IndexComp/>} />
       </Routes>
     </div> 
