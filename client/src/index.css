@@ -62,7 +62,7 @@ html {
     justify-content: center;
     box-shadow: 0px 5px 10px rgba(0, 0, 0, 0.3); /* Bottom border shadow */
   }
-  .sidebarButtonsArea {
+  .sidebarButtonsArea { 
     cursor: pointer;
     background-color: #5bff85;
   }

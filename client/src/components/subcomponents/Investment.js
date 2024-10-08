@@ -24,7 +24,7 @@ function Investment() {
     }
     if (Number(invPercentage2) < 1 || Number(invPercentage2) > 10000 || invPercentage2 === '') {
       alert('Please enter a valid percentage');
-      return;
+      return; 
     }
     if (!Number.isInteger(Number(invAmount2)) || !Number.isInteger(Number(invDuration2)) || !Number.isInteger(Number(invPercentage2))) {
       alert('Please enter a whole number (no decimals allowed).');

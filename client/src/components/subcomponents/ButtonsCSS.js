@@ -15,18 +15,18 @@ function ButtonsCSS() {
         <p>You are welcome to copy and use them but You cannot sell them. You cannot also show them as if it is your design. </p>
         <p>Of course I appreciate credits: "Abdulhakim Luanda, 2024, eumaps.org"</p>
         <div className="allButtonsArea">
-            <button className="button1" onClick={() => styleBtn(1)}>COPY ME</button>
-            <button className="button2" onClick={() => styleBtn(2)}>COPY ME</button>
-            <button className="button3" onClick={() => styleBtn(3)}>COPY ME</button>
-            <button className="button4" onClick={() => styleBtn(4)}>COPY ME</button>
-            <button className="button5" onClick={() => styleBtn(5)}>COPY ME</button>
-            <button className="button6" onClick={() => styleBtn(6)}>COPY ME</button>
-            <button className="button7" onClick={() => styleBtn(7)}>COPY ME</button>
-            <button className="button8" onClick={() => styleBtn(8)}>COPY ME</button>
-            <button className="button8" onClick={() => styleBtn(9)}>COPY INPUT</button>
+            <button className="button1001" onClick={() => styleBtn(1001)}>COPY ME</button>
+            <button className="button2002" onClick={() => styleBtn(2002)}>COPY ME</button>
+            <button className="button3003" onClick={() => styleBtn(3003)}>COPY ME</button>
+            <button className="button4004" onClick={() => styleBtn(4004)}>COPY ME</button>
+            <button className="button5005" onClick={() => styleBtn(5005)}>COPY ME</button>
+            <button className="button6006" onClick={() => styleBtn(6006)}>COPY ME</button>
+            <button className="button7007" onClick={() => styleBtn(7007)}>COPY ME</button>
+            <button className="button8008" onClick={() => styleBtn(8008)}>COPY ME</button>
+            <button className="button8008" onClick={() => styleBtn(9009)}>COPY INPUT</button>
             <input type="number" className="input1" />
-            <button className="button10" onClick={() => styleBtn(10)}>COPY ME</button>
-            <button className="button11" onClick={() => styleBtn(11)}>COPY ME</button>
+            <button className="button1010" onClick={() => styleBtn(1010)}>COPY ME</button>
+            <button className="button1111" onClick={() => styleBtn(1111)}>COPY ME</button>
         </div>
     </div>
   )

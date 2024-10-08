@@ -53,7 +53,7 @@ function MainArea() {
       <Routes>
         <Route path="/converters-calculators" element={<ConvertersMain/>} />
       
-        <Route path="/speed-of-light-calculator" element={<SpeedOfLight/>} />
+        
         <Route path="/investment-return-calculator" element={<Investment/>} />
         <Route path="/kira-yardimi-hesaplama" element={<Rent/>} />
 
@@ -72,6 +72,7 @@ function MainArea() {
         <Route path="/volume-units-converter" element={<Volume/>} />
         <Route path="/time-units-converter" element={<Time/>} />
         <Route path="/einstein-mass-energy-converter" element={<MatterToEnergy/>} />
+        <Route path="/einstein-time-dilation-calculator" element={<SpeedOfLight/>} />
         
 
         <Route path="/character-and-word-counter" element={<Counter/>} />

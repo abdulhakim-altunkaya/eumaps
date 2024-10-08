@@ -36,7 +36,7 @@ function SidebarNav() {
           </>
         )
       }
-      <div className='sidebarMainButtons' onClick={() => navigate("/speed-of-light-calculator")}>Time Dilation Calculator</div>
+      
       <div className='sidebarMainButtons' onClick={() => navigate("/investment-return-calculator")}>Investment Return Calculator</div>
       <div className='sidebarMainButtons' onClick={() => navigate("/free-css-buttons")}>Free CSS Buttons</div>
       <div onClick={toggleConverters} className='sidebarMainButtons'>Converters & Calculators &#x25BC;</div>
@@ -50,6 +50,7 @@ function SidebarNav() {
             <div className='sidebarSideButtons' onClick={() => navigate("/volume-units-converter")}>Volume Converter</div>
             <div className='sidebarSideButtons' onClick={() => navigate("/time-units-converter")}>Time Converter</div>
             <div className='sidebarSideButtons' onClick={() => navigate("/einstein-mass-energy-converter")}>Einstein Mass-Energy Converter</div>
+            <div className='sidebarSideButtons' onClick={() => navigate("/einstein-time-dilation-calculator")}>Einstein Time Dilation Calculator</div>
           </>
         )
       }

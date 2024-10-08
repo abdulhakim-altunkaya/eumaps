@@ -43,6 +43,10 @@ function ConvertersMain() {
                 <span className="converter-name2">Einstein Mass-Energy</span>
                 <span className="icon-wrapper"><img src="/icons/einstein.png" className="unitIcons" alt="Clickable Einstein Mass-Energy Icon"/></span>
             </div>
+            <div className="converter-item" onClick={ () => navigate("/einstein-time-dilation-calculator")}>
+                <span className="converter-name2">Einstein Time Dilation</span>
+                <span className="icon-wrapper"><img src="/icons/dilation.png" className="unitIcons" alt="Clickable Einstein Time Dilation Calculator Icon"/></span>
+            </div>
         </div>
       </div>
     </div>
