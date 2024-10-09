@@ -4,7 +4,7 @@ import CommentDisplay from '../CommentDisplay';
 import { BlockMath } from 'react-katex';
 import 'katex/dist/katex.min.css'; // Import the KaTeX CSS for proper styling of Einstein formula
 
-function SpeedOfLight() {
+function DilationSpeed() {
 
   const [resultArea, setResultArea] = useState('');
 
@@ -119,4 +119,4 @@ function SpeedOfLight() {
   )
 }
 
-export default SpeedOfLight;
+export default DilationSpeed;

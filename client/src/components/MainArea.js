@@ -1,7 +1,7 @@
 import React, {useEffect} from 'react';
 import axios from 'axios';
 import {Routes, Route} from "react-router-dom";
-import SpeedOfLight from "./subcomponents/SpeedOfLight";
+
 import Investment from "./subcomponents/Investment";
 import Rent from "./subcomponents/Rent";
 import ConvertersMain from './ConvertersMain';
@@ -14,13 +14,16 @@ import CustomsHybridPlugin from "./subcomponents/CustomsHybridPlugin";
 import CustomsBike from "./subcomponents/CustomsBike";
 import CustomsNotes from "./subcomponents/CustomsNotes";
 
+import DilationSpeed from "./einstein/DilationSpeed";
+import DilationGravity from './einstein/DilationGravity';
+import MatterToEnergy from "./einstein/MatterToEnergy";
+
 import Weight from "./converters/Weight";
 import Length from "./converters/Length";
 import Temperature from "./converters/Temperature";
 import Area from "./converters/Area";
 import Volume from "./converters/Volume";
 import Time from "./converters/Time";
-import MatterToEnergy from "./converters/MatterToEnergy";
 
 import Counter from "./wordTools/Counter";
 import WordInsulator from "./wordTools/WordInsulator";
@@ -30,6 +33,7 @@ import SchengenVisa from "./otherTools/SchengenVisa";
 import ButtonsCSS from "./subcomponents/ButtonsCSS";
 import IndexComp from "./subcomponents/IndexComp";
 import ToolsMain from './ToolsMain';
+
 
 
 function MainArea() {
@@ -71,9 +75,10 @@ function MainArea() {
         <Route path="/area-units-converter" element={<Area/>} />
         <Route path="/volume-units-converter" element={<Volume/>} />
         <Route path="/time-units-converter" element={<Time/>} />
-        <Route path="/einstein-mass-energy-converter" element={<MatterToEnergy/>} />
-        <Route path="/einstein-time-dilation-calculator" element={<SpeedOfLight/>} />
         
+        <Route path="/einstein-mass-energy-converter" element={<MatterToEnergy/>} />
+        <Route path="/einstein-time-dilation-calculator" element={<DilationSpeed/>} />
+        <Route path="/einstein-gravitational-time-dilation-calculator" element={<DilationGravity/>} />
 
         <Route path="/character-and-word-counter" element={<Counter/>} />
         <Route path="/word-insulator" element={<WordInsulator/>} />

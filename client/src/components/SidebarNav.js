@@ -37,7 +37,6 @@ function SidebarNav() {
         )
       }
       
-      <div className='sidebarMainButtons' onClick={() => navigate("/investment-return-calculator")}>Investment Return Calculator</div>
       <div className='sidebarMainButtons' onClick={() => navigate("/free-css-buttons")}>Free CSS Buttons</div>
       <div onClick={toggleConverters} className='sidebarMainButtons'>Converters & Calculators &#x25BC;</div>
       {
@@ -49,8 +48,12 @@ function SidebarNav() {
             <div className='sidebarSideButtons' onClick={() => navigate("/area-units-converter")}>Area Converter</div>
             <div className='sidebarSideButtons' onClick={() => navigate("/volume-units-converter")}>Volume Converter</div>
             <div className='sidebarSideButtons' onClick={() => navigate("/time-units-converter")}>Time Converter</div>
-            <div className='sidebarSideButtons' onClick={() => navigate("/einstein-mass-energy-converter")}>Einstein Mass-Energy Converter</div>
-            <div className='sidebarSideButtons' onClick={() => navigate("/einstein-time-dilation-calculator")}>Einstein Time Dilation Calculator</div>
+            <div className='sidebarSideButtons' 
+              onClick={() => navigate("/einstein-mass-energy-converter")}>Einstein Mass-Energy Converter</div>
+            <div className='sidebarSideButtons' 
+              onClick={() => navigate("/einstein-time-dilation-calculator")}>Einstein Time Dilation Calculator (Speed)</div>
+            <div className='sidebarSideButtons' 
+              onClick={() => navigate("/einstein-gravitational-time-dilation-calculator")}>Einstein Time Dilation Calculator (Gravity)</div>
           </>
         )
       }
@@ -62,6 +65,7 @@ function SidebarNav() {
             <div className='sidebarSideButtons' onClick={() => navigate("/word-insulator")}>Word Insulator</div>
             <div className='sidebarSideButtons' onClick={() => navigate("/sentence-splitter")}>Sentence Splitter</div>
             <div className='sidebarSideButtons' onClick={() => navigate("/schengen-visa-calculator")}>Schengen Visa Calculator</div>
+            <div className='sidebarSideButtons' onClick={() => navigate("/investment-return-calculator")}>Investment Return Calculator</div>
           </>
         )
       }

@@ -1,10 +1,11 @@
 import React from 'react';
 import {useNavigate} from "react-router-dom";
 import "../styles/ConvertersMain.css"; 
+import Footer from './Footer';
 
 function ConvertersMain() {
   
-  const navigate = useNavigate();
+  const navigate = useNavigate(); 
 
   return (
     <div>
@@ -41,14 +42,34 @@ function ConvertersMain() {
         <div className='convertersIconsMainArea'>
             <div className="converter-item" onClick={ () => navigate("/einstein-mass-energy-converter")}>
                 <span className="converter-name2">Einstein Mass-Energy</span>
-                <span className="icon-wrapper"><img src="/icons/einstein.png" className="unitIcons" alt="Clickable Einstein Mass-Energy Icon"/></span>
+                <span className="icon-wrapper"><img src="/icons/einstein.png" className="unitIcons" 
+                    alt="Clickable Einstein Mass-Energy Icon"/></span>
             </div>
             <div className="converter-item" onClick={ () => navigate("/einstein-time-dilation-calculator")}>
-                <span className="converter-name2">Einstein Time Dilation</span>
-                <span className="icon-wrapper"><img src="/icons/dilation.png" className="unitIcons" alt="Clickable Einstein Time Dilation Calculator Icon"/></span>
+                <span className="converter-name2">Einstein Time Dilation (Speed)</span>
+                <span className="icon-wrapper"><img src="/icons/dilation.png" className="unitIcons" 
+                    alt="Clickable Einstein Speed Based Time Dilation Calculator Icon"/></span>
+            </div>
+            <div className="converter-item" onClick={ () => navigate("/einstein-gravitational-time-dilation-calculator")}>
+                <span className="converter-name2">Einstein Time Dilation (Gravity)</span>
+                <span className="icon-wrapper"><img src="/icons/gravity.png" className="unitIcons" 
+                    alt="Clickable Einstein Gravitational Time Dilation Calculator Icon"/></span>
             </div>
         </div>
       </div>
+      <br/>
+      <br/>
+      <br/>
+      <br/>
+      <br/>
+      <br/>
+      <br/>
+      <br/>
+      <br/>
+      <br/>
+      <br/>
+      <br/>
+      <Footer/>
     </div>
 
   )
