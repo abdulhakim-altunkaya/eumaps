@@ -11,6 +11,7 @@ const MatterToEnergy = () => {
   const energyPerMegatonTNT = 4.18 * Math.pow(10, 15); // Energy in joules for 1 megaton of TNT
   const energyPerKgTNT = 4.184 * Math.pow(10, 6); // Energy in joules for 1 kg of TNT
   const energyPerHiroshimaBomb = 6.276 * Math.pow(10, 13); // Energy in joules for Hiroshima bomb
+  const energyPerTsarBomb = 2.09 * Math.pow(10, 17); // Energy in joules for Tsar bomb
 
   const handleConvert = () => {
     if (grams) {
@@ -24,6 +25,7 @@ const MatterToEnergy = () => {
       const energyMegatonsTNT = energyJoules / energyPerMegatonTNT; // Energy in megatons of TNT
       const energyKgTNT = energyJoules / energyPerKgTNT; // Energy in kilograms of TNT
       const energyHiroshimaBombs = energyJoules / energyPerHiroshimaBomb; // Energy in Hiroshima bombs
+      const energyTsarBombs = energyJoules / energyPerTsarBomb; // Energy in Tsar bombs
 
       setEnergy({
         joules: energyJoules.toFixed(2),
@@ -33,6 +35,7 @@ const MatterToEnergy = () => {
         megatonsTNT: energyMegatonsTNT.toFixed(5),
         kgTNT: energyKgTNT.toFixed(2),
         hiroshimaBombs: energyHiroshimaBombs.toFixed(5),
+        tsarBombs: energyTsarBombs.toFixed(5),
       });
     }
   };
@@ -69,7 +72,8 @@ const MatterToEnergy = () => {
           <p><strong>Energy in Calories:</strong> {energy.calories} cal</p>
           <p><strong>Equivalent in Megatons of TNT:</strong> {energy.megatonsTNT}</p>
           <p><strong>Equivalent in Kilograms of TNT:</strong> {energy.kgTNT}</p>
-          <p><strong>Equivalent in Hiroshima Bombs:</strong> {energy.hiroshimaBombs}</p>
+          <p><strong>Equivalent in Hiroshima Atomic Bombs:</strong> {energy.hiroshimaBombs}</p>
+          <p><strong>Equivalent in Tsar Hydrogen Bombs:</strong> {energy.tsarBombs}</p>
         </div>
       )}
     </div>
