@@ -2,7 +2,7 @@ import React from 'react';
 import {useNavigate} from "react-router-dom";
 import "../styles/ConvertersMain.css"; 
 
-function ToolsMain() {
+function MainTools() {
   
   const navigate = useNavigate();
 
@@ -41,4 +41,4 @@ function ToolsMain() {
   )
 }
 
-export default ToolsMain;
+export default MainTools;

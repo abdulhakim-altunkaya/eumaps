@@ -7,16 +7,22 @@ function SidebarNav() {
 
   const [converterToggle, setConverterToggle] = useState(false);
   const [wordToolsToggle, setWordToolsToggle] = useState(false);
+  const [einsteinToggle, setEinsteinToggle] = useState(false);
   const [mfaCalculatorsToggle, setMfaCalculatorsToggle] = useState(false);
 
   const toggleConverters = () => {
     setConverterToggle(!converterToggle);
-    navigate("/converters-calculators");
+    navigate("/converters");
   }
 
   const toggleWordTools = () => {
     setWordToolsToggle(!wordToolsToggle);
     navigate("/tools");
+  }
+
+  const toggleEinstein = () => {
+    setEinsteinToggle(!einsteinToggle);
+    navigate("/einstein-calculators");
   }
 
   const toggleMFACalculators = () => {
@@ -38,7 +44,7 @@ function SidebarNav() {
       }
       
       <div className='sidebarMainButtons' onClick={() => navigate("/free-css-buttons")}>Free CSS Buttons</div>
-      <div onClick={toggleConverters} className='sidebarMainButtons'>Converters & Calculators &#x25BC;</div>
+      <div onClick={toggleConverters} className='sidebarMainButtons'>Unit Converters&#x25BC;</div>
       {
         converterToggle && (
           <>
@@ -48,12 +54,22 @@ function SidebarNav() {
             <div className='sidebarSideButtons' onClick={() => navigate("/area-units-converter")}>Area Converter</div>
             <div className='sidebarSideButtons' onClick={() => navigate("/volume-units-converter")}>Volume Converter</div>
             <div className='sidebarSideButtons' onClick={() => navigate("/time-units-converter")}>Time Converter</div>
+            
+          </>
+        )
+      }
+      <div onClick={toggleEinstein} className='sidebarMainButtons'>Einstein Calculators &#9660;</div>
+      {
+        einsteinToggle && (
+          <>
             <div className='sidebarSideButtons' 
               onClick={() => navigate("/einstein-mass-energy-converter")}>Einstein Mass-Energy Converter</div>
             <div className='sidebarSideButtons' 
               onClick={() => navigate("/einstein-time-dilation-calculator")}>Einstein Time Dilation Calculator (Speed)</div>
             <div className='sidebarSideButtons' 
               onClick={() => navigate("/einstein-gravitational-time-dilation-calculator")}>Einstein Time Dilation Calculator (Gravity)</div>
+            <div className='sidebarSideButtons' 
+              onClick={() => navigate("/einstein-length-contraction-calculator")}>Einstein Length Contraction Calculator</div>
           </>
         )
       }

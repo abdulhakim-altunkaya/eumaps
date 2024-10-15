@@ -1,9 +1,8 @@
 import React from 'react';
 import {useNavigate} from "react-router-dom";
 import "../styles/ConvertersMain.css"; 
-import Footer from './Footer';
 
-function ConvertersMain() {
+function MainConverters() {
   
   const navigate = useNavigate(); 
 
@@ -39,23 +38,6 @@ function ConvertersMain() {
                 <span className="icon-wrapper"><img src="/icons/time.png" className="unitIcons" alt="Clickable Time Icon"/></span>
             </div>
         </div>
-        <div className='convertersIconsMainArea'>
-            <div className="converter-item" onClick={ () => navigate("/einstein-mass-energy-converter")}>
-                <span className="converter-name2">Einstein Mass-Energy</span>
-                <span className="icon-wrapper"><img src="/icons/einstein.png" className="unitIcons" 
-                    alt="Clickable Einstein Mass-Energy Icon"/></span>
-            </div>
-            <div className="converter-item" onClick={ () => navigate("/einstein-time-dilation-calculator")}>
-                <span className="converter-name2">Einstein Time Dilation (Speed)</span>
-                <span className="icon-wrapper"><img src="/icons/dilation.png" className="unitIcons" 
-                    alt="Clickable Einstein Speed Based Time Dilation Calculator Icon"/></span>
-            </div>
-            <div className="converter-item" onClick={ () => navigate("/einstein-gravitational-time-dilation-calculator")}>
-                <span className="converter-name2">Einstein Time Dilation (Gravity)</span>
-                <span className="icon-wrapper"><img src="/icons/gravity.png" className="unitIcons" 
-                    alt="Clickable Einstein Gravitational Time Dilation Calculator Icon"/></span>
-            </div>
-        </div>
       </div>
       <br/>
       <br/>
@@ -69,10 +51,9 @@ function ConvertersMain() {
       <br/>
       <br/>
       <br/>
-      <Footer/>
     </div>
 
   )
 }
 
-export default ConvertersMain
+export default MainConverters;

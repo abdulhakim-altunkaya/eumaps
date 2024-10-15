@@ -2,9 +2,13 @@ import React, {useEffect} from 'react';
 import axios from 'axios';
 import {Routes, Route} from "react-router-dom";
 
+import MainConverters from './MainConverters';
+import MainTools from './MainTools';
+import MainEinstein from './MainEinstein';
+
 import Investment from "./subcomponents/Investment";
 import Rent from "./subcomponents/Rent";
-import ConvertersMain from './ConvertersMain';
+
 
 import Customs from "./subcomponents/Customs";
 import CustomsElectric from "./subcomponents/CustomsElectric";
@@ -17,6 +21,7 @@ import CustomsNotes from "./subcomponents/CustomsNotes";
 import DilationSpeed from "./einstein/DilationSpeed";
 import DilationGravity from './einstein/DilationGravity';
 import MatterToEnergy from "./einstein/MatterToEnergy";
+import LengthContraction from './einstein/LengthContraction';
 
 import Weight from "./converters/Weight";
 import Length from "./converters/Length";
@@ -32,7 +37,8 @@ import SchengenVisa from "./otherTools/SchengenVisa";
 
 import ButtonsCSS from "./subcomponents/ButtonsCSS";
 import IndexComp from "./subcomponents/IndexComp";
-import ToolsMain from './ToolsMain';
+
+
 
 
 
@@ -55,7 +61,7 @@ function MainArea() {
   return (
     <div className='mainArea'>
       <Routes>
-        <Route path="/converters-calculators" element={<ConvertersMain/>} />
+        
       
         
         <Route path="/investment-return-calculator" element={<Investment/>} />
@@ -79,6 +85,8 @@ function MainArea() {
         <Route path="/einstein-mass-energy-converter" element={<MatterToEnergy/>} />
         <Route path="/einstein-time-dilation-calculator" element={<DilationSpeed/>} />
         <Route path="/einstein-gravitational-time-dilation-calculator" element={<DilationGravity/>} />
+        <Route path="/einstein-length-contraction-calculator" element={<LengthContraction/>} />
+        
 
         <Route path="/character-and-word-counter" element={<Counter/>} />
         <Route path="/word-insulator" element={<WordInsulator/>} />
@@ -87,7 +95,9 @@ function MainArea() {
 
         <Route path="/free-css-buttons" element={<ButtonsCSS/>} />
 
-        <Route path="/tools" element={<ToolsMain/>} />
+        <Route path="/einstein-calculators" element={<MainEinstein/>} />
+        <Route path="/converters" element={<MainConverters/>} />
+        <Route path="/tools" element={<MainTools/>} />
         <Route path="/" element={<IndexComp/>} />
       </Routes>
     </div> 
