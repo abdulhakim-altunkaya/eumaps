@@ -96,3 +96,9 @@ input[type=number] {
     margin-right: 10px !important;
     margin-left: 0 !important;
 }
+
+
+.relativisticKineticMainDiv {
+    padding-right: 100px;
+    line-height: 1.5;
+}
