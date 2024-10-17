@@ -27,8 +27,9 @@ function SidebarNav() {
 
   const toggleMFACalculators = () => {
     setMfaCalculatorsToggle(!mfaCalculatorsToggle);
+    navigate("/hariciye");
   }
-
+ 
 
   return (
     <div className='sidebarButtonsArea'>
@@ -43,7 +44,7 @@ function SidebarNav() {
         )
       }
       
-      <div className='sidebarMainButtons' onClick={() => navigate("/free-css-buttons")}>Free CSS Buttons</div>
+      
       <div onClick={toggleConverters} className='sidebarMainButtons'>Unit Converters&#x25BC;</div>
       {
         converterToggle && (
@@ -84,6 +85,7 @@ function SidebarNav() {
             <div className='sidebarSideButtons' onClick={() => navigate("/sentence-splitter")}>Sentence Splitter</div>
             <div className='sidebarSideButtons' onClick={() => navigate("/schengen-visa-calculator")}>Schengen Visa Calculator</div>
             <div className='sidebarSideButtons' onClick={() => navigate("/investment-return-calculator")}>Investment Return Calculator</div>
+            <div className='sidebarSideButtons' onClick={() => navigate("/free-css-buttons")}>Free CSS Buttons</div>
           </>
         )
       }

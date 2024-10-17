@@ -60,14 +60,17 @@ html {
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0px 5px 10px rgba(0, 0, 0, 0.3); /* Bottom border shadow */
+    box-shadow: 0px 5px 10px rgba(0, 0, 0, 0.3); /* Bottom border shadow   */
   }
   .sidebarButtonsArea { 
     cursor: pointer;
-    background-color: #5bff85;
+    /* background-image: linear-gradient(92.83deg, #3C6478 0,  #f25500  100%); */
+    background-color: #00246B;
   }
   .sidebarMainButtons{
     box-shadow: 0px 0.4px 3px #b0b0b0; /* Bottom border shadow */
+    color: #CADCFC;
+    font-family: "Monda";
   }
   .sidebarMainButtons:hover {
     background-color: #3C6478;
@@ -110,4 +113,8 @@ html {
 
   .customsNotesArea {
     margin-left: 12px;
+  }
+
+  .mainAreasMainComponents {
+    margin-top: 50px;
   }

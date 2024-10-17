@@ -7,7 +7,7 @@ function MainConverters() {
   const navigate = useNavigate(); 
 
   return (
-    <div>
+    <div className='mainAreasMainComponents'>
       <h1 className='convertersMainH1Long'>Converters & Calculators</h1>
       <div className='convertersMain'>
         <div className='convertersIconsMainArea'>          

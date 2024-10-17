@@ -5,6 +5,7 @@ import {Routes, Route} from "react-router-dom";
 import MainConverters from './MainConverters';
 import MainTools from './MainTools';
 import MainEinstein from './MainEinstein';
+import MainHariciye from './MainHariciye';
 
 import Rent from "./hariciye/Rent";
 import Customs from "./hariciye/Customs";
@@ -96,6 +97,7 @@ function MainArea() {
 
         <Route path="/einstein-calculators" element={<MainEinstein/>} />
         <Route path="/converters" element={<MainConverters/>} />
+        <Route path="/hariciye" element={<MainHariciye/>} />
         <Route path="/tools" element={<MainTools/>} />
         <Route path="/" element={<IndexComp/>} />
       </Routes>
