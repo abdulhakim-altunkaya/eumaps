@@ -6,22 +6,20 @@ import MainConverters from './MainConverters';
 import MainTools from './MainTools';
 import MainEinstein from './MainEinstein';
 
-import Investment from "./subcomponents/Investment";
-import Rent from "./subcomponents/Rent";
-
-
-import Customs from "./subcomponents/Customs";
-import CustomsElectric from "./subcomponents/CustomsElectric";
-import CustomsHybrid from "./subcomponents/CustomsHybrid";
-import CustomsGasoline from "./subcomponents/CustomsGasoline";
-import CustomsHybridPlugin from "./subcomponents/CustomsHybridPlugin";
-import CustomsBike from "./subcomponents/CustomsBike";
-import CustomsNotes from "./subcomponents/CustomsNotes";
+import Rent from "./hariciye/Rent";
+import Customs from "./hariciye/Customs";
+import CustomsElectric from "./hariciye/CustomsElectric";
+import CustomsHybrid from "./hariciye/CustomsHybrid";
+import CustomsGasoline from "./hariciye/CustomsGasoline";
+import CustomsHybridPlugin from "./hariciye/CustomsHybridPlugin";
+import CustomsBike from "./hariciye/CustomsBike";
+import CustomsNotes from "./hariciye/CustomsNotes";
 
 import DilationSpeed from "./einstein/DilationSpeed";
 import DilationGravity from './einstein/DilationGravity';
 import MatterToEnergy from "./einstein/MatterToEnergy";
 import LengthContraction from './einstein/LengthContraction';
+import RelativisticKinetic from './einstein/RelativisticKinetic';
 
 import Weight from "./converters/Weight";
 import Length from "./converters/Length";
@@ -30,6 +28,7 @@ import Area from "./converters/Area";
 import Volume from "./converters/Volume";
 import Time from "./converters/Time";
 
+import Investment from "./subcomponents/Investment";
 import Counter from "./wordTools/Counter";
 import WordInsulator from "./wordTools/WordInsulator";
 import SentenceSplitter from "./wordTools/SentenceSplitter";
@@ -86,7 +85,7 @@ function MainArea() {
         <Route path="/einstein-time-dilation-calculator" element={<DilationSpeed/>} />
         <Route path="/einstein-gravitational-time-dilation-calculator" element={<DilationGravity/>} />
         <Route path="/einstein-length-contraction-calculator" element={<LengthContraction/>} />
-        
+        <Route path="/einstein-relativistic-kinetic-energy-calculator" element={<RelativisticKinetic/>} />
 
         <Route path="/character-and-word-counter" element={<Counter/>} />
         <Route path="/word-insulator" element={<WordInsulator/>} />

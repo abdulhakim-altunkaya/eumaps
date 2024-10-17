@@ -63,13 +63,15 @@ function SidebarNav() {
         einsteinToggle && (
           <>
             <div className='sidebarSideButtons' 
-              onClick={() => navigate("/einstein-mass-energy-converter")}>Einstein Mass-Energy Converter</div>
+              onClick={() => navigate("/einstein-mass-energy-converter")}>Mass-Energy Converter</div>
             <div className='sidebarSideButtons' 
-              onClick={() => navigate("/einstein-time-dilation-calculator")}>Einstein Time Dilation Calculator (Speed)</div>
+              onClick={() => navigate("/einstein-time-dilation-calculator")}>Time Dilation Calculator (Speed)</div>
             <div className='sidebarSideButtons' 
-              onClick={() => navigate("/einstein-gravitational-time-dilation-calculator")}>Einstein Time Dilation Calculator (Gravity)</div>
+              onClick={() => navigate("/einstein-gravitational-time-dilation-calculator")}>Time Dilation Calculator (Gravity)</div>
+            <div className='sidebarSideButtons'
+              onClick={() => navigate("/einstein-length-contraction-calculator")}>Length Contraction Calculator</div>
             <div className='sidebarSideButtons' 
-              onClick={() => navigate("/einstein-length-contraction-calculator")}>Einstein Length Contraction Calculator</div>
+              onClick={() => navigate("/einstein-relativistic-kinetic-energy-calculator")}>Relativistic Kinetic Energy Calculator</div>
           </>
         )
       }
