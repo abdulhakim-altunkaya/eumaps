@@ -6,7 +6,7 @@ import 'katex/dist/katex.min.css'; // Import the KaTeX CSS for proper styling of
 
 function LengthContraction() {
 
-  const [resultArea, setResultArea] = useState('');
+  const [resultArea, setResultArea] = useState(<span>Speed of light: 299,792.4580 km/s</span>);
 
   const calculateLengthContraction = (e) => {
     e.preventDefault(); // prevent form from refreshing page
@@ -36,6 +36,9 @@ function LengthContraction() {
     // Constant
     const c = 299792458;   // Speed of light in m/s
 
+    // Calculate the velocity as a ratio of the speed of light
+    const velocityRatio = (v / c).toFixed(20); // Displaying to 5 decimal places
+
     // Calculate the contraction factor
     const factor = Math.sqrt(1 - (Math.pow(v, 2) / Math.pow(c, 2)));
 
@@ -44,13 +47,15 @@ function LengthContraction() {
     }
 
     const contractedLength = L0 * factor;
-    const contractedLength2 = contractedLength.toFixed(3);
+    const contractedLength2 = contractedLength.toFixed(6);
     const contractedLength3 = contractedLength2.toString();
 
     setResultArea(
       <div style={{ textAlign: 'left' }}>
         <span>Rest Length: {L0} meters</span> <br/>
-        <br/>
+        <span>Speed of light: 299,792.4580 km/s</span> <br/>
+        <span>Velocity to speed of light ratio: <strong>{velocityRatio}</strong></span> <br/><br/>
+  
         <span>Observed Length: <strong>{contractedLength3} meters</strong></span> <br/> <br/>
         <span>
           Relativistic Length Contraction Equation (L: observed length, L0: rest length, v: velocity km/s, c: speed of light km/s): 
@@ -90,7 +95,7 @@ function LengthContraction() {
           name='velocity'
           id='velocity'
           aria-label='Enter Velocity in kilometers per second.'
-          min="1"
+          step="any"
           required
         /> &nbsp; &nbsp;
         <label htmlFor='velocity'>Enter Velocity (in km/s)</label> <br/><br/>

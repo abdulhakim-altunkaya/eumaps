@@ -6,7 +6,7 @@ import 'katex/dist/katex.min.css'; // Import the KaTeX CSS for proper styling of
 
 function DilationSpeed() {
 
-  const [resultArea, setResultArea] = useState('');
+  const [resultArea, setResultArea] = useState(<span>Speed of light: 299,792.4580 km/s</span>);
 
   const calculateTimeDilation = (e) => {
     e.preventDefault(); // prevent form from refreshing page
@@ -28,12 +28,9 @@ function DilationSpeed() {
       alert('Invalid amount of time. Enter time in seconds. Do not use comma or dots');
       return;
     }
-    if (!Number.isInteger(spaceshipTime3) || !Number.isInteger(spaceshipVelocity3) ) {
-      alert('Enter a valid number. Do not use commas or dots');
-      return;
-    }
 
-    const speedLight = 299792.45;
+
+    const speedLight = 299792.4580;
     const part1 = Math.pow(speedLight, 2);
     const part2 = Math.pow(spaceshipVelocity3, 2);
     const part3 = part2/part1;
@@ -44,11 +41,15 @@ function DilationSpeed() {
     const side1 = spaceshipVelocity3*100;
     const side2 = side1/speedLight;
     const side3 = part7-spaceshipTime3;
-    const side4 = side3.toFixed(1)
+    const side4 = side3.toFixed(1);
+
+    // Calculate the velocity as a ratio of the speed of light
+    const velocityRatio = (spaceshipVelocity3 / 299792.458).toFixed(20); // Displaying to 20 decimal places
 
     setResultArea(
       <div style={{ textAlign: 'left' }}>
-        <span>Speed of Light: {speedLight}</span> <br/> 
+        <span>Speed of Light: {speedLight}</span> <br/>
+        <span>Velocity to speed of light ratio: <strong>{velocityRatio}</strong></span> <br/><br/>
         <span>Ratio of Spaceship Velocity to Light: {side2}%</span> <br/>
         <span>Time Dilation: {side4} seconds</span> <br/>
         <span>Time passed on Spaceship: <strong>{spaceshipTime3} seconds</strong></span> <br/>
@@ -98,7 +99,7 @@ function DilationSpeed() {
           name='spaceshipVelocity'
           id='spaceshipVelocity'
           aria-label='Enter Spaceship velocity in km per second'
-          min="1"
+          step="any"
           max="100000000000000000000"
           required
         /> &nbsp; &nbsp;

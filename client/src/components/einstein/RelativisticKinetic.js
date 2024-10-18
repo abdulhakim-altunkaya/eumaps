@@ -5,7 +5,7 @@ import { BlockMath } from 'react-katex';
 import 'katex/dist/katex.min.css'; // Import the KaTeX CSS for proper styling of Einstein formula
 
 function RelativisticKinetic() {
-  const [resultArea, setResultArea] = useState('');
+  const [resultArea, setResultArea] = useState(<span>Speed of light: 299,792.4580 km/s</span>);
 
   // Constants for unit conversions
   const JOULES_TO_KWH = 2.77778e-7;
@@ -51,23 +51,28 @@ function RelativisticKinetic() {
     // Calculate the relativistic kinetic energy in joules
     const kineticEnergyJoules = (gamma - 1) * m0 * Math.pow(c, 2); // in joules
 
+    // Calculate the velocity as a ratio of the speed of light
+    const velocityRatio = (v / c).toFixed(20); // Displaying to 5 decimal places
+
     // Convert the energy into different units
     const energy = {
       joules: kineticEnergyJoules.toFixed(2),
       kWh: (kineticEnergyJoules * JOULES_TO_KWH).toFixed(2),
       eV: (kineticEnergyJoules * JOULES_TO_EV).toExponential(2),
       calories: (kineticEnergyJoules * JOULES_TO_CAL).toFixed(2),
-      megatonsTNT: (kineticEnergyJoules * JOULES_TO_MEGATONS_TNT).toFixed(3),
-      kgTNT: (kineticEnergyJoules * JOULES_TO_KG_TNT).toFixed(3),
-      hiroshimaBombs: (kineticEnergyJoules / JOULES_TO_HIROSHIMA).toFixed(3),
-      tsarBombs: (kineticEnergyJoules / JOULES_TO_TSAR_BOMB).toFixed(5),
+      kgTNT: (kineticEnergyJoules * JOULES_TO_KG_TNT).toFixed(2),
+      megatonsTNT: (kineticEnergyJoules * JOULES_TO_MEGATONS_TNT).toFixed(2),
+      hiroshimaBombs: (kineticEnergyJoules / JOULES_TO_HIROSHIMA).toFixed(4),
+      tsarBombs: (kineticEnergyJoules / JOULES_TO_TSAR_BOMB).toFixed(6),
     };
 
     setResultArea(
       <div className='relativisticKineticMainDiv' style={{ textAlign: 'left' }}>
         <span>Rest Mass: {restMassGrams} grams</span> <br/>
         <br/>
-        <span>Velocity: {vKm} km/s</span> <br/><br/>
+        <span>Velocity: {vKm} km/s</span> <br/>
+        <span>Speed of light: 299,792.4580 km/s</span> <br/>
+        <span>Velocity to speed of light ratio: <strong>{velocityRatio}</strong></span> <br/><br/>
         <p><strong>Energy in Joules:</strong> {energy.joules} J</p>
         <p><strong>Energy in Kilowatt-hours:</strong> {energy.kWh} kWh</p>
         <p><strong>Energy in Electronvolts:</strong> {energy.eV} eV</p>
@@ -102,7 +107,7 @@ function RelativisticKinetic() {
           convert into an explosion (heat, shockwaves, seismic waves, etc). Atmospheric drag for objects moving at 
           relativistic speed is negligible. During these type of impacts, rest enegy of the object is not converted into
           explosion, only its kinetic energy is converted to explosion (90%). For impact scenarios where kinetic energy 
-          and rest energy together convert into explosion, the impact should be accompanied by a type of nuclear or 
+          and rest energy together convert into explosion, the impact should be accompanied by a type of nuclear detonation or 
           matter-antimatter annihilation.
         </span>
 
@@ -138,7 +143,7 @@ function RelativisticKinetic() {
           name='velocity'
           id='velocity'
           aria-label='Enter Velocity in kilometers per second.'
-          min="1"
+          step="any"
           required
         /> &nbsp; &nbsp;
         <label htmlFor='velocity'>Enter Velocity (in km/s)</label> <br/><br/>
@@ -146,7 +151,7 @@ function RelativisticKinetic() {
         <button className='button101' type="submit">Calculate</button>
         <button className='button101' onClick={clearKineticEnergyForm}>Clear</button>
       </form>
-
+      
       <div className='resultAreaInvestment' aria-live='polite'>
         {resultArea}
       </div>
