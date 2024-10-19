@@ -24,7 +24,7 @@ function CommentDisplay({pageId}) {
     const getComments = async () => {
       try {
         const response = await axios.get(`/servergetcomments/${pageId}`);
-        const fetchedComments = response.data;
+        const fetchedComments = Array.isArray(response.data) ? response.data : [];
         setComments(fetchedComments);
         const replies = fetchedComments.filter(comment => comment.parent_id !== null);
         setReplies(replies);
