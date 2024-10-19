@@ -5,7 +5,7 @@ const path = require('path');
 const { pool } = require("./db");
 const useragent = require('useragent');
 const cors = require("cors");
-app.use(cors());
+/* app.use(cors()); *///commented out for production deployment
 
 //we need this as we use req.body to send data from frontend to backend
 app.use(express.json());
