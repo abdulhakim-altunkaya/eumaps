@@ -115,7 +115,7 @@ function DilationSpeed() {
 
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
 
-      <div> <CommentDisplay pageId={11}/></div>
+      <div> <CommentDisplay pageId={9}/></div>
     </div>
   )
 }

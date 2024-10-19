@@ -23,7 +23,7 @@ function CommentDisplay({pageId}) {
   useEffect(() => {
     const getComments = async () => {
       try {
-        const response = await axios.get(`http://localhost:5000/servergetcomments/${pageId}`);
+        const response = await axios.get(`/servergetcomments/${pageId}`);
         const fetchedComments = response.data;
         setComments(fetchedComments);
         const replies = fetchedComments.filter(comment => comment.parent_id !== null);
@@ -49,6 +49,7 @@ function CommentDisplay({pageId}) {
 
   const cancelReply = () => {
     setIsCommentReply(false);
+    setIsReply(true);
     setRepliedCommentId(null);
   };
     

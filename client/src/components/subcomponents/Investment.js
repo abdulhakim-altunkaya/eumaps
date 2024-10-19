@@ -102,7 +102,7 @@ function Investment() {
         {resultArea}
       </div>
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
-      <div> <CommentDisplay pageId={10}/></div>
+      <div> <CommentDisplay pageId={20}/></div>
     </div>
   )
 }

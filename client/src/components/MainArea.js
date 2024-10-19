@@ -7,40 +7,37 @@ import MainTools from './MainTools';
 import MainEinstein from './MainEinstein';
 import MainHariciye from './MainHariciye';
 
-import Rent from "./hariciye/Rent";
-import Customs from "./hariciye/Customs";
-import CustomsElectric from "./hariciye/CustomsElectric";
-import CustomsHybrid from "./hariciye/CustomsHybrid";
-import CustomsGasoline from "./hariciye/CustomsGasoline";
-import CustomsHybridPlugin from "./hariciye/CustomsHybridPlugin";
-import CustomsBike from "./hariciye/CustomsBike";
-import CustomsNotes from "./hariciye/CustomsNotes";
+import Rent from "./hariciye/Rent"; //1 These numbers are for comment component, NUMBER 2 is empty for now
+import Customs from "./hariciye/Customs"; 
+import CustomsElectric from "./hariciye/CustomsElectric"; //3
+import CustomsHybrid from "./hariciye/CustomsHybrid"; //4
+import CustomsGasoline from "./hariciye/CustomsGasoline"; //5
+import CustomsHybridPlugin from "./hariciye/CustomsHybridPlugin"; //6
+import CustomsBike from "./hariciye/CustomsBike"; //7
+import CustomsNotes from "./hariciye/CustomsNotes"; //8
 
-import DilationSpeed from "./einstein/DilationSpeed";
-import DilationGravity from './einstein/DilationGravity';
-import MatterToEnergy from "./einstein/MatterToEnergy";
-import LengthContraction from './einstein/LengthContraction';
-import RelativisticKinetic from './einstein/RelativisticKinetic';
+import DilationSpeed from "./einstein/DilationSpeed"; //9
+import DilationGravity from './einstein/DilationGravity'; //10
+import MatterToEnergy from "./einstein/MatterToEnergy"; //11
+import LengthContraction from './einstein/LengthContraction'; //12
+import RelativisticKinetic from './einstein/RelativisticKinetic'; //13
+import RelativisticMass from './einstein/RelativisticMass'; //26***THE LAST COMMENT COMPONENT ID
 
-import Weight from "./converters/Weight";
-import Length from "./converters/Length";
-import Temperature from "./converters/Temperature";
-import Area from "./converters/Area";
-import Volume from "./converters/Volume";
-import Time from "./converters/Time";
+import Weight from "./converters/Weight"; //14
+import Length from "./converters/Length"; //15
+import Temperature from "./converters/Temperature"; //16
+import Area from "./converters/Area"; //17
+import Volume from "./converters/Volume"; //18
+import Time from "./converters/Time"; //19
 
-import Investment from "./subcomponents/Investment";
-import Counter from "./wordTools/Counter";
-import WordInsulator from "./wordTools/WordInsulator";
-import SentenceSplitter from "./wordTools/SentenceSplitter";
-import SchengenVisa from "./otherTools/SchengenVisa";
+import Investment from "./subcomponents/Investment"; //20
+import Counter from "./wordTools/Counter"; //21
+import WordInsulator from "./wordTools/WordInsulator"; //22
+import SentenceSplitter from "./wordTools/SentenceSplitter"; //23
+import SchengenVisa from "./otherTools/SchengenVisa"; //24
+import ButtonsCSS from "./subcomponents/ButtonsCSS"; //25
 
-import ButtonsCSS from "./subcomponents/ButtonsCSS";
 import IndexComp from "./subcomponents/IndexComp";
-
-
-
-
 
 function MainArea() {
 
@@ -48,7 +45,7 @@ function MainArea() {
     const getData = async () => {
       try {
         // Send the request to log the visitor data without awaiting its completion
-        axios.post("http://localhost:5000/serversavevisitor", {}).catch((error) => {
+        axios.post("/serversavevisitor", {}).catch((error) => {
           console.error('Error logging visit:', error.message);
         });
       } catch (error) {
@@ -87,6 +84,7 @@ function MainArea() {
         <Route path="/einstein-gravitational-time-dilation-calculator" element={<DilationGravity/>} />
         <Route path="/einstein-length-contraction-calculator" element={<LengthContraction/>} />
         <Route path="/einstein-relativistic-kinetic-energy-calculator" element={<RelativisticKinetic/>} />
+        <Route path="/einstein-relativistic-mass-calculator" element={<RelativisticMass/>} />
 
         <Route path="/character-and-word-counter" element={<Counter/>} />
         <Route path="/word-insulator" element={<WordInsulator/>} />

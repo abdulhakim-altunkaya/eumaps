@@ -42,7 +42,7 @@ function WordInsulator() {
         </div>
       )}
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
-      <div> <CommentDisplay pageId={12}/></div>
+      <div> <CommentDisplay pageId={22}/></div>
     </div>
   );
 }

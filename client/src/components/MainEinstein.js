@@ -38,6 +38,11 @@ function MainEinstein() {
                 <span className="icon-wrapper"><img src="/icons/kinetic.png" className="unitIcons" 
                     alt="Clickable Einstein Relativistic Kinetic Energy Calculator Icon"/></span>
             </div>
+            <div className="converter-item" onClick={ () => navigate("/einstein-relativistic-mass-calculator")}>
+                <span className="converter-name2">Relativistic Mass</span>
+                <span className="icon-wrapper"><img src="/icons/weight.png" className="unitIcons" 
+                    alt="Clickable Einstein Relativistic Mass Calculator Icon"/></span>
+            </div>
         </div>
       </div>
       <br/>

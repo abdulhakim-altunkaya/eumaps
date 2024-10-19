@@ -199,7 +199,7 @@ function CustomsBike() {
               <br/>
               <p>{resultArea}</p>
               <div> <br/><br/><br/><br/><br/><br/><br/> </div>
-              <div> <CommentDisplay pageId={2}/></div>
+              <div> <CommentDisplay pageId={7}/></div>
             </div>
           )}
       </div>

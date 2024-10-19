@@ -73,6 +73,8 @@ function SidebarNav() {
               onClick={() => navigate("/einstein-length-contraction-calculator")}>Length Contraction Calculator</div>
             <div className='sidebarSideButtons' 
               onClick={() => navigate("/einstein-relativistic-kinetic-energy-calculator")}>Relativistic Kinetic Energy Calculator</div>
+            <div className='sidebarSideButtons' 
+              onClick={() => navigate("/einstein-relativistic-mass-calculator")}>Relativistic Mass Calculator</div>
           </>
         )
       }

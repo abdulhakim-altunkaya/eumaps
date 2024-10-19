@@ -40,7 +40,7 @@ function CommentReply({commentId2, pageId3, cancelReply}) {
                 commentId: Number(commentId2)
             }
             try {
-                const response = await axios.post("http://localhost:5000/serversavecommentreply", newComment)
+                const response = await axios.post("/serversavecommentreply", newComment)
                 alert(response.data.message);
             } catch (error) {
                 if (error.response && error.response.status === 429) {

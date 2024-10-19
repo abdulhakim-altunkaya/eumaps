@@ -98,7 +98,7 @@ function Rent() {
         {resultArea}
       </div>
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
-      <div> <CommentDisplay pageId={8}/></div>
+      <div> <CommentDisplay pageId={1}/></div>
     </div>
   )
 }

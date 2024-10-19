@@ -110,7 +110,7 @@ function LengthContraction() {
 
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
 
-      <div> <CommentDisplay pageId={13}/></div>
+      <div> <CommentDisplay pageId={12}/></div>
     </div>
   )
 }

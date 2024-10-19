@@ -69,7 +69,7 @@ function Counter() {
         </div>
       )}
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
-      <div> <CommentDisplay pageId={14}/></div>
+      <div> <CommentDisplay pageId={21}/></div>
     </div>
   );
 }

@@ -1,16 +1,21 @@
 import React from 'react';
 import "../../styles/buttons.css"; 
 import { objectsArray } from './ButtonsArray';
+import CommentDisplay from '../CommentDisplay'; 
 
 function ButtonsCSS() {
 
     const styleBtn = (index) => {
-        navigator.clipboard.writeText(objectsArray[index - 1].css);
-        alert('CSS copied to clipboard successfully!');
-    } 
+      const targetButton = objectsArray.find(obj => obj.id === `button${index}`);
+      if(targetButton && targetButton.css) {
+
+      }
+      navigator.clipboard.writeText(targetButton.css);
+      alert('CSS copied to clipboard successfully!');
+    }  
 
   return (
-    <div>
+    <div className='buttonsMainArea'>
         <h2>FREE CSS BUTTON STYLES</h2>
         <p>You are welcome to copy and use them but You cannot sell them. You cannot also show them as if it is your design. </p>
         <p>Of course I appreciate credits: "Abdulhakim Luanda, 2024, eumaps.org"</p>
@@ -28,6 +33,8 @@ function ButtonsCSS() {
             <button className="button1010" onClick={() => styleBtn(1010)}>COPY ME</button>
             <button className="button1111" onClick={() => styleBtn(1111)}>COPY ME</button>
         </div>
+        <div> <br/><br/><br/><br/><br/><br/><br/> </div>
+        <div> <CommentDisplay pageId={25}/></div>
     </div>
   )
 }

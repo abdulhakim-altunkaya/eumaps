@@ -76,6 +76,9 @@ const MatterToEnergy = () => {
           <p><strong>Equivalent in Tsar Hydrogen Bombs:</strong> {energy.tsarBombs}</p>
         </div>
       )}
+
+      <div> <br/><br/><br/><br/><br/><br/><br/> </div>
+      <div> <CommentDisplay pageId={11}/></div>
     </div>
   );
 };

@@ -139,7 +139,7 @@ function GravitationalTimeDilation() {
 
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
 
-      <div> <CommentDisplay pageId={12}/></div>
+      <div> <CommentDisplay pageId={10}/></div>
     </div>
   )
 }

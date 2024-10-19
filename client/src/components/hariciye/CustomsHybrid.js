@@ -256,7 +256,7 @@ function CustomsHybrid() {
               <br/>
               <p>{resultArea}</p>
               <div> <br/><br/><br/><br/><br/><br/><br/> </div>
-              <div> <CommentDisplay pageId={5}/></div>
+              <div> <CommentDisplay pageId={4}/></div>
             </div>
           )}
       </div>

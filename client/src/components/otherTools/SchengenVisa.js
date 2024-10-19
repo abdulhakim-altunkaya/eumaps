@@ -3,6 +3,7 @@ import "../../styles/otherTools.css";
 import "../../styles/converters.css"; 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowRight } from '@fortawesome/free-solid-svg-icons';
+import CommentDisplay from '../CommentDisplay'; 
 
 const SchengenVisa = () => {
   const [trips, setTrips] = useState([]);
@@ -86,6 +87,8 @@ const SchengenVisa = () => {
           <p>Warning: You have exceeded your Schengen visa stay.</p>
         )}
       </div>
+      <div> <br/><br/><br/><br/><br/><br/><br/> </div>
+      <div> <CommentDisplay pageId={24}/></div>
     </div>
   );
 };
