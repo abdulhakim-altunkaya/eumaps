@@ -14,6 +14,12 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'client/build')));
 //For serving from build directory, you need to install path package and initiate it:
 
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
+});
+
+
+
 app.get("/serversendhello", (req, res) => {
   res.status(200).json({myMessage: "Hello from backend"});
 })
@@ -145,10 +151,6 @@ app.post("/serversavevisitor", async (req, res) => {
   }
 })
 
-/* app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
-}); */
-
 
 const PORT = process.env.port || 5000;
 app.listen(PORT, () => {
@@ -156,7 +158,14 @@ app.listen(PORT, () => {
 });
 
 //remove "build" from gitignore before production deployment
-//create "build" folder
+//create "build" folder-- npm run build in client folder
 //You can remove cors before production
 //Fix server api routes before production, remove "localhost" part
 //add environment variables
+/*Also add this otherwise only index route will be visible when you deploy app to production
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
+});
+
+*/
