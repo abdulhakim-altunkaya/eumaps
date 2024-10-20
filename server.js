@@ -83,13 +83,13 @@ app.post("/serversavecommentreply", async (req, res) => {
   }
 });
 
-app.get("/servergetcomments/:idpro", async (req, res) => {
+app.get("/servergetcomments/:pageId", async (req, res) => {
   let client;
-  const { idpro } = req.params;
+  const { pageId } = req.params;
   try {
     client = await pool.connect(); 
     const result = await client.query(
-      `SELECT * FROM eumaps_comments WHERE sectionid = $1 ORDER BY id DESC`, [idpro]
+      `SELECT * FROM eumaps_comments WHERE sectionid = $1 ORDER BY id DESC`, [pageId]
     );
     const allComments = result.rows;
     res.status(200).json(allComments);
