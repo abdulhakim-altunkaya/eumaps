@@ -86,16 +86,13 @@ app.post("/serversavecommentreply", async (req, res) => {
 app.get("/servergetcomments/:pageId", async (req, res) => {
   let client;
   const { pageId } = req.params;
-  console.log("page id before server request", pageId);
   try {
     client = await pool.connect(); 
     const result = await client.query(
       `SELECT * FROM eumaps_comments WHERE sectionid = $1 ORDER BY id DESC`, [Number(pageId)]
     );
     const allComments = result.rows;
-    console.log(`hi from server, here are results: ${allComments}`)
-    console.log("page id after server request", pageId);
-
+    res.status(200).json(allComments);
   } catch (error) {
     console.log(error.message);
     res.status(500).json({message: "Error while fetching comments"})
