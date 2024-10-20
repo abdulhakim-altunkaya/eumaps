@@ -7,12 +7,20 @@ import CommentReply from "./CommentReply";
 function CommentDisplay({pageId}) {
   const [comments, setComments] = useState([]);
   const [error, setError] = useState("");
+  const [isPageIdReady, setIsPageIdReady] = useState(false);
   const [isReply, setIsReply] = useState(true);
   const [repliedCommentId, setRepliedCommentId] = useState("");
   const [isCommentReply, setIsCommentReply] = useState(false);
   const [replies, setReplies] = useState([]);
 
   const [commentTitle4, setCommentTitle4] = useState("Cevapla");
+
+  // Check if pageId is available
+  useEffect(() => {
+    if (pageId !== undefined && pageId !== null) {
+      setIsPageIdReady(true);
+    }
+  }, [pageId]);
 
   useEffect(() => {
     if (pageId !== undefined && pageId !== null) {
@@ -23,26 +31,31 @@ function CommentDisplay({pageId}) {
   }, [pageId])
 
   useEffect(() => {
-    if (pageId !== undefined && pageId !== null) {
-          const getComments = async () => {
-            try {
-              const response = await axios.get(`/servergetcomments/${Number(pageId)}`);
-              console.log(`here is all response: ${response}`);
-              console.log(`here is all response data: ${response.data}`);
-              const fetchedComments = Array.isArray(response.data) ? response.data : [];
-              setComments(fetchedComments);
-              const replies = fetchedComments.filter(comment => comment.parent_id !== null);
-              setReplies(replies);
-              console.log(`hi from commentDisplay component: here are replies: ${replies}`)
-              console.log(`hi from commentDisplay component: here are comments: ${comments}`)
-            } catch (error) {
-              console.log("Error fetching comments:", error.message);
-              setError("Yorumlar Database'den alınmadı")
-            } 
-          }
-          getComments();
+    console.log(`here is pageid before isPageReady varible: ${pageId}`);
+    if (isPageIdReady) {
+      if (Number(pageId) > 9) {
+        setCommentTitle4("Reply");
+      }
+      console.log(`here is pageid after isPageReady varible: ${pageId}`);
+      const getComments = async () => {
+        try {
+          const response = await axios.get(`/servergetcomments/${Number(pageId)}`);
+          console.log(`here is all response: ${response}`);
+          console.log(`here is all response data: ${response.data}`);
+          const fetchedComments = Array.isArray(response.data) ? response.data : [];
+          setComments(fetchedComments);
+          const replies = fetchedComments.filter(comment => comment.parent_id !== null);
+          setReplies(replies);
+          console.log(`hi from commentDisplay component: here are replies: ${replies}`)
+          console.log(`hi from commentDisplay component: here are comments: ${comments}`)
+        } catch (error) {
+          console.log("Error fetching comments:", error.message);
+          setError("Yorumlar Database'den alınmadı")
+        } 
+      }
+      getComments();
     }
-  }, [pageId]);
+  }, [isPageIdReady, pageId]);
 
   const replyComment = async (replyId) => {
     setRepliedCommentId(replyId);
