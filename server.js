@@ -5,7 +5,7 @@ const path = require('path');
 const { pool } = require("./db");
 const useragent = require('useragent');
 const cors = require("cors");
-/* app.use(cors()); *///commented out for production deployment
+app.use(cors());
 
 //we need this as we use req.body to send data from frontend to backend
 app.use(express.json());
@@ -87,19 +87,20 @@ app.get("/servergetcomments/:idpro", async (req, res) => {
   let client;
   const { idpro } = req.params;
   try {
-    client = await pool.connect();
+    client = await pool.connect(); 
     const result = await client.query(
       `SELECT * FROM eumaps_comments WHERE sectionid = $1 ORDER BY id DESC`, [idpro]
     );
     const allComments = result.rows;
     res.status(200).json(allComments);
+    console.log(`hi from server, here are results: ${allComments}`)
   } catch (error) {
     console.log(error.message);
     res.status(500).json({message: "Error while fetching comments"})
   } finally {
     if(client) client.release();
   }
-})
+});
 
 
 //A temporary cache to save ip addresses and it will prevent saving same ip addresses for 1 hour.
