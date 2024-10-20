@@ -15,29 +15,33 @@ function CommentDisplay({pageId}) {
   const [commentTitle4, setCommentTitle4] = useState("Cevapla");
 
   useEffect(() => {
+    if (pageId !== undefined && pageId !== null) {
       if (Number(pageId) > 9) {
-          setCommentTitle4("Reply");
+        setCommentTitle4("Reply");
       }
+    }
   }, [pageId])
 
   useEffect(() => {
-    const getComments = async () => {
-      try {
-        const response = await axios.get(`/servergetcomments/${Number(pageId)}`);
-        console.log(`here is all response: ${response}`);
-        console.log(`here is all response data: ${response.data}`);
-        const fetchedComments = Array.isArray(response.data) ? response.data : [];
-        setComments(fetchedComments);
-        const replies = fetchedComments.filter(comment => comment.parent_id !== null);
-        setReplies(replies);
-        console.log(`hi from commentDisplay component: here are replies: ${replies}`)
-        console.log(`hi from commentDisplay component: here are comments: ${comments}`)
-      } catch (error) {
-        console.log("Error fetching comments:", error.message);
-        setError("Yorumlar Database'den alınmadı")
-      } 
+    if (pageId !== undefined && pageId !== null) {
+          const getComments = async () => {
+            try {
+              const response = await axios.get(`/servergetcomments/${Number(pageId)}`);
+              console.log(`here is all response: ${response}`);
+              console.log(`here is all response data: ${response.data}`);
+              const fetchedComments = Array.isArray(response.data) ? response.data : [];
+              setComments(fetchedComments);
+              const replies = fetchedComments.filter(comment => comment.parent_id !== null);
+              setReplies(replies);
+              console.log(`hi from commentDisplay component: here are replies: ${replies}`)
+              console.log(`hi from commentDisplay component: here are comments: ${comments}`)
+            } catch (error) {
+              console.log("Error fetching comments:", error.message);
+              setError("Yorumlar Database'den alınmadı")
+            } 
+          }
+          getComments();
     }
-    getComments();
   }, [pageId]);
 
   const replyComment = async (replyId) => {
