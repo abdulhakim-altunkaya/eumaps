@@ -40,8 +40,8 @@ function CommentDisplay({pageId}) {
       const getComments = async () => {
         try {
           const response = await axios.get(`/servergetcomments/${Number(pageId)}`);
-          console.log(`here is all response: ${response}`);
-          console.log(`here is all response data: ${response.data}`);
+          console.log("here is all response:", response);
+          console.log("here is all response data:", response.data);
           const fetchedComments = Array.isArray(response.data) ? response.data : [];
           setComments(fetchedComments);
           const replies = fetchedComments.filter(comment => comment.parent_id !== null);
