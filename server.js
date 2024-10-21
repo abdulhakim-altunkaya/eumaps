@@ -13,12 +13,9 @@ app.use(express.json());
 //Then go to server.js file and make sure you serve static files from build directory:
 app.use(express.static(path.join(__dirname, 'client/build')));
 //For serving from build directory, you need to install path package and initiate it:
-
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
 });
-
-
 
 app.get("/serversendhello", (req, res) => {
   res.status(200).json({myMessage: "Hello from backend"});
@@ -31,9 +28,11 @@ app.post("/serversavecomment", async (req, res) => {
   //preventing spam comments
   const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
   // Check if IP exists in cache and if last comment was less than 1 minute ago
+  /*
   if (ipCache2[ipVisitor] && Date.now() - ipCache2[ipVisitor] < 60000) {
     return res.status(429).json({message: 'Too many comments'});
   }
+  */
   ipCache2[ipVisitor] = Date.now();//save visitor ip to ipCache2
 
   let client;
@@ -89,9 +88,13 @@ app.get("/servergetcomments/:pageId", async (req, res) => {
   try {
     client = await pool.connect(); 
     const result = await client.query(
-      `SELECT * FROM eumaps_comments WHERE sectionid = $1 ORDER BY id DESC`, [Number(pageId)]
+      `SELECT * FROM eumaps_comments WHERE sectionid = $1`, [pageId]
     );
-    const allComments = result.rows;
+    const allComments = await result.rows;
+    console.log(allComments);
+    if(!allComments) {
+      return res.status(404).json({ message: "No comments yet"})
+    }
     res.status(200).json(allComments);
   } catch (error) {
     console.log(error.message);
@@ -100,7 +103,6 @@ app.get("/servergetcomments/:pageId", async (req, res) => {
     if(client) client.release();
   }
 });
-
 
 //A temporary cache to save ip addresses and it will prevent saving same ip addresses for 1 hour.
 //I can do that by checking each ip with database ip addresses but then it will be too many requests to db
