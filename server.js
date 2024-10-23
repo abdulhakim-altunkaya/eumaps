@@ -13,10 +13,6 @@ app.use(express.json());
 //Then go to server.js file and make sure you serve static files from build directory:
 app.use(express.static(path.join(__dirname, 'client/build')));
 //For serving from build directory, you need to install path package and initiate it:
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
-});
-
 app.get("/serversendhello", (req, res) => {
   res.status(200).json({myMessage: "Hello from backend"});
 })
@@ -91,7 +87,6 @@ app.get("/servergetcomments/:pageId", async (req, res) => {
       `SELECT * FROM eumaps_comments WHERE sectionid = $1`, [pageId]
     );
     const allComments = await result.rows;
-    console.log(allComments);
     if(!allComments) {
       return res.status(404).json({ message: "No comments yet"})
     }
@@ -152,6 +147,12 @@ app.post("/serversavevisitor", async (req, res) => {
     if(client) client.release();
   }
 })
+
+//This piece of code must be under all routes. Otherwise you will have issues like not being able to 
+//fetch comments etc. This code helps with managing routes that are not defined on react frontend.
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
+});
 
 
 const PORT = process.env.port || 5000;
