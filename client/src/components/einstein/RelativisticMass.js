@@ -115,7 +115,7 @@ function RelativisticMass() {
           min="1"
           required
         /> &nbsp; &nbsp;
-        <label htmlFor='restMass'>Enter Rest Mass (in grams)</label> <br/><br/>
+        <label htmlFor='restMass'>Rest Mass (in grams)</label> <br/><br/>
 
         <input
           className='inputFields'
@@ -126,7 +126,7 @@ function RelativisticMass() {
           step="any"
           required
         /> &nbsp; &nbsp;
-        <label htmlFor='velocity'>Enter Velocity (in km/s)</label> <br/><br/>
+        <label htmlFor='velocity'>Velocity (in km/s)</label> <br/><br/>
 
         <button className='button101' type="submit">Calculate</button>
         <button className='button101' onClick={clearRelativisticMassForm}>Clear</button>

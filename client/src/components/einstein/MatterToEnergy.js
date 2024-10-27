@@ -52,7 +52,7 @@ const MatterToEnergy = () => {
         <div>
           <input type="number" className='input2'
             value={grams} onChange={(e) => setGrams(e.target.value)} />
-          <label>Enter Mass in Grams</label>
+          <label>Mass in Grams</label>
         </div>
         <div>
           <button onClick={handleConvert} className='button201'>Convert</button>

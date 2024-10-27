@@ -90,7 +90,7 @@ function DilationSpeed() {
           max="100000000000000"
           required
         /> &nbsp; &nbsp;
-        <label htmlFor='spaceshipTime'>Enter Spaceship time (in seconds)</label> <br/><br/>
+        <label htmlFor='spaceshipTime'>Spaceship time (in seconds)</label> <br/><br/>
 
         
         <input
@@ -103,7 +103,7 @@ function DilationSpeed() {
           max="100000000000000000000"
           required
         /> &nbsp; &nbsp;
-        <label htmlFor='spaceshipVelocity'>Enter Spaceship velocity (in km/seconds)</label> <br/><br/>
+        <label htmlFor='spaceshipVelocity'>Spaceship velocity (in km/seconds)</label> <br/><br/>
 
         <button className='button101' type="submit">Calculate</button>
         <button className='button101' onClick={clearTimeDilationForm}>Clear</button>

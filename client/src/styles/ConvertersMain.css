@@ -66,3 +66,74 @@
     background-color: blue;
 }
 
+
+/* Media query for mobile screens */
+@media (max-width: 768px) {
+
+    .convertersMain{   
+        margin: 12px;
+    }
+
+    .parentAreasTitleDiv {
+        display: flex;
+        flex-wrap: wrap;
+        padding-top: 15px;
+        padding-bottom: 15px;
+        padding-left: 12px;
+        font-family: "Monda";
+    }
+    
+    .convertersIconsMainArea {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        flex-wrap: wrap; /* Allows the items to wrap to the next line */
+        margin-bottom: auto;
+        margin-right: auto;
+    }
+    
+    .converter-item {
+        display: flex;
+        align-items: center; /* Aligns text and icon */
+        justify-content: space-between;
+        height: 70px;
+        width: 220px;
+        min-height: fit-content;
+        padding: 10px;
+        margin-bottom: 15px;
+        box-shadow: 0px 0px 14px rgba(0, 0, 0, 0.4); /* Even soft shadow on all sides */
+        border-radius: 5px; /* Smooths the corners */
+        transition: box-shadow 0.15s ease, transform 0.15s ease; /* Smooth transition for shadow and movement */
+    }
+    
+    .converter-item:hover {
+        cursor: pointer;
+        box-shadow: 0px 0px 20px rgba(139, 0, 0, 0.7); /* Dark reddish color closer to black */
+        transform: translateY(-5px); /* Moves the container up when hovered */
+    }
+    .converter-item:active {
+        transform: translateY(2px); /* Moves the container down when clicked */
+        box-shadow: 0px 0px 12px rgba(139, 0, 0, 0.5); /* Slightly reduce the shadow */
+    }
+    
+    .converter-name {
+        font-size: 25px;
+        font-family: "Fredoka One"; 
+    }
+    .converter-name2 {
+        font-size: 20px;
+        font-family: "Fredoka One"; 
+        text-wrap:wrap;
+    }
+    
+    .icon-wrapper {
+    
+    }
+    
+    .unitIcons {
+        width: 60px;
+        max-height: 65px;
+        background-color: blue;
+    }
+}

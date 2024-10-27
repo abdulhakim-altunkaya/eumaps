@@ -105,7 +105,7 @@ function GravitationalTimeDilation() {
           max="100000000000000"
           required
         /> &nbsp; &nbsp;
-        <label htmlFor='observerTime'>Enter Observer time (in seconds)</label> <br/><br/>
+        <label htmlFor='observerTime'>Observer time (in seconds)</label> <br/><br/>
 
         <input
           className='inputFields'
@@ -116,7 +116,7 @@ function GravitationalTimeDilation() {
           min="1"
           required
         /> &nbsp; &nbsp;
-        <label htmlFor='massOfObject'>Enter Mass of Object (in Solar masses)</label> <br/><br/>
+        <label htmlFor='massOfObject'>Mass of Object (in Solar masses)</label> <br/><br/>
 
         <input
           className='inputFields'
@@ -127,7 +127,7 @@ function GravitationalTimeDilation() {
           min="1"
           required
         /> &nbsp; &nbsp;
-        <label htmlFor='radius'>Enter Radius (distance from the object in kilometers)</label> <br/><br/>
+        <label htmlFor='radius'>Radius (distance from the object in kilometers)</label> <br/><br/>
 
         <button className='button101' type="submit">Calculate</button>
         <button className='button101' onClick={clearTimeDilationForm}>Clear</button>

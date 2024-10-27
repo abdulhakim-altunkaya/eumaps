@@ -8,7 +8,7 @@ function MainEinstein() {
 
   return (
     <div>
-      <h1 className='convertersMainH1Long'>Einstein Calculators</h1>
+      <div className='parentAreasTitleDiv'><h1 className='convertersMainH1Long'>Einstein Calculators</h1></div>
       <div className='convertersMain'>
         <div className='convertersIconsMainArea'>
             <div className="converter-item" onClick={ () => navigate("/einstein-mass-energy-converter")}>

@@ -8,7 +8,7 @@ function MainHariciye() {
 
   return (
     <div className='mainAreasMainComponents'>
-      <h3 className='convertersMainH1Long'>Dışişleri Bakanlığı Hesaplamaları</h3>
+      <div className='parentAreasTitleDiv'><h3 className='convertersMainH1Long'>Dışişleri Bakanlığı Hesaplamaları</h3></div>
       <div className='convertersMain'>
         <div className='convertersIconsMainArea'>
             <div className="converter-item" onClick={ () => navigate("/arac-gumruk-vergi-hesaplama")}>

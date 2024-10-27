@@ -8,7 +8,7 @@ function MainConverters() {
 
   return (
     <div className='mainAreasMainComponents'>
-      <h1 className='convertersMainH1Long'>Converters & Calculators</h1>
+      <div className='parentAreasTitleDiv'><h1 className='convertersMainH1Long'>Converters & Calculators</h1></div>
       <div className='convertersMain'>
         <div className='convertersIconsMainArea'>          
             <div className="converter-item" onClick={ () => navigate("/weight-units-converter")}>

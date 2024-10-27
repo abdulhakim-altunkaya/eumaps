@@ -46,7 +46,7 @@ html {
     overflow-y: auto; /* Content scrolls if overflow */
     scrollbar-width: none; /* For Firefox */
     user-select: none;
-}
+  }
 
   /* For WebKit-based browsers (Chrome, Safari) */
   .sidebarArea::-webkit-scrollbar {
@@ -122,3 +122,108 @@ html {
   .mainAreasMainComponents {
     margin-top: 50px;
   }
+
+/* Media query for mobile screens */
+@media (max-width: 768px) {
+  html {
+    font-size: 18px;
+    font-family: "Ubuntu", sans-serif;
+  }
+  
+  body {
+    margin: 0;
+    background-color: white;
+    font-family: "Ubuntu", sans-serif;
+  }
+  .App {
+    display: flex;
+    flex-direction: column;
+    min-width: 100%;
+    height: 100%; /* Full viewport height */
+  }
+
+  .mainArea {
+    min-width: 100%;
+  }
+
+  .sidebarArea {
+    min-width: 100%;
+    background-color: #CCECFE;
+    color: black;
+    /*
+    background-color: #093945;
+    color: white;
+    */
+    box-shadow: 5px 0px 10px rgba(0, 0, 0, 0.3);/*border right shade*/
+    overflow-y: none;
+     /* Content scrolls if overflow */
+    scrollbar-width: auto; /* For Firefox */
+    user-select: none;
+    height: auto;
+  }
+
+
+  
+  .sidebarLogoArea {
+    background-color: #CCECFE;
+    min-width: 100%;
+    /*placing logo to the center horizontally and vertically*/
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0px 5px 10px rgba(0, 0, 0, 0.3); /* Bottom border shadow   */
+  }
+  .sidebarButtonsArea { 
+    cursor: pointer;
+    /* background-image: linear-gradient(92.83deg, #3C6478 0,  #f25500  100%); */
+    background-color: #00246B;
+  }
+  .sidebarMainButtons{
+    box-shadow: 0px 0.4px 3px #b0b0b0; /* Bottom border shadow */
+    color: #CADCFC;
+    font-family: "Monda";
+  }
+  .sidebarMainButtons:hover {
+    background-color: #3C6478;
+    /* Light gray border on hover */
+  }
+  .sidebarMainButtons:active{
+    background-color: #94b8c9;
+  }
+
+  .sidebarSideButtons {
+    background-color: #EFD469;
+    color: black;
+    box-shadow: 0px 0.2px 2px #b0b0b0; /* Bottom border shadow */
+    font-family: "Concert One", sans-serif; /* Example font family */
+    font-size: 0.75rem;
+    padding-left: 30px !important;
+  }
+  .sidebarSideButtons:hover {
+    background-color: #bb9913;
+  }
+  .sidebarMainButtons, .sidebarSideButtons {
+    padding: 15px 10px 5px 18px;/*top-right-bottom-left*/
+  }
+
+  .notesArea {
+    font-family: "Edu AU VIC WA NT Hand", cursive;
+  }
+
+  .homepageArea {
+    margin-left: 12px;
+    margin-top: 30px;
+  }
+
+  .customsNotesArea {
+    margin-left: 12px;
+  }
+
+  .buttonsMainArea {
+    margin-left: 12px;
+  }
+
+  .mainAreasMainComponents {
+    margin-top: 50px;
+  }
+}
