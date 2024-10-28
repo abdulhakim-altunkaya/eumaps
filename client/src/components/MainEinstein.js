@@ -7,7 +7,7 @@ function MainEinstein() {
   const navigate = useNavigate(); 
 
   return (
-    <div>
+    <div className='mainAreasMainComponents'>
       <div className='parentAreasTitleDiv'><h1 className='convertersMainH1Long'>Einstein Calculators</h1></div>
       <div className='convertersMain'>
         <div className='convertersIconsMainArea'>

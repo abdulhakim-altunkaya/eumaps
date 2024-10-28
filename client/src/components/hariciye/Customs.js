@@ -10,7 +10,7 @@ function Customs() {
       <div className='customsMainPageTitlesArea'>
         <h2>EUMAPS.ORG<br />
         BEDELSİZ ARAÇ İTHALATI<br />
-        VERGİ HESAPLAMA</h2>
+        VERGİ HESAPLAMA</h2> 
       </div>
       <div className='customsMainPageButtonsArea'>
         <button className='button102' onClick={()=>navigate("/benzin-dizel-arac-gumruk-vergi-hesaplama")}>Benzin/Dizel</button>

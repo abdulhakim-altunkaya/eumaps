@@ -7,9 +7,10 @@ function MainHariciye() {
   const navigate = useNavigate(); 
 
   return (
-    <div className='mainAreasMainComponents'>
-      <div className='parentAreasTitleDiv'><h3 className='convertersMainH1Long'>Dışişleri Bakanlığı Hesaplamaları</h3></div>
-      <div className='convertersMain'>
+      <div className='mainAreasMainComponents'>
+        <div className='parentAreasTitleDiv'><h1 className='convertersMainH1Short'>Dışişleri Bakanlığı Hesaplamaları</h1></div>
+        <div className='convertersMain'>
+        
         <div className='convertersIconsMainArea'>
             <div className="converter-item" onClick={ () => navigate("/arac-gumruk-vergi-hesaplama")}>
                 <span className="converter-name2">Araç Gümrük Vergi Hesaplama</span>

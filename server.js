@@ -105,7 +105,7 @@ app.get("/servergetcomments/:pageId", async (req, res) => {
 const ipCache = {}
 // List of IPs to ignore (server centers, ad bots, my ip etc)
 const ignoredIPs = ["66.249.68.5", "66.249.68.4", "66.249.88.2", "66.249.89.2", "66.249.65.32", "66.249.88.3", "209.85.238.225", 
-  "209.85.238.224", "80.89.77.205", "212.3.197.186"];
+  "209.85.238.224", "80.89.77.205", "212.3.197.186", "80.89.74.90", "::1", "80.89.79.74", "80.89.77.116", "80.89.73.22"];
 
 app.post("/serversavevisitor", async (req, res) => {
   //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform

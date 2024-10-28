@@ -154,8 +154,8 @@ function CustomsGasoline() {
         BEDELSİZ ARAÇ İTHALATI<br />
         VERGİ HESAPLAMA</h3>
       </div>
-      <h4>BENZİN/DİZEL ARAÇLAR</h4>
-      <div>
+      <h4 className='customsLeftMargin'>BENZİN/DİZEL ARAÇLAR</h4>
+      <div className='customsLeftMargin'>
         {/* Radio buttons */}
         <div>
           <input
@@ -248,7 +248,7 @@ function CustomsGasoline() {
                   <button className='button102' onClick={clearCarForm}>Sil</button>
               </form>
               <br/>
-              <p>{resultArea}</p>
+              <div>{resultArea}</div>
               <div> <br/><br/><br/><br/><br/><br/><br/> </div>
               <div> <CommentDisplay pageId={5}/></div>
             </div>

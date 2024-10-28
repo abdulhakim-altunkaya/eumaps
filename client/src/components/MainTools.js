@@ -7,7 +7,7 @@ function MainTools() {
   const navigate = useNavigate();
 
   return (
-    <div>
+    <div className='mainAreasMainComponents'>
         <div className='parentAreasTitleDiv'><h1 className='convertersMainH1Short'>Tools</h1></div>
         <div className='convertersMain'>
             <div className='convertersIconsMainArea'>          

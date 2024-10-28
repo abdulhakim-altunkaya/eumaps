@@ -135,8 +135,8 @@ function CustomsBike() {
         BEDELSİZ ARAÇ İTHALATI<br />
         VERGİ HESAPLAMA</h3>
       </div>
-      <h4>MOTORSİKLETLER</h4>
-      <div>
+      <h4 className='customsLeftMargin'>MOTORSİKLETLER</h4>
+      <div className='customsLeftMargin'>
         {/* Radio buttons */}
         <div>
           <input
@@ -197,7 +197,7 @@ function CustomsBike() {
                 <button className='button102' onClick={clearCarForm}>Sil</button>
               </form>
               <br/>
-              <p>{resultArea}</p>
+              <div>{resultArea}</div>
               <div> <br/><br/><br/><br/><br/><br/><br/> </div>
               <div> <CommentDisplay pageId={7}/></div>
             </div>

@@ -155,8 +155,8 @@ function CustomsHybrid() {
         BEDELSİZ ARAÇ İTHALATI<br />
         VERGİ HESAPLAMA</h3>
       </div>
-      <h4>HİBRİT ARAÇLAR</h4>
-      <div>
+      <h4 className='customsLeftMargin'>HİBRİT ARAÇLAR</h4>
+      <div className='customsLeftMargin'>
         {/* Radio buttons */}
         <div>
           <input
@@ -254,7 +254,7 @@ function CustomsHybrid() {
                   <button className='button102' onClick={clearCarForm}>Sil</button>
               </form>
               <br/>
-              <p>{resultArea}</p>
+              <div>{resultArea}</div>
               <div> <br/><br/><br/><br/><br/><br/><br/> </div>
               <div> <CommentDisplay pageId={4}/></div>
             </div>

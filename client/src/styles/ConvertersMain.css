@@ -1,5 +1,9 @@
-.convertersMain{   
-    margin: 12px;
+
+/* Media query for mobile screens */
+@media (min-width: 871px) {
+    .convertersMain{   
+        margin: 12px;
+    }
 }
 .convertersMainH1Long {
     font-family: "Monda";
@@ -68,19 +72,39 @@
 
 
 /* Media query for mobile screens */
-@media (max-width: 768px) {
+@media (max-width: 870px) {
+    .mainAreasMainComponents {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
 
     .convertersMain{   
-        margin: 12px;
+        margin: auto;
     }
 
     .parentAreasTitleDiv {
         display: flex;
-        flex-wrap: wrap;
+        flex-direction: row;
+        justify-content: center;
+        align-items: center;
+        vertical-align: center;
         padding-top: 15px;
         padding-bottom: 15px;
-        padding-left: 12px;
-        font-family: "Monda";
+        font-family: "Comfortaa";
+    }
+    .convertersMainH1Long {
+        width: auto;
+        margin: none;
+        margin-bottom: 2px;
+        font-size: 25px;
+    }
+    .convertersMainH1Short {
+        width: auto;
+        margin: none;
+        margin-bottom: 2px;
+        font-size: 25px;
     }
     
     .convertersIconsMainArea {

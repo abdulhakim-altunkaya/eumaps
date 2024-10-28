@@ -15,9 +15,15 @@
 .customsMainArea {
     display: flex;
     flex-direction: column;
-    margin-left: 20px;
     font-family: "Maven Pro", 'Trebuchet MS', sans-serif;
 }
+
+@media (min-width: 871px) {
+    .customsMainArea {
+        margin-left: 20px;
+    }
+}
+
 .customsMainArea h1, h2, h3 {
     font-family: "Comfortaa", 'Trebuchet MS', sans-serif;
 }
@@ -100,3 +106,105 @@ input[type=number] {
   .customsRow td {
     border: 1px solid blue;
   }
+
+  /* Media query for mobile screens */
+@media (max-width: 870px) {
+    .customsMainArea {
+        display: flex;
+        flex-direction: column;
+        margin-left: none;
+        font-family: "Maven Pro", 'Trebuchet MS', sans-serif;
+    }
+    .customsMainArea h1, h2, h3 {
+        font-family: "Comfortaa", 'Trebuchet MS', sans-serif;
+    }
+    .customsLeftMargin {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+    .customsMainPageTitlesArea {
+        display: flex;
+        flex-direction: column; /* Stack elements vertically if needed */
+        justify-content: center; /* Align the content to the center horizontally */
+        align-items: center; /* Aligns items in the center of the flex container */
+        width: 100%; /* Ensure the container takes the full width */
+        text-align: center; /* Center the text itself */
+    }
+    
+    .customsMainPageButtonsArea {
+        width: 100%;
+        margin: auto;
+        padding-left: 20px;
+    }
+    
+    .button102 {
+        font-family: "Lobster";
+        font-size: 20px;
+        width: 40%;
+        height: 50px;
+        background: #4822cc;
+        border-radius: 4px;
+        color: white;
+        user-select: none;
+        cursor: pointer;
+        margin-bottom: 20px;
+    }
+    .button102 {
+        margin-left: 12px;
+    }
+    
+    .notesSpan {
+        color: red;
+        font-style: italic;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    
+    
+    
+    /*<input className="inputFields" />*/
+    .inputFields {
+        height: 27px;
+        width: 130px;
+        margin-left: 12px;
+        border-radius: 5px;
+    }
+    .inputFields:focus {
+        background-color: lightsalmon;
+        color:black;
+    }
+    /* Chrome, Safari, Edge, Opera */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+        /* Firefox */
+    input[type=number] {
+        -moz-appearance: textfield;
+    }
+    
+    .input2 {
+        border: solid 1px blue;
+        height: 20px;
+        width: 130px;
+        border-radius: 4px;
+    }
+    .input2:focus {
+        background-color: lightsalmon;
+        color:black;
+        outline: none;
+    }
+    
+    .customsTable {
+        width: 35%;
+        margin: 5px;
+        border: 1px solid blue;
+        border-radius: 5px;
+        font-size: 15px;
+        font-family: "Maven Pro";
+      }
+      .customsRow td {
+        border: 1px solid blue;
+      }
+}
