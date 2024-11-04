@@ -3,6 +3,7 @@ import '../../styles/investment.css';
 import CommentDisplay from '../CommentDisplay'; 
 import { BlockMath } from 'react-katex';
 import 'katex/dist/katex.min.css'; // Import the KaTeX CSS for proper styling of Einstein formula
+import Footer from "../Footer";
 
 function RelativisticKinetic() {
   const [resultArea, setResultArea] = useState(<span>Speed of light: 299,792.4580 km/s</span>);
@@ -120,7 +121,7 @@ function RelativisticKinetic() {
     e.target.closest('form').reset();
     setResultArea('');
   }
-
+ 
   return (
     <div>
       <h1 className='formHeader'>Relativistic Kinetic Energy Calculator</h1>
@@ -159,6 +160,7 @@ function RelativisticKinetic() {
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
 
       <div> <CommentDisplay pageId={13}/></div>
+      <div> <br/><br/><br/> <Footer /> </div>
     </div>
   )
 }

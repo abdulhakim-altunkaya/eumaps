@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import '../../styles/investment.css';
 import CommentDisplay from '../CommentDisplay'; 
-
+import Footer from "../Footer";
+ 
 function Investment() {
 
   const [resultArea, setResultArea] = useState('');
-
+ 
   const calculateInvestment = (e) => {
     e.preventDefault(); // prevent form from refreshing page
 
@@ -66,7 +67,7 @@ function Investment() {
           max="10000000000"
           required
         /> &nbsp; &nbsp;
-        <label htmlFor='invAmount'>Investment Amount (No dots or commas)</label> <br /><br />
+        <label htmlFor='invAmount'>Investment Amount</label> <br /><br />
 
         
         <input
@@ -79,7 +80,7 @@ function Investment() {
           max="100"
           required
         /> &nbsp; &nbsp;
-        <label htmlFor='invDuration'>Duration (No dots or commas. Years, days or months)</label> <br /><br />
+        <label htmlFor='invDuration'>Duration</label> <br /><br />
 
         
         <input
@@ -103,6 +104,7 @@ function Investment() {
       </div>
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
       <div> <CommentDisplay pageId={20}/></div>
+      <div> <br/><br/><br/> <Footer /> </div>
     </div>
   )
 }

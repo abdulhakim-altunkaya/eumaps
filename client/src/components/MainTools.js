@@ -8,7 +8,7 @@ function MainTools() {
 
   return (
     <div className='mainAreasMainComponents'>
-        <div className='parentAreasTitleDiv'><h1 className='convertersMainH1Short'>Tools</h1></div>
+        <div className='parentAreasTitleDiv'><h1 className='convertersMainH1'>Tools</h1></div>
         <div className='convertersMain'>
             <div className='convertersIconsMainArea'>          
                 <div className="converter-item" onClick={ () => navigate("/character-and-word-counter")}>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import "../../styles/wordTools.css"; 
 import CommentDisplay from '../CommentDisplay'; 
+import Footer from "../Footer";
 
 function WordInsulator() {
   const [text, setText] = useState("");
@@ -32,9 +33,10 @@ function WordInsulator() {
         cols="50"
         placeholder="Enter your text here..."
       />
-      <button onClick={handleInsulate} className='button201'>Insulate</button>
-      <button onClick={handleClear} className='button201'>Clear</button>
-
+      <div>
+        <button onClick={handleInsulate} className='button20155'>Insulate</button>
+        <button onClick={handleClear} className='button20155'>Clear</button>
+      </div>
       {insulatedText && (
         <div style={{ marginTop: '10px' }}>
           <h3>Insulated Text:</h3>
@@ -43,8 +45,9 @@ function WordInsulator() {
       )}
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
       <div> <CommentDisplay pageId={22}/></div>
+      <div> <br/><br/><br/> <Footer /> </div>
     </div>
   );
 }
 
-export default WordInsulator;
+export default WordInsulator; 

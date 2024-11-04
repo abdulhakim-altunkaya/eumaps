@@ -1,104 +1,235 @@
-.convertersMainArea { 
-    margin-left: 12px;
-    /* background-color: #ffc6aa; */
-    /* background-color: #EFD469;  */
-    padding: 20px;
-    width: auto;
-    max-width: 600px; /* Add a maximum width for the container */
-    border-radius: 10px; /* Optional: round the corners */
+
+/* Media query for mobile screens */
+@media (min-width: 781px) {
+    .convertersMainArea { 
+        padding: 20px;
+        width: auto;
+        border-radius: 10px; /* Optional: round the corners */
+    }
+    
+    .convertersMainArea h4{
+        font-family: "Monda";
+    }
+    
+    /* Input field styles */
+    .input101 {
+        margin-top: 10px;
+        width: 130px;
+        height: 20px;
+        padding: 5px;
+        box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2), 4px 4px 10px rgba(0, 0, 0, 0.2); /* Thicker shadow on the right side */
+    
+        /* box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.2); /* Adds the shade to the right */
+        border: 1px solid #ccc; /* Optional: Border to better see the input field */
+        border-radius: 5px;
+        transition: box-shadow 0.3s ease-in-out; /* Smooth transition on focus */
+    }
+    
+    .input101:focus {
+        background-color: #a5f1a5;
+        color: black;
+        box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.3); /* Increases shadow on focus */
+    }
+    /* Input field styles */
+    .input103 {
+        margin-top: 6px;
+        width: 130px;
+        height: 20px;
+        padding: 5px;
+        box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.2); /* Adds the shade to the right */
+        border: 1px solid #ccc; /* Optional: Border to better see the input field */
+        border-radius: 5px;
+        transition: box-shadow 0.3s ease-in-out; /* Smooth transition on focus */
+    }
+    
+    .input103:focus {
+        background-color: #a5f1a5;
+        color: black;
+        box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.3); /* Increases shadow on focus */
+    }
+    /* Remove spin buttons for number input fields */
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    
+    input[type=number] {
+        -moz-appearance: textfield;
+    }
+    
+    /* Center the label vertically with the input */
+    .convertersMainArea label {
+        margin-top: 10px;
+        align-items: center; /* Aligns the label to the center of the input */
+        justify-content: space-between; /* Space between label and input */
+        width: 200px; /* Adjust width as needed to space label and input properly */
+    }
+    
+    .convertersMainArea label  {
+        margin-left: 12px;
+        margin-top: 12px;
+    }
+    
+    .button201 {
+        font-family: "Lobster";
+        font-size: 20px;
+        width: 150px;
+        background: #3960e1;
+        border-radius: 4px;
+        color: white;
+        user-select: none;
+        cursor: pointer;
+    }
+    .inputButtonContainer {
+        display: flex;
+        flex-direction: column;
+    }
+    .inputButtonContainer input, .inputButtonContainer button{
+        height: 30px !important;
+        padding: 4px !important;
+        font-size: 19px !important;
+    }
+    .inputButtonContainer button {
+        margin-top: 12px;
+        margin-right: 10px !important;
+        margin-left: 0 !important;
+    }
+    .button225 {
+        font-family: "Lobster";
+        font-size: 20px;
+        width: 150px;
+        height: 35px;
+        background: #3960e1;
+        border-radius: 4px;
+        color: white;
+        user-select: none;
+        cursor: pointer;
+    }
+    
+    
+    .relativisticKineticMainDiv {
+        padding-right: 100px;
+        line-height: 1.5;
+    }
 }
 
-.convertersMainArea h4{
-    font-family: "Monda";
-}
-
-/* Input field styles */
-.input101 {
-    margin-top: 10px;
-    width: 130px;
-    height: 20px;
-    padding: 5px;
-    box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2), 4px 4px 10px rgba(0, 0, 0, 0.2); /* Thicker shadow on the right side */
-
-    /* box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.2); /* Adds the shade to the right */
-    border: 1px solid #ccc; /* Optional: Border to better see the input field */
-    border-radius: 5px;
-    transition: box-shadow 0.3s ease-in-out; /* Smooth transition on focus */
-}
-
-.input101:focus {
-    background-color: #a5f1a5;
-    color: black;
-    box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.3); /* Increases shadow on focus */
-}
-/* Input field styles */
-.input103 {
-    margin-top: 6px;
-    width: 130px;
-    height: 20px;
-    padding: 5px;
-    box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.2); /* Adds the shade to the right */
-    border: 1px solid #ccc; /* Optional: Border to better see the input field */
-    border-radius: 5px;
-    transition: box-shadow 0.3s ease-in-out; /* Smooth transition on focus */
-}
-
-.input103:focus {
-    background-color: #a5f1a5;
-    color: black;
-    box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.3); /* Increases shadow on focus */
-}
-/* Remove spin buttons for number input fields */
-input::-webkit-outer-spin-button,
-input::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-
-input[type=number] {
-    -moz-appearance: textfield;
-}
-
-/* Center the label vertically with the input */
-.convertersMainArea label {
-    margin-top: 10px;
-    align-items: center; /* Aligns the label to the center of the input */
-    justify-content: space-between; /* Space between label and input */
-    width: 200px; /* Adjust width as needed to space label and input properly */
-}
-
-.convertersMainArea label  {
-    margin-left: 12px;
-    margin-top: 12px;
-}
-
-.button201 {
-    font-family: "Lobster";
-    font-size: 20px;
-    width: 150px;
-    background: #3960e1;
-    border-radius: 4px;
-    color: white;
-    user-select: none;
-    cursor: pointer;
-}
-.inputButtonContainer {
-    display: flex;
-    flex-direction: column;
-}
-.inputButtonContainer input, .inputButtonContainer button{
-    height: 30px !important;
-    padding: 4px !important;
-    font-size: 19px !important;
-}
-.inputButtonContainer button {
-    margin-top: 12px;
-    margin-right: 10px !important;
-    margin-left: 0 !important;
-}
 
 
-.relativisticKineticMainDiv {
-    padding-right: 100px;
-    line-height: 1.5;
+/* Media query for mobile screens */
+@media (max-width: 780px) {
+    .convertersMainArea { 
+        padding-left: 10px;
+        width: auto;
+        max-width: 600px; /* Add a maximum width for the container */
+        border-radius: 10px; /* Optional: round the corners */
+    }
+
+    .convertersMainArea h4{
+        font-family: "Monda";
+    }
+    
+    /* Input field styles */
+    .input101 {
+        margin-top: 9px;
+        width: 130px;
+        height: 20px;
+        padding: 5px;
+        box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2), 4px 4px 10px rgba(0, 0, 0, 0.2); /* Thicker shadow on the right side */
+        border: 1px solid #ccc; /* Optional: Border to better see the input field */
+        border-radius: 5px;
+        transition: box-shadow 0.3s ease-in-out; /* Smooth transition on focus */
+    }
+    
+    .input101:focus {
+        background-color: #a5f1a5;
+        color: black;
+        box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.3); /* Increases shadow on focus */
+    }
+    /* Input field styles */
+    .input103 {
+        margin-top: 6px;
+        width: 130px;
+        height: 20px;
+        padding: 5px;
+        box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.2); /* Adds the shade to the right */
+        border: 1px solid #ccc; /* Optional: Border to better see the input field */
+        border-radius: 5px;
+        transition: box-shadow 0.3s ease-in-out; /* Smooth transition on focus */
+    }
+    
+    .input103:focus {
+        background-color: #a5f1a5;
+        color: black;
+        box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.3); /* Increases shadow on focus */
+    }
+    /* Remove spin buttons for number input fields */
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    
+    input[type=number] {
+        -moz-appearance: textfield;
+    }
+    
+    /* Center the label vertically with the input */
+    .convertersMainArea label {
+        margin-top: 10px;
+        align-items: center; /* Aligns the label to the center of the input */
+        justify-content: space-between; /* Space between label and input */
+        width: 200px; /* Adjust width as needed to space label and input properly */
+    }
+    
+    .convertersMainArea label  {
+        margin-left: 12px;
+    }
+    
+    .button201 {
+        font-family: "Lobster";
+        font-size: 20px;
+        width: 150px;
+        height: 35px;
+        background: #3960e1;
+        border-radius: 4px;
+        color: white;
+        user-select: none;
+        cursor: pointer;
+    }
+
+    /*Einstein Matter to Energy*/
+    .MatterEnergyMainDiv {
+        padding: 15px;
+        
+    }
+    .inputButtonContainer {
+        display: flex;
+        flex-direction: column;
+        font-size: 20px;
+    }
+    .inputButtonContainer input {
+        height: 28px;
+        padding: 4px;
+        font-size: 19px;
+    }
+    .button225 {
+        font-family: "Lobster";
+        font-size: 23px;
+        width: 130px;
+        height: 35px;
+        background: #3960e1;
+        border-radius: 4px;
+        color: white;
+        user-select: none;
+        cursor: pointer;
+        margin-top: 12px;
+        margin-right: 10px;
+        height: 35px;
+    }
+
+    .relativisticKineticMainDiv {
+        padding-right: 12px;
+        line-height: 1.5;
+    }
 }

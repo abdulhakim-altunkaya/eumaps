@@ -1,6 +1,7 @@
 import React, {useState} from 'react';
 import "../../styles/converters.css"; 
 import CommentDisplay from '../CommentDisplay'; 
+import Footer from "../Footer";
 
 function Weight() {
 
@@ -15,7 +16,7 @@ function Weight() {
         pound: "",
         ounce: "",
         carat: "",
-    })
+    }) 
 
     const convertValues = (name, value) => {
         const conversions = {
@@ -223,6 +224,7 @@ function Weight() {
         </div>
         <div> <br/><br/><br/><br/><br/><br/><br/> </div>
         <div> <CommentDisplay pageId={14}/></div>
+        <div> <br/><br/><br/> <Footer /> </div>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import "../../styles/wordTools.css"; 
 import CommentDisplay from '../CommentDisplay'; 
+import Footer from "../Footer";
 
 function SentenceSplitter() {
   const [text, setText] = useState("");
@@ -32,9 +33,10 @@ function SentenceSplitter() {
         cols="50"
         placeholder="Enter your text here..."
       />
-      <button onClick={handleSplit} className='button201'>Split</button>
-      <button onClick={handleClear} className='button201'>Clear</button>
-
+      <div>
+        <button onClick={handleSplit} className='button20155'>Split</button>
+        <button onClick={handleClear} className='button20155'>Clear</button>
+      </div>
       {sentences.length > 0 && (
         <div style={{ marginTop: '10px' }}>
           <h3>Split Sentences:</h3>
@@ -44,9 +46,10 @@ function SentenceSplitter() {
             ))}
           </ul>
         </div>
-      )}
+      )} 
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
       <div> <CommentDisplay pageId={23}/></div>
+      <div> <br/><br/><br/> <Footer /> </div>
     </div>
   );
 }

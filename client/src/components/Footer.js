@@ -16,9 +16,9 @@ const Footer = () => {
     <footer className="footer" role="contentinfo" aria-label="Footer">
       <div className="footer-content">
         <div className="footer-header">
-          <p>Icons:
+          <p>Icons:&nbsp;
             <a href="https://icons8.com/icons" target="_blank" rel="noopener noreferrer" 
-              aria-label="Link to icons8 website for the icons used on this website">icons8</a> and 
+              aria-label="Link to icons8 website for the icons used on this website">icons8</a> and &nbsp;
             <a href="https://www.flaticon.com/" target="_blank" rel="noopener noreferrer" 
               aria-label="Data link to TÜİK site">Flaticon</a>
           </p>

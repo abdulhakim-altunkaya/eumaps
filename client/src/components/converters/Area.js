@@ -1,6 +1,7 @@
 import React, {useState} from 'react';
 import "../../styles/converters.css"; 
 import CommentDisplay from '../CommentDisplay'; 
+import Footer from "../Footer";
 
 function Area() {
 
@@ -281,7 +282,7 @@ function Area() {
         barn: "",
       });
     };
-  
+   
   return (
     <div className='convertersMainArea'>
         <h4>AREA UNITS CONVERTER</h4>
@@ -315,7 +316,8 @@ function Area() {
             <button className='button201' onClick={handleClearFields}>Clear</button>
         </div>
         <div> <br/><br/><br/><br/><br/><br/><br/> </div>
-        <div> <CommentDisplay pageId={17}/></div>
+        <div><CommentDisplay pageId={17}/></div>
+        <div> <br/><br/><br/> <Footer /> </div>
     </div>
   )
 }

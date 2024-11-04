@@ -3,6 +3,7 @@ import '../../styles/investment.css';
 import CommentDisplay from '../CommentDisplay'; 
 import { BlockMath } from 'react-katex';
 import 'katex/dist/katex.min.css'; // Import the KaTeX CSS for proper styling of Einstein formula
+import Footer from "../Footer";
 
 function LengthContraction() {
 
@@ -73,7 +74,7 @@ function LengthContraction() {
     setResultArea('');
   }
 
-  return (
+  return ( 
     <div>
       <h1 className='formHeader'>Relativistic Length Contraction Calculator</h1>
       <form className='formInvestment' onSubmit={calculateLengthContraction}>
@@ -111,6 +112,7 @@ function LengthContraction() {
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
 
       <div> <CommentDisplay pageId={12}/></div>
+      <div> <br/><br/><br/> <Footer /> </div>
     </div>
   )
 }

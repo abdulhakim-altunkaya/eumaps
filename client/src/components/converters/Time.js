@@ -1,6 +1,7 @@
 import React, {useState} from 'react';
 import "../../styles/converters.css"; 
 import CommentDisplay from '../CommentDisplay'; 
+import Footer from "../Footer";
 
 function Time() {
 
@@ -18,7 +19,7 @@ function Time() {
         decade: "",
         century: "",
         julianYear: "",
-        siderealYear: "",
+        siderealYear: "", 
         planckTime: "",
         fortnight: "",
     });
@@ -389,7 +390,7 @@ function Time() {
   
   return (
     <div className='convertersMainArea'>
-        <span><strong>TIME UNITS CONVERTER</strong> </span>
+        <h4>TIME UNITS CONVERTER</h4>
         <div>
             <input type='number' className='input103' value={values.nanosecond} 
                 name='nanosecond' onChange={handleChangeTimeUnits} /> <label>Nanoseconds (ns)</label> <br/>
@@ -427,6 +428,7 @@ function Time() {
         </div>
         <div> <br/><br/><br/><br/><br/><br/><br/> </div>
         <div> <CommentDisplay pageId={19}/></div>
+        <div> <br/><br/><br/> <Footer /> </div>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import React from 'react';
 import {useNavigate} from "react-router-dom";
 import "../../styles/car.css"; 
+import Footer from "../Footer";
 
 function Customs() {
   const navigate = useNavigate(); 
@@ -18,6 +19,7 @@ function Customs() {
         <button className='button102' onClick={()=>navigate("/hibrit-arac-gumruk-vergi-hesaplama")}>Hibrit</button>
         <button className='button102' onClick={()=>navigate("/plug-in-hibrit-arac-gumruk-vergi-hesaplama")}>Plug-In Hibrit</button>
       </div>
+      <div> <br/><br/><br/> <br/><br/><br/> <br/><br/><br/>  <br/><br/><br/> <br/><br/><br/> <Footer /> </div>
     </div>
   );
 }

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import '../../styles/investment.css';
 import CommentDisplay from '../CommentDisplay'; 
+import Footer from "../Footer"; 
 
-function Rent() {
+function Rent() { 
 
   const [resultArea, setResultArea] = useState('');
 
@@ -48,7 +49,7 @@ function Rent() {
     e.target.closest('form').reset();
     setResultArea('');
   }
-
+     
   return (
     <div>
       <h1 className='formHeader'>Dışişleri Bakanlığı Kira Yardımı Hesaplama</h1>
@@ -64,7 +65,7 @@ function Rent() {
           max="1000000"
           required
         /> &nbsp; &nbsp;
-        <label htmlFor='amountSalary'>Aylık Maaşınız (Nokta ve virgül koymadan)</label> <br /><br />
+        <label htmlFor='amountSalary'>Aylık Maaşınız</label> <br /><br />
 
         
         <input
@@ -99,6 +100,7 @@ function Rent() {
       </div>
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
       <div> <CommentDisplay pageId={1}/></div>
+      <div> <br/><br/><br/> <Footer /> </div>
     </div>
   )
 }

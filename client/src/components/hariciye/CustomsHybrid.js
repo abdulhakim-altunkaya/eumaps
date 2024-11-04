@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import "../../styles/car.css"; 
 import CommentDisplay from '../CommentDisplay'; 
+import Footer from "../Footer";
 
 function CustomsHybrid() {
   const navigate = useNavigate();
@@ -155,8 +156,8 @@ function CustomsHybrid() {
         BEDELSİZ ARAÇ İTHALATI<br />
         VERGİ HESAPLAMA</h3>
       </div>
-      <h4 className='customsLeftMargin'>HİBRİT ARAÇLAR</h4>
-      <div className='customsLeftMargin'>
+      <h3 className='customsLeftMargin'>HİBRİT ARAÇLAR</h3>
+      <div className='customsLeftMargin customsTexts'>
         {/* Radio buttons */}
         <div>
           <input
@@ -180,17 +181,17 @@ function CustomsHybrid() {
           {/* Conditionally render the forms based on the selected radio button */}
           {(selectedForm === 'newCarsRadio' || selectedForm === 'usedCarsRadio')  && (
             <div>
-              <p>Fatura Bedeli kısmına KDV iadesi almışsanız veya KDV ödememişseniz, KDV hariç bedeli yazınız.</p>
-              <p>Detaylı bilgi: 
+              <p className='customsTexts'>Fatura Bedeli kısmına KDV ödememişseniz veya KDV iadesi almışsanız, KDV hariç bedeli yazınız.</p>
+              <p className='customsTexts'>Detaylı bilgi: 
                 <span className="notesSpan" onClick={()=> navigate("/bedelsiz-arac-ithalati-onemli-notlar")}>Süreç ve 
                 Önemli Notlar</span></p>
-              <form onSubmit={calculateTax}>
+              <form onSubmit={calculateTax} className='customsForm'>
                 <input type="radio" id="dollarRadio" name="formSelectorCurrency" value="dollarRadio" onChange={handleRadioCurrency} 
-                required />
+                required className='radioLabelsCustoms' />
                 <label htmlFor="dollarRadio">Dolar</label> <br/>
                 
                 <input type="radio" id="euroRadio" name="formSelectorCurrency" value="euroRadio" onChange={handleRadioCurrency} 
-                required />
+                required className='radioLabelsCustoms' />
                 <label htmlFor="euroRadio">Euro</label> <br/>
 
                 <input className='input2' type='number' name='invoiceAmount' id='invoiceAmount'
@@ -207,7 +208,7 @@ function CustomsHybrid() {
 
                 <input className='input2' type='number' name='customsRegYear' id='customsRegYear'
                   aria-label='Arabayı Türkiyeye kaydedeceğiniz yılı 4 rakam olarak giriniz' required/> &nbsp; &nbsp;
-                <label htmlFor='customsRegYear'>Arabayı Türkiye'ye kaydedeceğiniz Yıl</label> <br/>
+                <label htmlFor='customsRegYear'>Türkiye'ye kaydedeceğiniz Yıl</label> <br/>
 
                 <input className='input2' type='number' name='engineCapacityElectric' id='engineCapacityElectric'
                   aria-label='Elektrik Motor hacmini giriniz.' required/> &nbsp; &nbsp;
@@ -257,6 +258,7 @@ function CustomsHybrid() {
               <div>{resultArea}</div>
               <div> <br/><br/><br/><br/><br/><br/><br/> </div>
               <div> <CommentDisplay pageId={4}/></div>
+              <div> <br/><br/><br/> <Footer /> </div>
             </div>
           )}
       </div>

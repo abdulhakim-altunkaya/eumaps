@@ -1,6 +1,7 @@
 import React, {useState} from 'react';
 import "../../styles/converters.css"; 
 import CommentDisplay from '../CommentDisplay'; 
+import Footer from "../Footer";
 
 function Volume() {
 
@@ -606,7 +607,7 @@ function Volume() {
 
   return (
     <div className='convertersMainArea'>
-        <span> <strong>VOLUME UNITS CONVERTER</strong> </span>
+        <h4>VOLUME UNITS CONVERTER</h4>
         <div>
             <input type='number' className='input103' value={values.cubicMillimeter} 
                 name='cubicMillimeter' onChange={handleChangeVolumeUnits} /> <label>Cubic Millimeter (mm³)</label> <br/>
@@ -656,9 +657,10 @@ function Volume() {
         </div>
         <div> <br/><br/><br/><br/><br/><br/><br/> </div>
         <div> <CommentDisplay pageId={18}/></div>
+        <div> <br/><br/><br/> <Footer /> </div>
     </div>
   )
 }
 
 export default Volume;
- 
+  

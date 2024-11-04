@@ -58,9 +58,7 @@ function MainArea() {
   return (
     <div className='mainArea'>
       <Routes>
-        
-      
-        
+             
         <Route path="/investment-return-calculator" element={<Investment/>} />
         <Route path="/kira-yardimi-hesaplama" element={<Rent/>} />
 

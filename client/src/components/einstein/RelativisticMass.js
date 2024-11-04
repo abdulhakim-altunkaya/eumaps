@@ -3,6 +3,7 @@ import '../../styles/investment.css';
 import CommentDisplay from '../CommentDisplay'; 
 import { BlockMath } from 'react-katex';
 import 'katex/dist/katex.min.css'; // Import the KaTeX CSS for proper styling of Einstein formula
+import Footer from "../Footer";
 
 function RelativisticMass() {
   const [resultArea, setResultArea] = useState(<span>Speed of light: 299,792.4580 km/s</span>);
@@ -106,7 +107,7 @@ function RelativisticMass() {
       <h1 className='formHeader'>Relativistic Mass Calculator</h1>
       <form className='formInvestment' onSubmit={calculateRelativisticMass}>
         
-        <input
+        <input 
           className='inputFields'
           type='number'
           name='restMass'
@@ -139,6 +140,7 @@ function RelativisticMass() {
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
 
       <div> <CommentDisplay pageId={26}/></div>
+      <div> <br/><br/><br/> <Footer /> </div>
     </div>
   )
 }

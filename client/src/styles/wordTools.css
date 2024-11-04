@@ -1,50 +1,84 @@
-.wordToolsArea {
-    margin-left: 20px;
+
+/* Media query for laptop/desktop screens */
+@media (min-width: 781px) {
+    .wordToolsArea {
+        margin-left: 20px;
+    }
+    
+    .wordToolsArea textarea {
+        border: 2px #112773 solid;
+        border-radius: 5px;
+        display: block;
+        margin-bottom: 10px;
+        font-family: "Maven Pro";
+        font-size: 16px;
+        color: #000;  /* Make the text color black for legibility */
+        opacity: 1;   /* Ensure full opacity for the text */
+    }
+    
+    /* Style for the placeholder text */
+    .wordToolsArea textarea::placeholder {
+        color: #004040;  /* Darker color for legibility */
+        font-style: italic;  /* Italicize if needed */
+        font-size: 16px;  /* Adjust font size */
+        opacity: 1;  /* Make sure the placeholder is fully opaque */
+    }    
+    .button20155 {
+        font-family: "Lobster";
+        font-size: 20px;
+        width: 150px;
+        background: #3960e1;
+        border-radius: 4px;
+        color: white;
+        user-select: none;
+        cursor: pointer;
+    }
+    .button20155 {
+        margin-left: 12px;
+    }
 }
 
-.wordToolsArea textarea {
-    border: 2px #112773 solid;
-    border-radius: 5px;
-    display: block;
-    margin-bottom: 10px;
-    font-family: "Maven Pro";
-    font-size: 16px;
-    color: #000;  /* Make the text color black for legibility */
-    opacity: 1;   /* Ensure full opacity for the text */
-}
-
-/* Style for the placeholder text */
-.wordToolsArea textarea::placeholder {
-    color: #004040;  /* Darker color for legibility */
-    font-style: italic;  /* Italicize if needed */
-    font-size: 16px;  /* Adjust font size */
-    opacity: 1;  /* Make sure the placeholder is fully opaque */
-}
-
-.button205 {
-    font-family: "Lobster";
-    font-size: 20px;
-    width: 40%;
-    background: #3960e1;
-    border-radius: 4px;
-    color: white;
-    user-select: none;
-    cursor: pointer;
-}
-.button205 {
-    margin-left: 12px;
-}
-
-.button205 {
-    font-family: "Lobster";
-    font-size: 20px;
-    width: 150px;
-    background: #3960e1;
-    border-radius: 4px;
-    color: white;
-    user-select: none;
-    cursor: pointer;
-}
-.button205 {
-    margin-left: 12px;
+/* Media query for mobile screens */
+@media (max-width: 780px) {
+    .wordToolsArea {
+        margin-left: 20px;
+        margin-right: 20px;
+        padding-top: 10px;
+    }
+    
+    .wordToolsArea textarea {
+        width: 100%;         /* Make textarea responsive */
+        max-width: 100%;     /* Prevents it from exceeding container width */
+        box-sizing: border-box; /* Ensures padding doesn't affect the width */
+        border: 2px #112773 solid;
+        border-radius: 5px;
+        display: block;
+        margin-bottom: 10px;
+        font-family: "Maven Pro";
+        font-size: 16px;
+        color: #000;  /* Make the text color black for legibility */
+        opacity: 1;   /* Ensure full opacity for the text */
+    }
+    
+    /* Style for the placeholder text */
+    .wordToolsArea textarea::placeholder {
+        color: #004040;  /* Darker color for legibility */
+        font-style: italic;  /* Italicize if needed */
+        font-size: 16px;  /* Adjust font size */
+        opacity: 1;  /* Make sure the placeholder is fully opaque */
+    }
+    
+    .button20155 {
+        font-family: "Lobster";
+        font-size: 20px;
+        width: 40%;
+        background: #3960e1;
+        border-radius: 4px;
+        color: white;
+        user-select: none;
+        cursor: pointer;
+    }
+    .button20155 {
+        margin-right: 12px;
+    }
 }

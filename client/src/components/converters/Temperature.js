@@ -1,6 +1,7 @@
 import React, {useState} from 'react';
 import "../../styles/converters.css"; 
 import CommentDisplay from '../CommentDisplay'; 
+import Footer from "../Footer";
 
 function Temperature() {
 
@@ -108,9 +109,10 @@ function Temperature() {
         </div>
         <div> <br/><br/><br/><br/><br/><br/><br/> </div>
         <div> <CommentDisplay pageId={16}/></div>
+        <div> <br/><br/><br/> <Footer /> </div>
     </div>
   )
 }
 
 export default Temperature;
- 
+  

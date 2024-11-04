@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import "../../styles/wordTools.css"; 
 import CommentDisplay from '../CommentDisplay'; 
+import Footer from "../Footer";
 
 function Counter() {
   const [text, setText] = useState("");
@@ -14,7 +15,7 @@ function Counter() {
   const handleTextChange = (e) => {
     setText(e.target.value);
   };
-
+ 
   const handleCount = () => {
     const countWithSpaces = text.length;
     const countWithoutSpaces = text.replace(/\s+/g, '').length;
@@ -46,9 +47,10 @@ function Counter() {
         cols="50"
         placeholder="Enter your text here..."
       />
-      <button onClick={handleCount} className='button201'>Count</button>
-      <button onClick={handleClear} className='button201'>Clear</button>
-
+      <div>
+        <button onClick={handleCount} className='button20155'>Count</button>
+        <button onClick={handleClear} className='button20155'>Clear</button>
+      </div>
       {characterCount !== null && (
         <div style={{ marginTop: '10px' }}>
           <p>Characters (with spaces): {characterCount}</p>
@@ -70,6 +72,7 @@ function Counter() {
       )}
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
       <div> <CommentDisplay pageId={21}/></div>
+      <div> <br/><br/><br/> <Footer /> </div>
     </div>
   );
 }

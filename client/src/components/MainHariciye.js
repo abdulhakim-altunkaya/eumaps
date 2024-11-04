@@ -8,27 +8,26 @@ function MainHariciye() {
 
   return (
       <div className='mainAreasMainComponents'>
-        <div className='parentAreasTitleDiv'><h1 className='convertersMainH1Short'>Dışişleri Bakanlığı Hesaplamaları</h1></div>
-        <div className='convertersMain'>
-        
-        <div className='convertersIconsMainArea'>
-            <div className="converter-item" onClick={ () => navigate("/arac-gumruk-vergi-hesaplama")}>
-                <span className="converter-name2">Araç Gümrük Vergi Hesaplama</span>
-                <span className="icon-wrapper"><img src="/icons/car2.png" className="unitIcons" 
-                    alt="Ara Gümrük Vergi Hesaplama sayfasına gitmek için üzerine tıklayabileceğiniz resim"/></span>
+            <div className='parentAreasTitleDiv'><h1 className='convertersMainH1'>Dışişleri Bakanlığı</h1></div>
+            <div className='convertersMain'>
+                    <div className='convertersIconsMainArea'>
+                      <div className="converter-item" onClick={ () => navigate("/arac-gumruk-vergi-hesaplama")}>
+                          <span className="converter-name2">Araç Gümrük Vergi Hesaplama</span>
+                          <span className="icon-wrapper"><img src="/icons/car2.png" className="unitIcons" 
+                              alt="Ara Gümrük Vergi Hesaplama sayfasına gitmek için üzerine tıklayabileceğiniz resim"/></span>
+                      </div>
+                      <div className="converter-item" onClick={ () => navigate("/motorsiklet-gumruk-vergi-hesaplama")}>
+                          <span className="converter-name2">Motorsiklet Gümrük Vergi Hesaplama</span>
+                          <span className="icon-wrapper"><img src="/icons/motorbike.png" className="unitIcons" 
+                              alt="Motorsiklet Gümrük Vergi Hesaplama sayfasına gitmek için üzerine tıklayabileceğiniz resim"/></span>
+                      </div>
+                      <div className="converter-item" onClick={ () => navigate("/kira-yardimi-hesaplama")}>
+                          <span className="converter-name2">Kira Yardımı Hesaplama</span>
+                          <span className="icon-wrapper"><img src="/icons/rent.png" className="unitIcons" 
+                              alt="Kira yardımı hesaplamak için üzerine tıklayabileceğiniz resim"/></span>
+                      </div>
+                    </div>
             </div>
-            <div className="converter-item" onClick={ () => navigate("/motorsiklet-gumruk-vergi-hesaplama")}>
-                <span className="converter-name2">Motorsiklet Gümrük Vergi Hesaplama</span>
-                <span className="icon-wrapper"><img src="/icons/motorbike.png" className="unitIcons" 
-                    alt="Motorsiklet Gümrük Vergi Hesaplama sayfasına gitmek için üzerine tıklayabileceğiniz resim"/></span>
-            </div>
-            <div className="converter-item" onClick={ () => navigate("/kira-yardimi-hesaplama")}>
-                <span className="converter-name2">Kira Yardımı Hesaplama</span>
-                <span className="icon-wrapper"><img src="/icons/rent.png" className="unitIcons" 
-                    alt="Kira yardımı hesaplamak için üzerine tıklayabileceğiniz resim"/></span>
-            </div>
-        </div>
-      </div>
       <br/>
       <br/>
       <br/>

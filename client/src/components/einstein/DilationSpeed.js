@@ -3,9 +3,10 @@ import '../../styles/investment.css';
 import CommentDisplay from '../CommentDisplay'; 
 import { BlockMath } from 'react-katex';
 import 'katex/dist/katex.min.css'; // Import the KaTeX CSS for proper styling of Einstein formula
+import Footer from "../Footer";
 
 function DilationSpeed() {
-
+ 
   const [resultArea, setResultArea] = useState(<span>Speed of light: 299,792.4580 km/s</span>);
 
   const calculateTimeDilation = (e) => {
@@ -116,6 +117,7 @@ function DilationSpeed() {
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
 
       <div> <CommentDisplay pageId={9}/></div>
+      <div> <br/><br/><br/> <Footer /> </div>
     </div>
   )
 }

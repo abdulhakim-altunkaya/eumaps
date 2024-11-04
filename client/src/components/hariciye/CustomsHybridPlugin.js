@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import "../../styles/car.css"; 
 import "../../styles/CheckboxForm.css"; // External CSS file for styling
 import CommentDisplay from '../CommentDisplay'; 
+import Footer from "../Footer";
 
 function CustomsHybridPlugin() {
   const navigate = useNavigate();
@@ -161,8 +162,8 @@ function CustomsHybridPlugin() {
         BEDELSİZ ARAÇ İTHALATI<br />
         VERGİ HESAPLAMA</h3>
       </div>
-      <h4 className='customsLeftMargin'>PLUG-IN HİBRİT ARAÇLAR</h4>
-      <div className='customsLeftMargin'>
+      <h3 className='customsLeftMargin'>PLUG-IN HİBRİT (Dışarıdan Şarj Edilebilir) ARAÇLAR</h3>
+      <div className='customsLeftMargin customsTexts'>
         {/* Radio buttons */}
         <div>
           <input
@@ -176,7 +177,7 @@ function CustomsHybridPlugin() {
           <br/>
           <input
             type="radio"
-            id="newCarsRadio"
+            id="newCarsRadio" 
             name="formSelector"
             value="newCarsRadio"
             onChange={handleRadioChange}
@@ -186,16 +187,13 @@ function CustomsHybridPlugin() {
           {/* Conditionally render the forms based on the selected radio button */}
           {(selectedForm === 'newCarsRadio' || selectedForm === 'usedCarsRadio')  && (
             <div>
-              <p>Fatura Bedeli kısmına KDV iadesi almışsanız veya KDV ödememişseniz, KDV hariç bedeli yazınız.</p>
-              <p>Bu alanda sadece Plug-In Hibrit ("Şarj Edilebilir") araçlar içindir. Kendi kendini şarj eden Hibrit araçlar içinse
-                "Hibrit Araçlar" düğmesine basın.
-              </p>
-              <p>Detaylı bilgi: 
+              <p className='customsTexts'>Fatura Bedeli kısmına KDV ödememişseniz veya KDV iadesi almışsanız, KDV hariç bedeli yazınız.</p>
+              <p className='customsTexts'>Detaylı bilgi: 
                 <span className="notesSpan" onClick={()=> navigate("/bedelsiz-arac-ithalati-onemli-notlar")}>Süreç ve 
                 Önemli Notlar</span></p>
-              <form onSubmit={calculateTax}>
+              <form onSubmit={calculateTax} className='customsForm'>
                 <input type="radio" id="dollarRadio" name="formSelectorCurrency" value="dollarRadio" onChange={handleRadioCurrency} 
-                required />
+                required className='radioLabelsCustoms' />
                 <label htmlFor="dollarRadio">Dolar</label> <br/>
                 
                 <input type="radio" id="euroRadio" name="formSelectorCurrency" value="euroRadio" onChange={handleRadioCurrency} 
@@ -203,8 +201,8 @@ function CustomsHybridPlugin() {
                 <label htmlFor="euroRadio">Euro</label> <br/><br/>
 
                 <div class="checkbox-wrapper-13">
-                <input type="checkbox" checked={isChecked} onChange={handleCheckboxChange} />
-                <label >Aracın CO2 emisyonu 25 gramdan az ve elektrik menzili 70 km'den çoktur.</label> <br/>
+                  <input type="checkbox" checked={isChecked} onChange={handleCheckboxChange} />
+                  <label >Aracın CO2 emisyonu 25 gramdan az ve elektrik menzili 70 km'den çoktur.</label> <br/>
                 </div>
 
                 <input className='input2' type='number' name='invoiceAmount' id='invoiceAmount'
@@ -217,11 +215,11 @@ function CustomsHybridPlugin() {
 
                 <input className='input2' type='number' name='productionYear' id='productionYear'
                   aria-label='Araç üretim yılını 4 rakam olarak giriniz.' required /> &nbsp; &nbsp;
-                <label htmlFor='productionYear'>Araç Üretim Yılı</label> <br/>
+                <label htmlFor='productionYear'>Üretim Yılı</label> <br/>
 
                 <input className='input2' type='number' name='customsRegYear' id='customsRegYear'
                   aria-label='Arabayı Türkiyeye kaydedeceğiniz yılı 4 rakam olarak giriniz' required/> &nbsp; &nbsp;
-                <label htmlFor='customsRegYear'>Arabayı Türkiye'ye kaydedeceğiniz Yıl</label> <br/>
+                <label htmlFor='customsRegYear'>Türkiye'ye kaydedeceğiniz Yıl</label> <br/>
 
                 <input className='input2' type='number' name='engineCapacityOil' id='engineCapacityOil'
                   aria-label='Benzin/Dizel Motor hacmini giriniz.' required/> &nbsp; &nbsp;
@@ -267,6 +265,7 @@ function CustomsHybridPlugin() {
               <div>{resultArea}</div>
               <div> <br/><br/><br/><br/><br/><br/><br/> </div>
               <div> <CommentDisplay pageId={6}/></div>
+              <div> <br/><br/><br/> <Footer /> </div>
             </div>
           )}
       </div>

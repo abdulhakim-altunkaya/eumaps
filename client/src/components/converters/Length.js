@@ -1,6 +1,7 @@
 import React, {useState} from 'react';
 import "../../styles/converters.css"; 
 import CommentDisplay from '../CommentDisplay'; 
+import Footer from "../Footer";
 
 function Length() {
 
@@ -421,7 +422,7 @@ function Length() {
   
   return (
     <div className='convertersMainArea'>
-        <span> <strong>LENGTH UNITS CONVERTER</strong> </span>
+        <h4>LENGTH UNITS CONVERTER</h4>
         <div>
             <input type='number' className='input103' value={values.attometer} 
                 name='attometer' onChange={handleChangeLengthUnits} /> <label>Attometer</label> <br/>
@@ -461,7 +462,8 @@ function Length() {
         </div>
         <div> <br/><br/><br/><br/><br/><br/><br/> </div>
         <div> <CommentDisplay pageId={15}/></div>
-    </div>
+        <div> <br/><br/><br/> <Footer /> </div>
+    </div> 
   )
 }
 

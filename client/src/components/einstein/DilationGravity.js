@@ -3,9 +3,10 @@ import '../../styles/investment.css';
 import CommentDisplay from '../CommentDisplay'; 
 import { BlockMath } from 'react-katex';
 import 'katex/dist/katex.min.css'; // Import the KaTeX CSS for proper styling of Einstein formula
+import Footer from "../Footer";
 
 function GravitationalTimeDilation() {
-
+ 
   const [resultArea, setResultArea] = useState('');
 
   const calculateTimeDilation = (e) => {
@@ -82,7 +83,7 @@ function GravitationalTimeDilation() {
         </BlockMath>
       </div>
     );
-  }
+  } 
 
   const clearTimeDilationForm = (e) => {
     e.preventDefault(); // prevent the form from refreshing the page
@@ -140,6 +141,7 @@ function GravitationalTimeDilation() {
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
 
       <div> <CommentDisplay pageId={10}/></div>
+      <div> <br/><br/><br/> <Footer /> </div>
     </div>
   )
 }

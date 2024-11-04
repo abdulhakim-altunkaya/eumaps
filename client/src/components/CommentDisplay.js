@@ -90,7 +90,8 @@ function CommentDisplay({pageId}) {
                       : 
                         null
                   ))}
-                  <button className='replyCommentBtn' aria-label={commentTitle4} onClick={() => replyComment(comment.id)}>{commentTitle4}</button>
+                  <button className='replyCommentBtn' aria-label={commentTitle4} 
+                    onClick={() => replyComment(comment.id)}>{commentTitle4}</button>
                   { isCommentReply ? 
                       repliedCommentId === comment.id ?
                           <CommentReply commentId2={comment.id} pageId3={pageId} cancelReply={cancelReply}/> 

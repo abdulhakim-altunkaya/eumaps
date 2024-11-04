@@ -3,9 +3,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Playwrite+HU:wght@100..400&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Edu+AU+VIC+WA+NT+Hand:wght@400..700&family=Playwrite+HU:wght@100..400&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Nerko+One&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Lobster&family=Nerko+One&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Acme&family=Lobster&family=Nerko+One&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nerko+One&display=swap'); /* Nerko One*/
+@import url('https://fonts.googleapis.com/css2?family=Acme&family=Lobster&family=Nerko+One&display=swap'); /*Acme Lobster Nerko One*/
 @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap'); /*Fredoka One*/
 @import url('https://fonts.googleapis.com/css2?family=Courgette&display=swap'); /*Courgette*/
 @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@300&display=swap');/*Comfortaa*/
@@ -14,7 +13,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Concert+One&family=Monda:wght@700&family=Righteous&display=swap');/*Monda*/
 @import url('https://fonts.googleapis.com/css2?family=Maven+Pro&display=swap');/*Maven Pro*/
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@200&display=swap'); /*Nunito*/
+/*Nunito Maven Pro Righteous Monda Concert One Courgette Fredoka One Lobster Nerko One Poppins Playwrite HU*/
 
+@media (min-width: 781px) {
 html {
     font-size: 1.25rem;
     font-family: "Ubuntu", sans-serif;
@@ -119,14 +120,11 @@ html {
     margin-left: 12px;
   }
 
-  .mainAreasMainComponents {
-    margin-top: 50px;
-  }
-
+}
 /* Media query for mobile screens */
-@media (max-width: 768px) {
+@media (max-width: 780px) {
   html {
-    font-size: 18px;
+    font-size: 16px;
     font-family: "Ubuntu", sans-serif;
   }
   
@@ -144,6 +142,7 @@ html {
 
   .mainArea {
     min-width: 100%;
+    padding-bottom: 25px;
   }
 
   .sidebarArea {
@@ -154,7 +153,7 @@ html {
     background-color: #093945;
     color: white;
     */
-    box-shadow: 5px 0px 10px rgba(0, 0, 0, 0.3);/*border right shade*/
+    box-shadow: 0px 5px 10px rgba(0, 0, 0, 0.3); /* Border bottom shadow */
     overflow-y: none;
      /* Content scrolls if overflow */
     scrollbar-width: auto; /* For Firefox */
@@ -171,7 +170,7 @@ html {
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0px 5px 10px rgba(0, 0, 0, 0.3); /* Bottom border shadow   */
+    box-shadow: 0px 6px 12px rgba(0, 0, 0, 0.4); /* Bottom border shadow   */
   }
   .sidebarButtonsArea { 
     cursor: pointer;
@@ -179,31 +178,24 @@ html {
     background-color: #00246B;
   }
   .sidebarMainButtons{
-    box-shadow: 0px 0.4px 3px #b0b0b0; /* Bottom border shadow */
-    color: #CADCFC;
+    box-shadow: 0px 0.4px 2px #b0b0b0; /* Bottom border shadow */
+    color: #f3f3f3;
     font-family: "Monda";
-  }
-  .sidebarMainButtons:hover {
-    background-color: #3C6478;
-    /* Light gray border on hover */
-  }
-  .sidebarMainButtons:active{
-    background-color: #94b8c9;
   }
 
   .sidebarSideButtons {
     background-color: #EFD469;
     color: black;
     box-shadow: 0px 0.2px 2px #b0b0b0; /* Bottom border shadow */
-    font-family: "Concert One", sans-serif; /* Example font family */
-    font-size: 0.75rem;
-    padding-left: 30px !important;
+    font-family: "Poppins", sans-serif; /* Nunito Maven Pro Righteous Monda Concert One Courgette Fredoka One Lobster Nerko One Poppins Playwrite HU*/
+    font-size: 16px;
+    padding-left: 25px !important;
   }
   .sidebarSideButtons:hover {
     background-color: #bb9913;
   }
   .sidebarMainButtons, .sidebarSideButtons {
-    padding: 15px 10px 5px 18px;/*top-right-bottom-left*/
+    padding: 11px 8px 4px 13px;/*top-right-bottom-left*/
   }
 
   .notesArea {
@@ -216,14 +208,18 @@ html {
   }
 
   .customsNotesArea {
-    margin-left: 12px;
+    padding-left: 20px;
+    text-align: justify;
+    padding-right: 20px;
+  }
+  .customsNotesAreaExtraMargin {
+    margin-bottom: 10px; /* Adjust as needed */
+    display: block; /* Make it behave like a block element to apply margin */
   }
 
   .buttonsMainArea {
-    margin-left: 12px;
-  }
-
-  .mainAreasMainComponents {
-    margin-top: 10px;
+    padding-left: 10px;
+    text-align: justify;
+    padding-right: 10px;
   }
 }

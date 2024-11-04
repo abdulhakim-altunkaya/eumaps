@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import "../../styles/car.css"; 
-import CommentDisplay from '../CommentDisplay'; 
+import CommentDisplay from '../CommentDisplay';
+import Footer from "../Footer"; 
 
 function CustomsGasoline() {
   const navigate = useNavigate();
@@ -154,8 +155,8 @@ function CustomsGasoline() {
         BEDELSİZ ARAÇ İTHALATI<br />
         VERGİ HESAPLAMA</h3>
       </div>
-      <h4 className='customsLeftMargin'>BENZİN/DİZEL ARAÇLAR</h4>
-      <div className='customsLeftMargin'>
+      <h3 className='customsLeftMargin'>BENZİN/DİZEL ARAÇLAR</h3>
+      <div className='customsLeftMargin customsTexts'>
         {/* Radio buttons */}
         <div>
           <input
@@ -179,16 +180,16 @@ function CustomsGasoline() {
           {/* Conditionally render the forms based on the selected radio button */}
           {(selectedForm === 'newCarsRadio' || selectedForm === 'usedCarsRadio')  && (
             <div>
-              <p>Fatura Bedeli kısmına KDV iadesi almışsanız veya KDV ödememişseniz, KDV hariç bedeli yazınız.</p>
-              <p>Detaylı bilgi: 
+              <p className='customsTexts'>Fatura Bedeli kısmına KDV ödememişseniz veya KDV iadesi almışsanız, KDV hariç bedeli yazınız.</p>
+              <p className='customsTexts'>Detaylı bilgi: 
                 <span className="notesSpan" onClick={()=> navigate("/bedelsiz-arac-ithalati-onemli-notlar")}>Süreç ve 
                 Önemli Notlar</span></p>
-              <form onSubmit={calculateTax}>
+              <form onSubmit={calculateTax} className='customsForm'>
                 <input type="radio" id="dollarRadio" name="formSelectorCurrency" value="dollarRadio" onChange={handleRadioCurrency} 
-                required />
+                required className='radioLabelsCustoms'/>
                 <label htmlFor="dollarRadio">Dolar</label> <br/>
                 <input type="radio" id="euroRadio" name="formSelectorCurrency" value="euroRadio" onChange={handleRadioCurrency} 
-                required />
+                requiredclassName='radioLabelsCustoms' />
                 <label htmlFor="euroRadio">Euro</label> <br/>
 
                 <input className='input2' type='number' name='invoiceAmount' id='invoiceAmount'
@@ -205,11 +206,11 @@ function CustomsGasoline() {
 
                 <input className='input2' type='number' name='customsRegYear' id='customsRegYear'
                   aria-label='Arabayı Türkiyeye kaydedeceğiniz yılı 4 rakam olarak giriniz' required/> &nbsp; &nbsp;
-                <label htmlFor='customsRegYear'>Arabayı Türkiye'ye kaydedeceğiniz Yıl</label> <br/>
+                <label htmlFor='customsRegYear'>Türkiye'ye kaydedeceğiniz Yıl</label> <br/>
 
                 <input className='input2' type='number' name='engineCapacity' id='engineCapacity'
                   aria-label='Motor hacmini giriniz.' required/> &nbsp; &nbsp;
-                <label htmlFor='engineCapacity'>Motor Hacmi <i>("1500", "2000"... gibi)</i></label> <br/>
+                <label htmlFor='engineCapacity'>Motor Hacmi <i>("1500", "2000" gibi)</i></label> <br/>
 
                 <input className='input2' type='number' name='navlunAmount' id='navlunAmount'
                   aria-label='Aşağıdaki tabloya göre Navlun ve Sigorta harcını giriniz.' min="100" max="5000" required/> &nbsp; &nbsp;
@@ -251,6 +252,7 @@ function CustomsGasoline() {
               <div>{resultArea}</div>
               <div> <br/><br/><br/><br/><br/><br/><br/> </div>
               <div> <CommentDisplay pageId={5}/></div>
+              <div> <br/><br/><br/> <Footer /> </div>
             </div>
           )}
       </div>

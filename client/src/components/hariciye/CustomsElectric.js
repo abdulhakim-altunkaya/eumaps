@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import "../../styles/car.css"; 
 import CommentDisplay from '../CommentDisplay'; 
+import Footer from "../Footer";
 
 function CustomsElectric() {
   const navigate = useNavigate();
@@ -141,8 +142,8 @@ function CustomsElectric() {
         BEDELSİZ ARAÇ İTHALATI<br />
         VERGİ HESAPLAMA</h3>
       </div>
-      <h4 className='customsLeftMargin'>ELEKTRİKLİ ARAÇLAR</h4>
-      <div className='customsLeftMargin'>
+      <h3 className='customsLeftMargin'>ELEKTRİKLİ ARAÇLAR</h3>
+      <div className='customsLeftMargin customsTexts'>
         {/* Radio buttons */}
         <div>
           <input
@@ -166,20 +167,20 @@ function CustomsElectric() {
           {/* Conditionally render the forms based on the selected radio button */}
           {(selectedForm === 'newCarsRadio' || selectedForm === 'usedCarsRadio')  && (
             <div>
-              <p>Fatura Bedeli kısmına KDV iadesi almışsanız veya KDV ödememişseniz, KDV hariç bedeli yazınız.</p>
-              <p>2. Avrupa Birliği ve Güney Kore haricinde diğer ülkelerde üretilen elektrikli 
+              <p className='customsTexts'>Fatura Bedeli kısmına KDV ödememişseniz veya KDV iadesi almışsanız, KDV hariç bedeli yazınız.</p>
+              <p className='customsTexts'>2. Avrupa Birliği ve Güney Kore haricinde diğer ülkelerde üretilen elektrikli 
                 araçların Türkiye'ye ithalatı yasak. Örnek: Tesla'nın Berlin'de üretilen modeli ithal 
                 edilebilir ama ABD'de ürettiği modeli ithal edilemez. Örnek: BMW'nin Almanya'da ürettiği iX1 
                 modeli ithal edilebilir ama Çin'de ürettiği iX3 modeli ithal edilemez.</p>
-              <p>Detaylı bilgi: 
+              <p className='customsTexts'>Detaylı bilgi: 
                 <span className="notesSpan" onClick={()=> navigate("/bedelsiz-arac-ithalati-onemli-notlar")}>Süreç ve 
                 Önemli Notlar</span></p>
-              <form onSubmit={calculateTax}>
+              <form onSubmit={calculateTax} className='customsTexts'>
                 <input type="radio" id="dollarRadio" name="formSelectorCurrency" value="dollarRadio" onChange={handleRadioCurrency} 
-                required />
+                required className='radioLabelsCustoms'/>
                 <label htmlFor="dollarRadio">Dolar</label> <br/>
                 <input type="radio" id="euroRadio" name="formSelectorCurrency" value="euroRadio" onChange={handleRadioCurrency} 
-                required />
+                required className='radioLabelsCustoms'/>
                 <label htmlFor="euroRadio">Euro</label> <br/>
 
                 <input className='input2' type='number' name='invoiceAmount' id='invoiceAmount'
@@ -196,7 +197,7 @@ function CustomsElectric() {
 
                 <input className='input2' type='number' name='customsRegYear' id='customsRegYear'
                   aria-label='Arabayı Türkiyeye kaydedeceğiniz yılı 4 rakam olarak giriniz' required/> &nbsp; &nbsp;
-                <label htmlFor='customsRegYear'>Arabayı Türkiye'ye kaydedeceğiniz Yıl</label> <br/>
+                <label htmlFor='customsRegYear'>Türkiye'ye kaydedeceğiniz Yıl</label> <br/>
 
                 <input className='input2' type='number' name='engineCapacity' id='engineCapacity'
                   aria-label='Arabanın KW gücünü hacmini giriniz. 125, 150 gibi' required/> &nbsp; &nbsp;
@@ -210,6 +211,7 @@ function CustomsElectric() {
               <div>{resultArea}</div>
               <div> <br/><br/><br/><br/><br/><br/><br/> </div>
               <div> <CommentDisplay pageId={3}/></div>
+              <div> <br/><br/><br/> <Footer /> </div>
             </div>
           )}
       </div>

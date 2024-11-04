@@ -11,7 +11,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@200&display=swap'); /*Nunito*/
 
 @import url('https://fonts.googleapis.com/css2?family=Lobster&family=Nerko+One&display=swap');
-
+@media (min-width: 871px) {
 .customsMainArea {
     display: flex;
     flex-direction: column;
@@ -59,22 +59,9 @@
     cursor: pointer;
 }
 
-
-
-/*<input className="inputFields" />*/
-.inputFields {
-    height: 27px;
-    width: 130px;
-    margin-left: 12px;
-    border-radius: 5px;
-}
-.inputFields:focus {
-    background-color: lightsalmon;
-    color:black;
-}
 /* Chrome, Safari, Edge, Opera */
-    input::-webkit-outer-spin-button,
-    input::-webkit-inner-spin-button {
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
 }
@@ -106,17 +93,23 @@ input[type=number] {
   .customsRow td {
     border: 1px solid blue;
   }
-
+}
   /* Media query for mobile screens */
 @media (max-width: 870px) {
     .customsMainArea {
         display: flex;
         flex-direction: column;
-        margin-left: none;
         font-family: "Maven Pro", 'Trebuchet MS', sans-serif;
     }
     .customsMainArea h1, h2, h3 {
         font-family: "Comfortaa", 'Trebuchet MS', sans-serif;
+    }
+
+    .customsTexts { /*some customs form contains a table and some dont. This targets the customs without table*/
+        font-size: 18px;
+    }
+    .customsForm label { /*some customs form contains a table and some dont. This targets the customs with table*/
+        font-size: 18px;
     }
     .customsLeftMargin {
         padding-left: 10px;
@@ -133,7 +126,6 @@ input[type=number] {
     
     .customsMainPageButtonsArea {
         width: 100%;
-        margin: auto;
         padding-left: 20px;
     }
     
@@ -141,15 +133,13 @@ input[type=number] {
         font-family: "Lobster";
         font-size: 20px;
         width: 40%;
-        height: 50px;
+        height: 40px;
         background: #4822cc;
         border-radius: 4px;
         color: white;
         user-select: none;
         cursor: pointer;
         margin-bottom: 20px;
-    }
-    .button102 {
         margin-left: 12px;
     }
     
@@ -160,19 +150,6 @@ input[type=number] {
         cursor: pointer;
     }
     
-    
-    
-    /*<input className="inputFields" />*/
-    .inputFields {
-        height: 27px;
-        width: 130px;
-        margin-left: 12px;
-        border-radius: 5px;
-    }
-    .inputFields:focus {
-        background-color: lightsalmon;
-        color:black;
-    }
     /* Chrome, Safari, Edge, Opera */
         input::-webkit-outer-spin-button,
         input::-webkit-inner-spin-button {
@@ -186,9 +163,11 @@ input[type=number] {
     
     .input2 {
         border: solid 1px blue;
-        height: 20px;
+        height: 30px;
         width: 130px;
         border-radius: 4px;
+        font-size: 18px;
+        margin-top: 5px;
     }
     .input2:focus {
         background-color: lightsalmon;
@@ -206,5 +185,8 @@ input[type=number] {
       }
       .customsRow td {
         border: 1px solid blue;
+      }
+      .radioLabelsCustoms {
+        margin-bottom: 10px;
       }
 }

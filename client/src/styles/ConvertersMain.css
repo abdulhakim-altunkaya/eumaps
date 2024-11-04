@@ -1,120 +1,26 @@
 
 /* Media query for mobile screens */
-@media (min-width: 871px) {
+@media (min-width: 781px) {
+    .mainAreasMainComponents {
+        padding-top: 40px;
+    }
     .convertersMain{   
         margin: 12px;
     }
-}
-.convertersMainH1Long {
-    font-family: "Monda";
-    width: 600px;
-    margin: auto;
-    margin-bottom: 50px;
-}
-.convertersMainH1Short {
-    font-family: "Monda";
-    width: 200px;
-    margin: auto;
-    margin-bottom: 50px;
-}
-
-.convertersIconsMainArea {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-around;
-    flex-wrap: wrap; /* Allows the items to wrap to the next line */
-    margin-bottom: 50px;
-    margin-right: 200px;
-}
-
-.converter-item {
-    display: flex;
-    align-items: center; /* Aligns text and icon */
-    justify-content: space-between;
-    height: 70px;
-    width: 220px;
-    min-height: fit-content;
-    padding: 10px;
-    box-shadow: 0px 0px 14px rgba(0, 0, 0, 0.4); /* Even soft shadow on all sides */
-    border-radius: 5px; /* Smooths the corners */
-    transition: box-shadow 0.15s ease, transform 0.15s ease; /* Smooth transition for shadow and movement */
-}
-
-.converter-item:hover {
-    cursor: pointer;
-    box-shadow: 0px 0px 20px rgba(139, 0, 0, 0.7); /* Dark reddish color closer to black */
-    transform: translateY(-5px); /* Moves the container up when hovered */
-}
-.converter-item:active {
-    transform: translateY(2px); /* Moves the container down when clicked */
-    box-shadow: 0px 0px 12px rgba(139, 0, 0, 0.5); /* Slightly reduce the shadow */
-}
-
-.converter-name {
-    font-size: 25px;
-    font-family: "Fredoka One"; 
-}
-.converter-name2 {
-    font-size: 20px;
-    font-family: "Fredoka One"; 
-    text-wrap:wrap;
-}
-
-.icon-wrapper {
-
-}
-
-.unitIcons {
-    width: 60px;
-    max-height: 65px;
-    background-color: blue;
-}
-
-
-/* Media query for mobile screens */
-@media (max-width: 870px) {
-    .mainAreasMainComponents {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-    }
-
-    .convertersMain{   
+    .convertersMainH1 {
+        font-family: "Monda";
+        width: 400px;
         margin: auto;
-    }
-
-    .parentAreasTitleDiv {
-        display: flex;
-        flex-direction: row;
-        justify-content: center;
-        align-items: center;
-        vertical-align: center;
-        padding-top: 15px;
-        padding-bottom: 15px;
-        font-family: "Comfortaa";
-    }
-    .convertersMainH1Long {
-        width: auto;
-        margin: none;
-        margin-bottom: 2px;
-        font-size: 25px;
-    }
-    .convertersMainH1Short {
-        width: auto;
-        margin: none;
-        margin-bottom: 2px;
-        font-size: 25px;
+        margin-bottom: 50px;
     }
     
     .convertersIconsMainArea {
         display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
+        flex-direction: row;
+        justify-content: space-around;
         flex-wrap: wrap; /* Allows the items to wrap to the next line */
-        margin-bottom: auto;
-        margin-right: auto;
+        margin-bottom: 50px;
+        margin-right: 200px;
     }
     
     .converter-item {
@@ -125,7 +31,6 @@
         width: 220px;
         min-height: fit-content;
         padding: 10px;
-        margin-bottom: 15px;
         box-shadow: 0px 0px 14px rgba(0, 0, 0, 0.4); /* Even soft shadow on all sides */
         border-radius: 5px; /* Smooths the corners */
         transition: box-shadow 0.15s ease, transform 0.15s ease; /* Smooth transition for shadow and movement */
@@ -151,13 +56,74 @@
         text-wrap:wrap;
     }
     
-    .icon-wrapper {
+    .unitIcons {
+        width: 60px;
+        max-height: 65px;
+    }
+}
+
+
+
+/* Media query for mobile screens */
+@media (max-width: 780px) {
+    .mainAreasMainComponents {
+        padding-top: 10px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .parentAreasTitleDiv {
+        font-family: "Comfortaa";
+        padding-bottom: 30px;
+    }
+    .convertersMainH1 {
+        width: auto;
+        margin: none;
+        margin-bottom: 2px;
+        font-size: 25px;
+    }
     
+    .convertersIconsMainArea {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        flex-wrap: wrap; /* Allows the items to wrap to the next line */
+    }
+    
+    .converter-item {
+        display: flex;
+        align-items: center; /* Aligns text and icon */
+        justify-content: space-between;
+        height: 70px;
+        width: 220px;
+        min-height: fit-content;
+        padding: 10px;
+        margin-bottom: 15px;
+        box-shadow: 0px 0px 14px rgba(0, 0, 0, 0.4); /* Even soft shadow on all sides */
+        border-radius: 5px; /* Smooths the corners */
+        transition: box-shadow 0.15s ease, transform 0.15s ease; /* Smooth transition for shadow and movement */
+    }
+    
+    .converter-item:active {
+        transform: translateY(2px); /* Moves the container down when clicked */
+        box-shadow: 0px 0px 12px rgba(139, 0, 0, 0.5); /* Slightly reduce the shadow */
+    }
+    
+    .converter-name {
+        font-size: 25px;
+        font-family: "Fredoka One"; 
+    }
+    .converter-name2 {
+        font-size: 20px;
+        font-family: "Fredoka One"; 
+        text-wrap:wrap;
     }
     
     .unitIcons {
         width: 60px;
         max-height: 65px;
-        background-color: blue;
     }
 }

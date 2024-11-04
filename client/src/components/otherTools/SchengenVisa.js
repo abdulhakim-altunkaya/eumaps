@@ -4,13 +4,14 @@ import "../../styles/converters.css";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowRight } from '@fortawesome/free-solid-svg-icons';
 import CommentDisplay from '../CommentDisplay'; 
+import Footer from "../Footer";
 
 const SchengenVisa = () => {
   const [trips, setTrips] = useState([]);
   const [entryDate, setEntryDate] = useState('');
   const [exitDate, setExitDate] = useState('');
 
-  const calculateDays = (startDate, endDate) => {
+  const calculateDays = (startDate, endDate) => { 
     const start = new Date(startDate);
     const end = new Date(endDate);
     const timeDifference = end - start;
@@ -73,13 +74,14 @@ const SchengenVisa = () => {
         <ul>
           {trips.map((trip, index) => (
             <li key={index}>
-              <span className='resultText1'>{trip.entryDate} <FontAwesomeIcon icon={faArrowRight} className='arrowIcon' /> {trip.exitDate}</span>:
-              &nbsp;&nbsp;&nbsp;&nbsp;{trip.duration} days
+              <span className='resultText1'>
+                {trip.entryDate} <FontAwesomeIcon icon={faArrowRight} className='arrowIcon' /> {trip.exitDate}
+              </span>:&nbsp;&nbsp;&nbsp;&nbsp;{trip.duration} days
             </li>
           ))}
         </ul>
       </div>
-      <div>
+      <div className='resultSchengenCalculator'>
         {remainingDays < 90 && <h3>Remaining Days</h3>}
         {remainingDays > 0 ? (
           <p>You have {remainingDays} days remaining in your Schengen visa period.</p>
@@ -88,7 +90,8 @@ const SchengenVisa = () => {
         )}
       </div>
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
-      <div> <CommentDisplay pageId={24}/></div>
+      <div><CommentDisplay pageId={24}/></div>
+      <div> <br/><br/><br/> <Footer /> </div>
     </div>
   );
 };
