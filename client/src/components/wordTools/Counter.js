@@ -38,42 +38,44 @@ function Counter() {
   };
 
   return (
-    <div  className='wordToolsArea'>
-      <h2>Character and Word Counter</h2>
-      <textarea
-        value={text}
-        onChange={handleTextChange}
-        rows="16"
-        cols="50"
-        placeholder="Enter your text here..."
-      />
-      <div>
-        <button onClick={handleCount} className='button20155'>Count</button>
-        <button onClick={handleClear} className='button20155'>Clear</button>
-      </div>
-      {characterCount !== null && (
-        <div style={{ marginTop: '10px' }}>
-          <p>Characters (with spaces): {characterCount}</p>
-          <p>Characters (without spaces): {characterCountWithoutSpaces}</p>
-          <p>Word count: {wordCount}</p>
-
-          <p>
-            {isTwitterLimit ? (
-              <span style={{ color: 'green', display: 'flex', alignItems: 'center' }}>
-                ✅ Fits within X/Twitter {twitterCharacterLimit}-character limit
-              </span>
-            ) : (
-              <span style={{ color: 'red', display: 'flex', alignItems: 'center' }}>
-                ❌ Exceeds X/Twitter {twitterCharacterLimit}-character limit
-              </span>
-            )}
-          </p>
+    <>
+      <div  className='wordToolsArea'>
+        <h2>Character and Word Counter</h2>
+        <textarea
+          value={text}
+          onChange={handleTextChange}
+          rows="16"
+          cols="50"
+          placeholder="Enter your text here..."
+        />
+        <div>
+          <button onClick={handleCount} className='button20155'>Count</button>
+          <button onClick={handleClear} className='button20155'>Clear</button>
         </div>
-      )}
+        {characterCount !== null && (
+          <div style={{ marginTop: '10px' }}>
+            <p>Characters (with spaces): {characterCount}</p>
+            <p>Characters (without spaces): {characterCountWithoutSpaces}</p>
+            <p>Word count: {wordCount}</p>
+
+            <p>
+              {isTwitterLimit ? (
+                <span style={{ color: 'green', display: 'flex', alignItems: 'center' }}>
+                  ✅ Fits within X/Twitter {twitterCharacterLimit}-character limit
+                </span>
+              ) : (
+                <span style={{ color: 'red', display: 'flex', alignItems: 'center' }}>
+                  ❌ Exceeds X/Twitter {twitterCharacterLimit}-character limit
+                </span>
+              )}
+            </p>
+          </div>
+        )}
+      </div>
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
       <div> <CommentDisplay pageId={21}/></div>
       <div> <br/><br/><br/> <Footer /> </div>
-    </div>
+    </>
   );
 }
 

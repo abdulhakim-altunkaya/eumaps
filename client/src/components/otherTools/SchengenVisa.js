@@ -50,49 +50,52 @@ const SchengenVisa = () => {
   const remainingDays = 90 - calculateDaysInLast180();
 
   return (
-    <div className='convertersMainArea'>
-      <h2>Schengen Visa Calculator (90/180 days)</h2>
-      
-      <div className='inputAreaContainer2'>
-        <div className='flex-container'>
-          <div className="date-input-wrapper">
-            Entry Date:&nbsp;&nbsp;
-            <input type="date" value={entryDate} className='dateInputAreas' onChange={(e) => setEntryDate(e.target.value)} />
-            <img src="/icons/calendar1.png" className="custom-calendar-icon" alt="Calendar Icon" />
-          </div>
+    <>
+      <div className='convertersMainArea'>
+        <h2>Schengen Visa Calculator (90/180 days)</h2>
+        
+        <div className='inputAreaContainer2'>
+          <div className='flex-container'>
+            <div className="date-input-wrapper">
+              Entry Date:&nbsp;&nbsp;
+              <input type="date" value={entryDate} className='dateInputAreas' onChange={(e) => setEntryDate(e.target.value)} />
+              <img src="/icons/calendar1.png" className="custom-calendar-icon" alt="Calendar Icon" />
+            </div>
 
-          <div className="date-input-wrapper">
-            Exit Date:&nbsp;&nbsp;
-            <input type="date" value={exitDate} className='dateInputAreas' onChange={(e) => setExitDate(e.target.value)} />
-            <img src="/icons/calendar1.png" className="custom-calendar-icon" alt="Calendar Icon" />
-          </div>
-        </div>&nbsp;&nbsp;&nbsp;&nbsp;
-        <button onClick={addTrip} className='button_plus'></button>
-      </div>
-      
-      <div>
-        <ul>
-          {trips.map((trip, index) => (
-            <li key={index}>
-              <span className='resultText1'>
-                {trip.entryDate} <FontAwesomeIcon icon={faArrowRight} className='arrowIcon' /> {trip.exitDate}
-              </span>:&nbsp;&nbsp;&nbsp;&nbsp;{trip.duration} days
-            </li>
-          ))}
-        </ul>
-      </div>
-      <div className='resultSchengenCalculator'>
-        {remainingDays < 90 && <h3>Remaining Days</h3>}
-        {remainingDays > 0 ? (
-          <p>You have {remainingDays} days remaining in your Schengen visa period.</p>
-        ) : (
-          <p>Warning: You have exceeded your Schengen visa stay.</p>
-        )}
+            <div className="date-input-wrapper">
+              Exit Date:&nbsp;&nbsp;
+              <input type="date" value={exitDate} className='dateInputAreas' onChange={(e) => setExitDate(e.target.value)} />
+              <img src="/icons/calendar1.png" className="custom-calendar-icon" alt="Calendar Icon" />
+            </div>
+          </div>&nbsp;&nbsp;&nbsp;&nbsp;
+          <button onClick={addTrip} className='button_plus'></button>
+        </div>
+        
+        <div>
+          <ul>
+            {trips.map((trip, index) => (
+              <li key={index}>
+                <span className='resultText1'>
+                  {trip.entryDate} <FontAwesomeIcon icon={faArrowRight} className='arrowIcon' /> {trip.exitDate}
+                </span>:&nbsp;&nbsp;&nbsp;&nbsp;{trip.duration} days
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className='resultSchengenCalculator'>
+          {remainingDays < 90 && <h3>Remaining Days</h3>}
+          {remainingDays > 0 ? (
+            <p>You have {remainingDays} days remaining in your Schengen visa period.</p>
+          ) : (
+            <p>Warning: You have exceeded your Schengen visa stay.</p>
+          )}
+        </div>
       </div>
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
       <div><CommentDisplay pageId={24}/></div>
       <div> <br/><br/><br/> <Footer /> </div>
-    </div>
+    </>
+
   );
 };
 

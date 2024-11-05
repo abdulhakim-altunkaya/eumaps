@@ -149,116 +149,116 @@ function CustomsGasoline() {
   }
 
   return (
-    <div className='customsMainArea'>
-      <div className='customsMainPageTitlesArea'>
-        <h3>EUMAPS.ORG<br />
-        BEDELSİZ ARAÇ İTHALATI<br />
-        VERGİ HESAPLAMA</h3>
-      </div>
-      <h3 className='customsLeftMargin'>BENZİN/DİZEL ARAÇLAR</h3>
-      <div className='customsLeftMargin customsTexts'>
-        {/* Radio buttons */}
-        <div>
-          <input
-            type="radio"
-            id="usedCarsRadio"
-            name="formSelector"
-            value="usedCarsRadio"
-            onChange={handleRadioChange}
-          />
-          <label htmlFor="usedCarsRadio">İkinci El Araba</label>
-          <br/>
-          <input
-            type="radio"
-            id="newCarsRadio"
-            name="formSelector"
-            value="newCarsRadio"
-            onChange={handleRadioChange}
-          />
-          <label htmlFor="newCarsRadio">Yeni Araba</label>
+    <>
+      <div className='customsMainArea'>
+        <div className='customsMainPageTitlesArea'>
+          <h3>EUMAPS.ORG<br />
+          BEDELSİZ ARAÇ İTHALATI<br />
+          VERGİ HESAPLAMA</h3>
         </div>
-          {/* Conditionally render the forms based on the selected radio button */}
-          {(selectedForm === 'newCarsRadio' || selectedForm === 'usedCarsRadio')  && (
-            <div>
-              <p className='customsTexts'>Fatura Bedeli kısmına KDV ödememişseniz veya KDV iadesi almışsanız, KDV hariç bedeli yazınız.</p>
-              <p className='customsTexts'>Detaylı bilgi: 
-                <span className="notesSpan" onClick={()=> navigate("/bedelsiz-arac-ithalati-onemli-notlar")}>Süreç ve 
-                Önemli Notlar</span></p>
-              <form onSubmit={calculateTax} className='customsForm'>
-                <input type="radio" id="dollarRadio" name="formSelectorCurrency" value="dollarRadio" onChange={handleRadioCurrency} 
-                required className='radioLabelsCustoms'/>
-                <label htmlFor="dollarRadio">Dolar</label> <br/>
-                <input type="radio" id="euroRadio" name="formSelectorCurrency" value="euroRadio" onChange={handleRadioCurrency} 
-                requiredclassName='radioLabelsCustoms' />
-                <label htmlFor="euroRadio">Euro</label> <br/>
+        <h3 className='customsLeftMargin'>BENZİN/DİZEL ARAÇLAR</h3>
+        <div className='customsLeftMargin customsTexts'>
+          {/* Radio buttons */}
+          <div>
+            <input
+              type="radio"
+              id="usedCarsRadio"
+              name="formSelector"
+              value="usedCarsRadio"
+              onChange={handleRadioChange}
+            />
+            <label htmlFor="usedCarsRadio">İkinci El Araba</label>
+            <br/>
+            <input
+              type="radio"
+              id="newCarsRadio"
+              name="formSelector"
+              value="newCarsRadio"
+              onChange={handleRadioChange}
+            />
+            <label htmlFor="newCarsRadio">Yeni Araba</label>
+          </div>
+            {/* Conditionally render the forms based on the selected radio button */}
+            {(selectedForm === 'newCarsRadio' || selectedForm === 'usedCarsRadio')  && (
+              <div>
+                <p className='customsTexts'>Fatura Bedeli kısmına KDV ödememişseniz veya KDV iadesi almışsanız, KDV hariç bedeli yazınız.</p>
+                <p className='customsTexts'>Detaylı bilgi: 
+                  <span className="notesSpan" onClick={()=> navigate("/bedelsiz-arac-ithalati-onemli-notlar")}>Süreç ve 
+                  Önemli Notlar</span></p>
+                <form onSubmit={calculateTax} className='customsForm'>
+                  <input type="radio" id="dollarRadio" name="formSelectorCurrency" value="dollarRadio" onChange={handleRadioCurrency} 
+                  required className='radioLabelsCustoms'/>
+                  <label htmlFor="dollarRadio">Dolar</label> <br/>
+                  <input type="radio" id="euroRadio" name="formSelectorCurrency" value="euroRadio" onChange={handleRadioCurrency} 
+                  requiredclassName='radioLabelsCustoms' />
+                  <label htmlFor="euroRadio">Euro</label> <br/>
 
-                <input className='input2' type='number' name='invoiceAmount' id='invoiceAmount'
-                  aria-label='Faturada gözüken meblağı küsürat olmadan giriniz.' required/> &nbsp; &nbsp;
-                <label htmlFor='invoiceAmount'>Fatura Bedeli</label> <br/>
+                  <input className='input2' type='number' name='invoiceAmount' id='invoiceAmount'
+                    aria-label='Faturada gözüken meblağı küsürat olmadan giriniz.' required/> &nbsp; &nbsp;
+                  <label htmlFor='invoiceAmount'>Fatura Bedeli</label> <br/>
 
-                <input className='input2' type='number' name='invoiceYear' id='invoiceYear'
-                  aria-label='Fatura yılını 4 rakam olarak giriniz.' required /> &nbsp; &nbsp;
-                <label htmlFor='invoiceYear'>Fatura Yılı</label> <br/>
+                  <input className='input2' type='number' name='invoiceYear' id='invoiceYear'
+                    aria-label='Fatura yılını 4 rakam olarak giriniz.' required /> &nbsp; &nbsp;
+                  <label htmlFor='invoiceYear'>Fatura Yılı</label> <br/>
 
-                <input className='input2' type='number' name='productionYear' id='productionYear'
-                  aria-label='Araç üretim yılını 4 rakam olarak giriniz.' required /> &nbsp; &nbsp;
-                <label htmlFor='productionYear'>Üretim Yılı</label> <br/>
+                  <input className='input2' type='number' name='productionYear' id='productionYear'
+                    aria-label='Araç üretim yılını 4 rakam olarak giriniz.' required /> &nbsp; &nbsp;
+                  <label htmlFor='productionYear'>Üretim Yılı</label> <br/>
 
-                <input className='input2' type='number' name='customsRegYear' id='customsRegYear'
-                  aria-label='Arabayı Türkiyeye kaydedeceğiniz yılı 4 rakam olarak giriniz' required/> &nbsp; &nbsp;
-                <label htmlFor='customsRegYear'>Türkiye'ye kaydedeceğiniz Yıl</label> <br/>
+                  <input className='input2' type='number' name='customsRegYear' id='customsRegYear'
+                    aria-label='Arabayı Türkiyeye kaydedeceğiniz yılı 4 rakam olarak giriniz' required/> &nbsp; &nbsp;
+                  <label htmlFor='customsRegYear'>Türkiye'ye kaydedeceğiniz Yıl</label> <br/>
 
-                <input className='input2' type='number' name='engineCapacity' id='engineCapacity'
-                  aria-label='Motor hacmini giriniz.' required/> &nbsp; &nbsp;
-                <label htmlFor='engineCapacity'>Motor Hacmi <i>("1500", "2000" gibi)</i></label> <br/>
+                  <input className='input2' type='number' name='engineCapacity' id='engineCapacity'
+                    aria-label='Motor hacmini giriniz.' required/> &nbsp; &nbsp;
+                  <label htmlFor='engineCapacity'>Motor Hacmi <i>("1500", "2000" gibi)</i></label> <br/>
 
-                <input className='input2' type='number' name='navlunAmount' id='navlunAmount'
-                  aria-label='Aşağıdaki tabloya göre Navlun ve Sigorta harcını giriniz.' min="100" max="5000" required/> &nbsp; &nbsp;
-                <label htmlFor='navlunAmount'>"Navlun ve sigorta" harcı (aşağıdaki tabloya göre)</label> <br/> <br/>
+                  <input className='input2' type='number' name='navlunAmount' id='navlunAmount'
+                    aria-label='Aşağıdaki tabloya göre Navlun ve Sigorta harcını giriniz.' min="100" max="5000" required/> &nbsp; &nbsp;
+                  <label htmlFor='navlunAmount'>"Navlun ve sigorta" harcı (aşağıdaki tabloya göre)</label> <br/> <br/>
 
-                <table className="customsTable">
-                    <tbody>
-                      <tr className="customsRow">
-                        <td>AĞIRLIK(kg)</td>
-                        <td>Avrupa Menşeli</td>
-                        <td>ABD/Uzakdoğu Menşeli</td>
-                        <td>Avrupa'dan gelen Uzakdoğu Menşeli</td>
-                      </tr>
-                      <tr className="customsRow">
-                        <td>0-1200</td>
-                        <td>150 €</td>
-                        <td>650 $</td>
-                        <td>300 $ + 150 €</td>
-                      </tr>
-                      <tr className="customsRow">
-                        <td>1200-1600</td>
-                        <td>200 €</td>
-                        <td>700 $</td>
-                        <td>400 $ + 200 €</td>
-                      </tr>
-                      <tr className="customsRow">
-                        <td>1600 üzeri</td>
-                        <td>230 €</td>
-                        <td>800 $</td>
-                        <td>500 $ + 230 €</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                  <br/>
-                  <button className='button102' type="submit">Hesapla</button>
-                  <button className='button102' onClick={clearCarForm}>Sil</button>
-              </form>
-              <br/>
-              <div>{resultArea}</div>
-              <div> <br/><br/><br/><br/><br/><br/><br/> </div>
-              <div> <CommentDisplay pageId={5}/></div>
-              <div> <br/><br/><br/> <Footer /> </div>
-            </div>
-          )}
+                  <table className="customsTable">
+                      <tbody>
+                        <tr className="customsRow">
+                          <td>AĞIRLIK(kg)</td>
+                          <td>Avrupa Menşeli</td>
+                          <td>ABD/Uzakdoğu Menşeli</td>
+                          <td>Avrupa'dan gelen Uzakdoğu Menşeli</td>
+                        </tr>
+                        <tr className="customsRow">
+                          <td>0-1200</td>
+                          <td>150 €</td>
+                          <td>650 $</td>
+                          <td>300 $ + 150 €</td>
+                        </tr>
+                        <tr className="customsRow">
+                          <td>1200-1600</td>
+                          <td>200 €</td>
+                          <td>700 $</td>
+                          <td>400 $ + 200 €</td>
+                        </tr>
+                        <tr className="customsRow">
+                          <td>1600 üzeri</td>
+                          <td>230 €</td>
+                          <td>800 $</td>
+                          <td>500 $ + 230 €</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <br/>
+                    <button className='button102' type="submit">Hesapla</button>
+                    <button className='button102' onClick={clearCarForm}>Sil</button>
+                </form>
+                <br/>
+                <div>{resultArea}</div>
+              </div>
+            )}
+        </div>
       </div>
-
-
-    </div>
+      <div> <br/><br/><br/><br/><br/><br/><br/> </div>
+      <div> <CommentDisplay pageId={5}/></div>
+      <div> <br/><br/><br/> <Footer /> </div>
+    </>
   )
 }
 

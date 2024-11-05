@@ -47,44 +47,45 @@ const MatterToEnergy = () => {
   }
 
   return (
-    <div className='convertersMainArea'>
-      <div className='MatterEnergyMainDiv'>
-          <h2>Convert Mass to Energy (E = mc²)</h2>
-          <div className='inputButtonContainer'>
-            <div>
-              <input type="number" className='input2'
-                value={grams} onChange={(e) => setGrams(e.target.value)} />
-              <label>Mass in Grams</label>
-            </div>
-            <div>
-              <button onClick={handleConvert} className='button225'>Convert</button>
-              <button onClick={clearFields} className='button225'>Clear</button>
-            </div>
-
-          </div>
-          {energy && (
-            <div>
-              {/* Display the formula */}
-              <div style={{ margin: "20px 0", fontSize: "1.2em" }}>
-                E<sub>joules</sub> = m<sub>kg</sub> × (3 × 10<sup>8</sup>)<sup>2</sup>
+    <>
+      <div className='convertersMainArea'>
+        <div className='MatterEnergyMainDiv'>
+            <h2>Convert Mass to Energy (E = mc²)</h2>
+            <div className='inputButtonContainer'>
+              <div>
+                <input type="number" className='input2'
+                  value={grams} onChange={(e) => setGrams(e.target.value)} />
+                <label>Mass in Grams</label>
               </div>
-              <p><strong>Energy in Joules:</strong> {energy.joules} J</p>
-              <p><strong>Energy in Kilowatt-hours:</strong> {energy.kWh} kWh</p>
-              <p><strong>Energy in Electronvolts:</strong> {energy.eV} eV</p>
-              <p><strong>Energy in Calories:</strong> {energy.calories} cal</p>
-              <p><strong>Equivalent in Megatons of TNT:</strong> {energy.megatonsTNT}</p>
-              <p><strong>Equivalent in Kilograms of TNT:</strong> {energy.kgTNT}</p>
-              <p><strong>Equivalent in Hiroshima Atomic Bombs:</strong> {energy.hiroshimaBombs}</p>
-              <p><strong>Equivalent in Tsar Hydrogen Bombs:</strong> {energy.tsarBombs}</p>
+              <div>
+                <button onClick={handleConvert} className='button225'>Convert</button>
+                <button onClick={clearFields} className='button225'>Clear</button>
+              </div>
+
             </div>
-          )}
+            {energy && (
+              <div>
+                {/* Display the formula */}
+                <div style={{ margin: "20px 0", fontSize: "1.2em" }}>
+                  E<sub>joules</sub> = m<sub>kg</sub> × (3 × 10<sup>8</sup>)<sup>2</sup>
+                </div>
+                <p><strong>Energy in Joules:</strong> {energy.joules} J</p>
+                <p><strong>Energy in Kilowatt-hours:</strong> {energy.kWh} kWh</p>
+                <p><strong>Energy in Electronvolts:</strong> {energy.eV} eV</p>
+                <p><strong>Energy in Calories:</strong> {energy.calories} cal</p>
+                <p><strong>Equivalent in Megatons of TNT:</strong> {energy.megatonsTNT}</p>
+                <p><strong>Equivalent in Kilograms of TNT:</strong> {energy.kgTNT}</p>
+                <p><strong>Equivalent in Hiroshima Atomic Bombs:</strong> {energy.hiroshimaBombs}</p>
+                <p><strong>Equivalent in Tsar Hydrogen Bombs:</strong> {energy.tsarBombs}</p>
+              </div>
+            )}
+        </div>
+        <div> <br/><br/><br/><br/><br/><br/><br/> </div>
       </div>
-
-
-      <div> <br/><br/><br/><br/><br/><br/><br/> </div>
       <div> <CommentDisplay pageId={11}/></div>
       <div> <br/><br/><br/> <Footer /> </div>
-    </div>
+    </>
+
   );
 };
 

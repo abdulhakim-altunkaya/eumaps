@@ -114,14 +114,14 @@
 /* Media query for mobile screens */
 @media (max-width: 780px) {
     .comment-container {
-      width: 350px;
-      max-width: 600px;
-      margin-left: 12px;
+      min-width: 100%;
+      max-width: 100%;
+      margin-bottom: 20px;
       padding: 8px;
       border: 1px solid #ddd;
       border-radius: 4px;
       background-color: #f1ec81;
-      margin-bottom: 20px;
+
     }
     .comment-form {
       display: flex;

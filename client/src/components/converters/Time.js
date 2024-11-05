@@ -389,47 +389,50 @@ function Time() {
     };
   
   return (
-    <div className='convertersMainArea'>
-        <h4>TIME UNITS CONVERTER</h4>
-        <div>
-            <input type='number' className='input103' value={values.nanosecond} 
-                name='nanosecond' onChange={handleChangeTimeUnits} /> <label>Nanoseconds (ns)</label> <br/>
-            <input type='number' className='input103' value={values.microsecond} 
-                name='microsecond' onChange={handleChangeTimeUnits} /> <label>Microseconds (µs)</label> <br/>
-            <input type='number' className='input103' value={values.millisecond} 
-                name='millisecond' onChange={handleChangeTimeUnits} /> <label>Milliseconds (ms)</label> <br/>
-            <input type='number' className='input103' value={values.second} 
-                name='second' onChange={handleChangeTimeUnits} /> <label>Seconds (s)</label> <br/>
-            <input type='number' className='input103' value={values.minute} 
-                name='minute' onChange={handleChangeTimeUnits} /> <label>Minutes (min)</label> <br/>
-            <input type='number' className='input103' value={values.hour} 
-                name='hour' onChange={handleChangeTimeUnits} /> <label>Hours (h)</label> <br/> 
-            <input type='number' className='input103' value={values.day} 
-                name='day' onChange={handleChangeTimeUnits} /> <label>Days (d)</label> <br/>
-            <input type='number' className='input103' value={values.week} 
-                name='week' onChange={handleChangeTimeUnits} /> <label>Weeks</label> <br/>
-            <input type='number' className='input103' value={values.month} 
-                name='month' onChange={handleChangeTimeUnits} /> <label>Months</label> <br/>
-            <input type='number' className='input103' value={values.year} 
-                name='year' onChange={handleChangeTimeUnits} /> <label>Years</label> <br/>
-            <input type='number' className='input103' value={values.decade} 
-                name='decade' onChange={handleChangeTimeUnits} /> <label>Decades</label> <br/>
-            <input type='number' className='input103' value={values.century} 
-                name='century' onChange={handleChangeTimeUnits} /> <label>Centuries</label> <br/>
-            <input type='number' className='input103' value={values.julianYear}
-                name='julianYear' onChange={handleChangeTimeUnits} /> <label>Julian Year</label> <br/>
-            <input type='number' className='input103' value={values.siderealYear}
-                name='siderealYear' onChange={handleChangeTimeUnits} /> <label>Sidereal Day</label> <br/>
-            <input type='number' className='input103' value={values.planckTime}
-                name='planckTime' onChange={handleChangeTimeUnits} /> <label>Planck Time</label> <br/>
-            <input type='number' className='input103' value={values.fortnight}
-                name='fortnight' onChange={handleChangeTimeUnits} /> <label>Fortnight</label> <br/><br/>
-            <button className='button201' onClick={handleClearFields}>Clear</button>
+    <>
+        <div className='convertersMainArea'>
+            <h4>TIME UNITS CONVERTER</h4>
+            <div>
+                <input type='number' className='input103' value={values.nanosecond} 
+                    name='nanosecond' onChange={handleChangeTimeUnits} /> <label>Nanoseconds (ns)</label> <br/>
+                <input type='number' className='input103' value={values.microsecond} 
+                    name='microsecond' onChange={handleChangeTimeUnits} /> <label>Microseconds (µs)</label> <br/>
+                <input type='number' className='input103' value={values.millisecond} 
+                    name='millisecond' onChange={handleChangeTimeUnits} /> <label>Milliseconds (ms)</label> <br/>
+                <input type='number' className='input103' value={values.second} 
+                    name='second' onChange={handleChangeTimeUnits} /> <label>Seconds (s)</label> <br/>
+                <input type='number' className='input103' value={values.minute} 
+                    name='minute' onChange={handleChangeTimeUnits} /> <label>Minutes (min)</label> <br/>
+                <input type='number' className='input103' value={values.hour} 
+                    name='hour' onChange={handleChangeTimeUnits} /> <label>Hours (h)</label> <br/> 
+                <input type='number' className='input103' value={values.day} 
+                    name='day' onChange={handleChangeTimeUnits} /> <label>Days (d)</label> <br/>
+                <input type='number' className='input103' value={values.week} 
+                    name='week' onChange={handleChangeTimeUnits} /> <label>Weeks</label> <br/>
+                <input type='number' className='input103' value={values.month} 
+                    name='month' onChange={handleChangeTimeUnits} /> <label>Months</label> <br/>
+                <input type='number' className='input103' value={values.year} 
+                    name='year' onChange={handleChangeTimeUnits} /> <label>Years</label> <br/>
+                <input type='number' className='input103' value={values.decade} 
+                    name='decade' onChange={handleChangeTimeUnits} /> <label>Decades</label> <br/>
+                <input type='number' className='input103' value={values.century} 
+                    name='century' onChange={handleChangeTimeUnits} /> <label>Centuries</label> <br/>
+                <input type='number' className='input103' value={values.julianYear}
+                    name='julianYear' onChange={handleChangeTimeUnits} /> <label>Julian Year</label> <br/>
+                <input type='number' className='input103' value={values.siderealYear}
+                    name='siderealYear' onChange={handleChangeTimeUnits} /> <label>Sidereal Day</label> <br/>
+                <input type='number' className='input103' value={values.planckTime}
+                    name='planckTime' onChange={handleChangeTimeUnits} /> <label>Planck Time</label> <br/>
+                <input type='number' className='input103' value={values.fortnight}
+                    name='fortnight' onChange={handleChangeTimeUnits} /> <label>Fortnight</label> <br/><br/>
+                <button className='button201' onClick={handleClearFields}>Clear</button>
+            </div>
+            <div> <br/><br/><br/><br/><br/><br/><br/> </div>
         </div>
-        <div> <br/><br/><br/><br/><br/><br/><br/> </div>
         <div> <CommentDisplay pageId={19}/></div>
         <div> <br/><br/><br/> <Footer /> </div>
-    </div>
+    </>
+
   )
 }
 export default Time;

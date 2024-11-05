@@ -284,41 +284,44 @@ function Area() {
     };
    
   return (
-    <div className='convertersMainArea'>
-        <h4>AREA UNITS CONVERTER</h4>
-        <div>
-            <input type='number' className='input101' value={values.sqMillimeter} 
-                name='sqMillimeter' onChange={handleChangeAreaUnits} /> <label>Square Millimeter (mm²)</label> <br/>
-            <input type='number' className='input101' value={values.sqCentimeter} 
-                name='sqCentimeter' onChange={handleChangeAreaUnits} /> <label>Square Centimeter (cm²)</label> <br/>
-            <input type='number' className='input101' value={values.sqMeter} 
-                name='sqMeter' onChange={handleChangeAreaUnits} /> <label>Square Meter (m²)</label> <br/>
-            <input type='number' className='input101' value={values.sqKilometer} 
-                name='sqKilometer' onChange={handleChangeAreaUnits} /> <label>Square Kilometer (km²)</label> <br/>
-            <input type='number' className='input101' value={values.sqFeet} 
-                name='sqFeet' onChange={handleChangeAreaUnits} /> <label>Square Feet (ft²)</label> <br/>
-            <input type='number' className='input101' value={values.sqInch} 
-                name='sqInch' onChange={handleChangeAreaUnits} /> <label>Square Inch (in²)</label> <br/> 
-            <input type='number' className='input101' value={values.sqYard} 
-                name='sqYard' onChange={handleChangeAreaUnits} /> <label>Square Yard (yd²)</label> <br/>
-            <input type='number' className='input101' value={values.acre} 
-                name='acre' onChange={handleChangeAreaUnits} /> <label>Acre</label> <br/>
-            <input type='number' className='input101' value={values.hectare} 
-                name='hectare' onChange={handleChangeAreaUnits} /> <label>Hectare (ha)</label> <br/>
-            <input type='number' className='input101' value={values.sqMile} 
-                name='sqMile' onChange={handleChangeAreaUnits} /> <label>Square Mile (mi²)</label> <br/>
-            <input type='number' className='input101' value={values.are} 
-                name='are' onChange={handleChangeAreaUnits} /> <label>Are</label> <br/>
-            <input type='number' className='input101' value={values.sqMicrometer} 
-                name='sqMicrometer' onChange={handleChangeAreaUnits} /> <label>Square Micrometer (μm²)</label> <br/>
-            <input type='number' className='input101' value={values.barn}
-                name='barn' onChange={handleChangeAreaUnits} /> <label>Barn (b)</label> <br/><br/>
-            <button className='button201' onClick={handleClearFields}>Clear</button>
+    <>
+        <div className='convertersMainArea'>
+            <h4>AREA UNITS CONVERTER</h4>
+            <div>
+                <input type='number' className='input101' value={values.sqMillimeter} 
+                    name='sqMillimeter' onChange={handleChangeAreaUnits} /> <label>Square Millimeter (mm²)</label> <br/>
+                <input type='number' className='input101' value={values.sqCentimeter} 
+                    name='sqCentimeter' onChange={handleChangeAreaUnits} /> <label>Square Centimeter (cm²)</label> <br/>
+                <input type='number' className='input101' value={values.sqMeter} 
+                    name='sqMeter' onChange={handleChangeAreaUnits} /> <label>Square Meter (m²)</label> <br/>
+                <input type='number' className='input101' value={values.sqKilometer} 
+                    name='sqKilometer' onChange={handleChangeAreaUnits} /> <label>Square Kilometer (km²)</label> <br/>
+                <input type='number' className='input101' value={values.sqFeet} 
+                    name='sqFeet' onChange={handleChangeAreaUnits} /> <label>Square Feet (ft²)</label> <br/>
+                <input type='number' className='input101' value={values.sqInch} 
+                    name='sqInch' onChange={handleChangeAreaUnits} /> <label>Square Inch (in²)</label> <br/> 
+                <input type='number' className='input101' value={values.sqYard} 
+                    name='sqYard' onChange={handleChangeAreaUnits} /> <label>Square Yard (yd²)</label> <br/>
+                <input type='number' className='input101' value={values.acre} 
+                    name='acre' onChange={handleChangeAreaUnits} /> <label>Acre</label> <br/>
+                <input type='number' className='input101' value={values.hectare} 
+                    name='hectare' onChange={handleChangeAreaUnits} /> <label>Hectare (ha)</label> <br/>
+                <input type='number' className='input101' value={values.sqMile} 
+                    name='sqMile' onChange={handleChangeAreaUnits} /> <label>Square Mile (mi²)</label> <br/>
+                <input type='number' className='input101' value={values.are} 
+                    name='are' onChange={handleChangeAreaUnits} /> <label>Are</label> <br/>
+                <input type='number' className='input101' value={values.sqMicrometer} 
+                    name='sqMicrometer' onChange={handleChangeAreaUnits} /> <label>Square Micrometer (μm²)</label> <br/>
+                <input type='number' className='input101' value={values.barn}
+                    name='barn' onChange={handleChangeAreaUnits} /> <label>Barn (b)</label> <br/><br/>
+                <button className='button201' onClick={handleClearFields}>Clear</button>
+            </div>
+            <div> <br/><br/><br/><br/><br/><br/><br/> </div>
         </div>
-        <div> <br/><br/><br/><br/><br/><br/><br/> </div>
         <div><CommentDisplay pageId={17}/></div>
         <div> <br/><br/><br/> <Footer /> </div>
-    </div>
+    </>
+    
   )
 }
 

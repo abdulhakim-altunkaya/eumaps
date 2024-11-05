@@ -421,49 +421,52 @@ function Length() {
     };
   
   return (
-    <div className='convertersMainArea'>
-        <h4>LENGTH UNITS CONVERTER</h4>
-        <div>
-            <input type='number' className='input103' value={values.attometer} 
-                name='attometer' onChange={handleChangeLengthUnits} /> <label>Attometer</label> <br/>
-            <input type='number' className='input103' value={values.femtometer} 
-                name='femtometer' onChange={handleChangeLengthUnits} /> <label>Femtometer</label> <br/>
-            <input type='number' className='input103' value={values.picometer} 
-                name='picometer' onChange={handleChangeLengthUnits} /> <label>Picometer</label> <br/>
-            <input type='number' className='input103' value={values.nanometer} 
-                name='Nanometer' onChange={handleChangeLengthUnits} /> <label>Nanometer</label> <br/>
-            <input type='number' className='input103' value={values.micrometer} 
-                name='micrometer' onChange={handleChangeLengthUnits} /> <label>Micrometer</label> <br/>
-            <input type='number' className='input103' value={values.millimeter} 
-                name='millimeter' onChange={handleChangeLengthUnits} /> <label>Millimeter</label> <br/> 
-            <input type='number' className='input103' value={values.centimeter} 
-                name='centimeter' onChange={handleChangeLengthUnits} /> <label>Centimeter</label> <br/>
-            <input type='number' className='input103' value={values.meter} 
-                name='meter' onChange={handleChangeLengthUnits} /> <label>Meter</label> <br/>
-            <input type='number' className='input103' value={values.kilometer} 
-                name='kilometer' onChange={handleChangeLengthUnits} /> <label>Kilometer</label> <br/>
-            <input type='number' className='input103' value={values.thou} 
-                name='thou' onChange={handleChangeLengthUnits} /> <label>Thou</label> <br/>
-            <input type='number' className='input103' value={values.inch} 
-                name='inch' onChange={handleChangeLengthUnits} /> <label>Inch</label> <br/>
-            <input type='number' className='input103' value={values.feet} 
-                name='feet' onChange={handleChangeLengthUnits} /> <label>Feet</label> <br/>
-            <input type='number' className='input103' value={values.yard} 
-                name='yard' onChange={handleChangeLengthUnits} /> <label>Yard</label> <br/>
-            <input type='number' className='input103' value={values.mileLand} 
-                name='mileLand' onChange={handleChangeLengthUnits} /> <label>Mile(Land)</label> <br/>
-            <input type='number' className='input103' value={values.mileSea} 
-                name='mileSea' onChange={handleChangeLengthUnits} /> <label>Mile(Sea)</label> <br/>
-            <input type='number' className='input103' value={values.astroUnit} 
-                name='astroUnit' onChange={handleChangeLengthUnits} /> <label>Astronomical Unit</label> <br/>
-            <input type='number' className='input103' value={values.lightYear} 
-                name='lightYear' onChange={handleChangeLengthUnits} /> <label>Light-year</label> <br/><br/>
-            <button className='button201' onClick={handleClearFields}>Clear</button>
-        </div>
-        <div> <br/><br/><br/><br/><br/><br/><br/> </div>
+    <>
+        <div className='convertersMainArea'>
+            <h4>LENGTH UNITS CONVERTER</h4>
+            <div>
+                <input type='number' className='input103' value={values.attometer} 
+                    name='attometer' onChange={handleChangeLengthUnits} /> <label>Attometer</label> <br/>
+                <input type='number' className='input103' value={values.femtometer} 
+                    name='femtometer' onChange={handleChangeLengthUnits} /> <label>Femtometer</label> <br/>
+                <input type='number' className='input103' value={values.picometer} 
+                    name='picometer' onChange={handleChangeLengthUnits} /> <label>Picometer</label> <br/>
+                <input type='number' className='input103' value={values.nanometer} 
+                    name='Nanometer' onChange={handleChangeLengthUnits} /> <label>Nanometer</label> <br/>
+                <input type='number' className='input103' value={values.micrometer} 
+                    name='micrometer' onChange={handleChangeLengthUnits} /> <label>Micrometer</label> <br/>
+                <input type='number' className='input103' value={values.millimeter} 
+                    name='millimeter' onChange={handleChangeLengthUnits} /> <label>Millimeter</label> <br/> 
+                <input type='number' className='input103' value={values.centimeter} 
+                    name='centimeter' onChange={handleChangeLengthUnits} /> <label>Centimeter</label> <br/>
+                <input type='number' className='input103' value={values.meter} 
+                    name='meter' onChange={handleChangeLengthUnits} /> <label>Meter</label> <br/>
+                <input type='number' className='input103' value={values.kilometer} 
+                    name='kilometer' onChange={handleChangeLengthUnits} /> <label>Kilometer</label> <br/>
+                <input type='number' className='input103' value={values.thou} 
+                    name='thou' onChange={handleChangeLengthUnits} /> <label>Thou</label> <br/>
+                <input type='number' className='input103' value={values.inch} 
+                    name='inch' onChange={handleChangeLengthUnits} /> <label>Inch</label> <br/>
+                <input type='number' className='input103' value={values.feet} 
+                    name='feet' onChange={handleChangeLengthUnits} /> <label>Feet</label> <br/>
+                <input type='number' className='input103' value={values.yard} 
+                    name='yard' onChange={handleChangeLengthUnits} /> <label>Yard</label> <br/>
+                <input type='number' className='input103' value={values.mileLand} 
+                    name='mileLand' onChange={handleChangeLengthUnits} /> <label>Mile(Land)</label> <br/>
+                <input type='number' className='input103' value={values.mileSea} 
+                    name='mileSea' onChange={handleChangeLengthUnits} /> <label>Mile(Sea)</label> <br/>
+                <input type='number' className='input103' value={values.astroUnit} 
+                    name='astroUnit' onChange={handleChangeLengthUnits} /> <label>Astronomical Unit</label> <br/>
+                <input type='number' className='input103' value={values.lightYear} 
+                    name='lightYear' onChange={handleChangeLengthUnits} /> <label>Light-year</label> <br/><br/>
+                <button className='button201' onClick={handleClearFields}>Clear</button>
+            </div>
+            <div> <br/><br/><br/><br/><br/><br/><br/> </div>
+        </div> 
         <div> <CommentDisplay pageId={15}/></div>
         <div> <br/><br/><br/> <Footer /> </div>
-    </div> 
+    </>
+
   )
 }
 

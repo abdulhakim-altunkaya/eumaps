@@ -51,57 +51,59 @@ function Rent() {
   }
      
   return (
-    <div>
-      <h1 className='formHeader'>Dışişleri Bakanlığı Kira Yardımı Hesaplama</h1>
-      <form className='formInvestment' onSubmit={calculateRentSupport}>
-        
-        <input
-          className='inputFields'
-          type='number'
-          name='amountSalary'
-          id='amountSalary'
-          aria-label='Aylık Maaşınızı nokta veya virgül olmadan giriniz.'
-          min="1"
-          max="1000000"
-          required
-        /> &nbsp; &nbsp;
-        <label htmlFor='amountSalary'>Aylık Maaşınız</label> <br /><br />
+    <>
+      <div>
+        <h1 className='formHeader'>Dışişleri Bakanlığı Kira Yardımı Hesaplama</h1>
+        <form className='formInvestment' onSubmit={calculateRentSupport}>
+          
+          <input
+            className='inputFields'
+            type='number'
+            name='amountSalary'
+            id='amountSalary'
+            aria-label='Aylık Maaşınızı nokta veya virgül olmadan giriniz.'
+            min="1"
+            max="1000000"
+            required
+          /> &nbsp; &nbsp;
+          <label htmlFor='amountSalary'>Aylık Maaşınız</label> <br /><br />
 
-        
-        <input
-          className='inputFields'
-          type='number'
-          name='amountRent'
-          id='amountRent'
-          aria-label='Aylık kiranızı giriniz. Nokta ve virgül kullanmayınız.'
-          min="1"
-          max="100000"
-          required
-        /> &nbsp; &nbsp;
-        <label htmlFor='amountRent'>Aylık Kiranız</label> <br /><br />
+          
+          <input
+            className='inputFields'
+            type='number'
+            name='amountRent'
+            id='amountRent'
+            aria-label='Aylık kiranızı giriniz. Nokta ve virgül kullanmayınız.'
+            min="1"
+            max="100000"
+            required
+          /> &nbsp; &nbsp;
+          <label htmlFor='amountRent'>Aylık Kiranız</label> <br /><br />
 
-        
-        <input
-          className='inputFields'
-          type='text'
-          name='typeCurrency'
-          id='typeCurrency'
-          aria-label='Döviz cinsini giriniz. "Euro" veya "Dolar" gibi'
-          required
-        /> &nbsp; &nbsp;
-        <label htmlFor='typeCurrency'>Döviz Cinsi</label> <br /><br />
+          
+          <input
+            className='inputFields'
+            type='text'
+            name='typeCurrency'
+            id='typeCurrency'
+            aria-label='Döviz cinsini giriniz. "Euro" veya "Dolar" gibi'
+            required
+          /> &nbsp; &nbsp;
+          <label htmlFor='typeCurrency'>Döviz Cinsi</label> <br /><br />
 
-        <button className='button101' type="submit">Hesapla</button>
-        <button className='button101' onClick={clearRentForm}>Sil</button>
-      </form>
+          <button className='button101' type="submit">Hesapla</button>
+          <button className='button101' onClick={clearRentForm}>Sil</button>
+        </form>
 
-      <div className='resultAreaInvestment' aria-live='polite'>
-        {resultArea}
+        <div className='resultAreaInvestment' aria-live='polite'>
+          {resultArea}
+        </div>
       </div>
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
       <div> <CommentDisplay pageId={1}/></div>
       <div> <br/><br/><br/> <Footer /> </div>
-    </div>
+    </>
   )
 }
 

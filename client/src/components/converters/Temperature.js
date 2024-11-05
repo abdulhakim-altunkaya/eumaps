@@ -92,25 +92,28 @@ function Temperature() {
     };
 
   return (
-    <div className='convertersMainArea'>
-        <h4>TEMPERATURE UNITS CONVERTER</h4>
-        <div>
-            <input type='number' className='input101' value={values.celsius}  
-                name='celsius' onChange={handleChangeTemperatureUnits} /> <label>Celsius (°C)</label> <br/>
-            <input type='number' className='input101' value={values.fahrenheit} 
-                name='fahrenheit' onChange={handleChangeTemperatureUnits} /> <label>Fahrenheit (°F)</label> <br/>
-            <input type='number' className='input101' value={values.kelvin} 
-                name='kelvin' onChange={handleChangeTemperatureUnits} /> <label>Kelvin (K)</label> <br/>
-            <input type='number' className='input101' value={values.rankine} 
-                name='rankine' onChange={handleChangeTemperatureUnits} /> <label>Rankine (°R)</label> <br/>
-            <input type='number' className='input101' value={values.reaumur} 
-                name='reaumur' onChange={handleChangeTemperatureUnits} /> <label>Réaumur (°Re)</label> <br/><br/>
-            <button className='button201' onClick={handleClearFields}>Clear</button>
+    <>
+        <div className='convertersMainArea'>
+            <h4>TEMPERATURE UNITS CONVERTER</h4>
+            <div>
+                <input type='number' className='input101' value={values.celsius}  
+                    name='celsius' onChange={handleChangeTemperatureUnits} /> <label>Celsius (°C)</label> <br/>
+                <input type='number' className='input101' value={values.fahrenheit} 
+                    name='fahrenheit' onChange={handleChangeTemperatureUnits} /> <label>Fahrenheit (°F)</label> <br/>
+                <input type='number' className='input101' value={values.kelvin} 
+                    name='kelvin' onChange={handleChangeTemperatureUnits} /> <label>Kelvin (K)</label> <br/>
+                <input type='number' className='input101' value={values.rankine} 
+                    name='rankine' onChange={handleChangeTemperatureUnits} /> <label>Rankine (°R)</label> <br/>
+                <input type='number' className='input101' value={values.reaumur} 
+                    name='reaumur' onChange={handleChangeTemperatureUnits} /> <label>Réaumur (°Re)</label> <br/><br/>
+                <button className='button201' onClick={handleClearFields}>Clear</button>
+            </div>
+            <div> <br/><br/><br/><br/><br/><br/><br/> </div>
         </div>
-        <div> <br/><br/><br/><br/><br/><br/><br/> </div>
         <div> <CommentDisplay pageId={16}/></div>
         <div> <br/><br/><br/> <Footer /> </div>
-    </div>
+    </>
+
   )
 }
 

@@ -130,84 +130,85 @@ function CustomsBike() {
   }
 
   return (
-    <div className='customsMainArea'>
-      <div className='customsMainPageTitlesArea'>
-        <h3>EUMAPS.ORG<br />
-        BEDELSİZ ARAÇ İTHALATI<br />
-        VERGİ HESAPLAMA</h3>
-      </div>
-      <h3 className='customsLeftMargin'>MOTORSİKLETLER</h3>
-      <div className='customsLeftMargin customsTexts'>
-        {/* Radio buttons */}
-        <div className='customsTexts'>
-          <input
-            type="radio"
-            id="usedCarsRadio"
-            name="formSelector"
-            value="usedCarsRadio"
-            onChange={handleRadioChange}
-          />
-          <label htmlFor="usedCarsRadio">İkinci El Motorsiklet</label>
-          <br/>
-          <input
-            type="radio"
-            id="newCarsRadio"
-            name="formSelector"
-            value="newCarsRadio"
-            onChange={handleRadioChange}
-          />
-          <label htmlFor="newCarsRadio">Yeni Motorsiklet</label>
+    <>
+      <div className='customsMainArea'>
+        <div className='customsMainPageTitlesArea'>
+          <h3>EUMAPS.ORG<br />
+          BEDELSİZ ARAÇ İTHALATI<br />
+          VERGİ HESAPLAMA</h3>
         </div>
-          {/* Conditionally render the forms based on the selected radio button */}
-          {(selectedForm === 'newCarsRadio' || selectedForm === 'usedCarsRadio')  && (
-            <div >
-              <p className='customsTexts'>Fatura Bedeli kısmına KDV ödememişseniz veya KDV iadesi almışsanız, KDV hariç bedeli yazınız.</p>
-              <p className='customsTexts'>Detaylı bilgi: 
-                <span className="notesSpan" onClick={()=> navigate("/bedelsiz-arac-ithalati-onemli-notlar")}>Süreç ve 
-                Önemli Notlar</span></p>
-              <form onSubmit={calculateTax} className='customsTexts'>
-                <input type="radio" id="dollarRadio" name="formSelectorCurrency" value="dollarRadio" onChange={handleRadioCurrency} 
-                required  className='radioLabelsCustoms' />
-                <label htmlFor="dollarRadio">Dolar</label> <br/>
-                <input type="radio" id="euroRadio" name="formSelectorCurrency" value="euroRadio" onChange={handleRadioCurrency} 
-                required  className='radioLabelsCustoms'/>
-                <label htmlFor="euroRadio">Euro</label> <br/>
+        <h3 className='customsLeftMargin'>MOTORSİKLETLER</h3>
+        <div className='customsLeftMargin customsTexts'>
+          {/* Radio buttons */}
+          <div className='customsTexts'>
+            <input
+              type="radio"
+              id="usedCarsRadio"
+              name="formSelector"
+              value="usedCarsRadio"
+              onChange={handleRadioChange}
+            />
+            <label htmlFor="usedCarsRadio">İkinci El Motorsiklet</label>
+            <br/>
+            <input
+              type="radio"
+              id="newCarsRadio"
+              name="formSelector"
+              value="newCarsRadio"
+              onChange={handleRadioChange}
+            />
+            <label htmlFor="newCarsRadio">Yeni Motorsiklet</label>
+          </div>
+            {/* Conditionally render the forms based on the selected radio button */}
+            {(selectedForm === 'newCarsRadio' || selectedForm === 'usedCarsRadio')  && (
+              <div >
+                <p className='customsTexts'>Fatura Bedeli kısmına KDV ödememişseniz veya KDV iadesi almışsanız, KDV hariç bedeli yazınız.</p>
+                <p className='customsTexts'>Detaylı bilgi: 
+                  <span className="notesSpan" onClick={()=> navigate("/bedelsiz-arac-ithalati-onemli-notlar")}>Süreç ve 
+                  Önemli Notlar</span></p>
+                <form onSubmit={calculateTax} className='customsTexts'>
+                  <input type="radio" id="dollarRadio" name="formSelectorCurrency" value="dollarRadio" onChange={handleRadioCurrency} 
+                  required  className='radioLabelsCustoms' />
+                  <label htmlFor="dollarRadio">Dolar</label> <br/>
+                  <input type="radio" id="euroRadio" name="formSelectorCurrency" value="euroRadio" onChange={handleRadioCurrency} 
+                  required  className='radioLabelsCustoms'/>
+                  <label htmlFor="euroRadio">Euro</label> <br/>
 
-                <input className='input2' type='number' name='invoiceAmount' id='invoiceAmount'
-                  aria-label='Faturada gözüken meblağı küsürat olmadan giriniz.' required/> &nbsp; &nbsp;
-                <label htmlFor='invoiceAmount'>Fatura Bedeli</label> <br/>
+                  <input className='input2' type='number' name='invoiceAmount' id='invoiceAmount'
+                    aria-label='Faturada gözüken meblağı küsürat olmadan giriniz.' required/> &nbsp; &nbsp;
+                  <label htmlFor='invoiceAmount'>Fatura Bedeli</label> <br/>
 
-                <input className='input2' type='number' name='invoiceYear' id='invoiceYear'
-                  aria-label='Fatura yılını 4 rakam olarak giriniz.' required /> &nbsp; &nbsp;
-                <label htmlFor='invoiceYear'>Fatura Yılı</label> <br/>
+                  <input className='input2' type='number' name='invoiceYear' id='invoiceYear'
+                    aria-label='Fatura yılını 4 rakam olarak giriniz.' required /> &nbsp; &nbsp;
+                  <label htmlFor='invoiceYear'>Fatura Yılı</label> <br/>
 
-                <input className='input2' type='number' name='productionYear' id='productionYear'
-                  aria-label='Motorsiklet üretim yılını 4 rakam olarak giriniz.' required /> &nbsp; &nbsp;
-                <label htmlFor='productionYear'>Üretim Yılı</label> <br/>
+                  <input className='input2' type='number' name='productionYear' id='productionYear'
+                    aria-label='Motorsiklet üretim yılını 4 rakam olarak giriniz.' required /> &nbsp; &nbsp;
+                  <label htmlFor='productionYear'>Üretim Yılı</label> <br/>
 
-                <input className='input2' type='number' name='customsRegYear' id='customsRegYear'
-                  aria-label='Motorsikleti Türkiyeye kaydedeceğiniz yılı 4 rakam olarak giriniz' required/> &nbsp; &nbsp;
-                <label htmlFor='customsRegYear'>Türkiye'ye kaydedeceğiniz Yıl</label> <br/>
+                  <input className='input2' type='number' name='customsRegYear' id='customsRegYear'
+                    aria-label='Motorsikleti Türkiyeye kaydedeceğiniz yılı 4 rakam olarak giriniz' required/> &nbsp; &nbsp;
+                  <label htmlFor='customsRegYear'>Türkiye'ye kaydedeceğiniz Yıl</label> <br/>
 
-                <input className='input2' type='number' name='engineCapacity' id='engineCapacity'
-                  aria-label='Motor hacmini giriniz.' required/> &nbsp; &nbsp;
-                <label htmlFor='engineCapacity'>Motor Hacmi <i>("200", "250" gibi)</i></label> <br/>
+                  <input className='input2' type='number' name='engineCapacity' id='engineCapacity'
+                    aria-label='Motor hacmini giriniz.' required/> &nbsp; &nbsp;
+                  <label htmlFor='engineCapacity'>Motor Hacmi <i>("200", "250" gibi)</i></label> <br/>
 
+                  <br/>
+                  <button className='button102' type="submit">Hesapla</button>
+                  <button className='button102' onClick={clearCarForm}>Sil</button>
+                </form>
                 <br/>
-                <button className='button102' type="submit">Hesapla</button>
-                <button className='button102' onClick={clearCarForm}>Sil</button>
-              </form>
-              <br/>
-              <div>{resultArea}</div>
-              <div> <br/><br/><br/><br/><br/><br/><br/> </div>
-              <div> <CommentDisplay pageId={7}/></div>
-              <div> <br/><br/><br/> <Footer /> </div>
-            </div>
-          )}
+                <div>{resultArea}</div>
+              </div>
+            )}
+        </div>
       </div>
+      <div> <br/><br/><br/><br/><br/><br/><br/> </div>
+      <div> <CommentDisplay pageId={7}/></div>
+      <div> <br/><br/><br/> <Footer /> </div>
+    </>
 
-
-    </div>
   )
 }
 

@@ -56,20 +56,21 @@
 @media (max-width: 780px) {
     /* styles/Footer.css */
     .footer {
-      padding: 1rem 2rem; /* Adjusted padding for more balanced spacing */
       display: inline-block;
+      position: relative;
+      min-width: 100%;
+      max-width: 100%;
+      margin-top: 10px;
+      margin-left: -2px;
+      padding: 1rem 2rem; /* Adjusted padding for more balanced spacing */
+
       border: 3px solid #333333;
-      font-size: 1.2rem;
       border-radius: 2% 6% 5% 4% / 1% 1% 2% 4%;
       background: #ffffff;
-      position: relative;
-      margin-top: 2rem;
       background-color: teal;
       font-family: "Josefin Sans";
       font-size: 16px;
-      width: 76%;
       text-align: left;
-      margin-left: 12px;
     }
 
     .footer::before {
@@ -95,7 +96,7 @@
 
 
     .footer p {
-      margin: 0.5rem 0;
+      margin: 8px;
     }
 
     .footer a {

@@ -197,35 +197,38 @@ function Weight() {
     
   
   return (
-    <div className='convertersMainArea'>
-        <h4>WEIGHT UNITS CONVERTER</h4>
-        <div>
-            <input type='number' className='input101' value={values.milligram} 
-                name='milligram' onChange={handleChangeWeightUnits} /> <label>Milligram</label> <br/>
-            <input type='number' className='input101' value={values.gram} 
-                name='gram' onChange={handleChangeWeightUnits} /> <label>Gram</label> <br/>
-            <input type='number' className='input101' value={values.kilogram} 
-                name='kilogram' onChange={handleChangeWeightUnits} /> <label>Kilogram</label> <br/>
-            <input type='number' className='input101' value={values.ton} 
-                name='ton' onChange={handleChangeWeightUnits} /> <label>Ton</label> <br/>
-            <input type='number' className='input101' value={values.megaton} 
-                name='megaton' onChange={handleChangeWeightUnits} /> <label>Megaton</label> <br/>
-            <input type='number' className='input101' value={values.gigaton} 
-                name='gigaton' onChange={handleChangeWeightUnits} /> <label>Gigaton</label> <br/> 
-            <input type='number' className='input101' value={values.uston} 
-                name='uston' onChange={handleChangeWeightUnits} /> <label>U.S. ton</label> <br/>
-            <input type='number' className='input101' value={values.pound} 
-                name='pound' onChange={handleChangeWeightUnits} /> <label>Pound-lb.</label> <br/>
-            <input type='number' className='input101' value={values.ounce} 
-                name='ounce' onChange={handleChangeWeightUnits} /> <label>Ounce-oz.</label> <br/>
-            <input type='number' className='input101' value={values.carat} 
-                name='carat' onChange={handleChangeWeightUnits} /> <label>Carat</label> <br/><br/>
-            <button className='button201' onClick={handleClearFields}>Clear</button>
-        </div>
-        <div> <br/><br/><br/><br/><br/><br/><br/> </div>
-        <div> <CommentDisplay pageId={14}/></div>
-        <div> <br/><br/><br/> <Footer /> </div>
-    </div>
+    <>
+        <div className='convertersMainArea'>
+          <h4>WEIGHT UNITS CONVERTER</h4>
+          <div>
+              <input type='number' className='input101' value={values.milligram} 
+                  name='milligram' onChange={handleChangeWeightUnits} /> <label>Milligram</label> <br/>
+              <input type='number' className='input101' value={values.gram} 
+                  name='gram' onChange={handleChangeWeightUnits} /> <label>Gram</label> <br/>
+              <input type='number' className='input101' value={values.kilogram} 
+                  name='kilogram' onChange={handleChangeWeightUnits} /> <label>Kilogram</label> <br/>
+              <input type='number' className='input101' value={values.ton} 
+                  name='ton' onChange={handleChangeWeightUnits} /> <label>Ton</label> <br/>
+              <input type='number' className='input101' value={values.megaton} 
+                  name='megaton' onChange={handleChangeWeightUnits} /> <label>Megaton</label> <br/>
+              <input type='number' className='input101' value={values.gigaton} 
+                  name='gigaton' onChange={handleChangeWeightUnits} /> <label>Gigaton</label> <br/> 
+              <input type='number' className='input101' value={values.uston} 
+                  name='uston' onChange={handleChangeWeightUnits} /> <label>U.S. ton</label> <br/>
+              <input type='number' className='input101' value={values.pound} 
+                  name='pound' onChange={handleChangeWeightUnits} /> <label>Pound-lb.</label> <br/>
+              <input type='number' className='input101' value={values.ounce} 
+                  name='ounce' onChange={handleChangeWeightUnits} /> <label>Ounce-oz.</label> <br/>
+              <input type='number' className='input101' value={values.carat} 
+                  name='carat' onChange={handleChangeWeightUnits} /> <label>Carat</label> <br/><br/>
+              <button className='button201' onClick={handleClearFields}>Clear</button>
+          </div>
+          <div> <br/><br/><br/><br/><br/><br/><br/> </div>
+      </div>
+      <div> <CommentDisplay pageId={14}/></div>
+      <div> <br/><br/><br/> <Footer /> </div>
+    </>
+
   )
 }
 

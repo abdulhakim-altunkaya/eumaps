@@ -606,59 +606,62 @@ function Volume() {
     };
 
   return (
-    <div className='convertersMainArea'>
-        <h4>VOLUME UNITS CONVERTER</h4>
-        <div>
-            <input type='number' className='input103' value={values.cubicMillimeter} 
-                name='cubicMillimeter' onChange={handleChangeVolumeUnits} /> <label>Cubic Millimeter (mm³)</label> <br/>
-            <input type='number' className='input103' value={values.milliliter} 
-                name='milliliter' onChange={handleChangeVolumeUnits} /> <label>Milliliter (mL)</label> <br/>
-            <input type='number' className='input103' value={values.cubicCentimeter} 
-                name='cubicCentimeter' onChange={handleChangeVolumeUnits} /> <label>Cubic Centimeter (cm³)</label> <br/>
-            <input type='number' className='input103' value={values.liter} 
-                name='liter' onChange={handleChangeVolumeUnits} /> <label>Liter (L)</label> <br/>
-            <input type='number' className='input103' value={values.cubicMeter} 
-                name='cubicMeter' onChange={handleChangeVolumeUnits} /> <label>Cubic Meter (m³)</label> <br/>
-            <input type='number' className='input103' value={values.cubicKilometer} 
-                name='cubicKilometer' onChange={handleChangeVolumeUnits} /> <label>Cubic Kilometer (km³)</label> <br/>
-            <input type='number' className='input103' value={values.cubicInch} 
-                name='cubicInch' onChange={handleChangeVolumeUnits} /> <label>Cubic Inch (in³)</label> <br/> 
-            <input type='number' className='input103' value={values.cubicFeet} 
-                name='cubicFeet' onChange={handleChangeVolumeUnits} /> <label>Cubic Feet (ft³)</label> <br/> 
-            <input type='number' className='input103' value={values.cubicYard} 
-                name='cubicYard' onChange={handleChangeVolumeUnits} /> <label>Cubic Yard (yd³)</label> <br/>
-            <input type='number' className='input103' value={values.gallonUS} 
-                name='gallonUS' onChange={handleChangeVolumeUnits} /> <label>Gallon (US)</label> <br/>
-            <input type='number' className='input103' value={values.gallonIMP} 
-                name='gallonIMP' onChange={handleChangeVolumeUnits} /> <label>Gallon (Imperial)</label> <br/>
-            <input type='number' className='input103' value={values.quartUS} 
-                name='quartUS' onChange={handleChangeVolumeUnits} /> <label>Quart (US)</label> <br/>
-            <input type='number' className='input103' value={values.quartIMP} 
-                name='quartIMP' onChange={handleChangeVolumeUnits} /> <label>Quart (Imperial)</label> <br/>
-            <input type='number' className='input103' value={values.pintUS} 
-                name='pintUS' onChange={handleChangeVolumeUnits} /> <label>Pint (US)</label> <br/>
-            <input type='number' className='input103' value={values.pintIMP} 
-                name='pintIMP' onChange={handleChangeVolumeUnits} /> <label>Pint (US)</label> <br/>
-            <input type='number' className='input103' value={values.fluidOunceUS} 
-                name='fluidOunceUS' onChange={handleChangeVolumeUnits} /> <label>Fluid Ounce (US)</label> <br/>
-            <input type='number' className='input103' value={values.fluidOunceIMP} 
-                name='fluidOunceIMP' onChange={handleChangeVolumeUnits} /> <label>Fluid Ounce (Imperial)</label> <br/>
-            <input type='number' className='input103' value={values.cupUS} 
-                name='cupUS' onChange={handleChangeVolumeUnits} /> <label>Cup (US)</label> <br/>
-            <input type='number' className='input103' value={values.cupMET} 
-                name='cupMET' onChange={handleChangeVolumeUnits} /> <label>Cup (Metric)</label> <br/>
-            <input type='number' className='input103' value={values.barrel} 
-                name='barrel' onChange={handleChangeVolumeUnits} /> <label>Barrel (Oil)</label> <br/>
-            <input type='number' className='input103' value={values.teaspoon} 
-                name='teaspoon' onChange={handleChangeVolumeUnits} /> <label>Teaspoon (tsp)</label> <br/>
-            <input type='number' className='input103' value={values.tablespoon} 
-                name='tablespoon' onChange={handleChangeVolumeUnits} /> <label>Tablespoon (tbsp)</label> <br/> <br/>
-            <button className='button201' onClick={handleClearFields}>Clear</button>
+    <>
+        <div className='convertersMainArea'>
+            <h4>VOLUME UNITS CONVERTER</h4>
+            <div>
+                <input type='number' className='input103' value={values.cubicMillimeter} 
+                    name='cubicMillimeter' onChange={handleChangeVolumeUnits} /> <label>Cubic Millimeter (mm³)</label> <br/>
+                <input type='number' className='input103' value={values.milliliter} 
+                    name='milliliter' onChange={handleChangeVolumeUnits} /> <label>Milliliter (mL)</label> <br/>
+                <input type='number' className='input103' value={values.cubicCentimeter} 
+                    name='cubicCentimeter' onChange={handleChangeVolumeUnits} /> <label>Cubic Centimeter (cm³)</label> <br/>
+                <input type='number' className='input103' value={values.liter} 
+                    name='liter' onChange={handleChangeVolumeUnits} /> <label>Liter (L)</label> <br/>
+                <input type='number' className='input103' value={values.cubicMeter} 
+                    name='cubicMeter' onChange={handleChangeVolumeUnits} /> <label>Cubic Meter (m³)</label> <br/>
+                <input type='number' className='input103' value={values.cubicKilometer} 
+                    name='cubicKilometer' onChange={handleChangeVolumeUnits} /> <label>Cubic Kilometer (km³)</label> <br/>
+                <input type='number' className='input103' value={values.cubicInch} 
+                    name='cubicInch' onChange={handleChangeVolumeUnits} /> <label>Cubic Inch (in³)</label> <br/> 
+                <input type='number' className='input103' value={values.cubicFeet} 
+                    name='cubicFeet' onChange={handleChangeVolumeUnits} /> <label>Cubic Feet (ft³)</label> <br/> 
+                <input type='number' className='input103' value={values.cubicYard} 
+                    name='cubicYard' onChange={handleChangeVolumeUnits} /> <label>Cubic Yard (yd³)</label> <br/>
+                <input type='number' className='input103' value={values.gallonUS} 
+                    name='gallonUS' onChange={handleChangeVolumeUnits} /> <label>Gallon (US)</label> <br/>
+                <input type='number' className='input103' value={values.gallonIMP} 
+                    name='gallonIMP' onChange={handleChangeVolumeUnits} /> <label>Gallon (Imperial)</label> <br/>
+                <input type='number' className='input103' value={values.quartUS} 
+                    name='quartUS' onChange={handleChangeVolumeUnits} /> <label>Quart (US)</label> <br/>
+                <input type='number' className='input103' value={values.quartIMP} 
+                    name='quartIMP' onChange={handleChangeVolumeUnits} /> <label>Quart (Imperial)</label> <br/>
+                <input type='number' className='input103' value={values.pintUS} 
+                    name='pintUS' onChange={handleChangeVolumeUnits} /> <label>Pint (US)</label> <br/>
+                <input type='number' className='input103' value={values.pintIMP} 
+                    name='pintIMP' onChange={handleChangeVolumeUnits} /> <label>Pint (US)</label> <br/>
+                <input type='number' className='input103' value={values.fluidOunceUS} 
+                    name='fluidOunceUS' onChange={handleChangeVolumeUnits} /> <label>Fluid Ounce (US)</label> <br/>
+                <input type='number' className='input103' value={values.fluidOunceIMP} 
+                    name='fluidOunceIMP' onChange={handleChangeVolumeUnits} /> <label>Fluid Ounce (Imperial)</label> <br/>
+                <input type='number' className='input103' value={values.cupUS} 
+                    name='cupUS' onChange={handleChangeVolumeUnits} /> <label>Cup (US)</label> <br/>
+                <input type='number' className='input103' value={values.cupMET} 
+                    name='cupMET' onChange={handleChangeVolumeUnits} /> <label>Cup (Metric)</label> <br/>
+                <input type='number' className='input103' value={values.barrel} 
+                    name='barrel' onChange={handleChangeVolumeUnits} /> <label>Barrel (Oil)</label> <br/>
+                <input type='number' className='input103' value={values.teaspoon} 
+                    name='teaspoon' onChange={handleChangeVolumeUnits} /> <label>Teaspoon (tsp)</label> <br/>
+                <input type='number' className='input103' value={values.tablespoon} 
+                    name='tablespoon' onChange={handleChangeVolumeUnits} /> <label>Tablespoon (tbsp)</label> <br/> <br/>
+                <button className='button201' onClick={handleClearFields}>Clear</button>
+            </div>
+            <div> <br/><br/><br/><br/><br/><br/><br/> </div>
         </div>
-        <div> <br/><br/><br/><br/><br/><br/><br/> </div>
         <div> <CommentDisplay pageId={18}/></div>
         <div> <br/><br/><br/> <Footer /> </div>
-    </div>
+    </>
+
   )
 }
 
