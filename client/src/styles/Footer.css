@@ -61,8 +61,6 @@
       min-width: 100%;
       max-width: 100%;
       margin-top: 10px;
-      margin-left: -2px;
-      padding: 1rem 2rem; /* Adjusted padding for more balanced spacing */
 
       border: 3px solid #333333;
       border-radius: 2% 6% 5% 4% / 1% 1% 2% 4%;
@@ -105,10 +103,11 @@
     }
 
     .home-icon {
-      position: absolute;
+      display: none;
+/*       position: absolute;
       top: 5px;
       right: 5px;
       font-size: 1.5rem;
-      color: #333333;
+      color: #333333; */
     }
 }
