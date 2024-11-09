@@ -14,7 +14,8 @@ function CustomsNotes() {
             <strong>2.</strong> KDV ödediğinize ve geri aldığınıza dair bütün belgeleri, tercümesiyle birlikte yanınızda bulundurunuz.
             Tercümeyi arabayı aldığınız ülkedeki Türkiye elçiliği/konsolosluğundan yaptırınız.
             <br/><span className="customsNotesAreaExtraMargin"></span>
-            <strong>3.</strong> Eğer ödediğiniz KDV'yi geri aldığınıza dair belge sunamazsanız, o vakit Fatura bedelinizden ödediğiniz KDV düşülmeyecek,
+            <strong>3.</strong> Eğer ödediğiniz KDV'yi geri aldığınıza dair belge sunamazsanız, o vakit Fatura bedelinizden 
+            ödediğiniz KDV düşülmeyecek,
             Türkiye'de daha fazla vergi ödeyeceksiniz. Bu durumda fatura bedeline kdv miktarını da ekleyip öyle hesaplayın.
             <br/><span className="customsNotesAreaExtraMargin"></span>
             <strong>4.</strong> 6 ay veya 24 ay konusu: Yurtdışında yaşayan vatandaşlar arabalarını Türkiye'de yabancı plakasıyla 24 ay 
@@ -31,7 +32,10 @@ function CustomsNotes() {
             Türkiye'ye kesin dönüş yapan vatandaşlar ve memurların pasaportlarına iki senelik turistik muafiyet damgası 
             vurulmuş olsa bile, arabanızı altı ay içinde kaydetmeniz gerekiyor.
             <br/><span className="customsNotesAreaExtraMargin"></span>
-            <strong>5.</strong> Daha ilave bilgi için Ticaret Bakanlığının sitesini ziyaret edebilirsiniz: &nbsp;
+            <strong>5.</strong> Üretim ile fatura yılları arasında fark olan araçlar yeni 
+            olsalar bile İkinci el araç olarak muamele görürler.
+            <br/><span className="customsNotesAreaExtraMargin"></span>
+            <strong>6.</strong> Daha ilave bilgi için Ticaret Bakanlığının sitesini ziyaret edebilirsiniz: &nbsp;
             <a href="https://ticaret.gov.tr/gumruk-islemleri/sikca-sorulan-sorular/bireysel/bedelsiz-nakil-vasitasi-ithali">
             Ticaret Bakanlığı</a>
 
