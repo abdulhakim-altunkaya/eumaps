@@ -96,7 +96,7 @@ function CustomsHybrid() {
       firstYear = 0;
     } else if(selectedForm === "newCarsRadio") {
       if (invoiceYear3 - productionYear3 >= 1) {
-        alert("Üretim ile fatura yılları arasında fark olan araçlar yeni olsalar bile İkinci el araç olarak muamele görürler.");
+        alert("Üretim ile fatura yılları arasında fark olan araçlar yeni olsalar bile İkinci el gibi hesaplanırlar.");
         firstYear = 0;
       } else {
         firstYear = 10*invoiceAmount3/100;
@@ -122,6 +122,8 @@ function CustomsHybrid() {
       percentage = 130/100;
     } else if (engineCapacityElectric3>100 && engineCapacityOil3<2501 && basePriceLira>170000) {
       percentage = 150/100;
+    } else if (engineCapacityElectric3<51 && engineCapacityOil3<1801 && basePriceLira<350001) {
+      percentage = 80/100;
     } else {
       percentage = 220/100;
     }
@@ -138,6 +140,8 @@ function CustomsHybrid() {
         <span>Navlun ve Sigorta harcı: {amountNavlun} {currencyName}</span> <br/>
         <span>Toplam vergi: <strong>{amountSum} {currencyName}</strong></span> <br/> <br/>
         <span>Not: Rakamlar tahminidir.</span> <br/>
+        {engineCapacityElectric3 < 51 && <span>Elektrik motoru 50 kw'dan az araçların normal benzinli araç gibi 
+          hesaplanacağı bildirilmiştir. </span>}
       </div>
     )
 
