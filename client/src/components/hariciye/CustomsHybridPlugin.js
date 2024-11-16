@@ -90,8 +90,8 @@ function CustomsHybridPlugin() {
     };
 
     let yearDifference = customsRegYear3 - invoiceYear3;
-    if (yearDifference > 6) {
-      yearDifference = 6;
+    if (yearDifference > 8) {
+      yearDifference = 8;
     } else if (yearDifference < 0) {
       alert("Gümrüğe kaydetme tarihini veya Fatura tarihini yanlış girdiniz.");
       return;
@@ -106,6 +106,8 @@ function CustomsHybridPlugin() {
     } else if(selectedForm === "newCarsRadio") {
       if (invoiceYear3 - productionYear3 >= 1) {
         alert("Üretim ile fatura yılları arasında fark olan araçlar yeni olsalar bile İkinci el araç olarak muamele görürler.");
+        firstYear = 0;
+      } else if(yearDifference === 8) {
         firstYear = 0;
       } else {
         firstYear = 10*invoiceAmount3/100;
