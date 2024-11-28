@@ -24,11 +24,11 @@ app.post("/serversavecomment", async (req, res) => {
   //preventing spam comments
   const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
   // Check if IP exists in cache and if last comment was less than 1 minute ago
-  /*
+  
   if (ipCache2[ipVisitor] && Date.now() - ipCache2[ipVisitor] < 60000) {
     return res.status(429).json({message: 'Too many comments'});
   }
-  */
+ 
   ipCache2[ipVisitor] = Date.now();//save visitor ip to ipCache2
 
   let client;
@@ -122,10 +122,10 @@ app.post("/serversavevisitor", async (req, res) => {
   }
   // Check if IP exists in cache and if last visit was less than 1 hour ago
   if (ipCache[ipVisitor] && Date.now() - ipCache[ipVisitor] < 3600000) {
-    return res.status(429).json({message: 'Too many requests from this IP. Please try again later.'});
+    return res.status(429).json({message: 'Too many requests from this IP.'});
   }
 
-  //ipCache[ipVisitor] = Date.now();//save visitor ip to ipCache
+  ipCache[ipVisitor] = Date.now();//save visitor ip to ipCache
   const userAgentString = req.get('User-Agent');
   const agent = useragent.parse(userAgentString);
   
