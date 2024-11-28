@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect} from 'react';
+import axios from 'axios';
 import '../../styles/investment.css';
 import CommentDisplay from '../CommentDisplay'; 
 import Footer from "../Footer"; 
@@ -6,6 +7,20 @@ import Footer from "../Footer";
 function Rent() { 
 
   const [resultArea, setResultArea] = useState('');
+  const pageIdVisitorPage = 1;
+  useEffect(() => {
+    const getData = async () => {
+      try {
+        // Send the request to log the visitor data without awaiting its completion
+        axios.post(`/serversavevisitor/${pageIdVisitorPage}`, {}).catch((error) => {
+          console.error('Error logging visit:', error.message);
+        });
+      } catch (error) {
+        console.log(error.message);
+      }
+    };
+    getData();
+  }, []);
 
   const calculateRentSupport = (e) => {
     e.preventDefault(); // prevent form from refreshing page

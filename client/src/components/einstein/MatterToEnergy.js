@@ -1,10 +1,26 @@
-import { useState } from 'react'; 
+import { useState, useEffect } from 'react'; 
+import axios from 'axios';
 import "../../styles/converters.css"; 
 import "../../styles/car.css"; 
 import CommentDisplay from '../CommentDisplay'; 
 import Footer from "../Footer";
 
 const MatterToEnergy = () => {
+  const pageIdVisitorPage = 11;
+  useEffect(() => {
+    const getData = async () => {
+      try {
+        // Send the request to log the visitor data without awaiting its completion
+        axios.post(`/serversavevisitor/${pageIdVisitorPage}`, {}).catch((error) => {
+          console.error('Error logging visit:', error.message);
+        });
+      } catch (error) {
+        console.log(error.message);
+      }
+    };
+    getData();
+  }, []);
+
   const [grams, setGrams] = useState('');
   const [energy, setEnergy] = useState(null);
 

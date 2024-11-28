@@ -1,10 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect  } from 'react';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import "../../styles/car.css"; 
 import CommentDisplay from '../CommentDisplay';
 import Footer from "../Footer"; 
 
 function CustomsGasoline() {
+  const pageIdVisitorPage = 5;
+  useEffect(() => {
+    const getData = async () => {
+      try {
+        // Send the request to log the visitor data without awaiting its completion
+        axios.post(`/serversavevisitor/${pageIdVisitorPage}`, {}).catch((error) => {
+          console.error('Error logging visit:', error.message);
+        });
+      } catch (error) {
+        console.log(error.message);
+      }
+    };
+    getData();
+  }, []);
+
   const navigate = useNavigate();
 
   // State to track which radio button is selected

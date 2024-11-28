@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import '../../styles/investment.css';
 import CommentDisplay from '../CommentDisplay'; 
 import { BlockMath } from 'react-katex';
@@ -6,6 +7,20 @@ import 'katex/dist/katex.min.css'; // Import the KaTeX CSS for proper styling of
 import Footer from "../Footer";
 
 function DilationSpeed() {
+  const pageIdVisitorPage = 9;
+  useEffect(() => {
+    const getData = async () => {
+      try {
+        // Send the request to log the visitor data without awaiting its completion
+        axios.post(`/serversavevisitor/${pageIdVisitorPage}`, {}).catch((error) => {
+          console.error('Error logging visit:', error.message);
+        });
+      } catch (error) {
+        console.log(error.message);
+      }
+    };
+    getData();
+  }, []);
  
   const [resultArea, setResultArea] = useState(<span>Speed of light: 299,792.4580 km/s</span>);
 

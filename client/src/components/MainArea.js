@@ -1,5 +1,4 @@
-import React, {useEffect} from 'react';
-import axios from 'axios';
+import React from 'react';
 import {Routes, Route} from "react-router-dom";
 
 import MainConverters from './MainConverters';
@@ -40,20 +39,6 @@ import ButtonsCSS from "./subcomponents/ButtonsCSS"; //25
 import IndexComp from "./subcomponents/IndexComp";
 
 function MainArea() {
-
-  useEffect(() => {
-    const getData = async () => {
-      try {
-        // Send the request to log the visitor data without awaiting its completion
-        axios.post("/serversavevisitor", {}).catch((error) => {
-          console.error('Error logging visit:', error.message);
-        });
-      } catch (error) {
-        console.log(error.message);
-      }
-    };
-    getData();
-  }, []);
 
   return (
     <div className='mainArea'>

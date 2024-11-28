@@ -1,10 +1,25 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import axios from 'axios';
 import "../../styles/buttons.css"; 
 import { objectsArray } from './ButtonsArray';
 import CommentDisplay from '../CommentDisplay'; 
 import Footer from "../Footer";
 
 function ButtonsCSS() {
+  const pageIdVisitorPage = 25;
+  useEffect(() => {
+    const getData = async () => {
+      try {
+        // Send the request to log the visitor data without awaiting its completion
+        axios.post(`/serversavevisitor/${pageIdVisitorPage}`, {}).catch((error) => {
+          console.error('Error logging visit:', error.message);
+        });
+      } catch (error) {
+        console.log(error.message);
+      }
+    };
+    getData();
+  }, []);
 
     const styleBtn = (index) => {
       const targetButton = objectsArray.find(obj => obj.id === `button${index}`);

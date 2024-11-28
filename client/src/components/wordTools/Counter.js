@@ -1,9 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import "../../styles/wordTools.css"; 
 import CommentDisplay from '../CommentDisplay'; 
 import Footer from "../Footer";
 
 function Counter() {
+  const pageIdVisitorPage = 21;
+  useEffect(() => {
+    const getData = async () => {
+      try {
+        // Send the request to log the visitor data without awaiting its completion
+        axios.post(`/serversavevisitor/${pageIdVisitorPage}`, {}).catch((error) => {
+          console.error('Error logging visit:', error.message);
+        });
+      } catch (error) {
+        console.log(error.message);
+      }
+    };
+    getData();
+  }, []);
+
   const [text, setText] = useState("");
   const [characterCount, setCharacterCount] = useState(null);
   const [characterCountWithoutSpaces, setCharacterCountWithoutSpaces] = useState(null);
