@@ -5,19 +5,9 @@ import CommentDisplay from '../CommentDisplay';
 import Footer from "../Footer";
 
 function WordInsulator() {
-  const pageIdVisitorPage = 22;
   useEffect(() => {
-    const getData = async () => {
-      try {
-        // Send the request to log the visitor data without awaiting its completion
-        axios.post(`/serversavevisitor/${pageIdVisitorPage}`, {}).catch((error) => {
-          console.error('Error logging visit:', error.message);
-        });
-      } catch (error) {
-        console.log(error.message);
-      }
-    };
-    getData();
+    axios.post('/serversavevisitor2', { pageIdVisitorPage: 22 })
+      .catch((error) => console.error('Error logging visit:', error.message));
   }, []);
 
   const [text, setText] = useState("");

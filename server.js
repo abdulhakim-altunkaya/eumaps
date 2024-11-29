@@ -136,13 +136,58 @@ app.post("/serversavevisitor/:pageIdVisitorPage", async (req, res) => {
       os: agent.os.toString(), // operating system
       browser: agent.toAgent(), // browser
       visitDate: new Date().toLocaleDateString('en-GB'),
-      sectionId: parseInt(pageIdVisitorPage),
+      sectionId: Number(pageIdVisitorPage),
     };
     //save visitor to database
     client = await pool.connect();
     const result = await client.query(
       `INSERT INTO eumaps_visitors (ip, op, browser, date, sectionId) 
       VALUES ($1, $2, $3, $4, $5)`, [visitorData.ip, visitorData.os, visitorData.browser, visitorData.visitDate, visitorData.sectionId]
+    );
+    res.status(200).json({message: "Visitor IP successfully logged"});
+  } catch (error) {
+    console.error('Error logging visit:', error);
+    res.status(500).json({message: 'Error logging visit'});
+  } finally {
+    if(client) client.release();
+  }
+})
+
+app.post("/serversavevisitor2", async (req, res) => {
+  //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
+  //and Render is using proxies or load balancers. Because of that I will see "::1" as ip data if I not use
+  //this line below
+  const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
+  let client;
+  const { pageIdVisitorPage } = req.body;
+  const sectionId = parseInt(pageIdVisitorPage, 10);
+/*   // Check if the IP is in the ignored list
+  if (ignoredIPs.includes(ipVisitor)) {
+    return; // Simply exit the function, doing nothing for this IP
+  }
+  // Check if IP exists in cache and if last visit was less than 1 minute ago
+  if (ipCache[ipVisitor] && Date.now() - ipCache[ipVisitor] < 60000) {
+    return res.status(429).json({ message: 'Too many requests from this IP.' });
+  } 
+    
+  ipCache[ipVisitor] = Date.now();//save visitor ip to ipCache */
+  const userAgentString = req.get('User-Agent');
+  const agent = useragent.parse(userAgentString);
+  
+  try {
+    const visitorData = {
+      ip: ipVisitor,
+      os: agent.os.toString(), // operating system
+      browser: agent.toAgent(), // browser
+      visitDate: new Date().toLocaleDateString('en-GB'),
+      sectionId: sectionId
+    };
+    //save visitor to database
+    client = await pool.connect();
+    const result = await client.query(
+      `INSERT INTO eumaps_visitors (ip, op, browser, date, sectionId) 
+       VALUES ($1, $2, $3, $4, $5)`,
+      [visitorData.ip, visitorData.os, visitorData.browser, visitorData.visitDate, visitorData.sectionId]
     );
     res.status(200).json({message: "Visitor IP successfully logged"});
   } catch (error) {
