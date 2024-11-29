@@ -116,17 +116,17 @@ app.post("/serversavevisitor/:pageIdVisitorPage", async (req, res) => {
   //this line below
   const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
   let client;
-  // Check if the IP is in the ignored list
+  const { pageIdVisitorPage } = req.params;
+/*   // Check if the IP is in the ignored list
   if (ignoredIPs.includes(ipVisitor)) {
     return; // Simply exit the function, doing nothing for this IP
   }
   // Check if IP exists in cache and if last visit was less than 1 minute ago
   if (ipCache[ipVisitor] && Date.now() - ipCache[ipVisitor] < 60000) {
     return res.status(429).json({ message: 'Too many requests from this IP.' });
-  }
-  const { pageIdVisitorPage } = req.params;
-
-  ipCache[ipVisitor] = Date.now();//save visitor ip to ipCache
+  } 
+    
+  ipCache[ipVisitor] = Date.now();//save visitor ip to ipCache */
   const userAgentString = req.get('User-Agent');
   const agent = useragent.parse(userAgentString);
   
