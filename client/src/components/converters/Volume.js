@@ -5,7 +5,7 @@ import CommentDisplay from '../CommentDisplay';
 import Footer from "../Footer";
 
 function Volume() {
-    const pageIdVisitorPage = 18;
+    const pageIdVisitorPage = "unit_volume";
     useEffect(() => {
       const getData = async () => {
         try {

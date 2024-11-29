@@ -7,7 +7,7 @@ import 'katex/dist/katex.min.css'; // Import the KaTeX CSS for proper styling of
 import Footer from "../Footer";
 
 function GravitationalTimeDilation() {
-  const pageIdVisitorPage = 10;
+  const pageIdVisitorPage = "einstein_gravity";
   useEffect(() => {
     const getData = async () => {
       try {

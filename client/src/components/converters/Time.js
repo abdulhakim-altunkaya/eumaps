@@ -5,7 +5,7 @@ import CommentDisplay from '../CommentDisplay';
 import Footer from "../Footer";
 
 function Time() {
-    const pageIdVisitorPage = 19;
+    const pageIdVisitorPage = "unit_time";
     useEffect(() => {
       const getData = async () => {
         try {

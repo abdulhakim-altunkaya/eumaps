@@ -5,7 +5,7 @@ import CommentDisplay from '../CommentDisplay';
 import Footer from "../Footer";
 
 function Length() {
-    const pageIdVisitorPage = 15;
+    const pageIdVisitorPage = "unit_length";
     useEffect(() => {
       const getData = async () => {
         try {

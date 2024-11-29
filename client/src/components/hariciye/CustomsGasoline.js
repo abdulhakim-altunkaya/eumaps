@@ -6,7 +6,7 @@ import CommentDisplay from '../CommentDisplay';
 import Footer from "../Footer"; 
 
 function CustomsGasoline() {
-  const pageIdVisitorPage = 5;
+  const pageIdVisitorPage = "customs_gasoline";
   useEffect(() => {
     const getData = async () => {
       try {

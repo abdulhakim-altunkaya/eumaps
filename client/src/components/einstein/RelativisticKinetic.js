@@ -7,7 +7,7 @@ import 'katex/dist/katex.min.css'; // Import the KaTeX CSS for proper styling of
 import Footer from "../Footer";
 
 function RelativisticKinetic() {
-  const pageIdVisitorPage = 13;
+  const pageIdVisitorPage = "einstein_rel_kinetic";
   useEffect(() => {
     const getData = async () => {
       try {

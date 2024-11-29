@@ -5,7 +5,7 @@ import CommentDisplay from '../CommentDisplay';
 import Footer from "../Footer";
 
 function Temperature() {
-    const pageIdVisitorPage = 16;
+    const pageIdVisitorPage = "unit_temperature";
     useEffect(() => {
       const getData = async () => {
         try {

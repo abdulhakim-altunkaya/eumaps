@@ -7,7 +7,7 @@ import Footer from "../Footer";
 function Rent() { 
 
   const [resultArea, setResultArea] = useState('');
-  const pageIdVisitorPage = 1;
+  const pageIdVisitorPage = "mfa_rent"
   useEffect(() => {
     const getData = async () => {
       try {

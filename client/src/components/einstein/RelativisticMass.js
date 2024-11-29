@@ -7,7 +7,7 @@ import 'katex/dist/katex.min.css'; // Import the KaTeX CSS for proper styling of
 import Footer from "../Footer";
 
 function RelativisticMass() {
-  const pageIdVisitorPage = 26;
+  const pageIdVisitorPage = "einstein_rel_mass";
   useEffect(() => {
     const getData = async () => {
       try {

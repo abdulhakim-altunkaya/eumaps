@@ -7,7 +7,7 @@ import CommentDisplay from '../CommentDisplay';
 import Footer from "../Footer";
 
 function CustomsHybridPlugin() {
-  const pageIdVisitorPage = 6;
+  const pageIdVisitorPage = "customs_plugin";
   useEffect(() => {
     const getData = async () => {
       try {

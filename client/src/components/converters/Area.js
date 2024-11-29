@@ -5,19 +5,19 @@ import CommentDisplay from '../CommentDisplay';
 import Footer from "../Footer";
 
 function Area() {
-    const pageIdVisitorPage = 17;
+    const pageIdVisitorPage = "unit_area";
     useEffect(() => {
-      const getData = async () => {
-        try {
-          // Send the request to log the visitor data without awaiting its completion
-          axios.post(`/serversavevisitor/${pageIdVisitorPage}`, {}).catch((error) => {
-            console.error('Error logging visit:', error.message);
-          });
-        } catch (error) {
-          console.log(error.message);
-        }
-      };
-      getData();
+        const getData = async () => {
+          try {
+            // Send the request to log the visitor data without awaiting its completion
+            axios.post(`/serversavevisitor/${pageIdVisitorPage}`, {}).catch((error) => {
+              console.error('Error logging visit:', error.message);
+            });
+          } catch (error) {
+            console.log(error.message);
+          }
+        };
+        getData();
     }, []);
 
     const [values, setValues] = useState({

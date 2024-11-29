@@ -7,7 +7,7 @@ import 'katex/dist/katex.min.css'; // Import the KaTeX CSS for proper styling of
 import Footer from "../Footer";
 
 function LengthContraction() {
-  const pageIdVisitorPage = 12;
+  const pageIdVisitorPage = "einstein_length_cont";
   useEffect(() => {
     const getData = async () => {
       try {

@@ -7,7 +7,7 @@ import 'katex/dist/katex.min.css'; // Import the KaTeX CSS for proper styling of
 import Footer from "../Footer";
 
 function DilationSpeed() {
-  const pageIdVisitorPage = 9;
+  const pageIdVisitorPage = "einstein_speed_dil";
   useEffect(() => {
     const getData = async () => {
       try {

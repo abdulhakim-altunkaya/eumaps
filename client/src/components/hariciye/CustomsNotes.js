@@ -4,7 +4,7 @@ import CommentDisplay from '../CommentDisplay';
 import Footer from "../Footer";
 
 function CustomsNotes() {
-  const pageIdVisitorPage = 8;
+  const pageIdVisitorPage = "customs_notes";
   useEffect(() => {
     const getData = async () => {
       try {

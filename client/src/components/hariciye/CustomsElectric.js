@@ -6,7 +6,7 @@ import CommentDisplay from '../CommentDisplay';
 import Footer from "../Footer";
 
 function CustomsElectric() {
-  const pageIdVisitorPage = 3;
+  const pageIdVisitorPage = "customs_electric";
   useEffect(() => {
     const getData = async () => {
       try {

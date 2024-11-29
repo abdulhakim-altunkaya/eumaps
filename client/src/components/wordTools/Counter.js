@@ -5,7 +5,7 @@ import CommentDisplay from '../CommentDisplay';
 import Footer from "../Footer";
 
 function Counter() {
-  const pageIdVisitorPage = 21;
+  const pageIdVisitorPage = "tools_counter";
   useEffect(() => {
     const getData = async () => {
       try {

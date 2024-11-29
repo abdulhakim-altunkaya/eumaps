@@ -5,7 +5,7 @@ import CommentDisplay from '../CommentDisplay';
 import Footer from "../Footer";
 
 function Weight() {
-  const pageIdVisitorPage = 14;
+  const pageIdVisitorPage = "unit_weight";
   useEffect(() => {
     const getData = async () => {
       try {

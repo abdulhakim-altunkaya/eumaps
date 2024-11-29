@@ -6,7 +6,7 @@ import CommentDisplay from '../CommentDisplay';
 import Footer from "../Footer";
 
 function ButtonsCSS() {
-  const pageIdVisitorPage = 25;
+  const pageIdVisitorPage = "tools_freecss";
   useEffect(() => {
     const getData = async () => {
       try {

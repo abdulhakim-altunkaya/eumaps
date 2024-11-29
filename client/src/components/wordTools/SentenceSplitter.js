@@ -5,7 +5,7 @@ import CommentDisplay from '../CommentDisplay';
 import Footer from "../Footer";
 
 function SentenceSplitter() {
-  const pageIdVisitorPage = 23;
+  const pageIdVisitorPage = "tools_sentence_split";
   useEffect(() => {
     const getData = async () => {
       try {

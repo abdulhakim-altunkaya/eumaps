@@ -6,7 +6,7 @@ import CommentDisplay from '../CommentDisplay';
 import Footer from "../Footer";
 
 const MatterToEnergy = () => {
-  const pageIdVisitorPage = 11;
+  const pageIdVisitorPage = "einstein_masstoenergy";
   useEffect(() => {
     const getData = async () => {
       try {

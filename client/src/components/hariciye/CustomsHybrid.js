@@ -6,7 +6,7 @@ import CommentDisplay from '../CommentDisplay';
 import Footer from "../Footer";
 
 function CustomsHybrid() {
-  const pageIdVisitorPage = 4;
+  const pageIdVisitorPage = "customs_hybrid";
   useEffect(() => {
     const getData = async () => {
       try {

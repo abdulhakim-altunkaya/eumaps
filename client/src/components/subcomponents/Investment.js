@@ -5,7 +5,7 @@ import CommentDisplay from '../CommentDisplay';
 import Footer from "../Footer";
  
 function Investment() {
-  const pageIdVisitorPage = 20;
+  const pageIdVisitorPage = "tools_investment";
   useEffect(() => {
     const getData = async () => {
       try {

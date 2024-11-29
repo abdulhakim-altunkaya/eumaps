@@ -8,7 +8,7 @@ import CommentDisplay from '../CommentDisplay';
 import Footer from "../Footer";
 
 const SchengenVisa = () => {
-  const pageIdVisitorPage = 24;
+  const pageIdVisitorPage = "tools_schengen";
   useEffect(() => {
     const getData = async () => {
       try {
