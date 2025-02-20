@@ -83,6 +83,8 @@ function CustomsHybrid() {
     } else if (engineCapacityElectric3 === "" || engineCapacityElectric3 < 10 || engineCapacityElectric3 > 10000) {
       alert("Geçersiz KW gücü. Aracın KW gücünü sadece rakam olarak giriniz.");
       return;
+    } else if (engineCapacityElectric3 < 51) {
+      alert("50 KW altı elektrik motoru olan hibrit araçlar benzinli araç gibi değerlendirilir.");
     } else if (navlunAmount3 === "" || navlunAmount3 < 1 || navlunAmount3 > 10000) {
       alert("Geçersiz navlun bedeli. Navlun-Sigorta bedelini giriniz");
       return;
@@ -128,7 +130,7 @@ function CustomsHybrid() {
     discount = discount + firstYear;
     const basePrice = invoiceAmount3 - discount;
     const basePriceLira = basePrice * currency;
-
+ 
     let percentage;
     if (engineCapacityElectric3>50 && engineCapacityOil3<1801 && basePriceLira<228001) {
       percentage = 45/100;
@@ -140,8 +142,12 @@ function CustomsHybrid() {
       percentage = 130/100;
     } else if (engineCapacityElectric3>100 && engineCapacityOil3<2501 && basePriceLira>170000) {
       percentage = 150/100;
-    } else if (engineCapacityElectric3<51 && engineCapacityOil3<1801 && basePriceLira<350001) {
+    } else if (engineCapacityElectric3<51 && engineCapacityOil3<1601 && basePriceLira>280000) {
       percentage = 80/100;
+    } else if (engineCapacityElectric3<51 && engineCapacityOil3<2001 && basePriceLira<170001) {
+      percentage = 130/100;
+    } else if (engineCapacityElectric3<51 && engineCapacityOil3<2001 && basePriceLira>170000) {
+      percentage = 150/100;
     } else {
       percentage = 220/100;
     }
