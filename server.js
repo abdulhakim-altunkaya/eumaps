@@ -104,11 +104,9 @@ app.get("/servergetcomments/:pageId", async (req, res) => {
 //We will save each visitor data to database. 
 const ipCache = {}
 // List of IPs to ignore (server centers, ad bots, my ip etc)
-const ignoredIPs = ["66.249.68.5", "66.249.68.4", "66.249.88.2", "66.249.89.2", "66.249.65.32", "66.249.88.3", "209.85.238.225", 
-  "209.85.238.224", "80.89.77.205", "212.3.197.186", "80.89.74.90", "::1", "80.89.79.74", "80.89.77.116", "80.89.73.22", 
-  "66.249.64.10", "66.249.64.6", "66.249.64.5", "66.249.66.169", "66.249.66.160", "212.3.194.116", "212.3.194.116", 
-  "66.249.73.233", "66.249.73.234", "62.103.210.169", "66.249.66.161", "66.249.69.65", "66.249.68.33", "66.249.68.37",
-  "66.249.68.38", "66.249.68.34"];
+//The list is updated to let web crawlers to pass and visit website
+//block ip list currently has 2 decoy ip to prevent error on middleware code.
+const ignoredIPs = ["66.249.1111168.5", "66.249.68.42121"];
 
 app.post("/serversavevisitor/:pageIdVisitorPage", async (req, res) => {
   //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
