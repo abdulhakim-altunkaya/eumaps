@@ -44,7 +44,7 @@ function MainEinstein() {
                             alt="Clickable Einstein Relativistic Mass Calculator Icon"/></span>
                     </div>
                 </div>
-        </div>
+    </div>
       <br/>
       <br/>
       <br/>
