@@ -154,7 +154,7 @@ app.post("/serversavevisitor/:pageIdVisitorPage", async (req, res) => {
 })
 
 const ipCache3 = {}
-app.post("/api/save-visitor/ipradar", async (req, res) => {
+app.post("/api/save-visitor/ipradar/:ipInput", async (req, res) => {
   //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
   //and Render is using proxies or load balancers. Because of that I will see "::1" as ip data if I not use
   //this line below
@@ -168,7 +168,7 @@ app.post("/api/save-visitor/ipradar", async (req, res) => {
       resErrorCode: 1
     });
   }
-  // Check if IP exists in cache and if last visit was less than 16.67 minutes ago (1000000)
+  // Check if IP exists in cache and if last visit was less than 1 minute ago (60000 ms)
   if (ipCache3[ipVisitor] && Date.now() - ipCache3[ipVisitor] < 10000) {
     return res.status(429).json({
       resStatus: false,
@@ -181,6 +181,8 @@ app.post("/api/save-visitor/ipradar", async (req, res) => {
   const userAgentString = req.get('User-Agent') || '';
   const agent = useragent.parse(userAgentString);
 
+  const {ipInput} = req.params;
+
   try {
     const visitorData = {
       ip: ipVisitor,
@@ -188,17 +190,38 @@ app.post("/api/save-visitor/ipradar", async (req, res) => {
       browser: agent.toAgent(), // browser
       visitDate: new Date().toLocaleDateString('en-GB')
     };
-    //save visitor to database
+    // OPERATION 1: save visitor to database
     client = await pool.connect();
     const result = await client.query(
       `INSERT INTO visitors_ipradar (ip, op, browser, date) 
       VALUES ($1, $2, $3, $4)`, [visitorData.ip, visitorData.os, visitorData.browser, visitorData.visitDate]
     );
+
+    // OPERATION 2: Fetch geolocation from IPAPI
+    const ipapiKey = process.env.IPAPI_KEY;
+    const ipapiUrl = `https://ipapi.co/${ipInput}/json/?key=${ipapiKey}`;
+    const geoRes = await axios.get(ipapiUrl);
+
+    const data = geoRes.data;
+    const geoData = {
+      continent: data.continent_name,
+      country: data.country_name,
+      city: data.city,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      connectionType: data.connection_type,
+      ipType: data.version
+    };
+
+    //SEND OK MESSAGE AND LOCATION DATA AFTER OPERATION 1 (SAVING USER TO DB)
+    //AND OPERATION 2 (SENDING USER IP INPUT TO IPAPI ENDPOINT AND GETTING LOCATION DATA FROM IT)
     return res.status(200).json({
       resStatus: true,
-      resMessage: "Visitor successfully logged.",
-      resOkCode: 1
+      resMessage: "Visitor logged and geolocation fetched.",
+      resOkCode: 1,
+      resData: geoData
     });
+
   } catch (error) {
     console.error('Error logging visit:', error);
     return res.status(500).json({
