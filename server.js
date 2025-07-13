@@ -4,6 +4,7 @@ const path = require('path');
 
 const { pool } = require("./db");
 const useragent = require('useragent');
+
 const cors = require("cors");
 app.use(cors());
 
@@ -106,7 +107,7 @@ const ipCache = {}
 // List of IPs to ignore (server centers, ad bots, my ip etc)
 //The list is updated to let web crawlers to pass and visit website
 //block ip list currently has 2 decoy ip to prevent error on middleware code.
-const ignoredIPs = ["66.249.1111168.5", "66.249.68.42121"];
+const ignoredIPs = ["66.249.1111168.5", "66.249.68.421323221"];
 
 app.post("/serversavevisitor/:pageIdVisitorPage", async (req, res) => {
   //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
@@ -152,6 +153,63 @@ app.post("/serversavevisitor/:pageIdVisitorPage", async (req, res) => {
   }
 })
 
+const ipCache3 = {}
+app.post("/api/save-visitor/ipradar", async (req, res) => {
+  //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
+  //and Render is using proxies or load balancers. Because of that I will see "::1" as ip data if I not use
+  //this line below
+  const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
+  let client;
+  // Check if the IP is in the ignored list
+  if (ignoredIPs.includes(ipVisitor)) {
+    return res.status(403).json({
+      resStatus: false,
+      resMessage: "This IP is ignored from logging to Database",
+      resErrorCode: 1
+    });
+  }
+  // Check if IP exists in cache and if last visit was less than 16.67 minutes ago (1000000)
+  if (ipCache3[ipVisitor] && Date.now() - ipCache3[ipVisitor] < 10000) {
+    return res.status(429).json({
+      resStatus: false,
+      resMessage: "Too many requests from this IP.",
+      resErrorCode: 2
+    });
+  }
+
+  ipCache3[ipVisitor] = Date.now();//save visitor ip to ipCache3
+  const userAgentString = req.get('User-Agent') || '';
+  const agent = useragent.parse(userAgentString);
+
+  try {
+    const visitorData = {
+      ip: ipVisitor,
+      os: agent.os.toString(), // operating system
+      browser: agent.toAgent(), // browser
+      visitDate: new Date().toLocaleDateString('en-GB')
+    };
+    //save visitor to database
+    client = await pool.connect();
+    const result = await client.query(
+      `INSERT INTO visitors_ipradar (ip, op, browser, date) 
+      VALUES ($1, $2, $3, $4)`, [visitorData.ip, visitorData.os, visitorData.browser, visitorData.visitDate]
+    );
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "Visitor successfully logged.",
+      resOkCode: 1
+    });
+  } catch (error) {
+    console.error('Error logging visit:', error);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Database connection error while logging visitor.",
+      resErrorCode: 3
+    });
+  } finally {
+    if(client) client.release();
+  }
+});
 
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
 //fetch comments etc. This code helps with managing routes that are not defined on react frontend.
