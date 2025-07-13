@@ -8,6 +8,9 @@ const useragent = require('useragent');
 const cors = require("cors");
 app.use(cors());
 
+// ADD THIS NEAR TOP
+const axios = require('axios');
+
 //we need this as we use req.body to send data from frontend to backend
 app.use(express.json());
 
@@ -198,7 +201,7 @@ app.post("/api/save-visitor/ipradar/:ipInput", async (req, res) => {
     );
 
     // OPERATION 2: Fetch geolocation from IPAPI
-    const ipapiKey = process.env.IPAPI_KEY;
+    const ipapiKey = process.env.IPAPI_ACCESS_KEY;
     const ipapiUrl = `https://ipapi.co/${ipInput}/json/?key=${ipapiKey}`;
     const geoRes = await axios.get(ipapiUrl);
 
