@@ -203,9 +203,14 @@ app.post("/api/save-visitor/ipradar/:ipInput", async (req, res) => {
     // OPERATION 2: Fetch geolocation from IPAPI
     const ipapiKey = process.env.IPAPI_ACCESS_KEY;
     const ipapiUrl = `https://ipapi.co/${ipInput}/json/?key=${ipapiKey}`;
+console.log("IPAPI Key:", ipapiKey ? "[OK]" : "[MISSING]");
+console.log("ipInput:", ipInput);
+console.log("IPAPI URL:", ipapiUrl);
     const geoRes = await axios.get(ipapiUrl);
-
+console.log("IPAPI Response Status:", geoRes.status);
+console.log("IPAPI Response Data:", geoRes.data);
     const data = geoRes.data;
+    
     const geoData = {
       continent: data.continent_name,
       country: data.country_name,
