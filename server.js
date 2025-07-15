@@ -202,12 +202,9 @@ app.post("/api/save-visitor/ipradar/:ipInput", async (req, res) => {
     // OPERATION 2: Fetch geolocation from IPAPI
     const ipapiKey = process.env.IPAPI_ACCESS_KEY;
     const ipapiUrl = `https://ipapi.co/${ipInput}/json/?key=${ipapiKey}`;
-console.log("IPAPI Key:", ipapiKey ? "[OK]" : "[MISSING]");
-console.log("ipInput:", ipInput);
-console.log("IPAPI URL:", ipapiUrl);
+
     const geoRes = await axios.get(ipapiUrl);
-console.log("IPAPI Response Status:", geoRes.status);
-console.log("IPAPI Response Data:", geoRes.data);
+
     const data = geoRes.data;
     
     const geoData = {
@@ -241,27 +238,82 @@ console.log("IPAPI Response Data:", geoRes.data);
   }
 });
 
+// IP-based geolocation endpoint
+app.post("/api/get-coordinates-and-log-visitor", async (req, res) => {
+    //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
+  //and Render is using proxies or load balancers. Because of that I will see "::1" as ip data if I not use
+  //this line below
+  const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
+  let client;
+  // Check if the IP is in the ignored list
+  if (ignoredIPs.includes(ipVisitor)) {
+    return res.status(403).json({
+      resStatus: false,
+      resMessage: "This IP is ignored from logging to Database",
+      resErrorCode: 1
+    });
+  }
+  // Check if IP exists in cache and if last visit was less than 1 minute ago (60000 ms)
+  if (ipCache3[ipVisitor] && Date.now() - ipCache3[ipVisitor] < 10000) {
+    return res.status(429).json({
+      resStatus: false,
+      resMessage: "Too many requests from this IP.",
+      resErrorCode: 2
+    });
+  }
+
+  const { ipInput } = req.body; // Get IP address from the request body
+  ipCache3[ipVisitor] = Date.now();//save visitor ip to ipCache3
+  const userAgentString = req.get('User-Agent') || '';
+  const agent = useragent.parse(userAgentString);
+
+  try {
+    const visitorData = {
+      ip: ipVisitor,
+      os: agent.os.toString(), // operating system
+      browser: agent.toAgent(), // browser
+      visitDate: new Date().toLocaleDateString('en-GB')
+    };
+    // OPERATION 1: save visitor to database
+    client = await pool.connect();
+    const result = await client.query(
+      `INSERT INTO visitors_ipradar (ip, op, browser, date) 
+      VALUES ($1, $2, $3, $4)`, [visitorData.ip, visitorData.os, visitorData.browser, visitorData.visitDate]
+    );
+
+    const apiKey = process.env.IPAPI_KEY; // Load API key from .env file
+    const response = await axios.get(`http://api.ipapi.com/api/${ipInput}?access_key=${apiKey}`);
+    const geoData = {
+      latitude: response.data.latitude,
+      longitude: response.data.longitude,
+      country_name: response.data.country_name,
+      city: response.data.city,
+      connection_type: response.data.connection_type,
+      type: response.data.type,
+      continent_name: response.data.continent_name
+    };
+    return res.status(200).json({ 
+      resStatus: true,
+      resMessage: "Geo data obtained",
+      resOkCode: 1,
+      resData: geoData
+    });
+  } catch (error) {
+      console.error("Error fetching geolocation data:", error.message);
+      return res.status(500).json({
+        resStatus: false,
+        resMessage: "Failed to fetch geolocation data",
+        resErrorCode: 2
+      });
+  } finally {
+    if(client) client.release();
+  }
+});
+
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
 //fetch comments etc. This code helps with managing routes that are not defined on react frontend.
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
-});
-
-// IP-based geolocation endpoint
-app.post("/api/get-coordinates", async (req, res) => {
-  const { ipInput } = req.body; // Get IP address from the request body
-  console.log(ipInput);
-  try {
-     const apiKey = process.env.IPAPI_KEY; // Load API key from .env file
-     const response = await axios.get(`http://api.ipapi.com/api/${ipInput}?access_key=${apiKey}`);
-      const { latitude, longitude, country_name, city, connection_type, type, continent_name } = response.data;
-      // Send latitude and longitude in the response
-      console.log(response.data);
-      res.json({ latitude, longitude, country_name, city, connection_type, type, continent_name });
-  } catch (error) {
-      console.error("Error fetching geolocation data:", error.message);
-      res.status(500).json({ error: "Failed to fetch geolocation data" });
-  }
 });
 
 const PORT = process.env.port || 5000;
