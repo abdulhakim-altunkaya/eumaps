@@ -11,15 +11,14 @@ app.use(cors());
 // ADD THIS NEAR TOP
 const axios = require('axios');
 
+app.set('trust proxy', true);
+
 //we need this as we use req.body to send data from frontend to backend
 app.use(express.json());
 
 //Then go to server.js file and make sure you serve static files from build directory:
 app.use(express.static(path.join(__dirname, 'client/build')));
 //For serving from build directory, you need to install path package and initiate it:
-app.get("/serversendhello", (req, res) => {
-  res.status(200).json({myMessage: "Hello from backend"});
-})
 
 //A temporary cache to save ip addresses and it will prevent spam comments and replies for 1 minute.
 //I can do that by checking each ip with database ip addresses but then it will be too many requests to db
@@ -248,6 +247,22 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
 });
 
+// IP-based geolocation endpoint
+app.post("/api/get-coordinates", async (req, res) => {
+  const { ipInput } = req.body; // Get IP address from the request body
+  console.log(ipInput);
+  try {
+     const apiKey = process.env.IPAPI_KEY; // Load API key from .env file
+     const response = await axios.get(`http://api.ipapi.com/api/${ipInput}?access_key=${apiKey}`);
+      const { latitude, longitude, country_name, city, connection_type, type, continent_name } = response.data;
+      // Send latitude and longitude in the response
+      console.log(response.data);
+      res.json({ latitude, longitude, country_name, city, connection_type, type, continent_name });
+  } catch (error) {
+      console.error("Error fetching geolocation data:", error.message);
+      res.status(500).json({ error: "Failed to fetch geolocation data" });
+  }
+});
 
 const PORT = process.env.port || 5000;
 app.listen(PORT, () => {
