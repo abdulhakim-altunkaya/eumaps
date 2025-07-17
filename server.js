@@ -8,19 +8,26 @@ const useragent = require('useragent');
 const axios = require('axios');
 
 const cors = require("cors");
-//app.use(cors());//This line permits any request from any website
-
-const allowedOrigins = ['https://www.einsteincalculators.com', 'https://einsteincalculators.com', 'https://visacalculator.org',  
-  'https://www.visacalculator.org', 'https://www.ipradar.org', 'https://www.ipradar.org', 'https://www.eumaps.org', 'https://eumaps.org'];
+const allowedOrigins = [
+  'https://www.einsteincalculators.com',
+  'https://einsteincalculators.com',
+  'https://visacalculator.org',
+  'https://www.visacalculator.org',
+  'https://www.ipradar.org',
+  'https://ipradar.org',
+  'https://www.eumaps.org',
+  'https://eumaps.org'
+];
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    const normalizedOrigin = origin?.replace(/\/$/, '');  // remove trailing slash if present
+
+    if (!origin || allowedOrigins.includes(normalizedOrigin)) {
       return callback(null, true);
     }
     return callback(new Error('Not allowed by CORS'));
   }
 }));
-
 
 
 app.set('trust proxy', true);
