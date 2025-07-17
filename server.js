@@ -4,12 +4,24 @@ const path = require('path');
 
 const { pool } = require("./db");
 const useragent = require('useragent');
-
-const cors = require("cors");
-app.use(cors());
-
 // ADD THIS NEAR TOP
 const axios = require('axios');
+
+const cors = require("cors");
+//app.use(cors());//This line permits any request from any website
+
+const allowedOrigins = ['https://einsteincalculators.com', 'https://visacalculator.org', 
+  'https://www.ipradar.org', 'https://www.eumaps.org'];
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  }
+}));
+
+
 
 app.set('trust proxy', true);
 
