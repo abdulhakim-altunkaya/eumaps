@@ -10,8 +10,8 @@ const axios = require('axios');
 const cors = require("cors");
 //app.use(cors());//This line permits any request from any website
 
-const allowedOrigins = ['https://einsteincalculators.com', 'https://visacalculator.org', 
-  'https://www.ipradar.org', 'https://www.eumaps.org'];
+const allowedOrigins = ['https://www.einsteincalculators.com', 'https://einsteincalculators.com', 'https://visacalculator.org',  
+  'https://www.visacalculator.org', 'https://www.ipradar.org', 'https://www.ipradar.org', 'https://www.eumaps.org', 'https://eumaps.org'];
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
