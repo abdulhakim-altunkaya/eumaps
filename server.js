@@ -155,89 +155,7 @@ app.post("/serversavevisitor/:pageIdVisitorPage", async (req, res) => {
   }
 })
 
-const ipCache3 = {}
-app.post("/api/save-visitor/ipradar/:ipInput", async (req, res) => {
-  //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
-  //and Render is using proxies or load balancers. Because of that I will see "::1" as ip data if I not use
-  //this line below
-  const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
-  let client;
-  // Check if the IP is in the ignored list
-  if (ignoredIPs.includes(ipVisitor)) {
-    return res.status(403).json({
-      resStatus: false,
-      resMessage: "This IP is ignored from logging to Database",
-      resErrorCode: 1
-    });
-  }
-  // Check if IP exists in cache and if last visit was less than 1 minute ago (60000 ms)
-  if (ipCache3[ipVisitor] && Date.now() - ipCache3[ipVisitor] < 10000) {
-    return res.status(429).json({
-      resStatus: false,
-      resMessage: "Too many requests from this IP.",
-      resErrorCode: 2
-    });
-  }
-
-  ipCache3[ipVisitor] = Date.now();//save visitor ip to ipCache3
-  const userAgentString = req.get('User-Agent') || '';
-  const agent = useragent.parse(userAgentString);
-
-  const {ipInput} = req.params;
-
-  try {
-    const visitorData = {
-      ip: ipVisitor,
-      os: agent.os.toString(), // operating system
-      browser: agent.toAgent(), // browser
-      visitDate: new Date().toLocaleDateString('en-GB')
-    };
-    // OPERATION 1: save visitor to database
-    client = await pool.connect();
-    const result = await client.query(
-      `INSERT INTO visitors_ipradar (ip, op, browser, date) 
-      VALUES ($1, $2, $3, $4)`, [visitorData.ip, visitorData.os, visitorData.browser, visitorData.visitDate]
-    );
-
-    // OPERATION 2: Fetch geolocation from IPAPI
-    const ipapiKey = process.env.IPAPI_ACCESS_KEY;
-    const ipapiUrl = `https://ipapi.co/${ipInput}/json/?key=${ipapiKey}`;
-
-    const geoRes = await axios.get(ipapiUrl);
-
-    const data = geoRes.data;
-    
-    const geoData = {
-      continent: data.continent_name,
-      country: data.country_name,
-      city: data.city,
-      latitude: data.latitude,
-      longitude: data.longitude,
-      connectionType: data.connection_type,
-      ipType: data.version
-    };
-
-    //SEND OK MESSAGE AND LOCATION DATA AFTER OPERATION 1 (SAVING USER TO DB)
-    //AND OPERATION 2 (SENDING USER IP INPUT TO IPAPI ENDPOINT AND GETTING LOCATION DATA FROM IT)
-    return res.status(200).json({
-      resStatus: true,
-      resMessage: "Visitor logged and geolocation fetched.",
-      resOkCode: 1,
-      resData: geoData
-    });
-
-  } catch (error) {
-    console.error('Error logging visit:', error);
-    return res.status(500).json({
-      resStatus: false,
-      resMessage: "Database connection error while logging visitor.",
-      resErrorCode: 3
-    });
-  } finally {
-    if(client) client.release();
-  }
-});
-
+const ipCache5 = {}
 // IP-based geolocation endpoint
 app.post("/api/get-coordinates-and-log-visitor", async (req, res) => {
     //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
@@ -253,8 +171,8 @@ app.post("/api/get-coordinates-and-log-visitor", async (req, res) => {
       resErrorCode: 1
     });
   }
-  // Check if IP exists in cache and if last visit was less than 1 minute ago (60000 ms)
-  if (ipCache3[ipVisitor] && Date.now() - ipCache3[ipVisitor] < 10000) {
+  // Check if IP exists in cache and if last visit was less than 3 seconds ago (30000 ms)
+  if (ipCache5[ipVisitor] && Date.now() - ipCache5[ipVisitor] < 3000) {
     return res.status(429).json({
       resStatus: false,
       resMessage: "Too many requests from this IP.",
@@ -263,7 +181,7 @@ app.post("/api/get-coordinates-and-log-visitor", async (req, res) => {
   }
 
   const { ipInput } = req.body; // Get IP address from the request body
-  ipCache3[ipVisitor] = Date.now();//save visitor ip to ipCache3
+  ipCache5[ipVisitor] = Date.now();//save visitor ip to ipCache5
   const userAgentString = req.get('User-Agent') || '';
   const agent = useragent.parse(userAgentString);
 
@@ -303,13 +221,130 @@ app.post("/api/get-coordinates-and-log-visitor", async (req, res) => {
       return res.status(500).json({
         resStatus: false,
         resMessage: "Failed to fetch geolocation data",
-        resErrorCode: 2
+        resErrorCode: 3
       });
   } finally {
     if(client) client.release();
   }
 });
+const ipCache3 = {}
+app.post("/api/save-visitor/schengen", async (req, res) => {
+  //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
+  //and Render is using proxies or load balancers. Because of that I will see "::1" as ip data if I not use
+  //this line below
+  const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
+  let client;
+  // Check if the IP is in the ignored list
+  if (ignoredIPs.includes(ipVisitor)) {
+    return res.status(403).json({
+      resStatus: false,
+      resMessage: "This IP is ignored from logging to Database",
+      resErrorCode: 1
+    });
+  }
+  // Check if IP exists in cache and if last visit was less than 16.67 minutes ago
+  if (ipCache3[ipVisitor] && Date.now() - ipCache3[ipVisitor] < 1000000) {
+    return res.status(429).json({
+      resStatus: false,
+      resMessage: "Too many requests from this IP.",
+      resErrorCode: 2
+    });
+  }
 
+  ipCache3[ipVisitor] = Date.now();//save visitor ip to ipCache3
+  const userAgentString = req.get('User-Agent') || '';
+  const agent = useragent.parse(userAgentString);
+
+  try {
+    const visitorData = {
+      ip: ipVisitor,
+      os: agent.os.toString(), // operating system
+      browser: agent.toAgent(), // browser
+      visitDate: new Date().toLocaleDateString('en-GB')
+    };
+    //save visitor to database
+    client = await pool.connect();
+    const result = await client.query(
+      `INSERT INTO visitors_schengen (ip, op, browser, date) 
+      VALUES ($1, $2, $3, $4)`, [visitorData.ip, visitorData.os, visitorData.browser, visitorData.visitDate]
+    );
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "Visitor successfully logged.",
+      resOkCode: 1
+    });
+  } catch (error) {
+    console.error('Error logging visit:', error);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Database connection error while logging visitor.",
+      resErrorCode: 3
+    });
+  } finally {
+    if(client) client.release();
+  }
+});
+
+const ipCache4 = {}
+app.post("/api/save-visitor/einstein/:sectionName", async (req, res) => {
+  //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
+  //and Render is using proxies or load balancers. Because of that I will see "::1" as ip data if I not use
+  //this line below
+  const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
+  let client;
+  const { sectionName } = req.params;
+  
+  // Check if the IP is in the ignored list
+  if (ignoredIPs.includes(ipVisitor)) {
+    return res.status(403).json({
+      resStatus: false,
+      resMessage: "This IP is ignored from logging to Database",
+      resErrorCode: 1
+    });
+  }
+  // Check if IP exists in cache and if last visit was less than 16.67 minutes ago
+  if (ipCache4[ipVisitor] && Date.now() - ipCache4[ipVisitor] < 1000000) {
+    return res.status(429).json({
+      resStatus: false,
+      resMessage: "Too many requests from this IP.",
+      resErrorCode: 2
+    });
+  }
+
+  ipCache4[ipVisitor] = Date.now();//save visitor ip to ipCache4
+  const userAgentString = req.get('User-Agent') || '';
+  const agent = useragent.parse(userAgentString);
+
+  try {
+    const visitorData = {
+      ip: ipVisitor,
+      os: agent.os.toString(), // operating system
+      browser: agent.toAgent(), // browser
+      visitDate: new Date().toLocaleDateString('en-GB')
+    };
+    //save visitor to database
+    client = await pool.connect();
+    const result = await client.query(
+      `INSERT INTO visitors_einstein (ip, op, browser, date, section) 
+      VALUES ($1, $2, $3, $4, $5)`, 
+      [visitorData.ip, visitorData.os, visitorData.browser, visitorData.visitDate, sectionName]
+    );
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "Visitor successfully logged.",
+      resOkCode: 1
+    });
+  } catch (error) {
+    console.error('Error logging visit:', error);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Database connection error while logging visitor.",
+      resErrorCode: 3
+    });
+  } finally {
+    if(client) client.release();
+  }
+});
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
 //fetch comments etc. This code helps with managing routes that are not defined on react frontend.
 app.get('*', (req, res) => {
