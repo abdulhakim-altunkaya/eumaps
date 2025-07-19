@@ -7,7 +7,6 @@ function SidebarNav() {
 
   const [converterToggle, setConverterToggle] = useState(false);
   const [wordToolsToggle, setWordToolsToggle] = useState(false);
-  const [einsteinToggle, setEinsteinToggle] = useState(false);
   const [mfaCalculatorsToggle, setMfaCalculatorsToggle] = useState(false);
 
   const toggleConverters = () => {
@@ -18,11 +17,6 @@ function SidebarNav() {
   const toggleWordTools = () => {
     setWordToolsToggle(!wordToolsToggle);
     navigate("/tools");
-  }
-
-  const toggleEinstein = () => {
-    setEinsteinToggle(!einsteinToggle);
-    navigate("/einstein-calculators");
   }
 
   const toggleMFACalculators = () => {
@@ -62,25 +56,6 @@ function SidebarNav() {
           </>
         )
       }
-      <div onClick={toggleEinstein} className='sidebarMainButtons'>Einstein Calculators &#9660;</div>
-      {
-        einsteinToggle && (
-          <>
-            <div className='sidebarSideButtons' 
-              onClick={() => navigate("/einstein-mass-energy-converter")}>Mass-Energy Converter</div>
-            <div className='sidebarSideButtons' 
-              onClick={() => navigate("/einstein-time-dilation-calculator")}>Time Dilation Calculator (Speed)</div>
-            <div className='sidebarSideButtons' 
-              onClick={() => navigate("/einstein-gravitational-time-dilation-calculator")}>Time Dilation Calculator (Gravity)</div>
-            <div className='sidebarSideButtons'
-              onClick={() => navigate("/einstein-length-contraction-calculator")}>Length Contraction Calculator</div>
-            <div className='sidebarSideButtons' 
-              onClick={() => navigate("/einstein-relativistic-kinetic-energy-calculator")}>Relativistic Kinetic Energy Calculator</div>
-            <div className='sidebarSideButtons' 
-              onClick={() => navigate("/einstein-relativistic-mass-calculator")}>Relativistic Mass Calculator</div>
-          </>
-        )
-      }
       <div onClick={toggleWordTools} className='sidebarMainButtons'>Tools &#9660;</div>
       {
         wordToolsToggle && (
@@ -88,7 +63,6 @@ function SidebarNav() {
             <div className='sidebarSideButtons' onClick={() => navigate("/character-and-word-counter")}>Character & Word Counter</div>
             <div className='sidebarSideButtons' onClick={() => navigate("/word-insulator")}>Word Insulator</div>
             <div className='sidebarSideButtons' onClick={() => navigate("/sentence-splitter")}>Sentence Splitter</div>
-            <div className='sidebarSideButtons' onClick={() => navigate("/schengen-visa-calculator")}>Schengen Visa Calculator</div>
             <div className='sidebarSideButtons' onClick={() => navigate("/investment-return-calculator")}>Investment Return Calculator</div>
             <div className='sidebarSideButtons' onClick={() => navigate("/free-css-buttons")}>Free CSS Buttons</div>
           </>

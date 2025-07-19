@@ -28,11 +28,6 @@ function MainTools() {
                 </div>
             </div>
             <div className='convertersIconsMainArea'>
-                <div className="converter-item" onClick={ () => navigate("/schengen-visa-calculator")}>
-                    <span className="converter-name2">Schengen Visa Calculator</span>
-                    <span className="icon-wrapper"><img src="/icons/schengen.png" className="unitIcons" 
-                            alt="Clickable Area Icon"/></span>
-                </div>
                 <div className="converter-item" onClick={ () => navigate("/investment-return-calculator")}>
                     <span className="converter-name2">Investment Return Calculator</span>
                     <span className="icon-wrapper"><img src="/icons/investment.png" className="unitIcons" 

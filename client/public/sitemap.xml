@@ -4,7 +4,7 @@
   <url>
     <loc>https://www.eumaps.org/</loc>
     <changefreq>daily</changefreq>
-    <priority>1.0</priority>
+    <priority>1.0</priority> 
   </url>
   <url>
     <loc>https://www.eumaps.org/investment-return-calculator</loc>
@@ -86,38 +86,6 @@
     <priority>0.9</priority>
   </url>
 
-  <!-- Einstein Calculators -->
-  <url>
-    <loc>https://www.eumaps.org/einstein-mass-energy-converter</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://www.eumaps.org/einstein-time-dilation-calculator</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://www.eumaps.org/einstein-gravitational-time-dilation-calculator</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://www.eumaps.org/einstein-length-contraction-calculator</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://www.eumaps.org/einstein-relativistic-kinetic-energy-calculator</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://www.eumaps.org/einstein-relativistic-mass-calculator</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-
   <!-- Tools -->
   <url>
     <loc>https://www.eumaps.org/character-and-word-counter</loc>
@@ -133,11 +101,6 @@
     <loc>https://www.eumaps.org/sentence-splitter</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://www.eumaps.org/schengen-visa-calculator</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
   </url>
   <url>
     <loc>https://www.eumaps.org/free-css-buttons</loc>
