@@ -187,10 +187,6 @@ function CustomsElectric() {
             {(selectedForm === 'newCarsRadio' || selectedForm === 'usedCarsRadio')  && (
               <div>
                 <p className='customsTexts'>Fatura Bedeli kısmına KDV ödememişseniz veya KDV iadesi almışsanız, KDV hariç bedeli yazınız.</p>
-                <p className='customsTexts'>2. Avrupa Birliği ve Güney Kore haricinde diğer ülkelerde üretilen elektrikli 
-                  araçların Türkiye'ye ithalatı yasak. Örnek: Tesla'nın Berlin'de üretilen modeli ithal 
-                  edilebilir ama ABD'de ürettiği modeli ithal edilemez. Örnek: BMW'nin Almanya'da ürettiği iX1 
-                  modeli ithal edilebilir ama Çin'de ürettiği iX3 modeli ithal edilemez.</p>
                 <p className='customsTexts'>Detaylı bilgi: 
                   <span className="notesSpan" onClick={()=> navigate("/bedelsiz-arac-ithalati-onemli-notlar")}>Süreç ve 
                   Önemli Notlar</span></p>
