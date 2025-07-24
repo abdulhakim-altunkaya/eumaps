@@ -305,13 +305,13 @@ app.post("/api/save-visitor/schengen", async (req, res) => {
 });
 
 const ipCache4 = {}
-app.post("/api/save-visitor/einstein/:sectionName", async (req, res) => {
+app.post("/api/save-visitor/einstein", async (req, res) => {
   //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
   //and Render is using proxies or load balancers. Because of that I will see "::1" as ip data if I not use
   //this line below
   const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
   let client;
-  const { sectionName } = req.params;
+  const { sectionName } = req.query;
   
   // Check if the IP is in the ignored list
   if (ignoredIPs.includes(ipVisitor)) {
