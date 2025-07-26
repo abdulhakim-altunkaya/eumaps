@@ -364,6 +364,67 @@ app.post("/api/save-visitor/einstein", async (req, res) => {
     if(client) client.release();
   }
 });
+
+const ipCache6 = {}
+app.post("/api/save-visitor/units", async (req, res) => {
+  //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
+  //and Render is using proxies or load balancers. Because of that I will see "::1" as ip data if I not use
+  //this line below
+  const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
+  let client;
+  const { sectionName } = req.query;
+  
+  // Check if the IP is in the ignored list
+  if (ignoredIPs.includes(ipVisitor)) {
+    return res.status(403).json({
+      resStatus: false,
+      resMessage: "This IP is ignored from logging to Database",
+      resErrorCode: 1
+    });
+  }
+  // Check if IP exists in cache and if last visit was less than approximately 16.67 minutes ago
+  if (ipCache6[ipVisitor] && Date.now() - ipCache6[ipVisitor] < 1000000) {
+    return res.status(429).json({
+      resStatus: false,
+      resMessage: "Too many requests from this IP.",
+      resErrorCode: 2
+    });
+  }
+
+  ipCache6[ipVisitor] = Date.now();//save visitor ip to ipCache6
+  const userAgentString = req.get('User-Agent') || '';
+  const agent = useragent.parse(userAgentString);
+
+  try {
+    const visitorData = {
+      ip: ipVisitor,
+      os: agent.os.toString(), // operating system
+      browser: agent.toAgent(), // browser
+      visitDate: new Date().toLocaleDateString('en-GB')
+    };
+    //save visitor to database
+    client = await pool.connect();
+    const result = await client.query(
+      `INSERT INTO visitors_units (ip, op, browser, date, section) 
+      VALUES ($1, $2, $3, $4, $5)`, 
+      [visitorData.ip, visitorData.os, visitorData.browser, visitorData.visitDate, sectionName]
+    );
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "Visitor successfully logged.",
+      resOkCode: 1
+    });
+  } catch (error) {
+    console.error('Error logging visit:', error);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Database connection error while logging visitor.",
+      resErrorCode: 3
+    });
+  } finally {
+    if(client) client.release();
+  }
+});
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
 //fetch comments etc. This code helps with managing routes that are not defined on react frontend.
 app.get('*', (req, res) => {
