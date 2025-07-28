@@ -29,7 +29,7 @@ function CustomsGasoline() {
   const [currencyName, setCurrencyName] = useState("");
   const [resultArea, setResultArea] = useState("");
 
-  const exchangeDollar = 40.17;
+  const exchangeDollar = 40.56;
   const exchangeEuro = 47.06;
 
   // Handle radio button changes
@@ -125,21 +125,27 @@ function CustomsGasoline() {
     const basePriceLira = basePrice * currency;
 
     let percentage;
-    if (engineCapacity3<1601 && basePriceLira<184001) {
-      percentage = 45/100;
-    } else if (engineCapacity3<1601 && basePriceLira<220001) {
-      percentage = 50/100;
-    } else if (engineCapacity3<1601 && basePriceLira<250001) {
-      percentage = 60/100;
-    } else if (engineCapacity3<1601 && basePriceLira<280001) {
+    if (engineCapacity3 <1401 && basePriceLira<650001) {
       percentage = 70/100;
-    } else if (engineCapacity3<1601 && basePriceLira>280000) {
+    } else if (engineCapacity3 < 1401 && basePriceLira<900001) {
+      percentage = 75/100;
+    } else if (engineCapacity3 < 1401 && basePriceLira<1100001) {
       percentage = 80/100;
-    } else if (engineCapacity3<2001 && basePriceLira<170001) {
-      percentage = 130/100;
-    } else if (engineCapacity3<2001 && basePriceLira>170000) {
+    } else if (engineCapacity3 < 1401 && basePriceLira>1100000) {
+      percentage = 90/100;
+    } else if (engineCapacity3 < 1601 && basePriceLira<850001) {
+      percentage = 75/100;
+    } else if (engineCapacity3 < 1601 && basePriceLira<1100001) {
+      percentage = 80/100;
+    } else if (engineCapacity3 < 1601 && basePriceLira<1650001) {
+      percentage = 90/100;
+    } else if (engineCapacity3 < 1601 && basePriceLira>1650000) {
+      percentage = 100/100;
+    } else if (engineCapacity3 < 2001 && basePriceLira<1650001) {
       percentage = 150/100;
-    } else if (engineCapacity3>2000) {
+    } else if (engineCapacity3 < 2001 && basePriceLira>1650000) {
+      percentage = 170/100;
+    } else if (engineCapacity3 > 2000) {
       percentage = 220/100;
     }
 

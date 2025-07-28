@@ -29,7 +29,7 @@ function CustomsElectric() {
   const [currencyName, setCurrencyName] = useState("");
   const [resultArea, setResultArea] = useState("");
 
-  const exchangeDollar = 40.17;
+  const exchangeDollar = 40.56;
   const exchangeEuro = 47.06;
 
   // Handle radio button changes
@@ -120,16 +120,16 @@ function CustomsElectric() {
     const basePriceLira = basePrice * currency;
 
     let percentage;
-    if (engineCapacity3<161 && basePriceLira<1450001) {
-      percentage = 10/100;
-    } else if (engineCapacity3<161 && basePriceLira>1450000) {
-      percentage = 40/100;
-    } else if (engineCapacity3>160 && basePriceLira<1350001) {
-      percentage = 50/100;
-    } else if (engineCapacity3>160 && basePriceLira>1350000) {
-      percentage = 60/100;
+    if (engineCapacity3<161 && basePriceLira<1650001) {
+      percentage = 25/100;
+    } else if (engineCapacity3<161 && basePriceLira>1650000) {
+      percentage = 55/100;
+    } else if (engineCapacity3>160 && basePriceLira<1650001) {
+      percentage = 65/100;
+    } else if (engineCapacity3>160 && basePriceLira>1650000) {
+      percentage = 75/100;
     } else {
-      percentage = 60/100;
+      percentage = 75/100;
     }
 
     const amountOTV = Math.round(basePrice*percentage);
