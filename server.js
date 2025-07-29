@@ -16,7 +16,9 @@ const allowedOrigins = [
   'https://www.ipradar.org',
   'https://ipradar.org',
   'https://www.eumaps.org',
-  'https://eumaps.org'
+  'https://eumaps.org',
+  'https://www.unitzap.space',
+  'https://unitzap.space'
 ];
 app.use(cors({
   origin: function (origin, callback) {
