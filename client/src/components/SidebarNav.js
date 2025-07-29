@@ -1,18 +1,12 @@
-import React, {useState} from 'react';
+import {useState} from 'react';
 import { useNavigate } from 'react-router-dom';
 
 function SidebarNav() {
 
   const navigate = useNavigate();
 
-  const [converterToggle, setConverterToggle] = useState(false);
   const [wordToolsToggle, setWordToolsToggle] = useState(false);
   const [mfaCalculatorsToggle, setMfaCalculatorsToggle] = useState(false);
-
-  const toggleConverters = () => {
-    setConverterToggle(!converterToggle);
-    navigate("/converters");
-  }
 
   const toggleWordTools = () => {
     setWordToolsToggle(!wordToolsToggle);
@@ -41,21 +35,6 @@ function SidebarNav() {
         )
       }
       
-      
-      <div onClick={toggleConverters} className='sidebarMainButtons'>Unit Converters&#x25BC;</div>
-      {
-        converterToggle && (
-          <>
-            <div className='sidebarSideButtons' onClick={() => navigate("/weight-units-converter")}>Weight Converter</div>
-            <div className='sidebarSideButtons' onClick={() => navigate("/length-units-converter")}>Length Converter</div>
-            <div className='sidebarSideButtons' onClick={() => navigate("/temperature-units-converter")}>Temperature Converter</div>
-            <div className='sidebarSideButtons' onClick={() => navigate("/area-units-converter")}>Area Converter</div>
-            <div className='sidebarSideButtons' onClick={() => navigate("/volume-units-converter")}>Volume Converter</div>
-            <div className='sidebarSideButtons' onClick={() => navigate("/time-units-converter")}>Time Converter</div>
-            
-          </>
-        )
-      }
       <div onClick={toggleWordTools} className='sidebarMainButtons'>Tools &#9660;</div>
       {
         wordToolsToggle && (
