@@ -165,17 +165,19 @@ function CustomsHybrid() {
     } else {
       percentage = 220/100;
     }
-    
-    const amountOTV = Math.round(basePrice*percentage);
-    const amountKDV = Math.round((amountOTV+basePrice)*20/100);
+
     const amountNavlun = Math.round(navlunAmount3);
-    const amountSum = amountKDV + amountOTV + amountNavlun;
+    const finalBasePrice = basePrice + 200 + amountNavlun;
+    const amountOTV = Math.round(finalBasePrice*percentage);
+    const amountKDV = Math.round((amountOTV+finalBasePrice)*20/100);
+    const amountSum = amountKDV + amountOTV + amountNavlun + 200;
 
     setResultArea(
       <div>
         <span>ÖTV meblağı: {amountOTV} {currencyName}</span> <br/>
         <span>KDV meblağı: {amountKDV} {currencyName}</span> <br/>
         <span>Navlun ve Sigorta harcı: {amountNavlun} {currencyName}</span> <br/>
+        <span>Bandrol + Damga + Yurtiçi gider: 200 {currencyName}</span><br/>
         <span>Toplam vergi: <strong>{amountSum} {currencyName}</strong></span> <br/> <br/>
         <span>Not: Rakamlar tahminidir.</span> <br/>
         {engineCapacityElectric3 < 51 && <span>Elektrik motoru 50 kw'dan az araçların normal benzinli araç gibi 
@@ -263,7 +265,7 @@ function CustomsHybrid() {
 
                   <input className='input2' type='number' name='navlunAmount' id='navlunAmount'
                     aria-label='Aşağıdaki tabloya göre Navlun ve Sigorta harcını giriniz.' min="100" max="5000" required/> &nbsp; &nbsp;
-                  <label htmlFor='navlunAmount'>"Navlun ve sigorta" harcı (aşağıdaki tabloya göre)</label> <br/> <br/>
+                  <label htmlFor='navlunAmount'>"Navlun ve sigorta" (Tabloya göre)</label> <br/> <br/>
 
                   <table className="customsTable">
                       <tbody>

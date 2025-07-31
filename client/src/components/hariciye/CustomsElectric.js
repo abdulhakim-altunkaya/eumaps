@@ -54,12 +54,14 @@ function CustomsElectric() {
     const productionYear2 = formData.get('productionYear');
     const customsRegYear2 = formData.get('customsRegYear');
     const engineCapacity2 = formData.get('engineCapacity');
+    const navlunAmount2 = formData.get('navlunAmount');
 
     const invoiceAmount3 = Number(invoiceAmount2);
     const invoiceYear3 = Number(invoiceYear2);
     const productionYear3 = Number(productionYear2);
     const customsRegYear3 = Number(customsRegYear2);
     const engineCapacity3 = Number(engineCapacity2);
+    const navlunAmount3 = Number(navlunAmount2);
 
     if (invoiceAmount3 === "" || invoiceAmount3 < 100 || invoiceAmount3 > 10000000) {
       alert("Geçersiz meblağ. Fatura'daki KDV hariç fiyatı giriniz.");
@@ -75,6 +77,9 @@ function CustomsElectric() {
       return;
     } else if (engineCapacity3 === "" || engineCapacity3 < 10 || engineCapacity3 > 10000) {
       alert("Geçersiz KW gücü. Aracın KW gücünü sadece rakam olarak giriniz.");
+      return;
+    } else if (navlunAmount3 === "" || navlunAmount3 < 1 || navlunAmount3 > 10000) {
+      alert("Geçersiz navlun bedeli. Navlun-Sigorta bedelini giriniz");
       return;
     } else if (currency === null) {
       alert("Para biriminizi Dolar veya Euro seçiniz.");
@@ -131,15 +136,17 @@ function CustomsElectric() {
     } else {
       percentage = 75/100;
     }
-
-    const amountOTV = Math.round(basePrice*percentage);
-    const amountKDV = Math.round((amountOTV+basePrice)*20/100);
+    const amountNavlun = Math.round(navlunAmount3);
+    const finalBasePrice = basePrice + 200 + amountNavlun;
+    const amountOTV = Math.round(finalBasePrice*percentage);
+    const amountKDV = Math.round((amountOTV+finalBasePrice)*20/100);
     const amountSum = amountKDV + amountOTV;
 
     setResultArea(
       <div>
         <span>ÖTV meblağı: {amountOTV} {currencyName}</span> <br/>
         <span>KDV meblağı: {amountKDV} {currencyName}</span> <br/>
+        <span>Bandrol + Damga Vergisi + Yurtiçi gider: 200 {currencyName}</span><br/>
         <span>Toplam vergi: <strong>{amountSum} {currencyName}</strong></span> <br/> <br/>
         <span>Not: Rakamlar tahminidir.</span> <br/>
       </div>
@@ -218,6 +225,39 @@ function CustomsElectric() {
                     aria-label='Arabanın KW gücünü hacmini giriniz. 125, 150 gibi' required/> &nbsp; &nbsp;
                   <label htmlFor='engineCapacity'>KW gücü <i>("125", "150" gibi)</i></label> <br/>
 
+                  <input className='input2' type='number' name='navlunAmount' id='navlunAmount'
+                    aria-label='Aşağıdaki tabloya göre Navlun ve Sigorta harcını giriniz.' min="100" max="5000" required/> &nbsp; &nbsp;
+                  <label htmlFor='navlunAmount'>"Navlun ve sigorta" (Tabloya göre)</label> <br/> <br/>
+
+
+                  <table className="customsTable">
+                      <tbody>
+                        <tr className="customsRow">
+                          <td>AĞIRLIK(kg)</td>
+                          <td>Avrupa Menşeli</td>
+                          <td>ABD/Uzakdoğu Menşeli</td>
+                          <td>Avrupa'dan gelen Uzakdoğu Menşeli</td>
+                        </tr>
+                        <tr className="customsRow">
+                          <td>0-1200</td>
+                          <td>150 €</td>
+                          <td>650 $</td>
+                          <td>300 $ + 150 €</td>
+                        </tr>
+                        <tr className="customsRow">
+                          <td>1200-1600</td>
+                          <td>200 €</td>
+                          <td>700 $</td>
+                          <td>400 $ + 200 €</td>
+                        </tr>
+                        <tr className="customsRow">
+                          <td>1600 üzeri</td>
+                          <td>230 €</td>
+                          <td>800 $</td>
+                          <td>500 $ + 230 €</td>
+                        </tr>
+                      </tbody>
+                    </table>
                     <br/>
                     <button className='button102' type="submit">Hesapla</button>
                     <button className='button102' onClick={clearCarForm}>Sil</button>
