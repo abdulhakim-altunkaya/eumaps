@@ -148,7 +148,26 @@ function CustomsElectric() {
         <span>KDV meblağı: {amountKDV} {currencyName}</span> <br/>
         <span>Bandrol + Damga Vergisi + Yurtiçi gider: 200 {currencyName}</span><br/>
         <span>Toplam vergi: <strong>{amountSum} {currencyName}</strong></span> <br/> <br/>
+                <span>Rüşvet*: <strong>300 {currencyName}</strong></span> <br/> <br/>
+        <span>Toplam vergi + Rüşvet: <strong>{300 + amountSum} {currencyName}</strong></span> <br/> <br/>
         <span>Not: Rakamlar tahminidir.</span> <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <span>
+          <em>
+          *Gümrük beyannamesi adı altında kendilerinin doldurması gereken bir belgeyi 
+          sizden doldurmanızı istiyorlar. Belgeyi kendinizin doldurması çok zor. Bu yüzden aracı firmaya 
+          mecbur bırakıyorlar. O da en az 300 Euro istiyor. Dolaylı rüşvet. Eskiden bunu istemiyorlardı ve hatta
+          görev dönüşü gelen memurlara çok yardımcı oluyorlardı. Şimdi malesef yapmıyorlar.
+          Son olarak Ankara Gar Gümrük Müdürlüğü istemiş bunu. Diğer gümrükler rüşvetsiz yapıyor olabilir.
+          </em>
+        </span>
       </div>
     )
 
