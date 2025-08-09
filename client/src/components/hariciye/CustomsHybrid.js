@@ -179,8 +179,8 @@ function CustomsHybrid() {
         <span>Navlun ve Sigorta harcı: {amountNavlun} {currencyName}</span> <br/>
         <span>Bandrol + Damga + Yurtiçi gider: 200 {currencyName}</span><br/>
         <span>Toplam vergi: <strong>{amountSum} {currencyName}</strong></span> <br/> <br/>
-            <span>Rüşvet*: <strong>300 {currencyName}</strong></span> <br/> <br/>
-        <span>Toplam vergi + Rüşvet: <strong>{300 + amountSum} {currencyName}</strong></span> <br/> <br/>
+            <span>Gümrük Müşaviri*: <strong>500 {currencyName}</strong></span> <br/> <br/>
+        <span>Toplam vergi + Gümrük Müşaviri: <strong>{500 + amountSum} {currencyName}</strong></span> <br/> <br/>
         <span>Not: Rakamlar tahminidir.</span> <br/>
         {engineCapacityElectric3 < 51 && <span>Elektrik motoru 50 kw'dan az araçların normal benzinli araç gibi 
           hesaplanacağı bildirilmiştir. </span>}
@@ -194,11 +194,8 @@ function CustomsHybrid() {
         <br/>
         <span>
           <em>
-          *Gümrük beyannamesi adı altında kendilerinin doldurması gereken bir belgeyi 
-          sizden doldurmanızı istiyorlar. Belgeyi kendinizin doldurması çok zor. Bu yüzden aracı firmaya 
-          mecbur bırakıyorlar. O da en az 300 Euro istiyor. Dolaylı rüşvet. Eskiden bunu istemiyorlardı ve hatta
-          görev dönüşü gelen memurlara çok yardımcı oluyorlardı. Şimdi malesef yapmıyorlar.
-          Son olarak Ankara Gar Gümrük Müdürlüğü istemiş bunu. Diğer gümrükler rüşvetsiz yapıyor olabilir.
+          *2025 itibariyle gümrük işlerini iyice zorlaştırdıkları için sizi gümrük müşavirine mecbur bırakıyorlar.
+          Gümrük müşavirleri herşey dahil hizmet 500 Euro civarı ücret istiyor.
           </em>
         </span>
       </div>
