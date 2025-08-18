@@ -8,8 +8,8 @@ const useragent = require('useragent');
 const axios = require('axios');
 
 const cors = require("cors");
-app.use(cors());
-/*
+
+
 const allowedOrigins = [
   'https://www.einsteincalculators.com',
   'https://einsteincalculators.com',
@@ -20,7 +20,9 @@ const allowedOrigins = [
   'https://www.eumaps.org',
   'https://eumaps.org',
   'https://www.unitzap.space',
-  'https://unitzap.space'
+  'https://unitzap.space',
+  'https://www.letonyaoturum.com',
+  'https://letonyaoturum.com'
 ];
 app.use(cors({
   origin: function (origin, callback) {
@@ -32,7 +34,7 @@ app.use(cors({
     return callback(new Error('Not allowed by CORS'));
   }
 }));
-*/
+
 
 
 app.set('trust proxy', true);
@@ -506,7 +508,7 @@ app.post("/api/save-message/letonya-oturum", async (req, res) => {
     });
   }
   // Check if IP exists in cache and if last visit was less than approximately 16.67 minutes ago
-  if (ipCache7[ipVisitor] && Date.now() - ipCache7[ipVisitor] < 1000) {
+  if (ipCache7[ipVisitor] && Date.now() - ipCache7[ipVisitor] < 1000000) {
     return res.status(429).json({
       resStatus: false,
       resMessage: "Too many requests from this IP.",
@@ -529,7 +531,7 @@ app.post("/api/save-message/letonya-oturum", async (req, res) => {
     );
     return res.status(200).json({
       resStatus: true,
-      resMessage: "Mesaj kaydedildi",
+      resMessage: "Mesaj gönderildi",
       resOkCode: 1
     });
   } catch (error) {
