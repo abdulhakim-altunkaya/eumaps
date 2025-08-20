@@ -8,9 +8,9 @@ const useragent = require('useragent');
 const axios = require('axios');
 
 const cors = require("cors");
+app.use(cors());
 
-
-const allowedOrigins = [
+/* const allowedOrigins = [
   'https://www.einsteincalculators.com',
   'https://einsteincalculators.com',
   'https://visacalculator.org',
@@ -33,7 +33,7 @@ app.use(cors({
     }
     return callback(new Error('Not allowed by CORS'));
   }
-}));
+})); */
 
 
 
@@ -491,7 +491,7 @@ app.post("/api/save-visitor/letonya-oturum", async (req, res) => {
     if(client) client.release();
   }
 });
-
+const ipCache8 = {}
 app.post("/api/save-message/letonya-oturum", async (req, res) => {
   //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
   //and Render is using proxies or load balancers. Because of that I will see "::1" as ip data if I not use
@@ -508,13 +508,15 @@ app.post("/api/save-message/letonya-oturum", async (req, res) => {
     });
   }
   // Check if IP exists in cache and if last visit was less than approximately 16.67 minutes ago
-  if (ipCache7[ipVisitor] && Date.now() - ipCache7[ipVisitor] < 1000000) {
+  if (ipCache8[ipVisitor] && Date.now() - ipCache8[ipVisitor] < 1000000) {
     return res.status(429).json({
       resStatus: false,
       resMessage: "Too many requests from this IP.",
       resErrorCode: 2
     });
   }
+  ipCache8[ipVisitor] = Date.now();//save visitor ip to ipCache8
+
   const messageObject = req.body;
   try {
     const msgLoad = {
@@ -525,7 +527,7 @@ app.post("/api/save-message/letonya-oturum", async (req, res) => {
     };
     client = await pool.connect();
     const result = await client.query(
-      `INSERT INTO latviaresidency_messages (name, email, message, visitdate) 
+      `INSERT INTO messages_letonyaoturum (name, email, message, visitdate) 
       VALUES ($1, $2, $3, $4)`, 
       [msgLoad.name1, msgLoad.email1, msgLoad.message1, msgLoad.visitDate1]
     );
@@ -544,6 +546,119 @@ app.post("/api/save-message/letonya-oturum", async (req, res) => {
   }
 });
 
+const ipCache9 = {}
+app.post("/api/save-visitor/letonya-oturum-english", async (req, res) => {
+  //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
+  //and Render is using proxies or load balancers. Because of that I will see "::1" as ip data if I not use
+  //this line below
+  const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
+  let client;
+  
+  // Check if the IP is in the ignored list
+  if (ignoredIPs.includes(ipVisitor)) {
+    return res.status(403).json({
+      resStatus: false,
+      resMessage: "This IP is ignored from logging to Database",
+      resErrorCode: 1
+    });
+  }
+  // Check if IP exists in cache and if last visit was less than approximately 16.67 minutes ago
+  if (ipCache9[ipVisitor] && Date.now() - ipCache9[ipVisitor] < 1000000) {
+    return res.status(429).json({
+      resStatus: false,
+      resMessage: "Too many requests from this IP.",
+      resErrorCode: 2
+    });
+  }
+
+  ipCache9[ipVisitor] = Date.now();//save visitor ip to ipCache9
+  const userAgentString = req.get('User-Agent') || '';
+  const agent = useragent.parse(userAgentString);
+
+  try {
+    const visitorData = {
+      ip: ipVisitor,
+      os: agent.os.toString(), // operating system
+      browser: agent.toAgent(), // browser
+      visitDate: new Date().toLocaleDateString('en-GB')
+    };
+    //save visitor to database
+    client = await pool.connect();
+    const result = await client.query(
+      `INSERT INTO visitors_letonya_oturum_english (ip, op, browser, date) 
+      VALUES ($1, $2, $3, $4)`, 
+      [visitorData.ip, visitorData.os, visitorData.browser, visitorData.visitDate]
+    );
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "Visitor logged.",
+      resOkCode: 1
+    });
+  } catch (error) {
+    console.error('Error logging visit:', error);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Database connection error while logging visitor.",
+      resErrorCode: 3
+    });
+  } finally {
+    if(client) client.release();
+  }
+});
+const ipCache10 = {}
+app.post("/api/save-message/letonya-oturum-english", async (req, res) => {
+  //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
+  //and Render is using proxies or load balancers. Because of that I will see "::1" as ip data if I not use
+  //this line below
+  const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
+  let client;
+  
+  // Check if the IP is in the ignored list
+  if (ignoredIPs.includes(ipVisitor)) {
+    return res.status(403).json({
+      resStatus: false,
+      resMessage: "This IP is ignored from logging to Database",
+      resErrorCode: 1
+    });
+  }
+  // Check if IP exists in cache and if last visit was less than approximately 16.67 minutes ago
+  if (ipCache10[ipVisitor] && Date.now() - ipCache10[ipVisitor] < 1000000) {
+    return res.status(429).json({
+      resStatus: false,
+      resMessage: "Too many requests from this IP.",
+      resErrorCode: 2
+    });
+  }
+  ipCache10[ipVisitor] = Date.now();//save visitor ip to ipCache10
+
+  const messageObject = req.body;
+  try {
+    const msgLoad = {
+      name1: messageObject.inputName.trim(),
+      email1: messageObject.inputMail.trim(),     // Ensure text values are trimmed
+      message1: messageObject.inputMessage.trim(),     // Ensure date is trimmed (still stored as text in DB)
+      visitDate1: new Date().toLocaleDateString('en-GB')
+    };
+    client = await pool.connect();
+    const result = await client.query(
+      `INSERT INTO messages_letonyaoturum_english (name, email, message, visitdate) 
+      VALUES ($1, $2, $3, $4)`, 
+      [msgLoad.name1, msgLoad.email1, msgLoad.message1, msgLoad.visitDate1]
+    );
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "Mesaj gönderildi",
+      resOkCode: 1
+    });
+  } catch (error) {
+    console.log(error.message);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Database connection error",
+      resErrorCode: 3
+    });
+  }
+});
 
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
 //fetch comments etc. This code helps with managing routes that are not defined on react frontend.
