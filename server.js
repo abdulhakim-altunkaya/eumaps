@@ -8,9 +8,7 @@ const useragent = require('useragent');
 const axios = require('axios');
 
 const cors = require("cors");
-app.use(cors());
-
-/* const allowedOrigins = [
+const allowedOrigins = [
   'https://www.einsteincalculators.com',
   'https://einsteincalculators.com',
   'https://visacalculator.org',
@@ -22,7 +20,9 @@ app.use(cors());
   'https://www.unitzap.space',
   'https://unitzap.space',
   'https://www.letonyaoturum.com',
-  'https://letonyaoturum.com'
+  'https://letonyaoturum.com',
+  'https://www.latviaresidency.org',
+  'https://latviaresidency.org'
 ];
 app.use(cors({
   origin: function (origin, callback) {
@@ -33,7 +33,7 @@ app.use(cors({
     }
     return callback(new Error('Not allowed by CORS'));
   }
-})); */
+})); 
 
 
 
@@ -647,7 +647,7 @@ app.post("/api/save-message/letonya-oturum-english", async (req, res) => {
     );
     return res.status(200).json({
       resStatus: true,
-      resMessage: "Mesaj gönderildi",
+      resMessage: "Message sent",
       resOkCode: 1
     });
   } catch (error) {
