@@ -8,7 +8,8 @@ const useragent = require('useragent');
 const axios = require('axios');
 
 const cors = require("cors");
-const allowedOrigins = [
+app.use(cors());
+/* const allowedOrigins = [
   'https://www.einsteincalculators.com',
   'https://einsteincalculators.com',
   'https://visacalculator.org',
@@ -33,7 +34,7 @@ app.use(cors({
     }
     return callback(new Error('Not allowed by CORS'));
   }
-})); 
+}));  */
 
 
 
@@ -660,6 +661,33 @@ app.post("/api/save-message/letonya-oturum-english", async (req, res) => {
   }
 });
 
+app.get("/api/kac-milyon/get-provinces", async (req, res) => {
+  let client;
+  try {
+    client = await pool.connect();
+    const result = await client.query(
+      `SELECT "provincename", "2007", "2011", "2015", "2022", "2023", "2024", "provinceid"
+       FROM kacmilyon_provinces
+       ORDER BY "2024" DESC`
+    );
+    const dbprovinces = result.rows;
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "Homepage provinces table data fetched successfully",
+      resData: dbprovinces,
+      resOkCode: 1
+    })
+  } catch (error) {
+    console.log(error.message);
+    return res.status(403).json({
+      resStatus: false,
+      resMessage: "This IP is ignored from logging to Database",
+      resErrorCode: 1
+    });
+  } finally {
+    if(client) client.release();
+  }
+})
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
 //fetch comments etc. This code helps with managing routes that are not defined on react frontend.
 app.get('*', (req, res) => {
