@@ -688,6 +688,46 @@ app.get("/api/kac-milyon/get-provinces", async (req, res) => {
     if(client) client.release();
   }
 })
+app.get("/api/kac-milyon/get-province/:provinceId", async (req, res) => {
+  const { provinceId } = req.params;
+  let client;
+  if(!provinceId) {
+    return res.status(404).json({
+      resStatus: false,
+      resMessage: "No city id",
+      resErrorCode: 1
+    });
+  }
+  try {
+    client = await pool.connect();
+    const result = await client.query(
+      `SELECT * FROM kacmilyon_provinces WHERE provinceid = $1`, [provinceId]
+    );
+    const provinceDetails = await result.rows[0];
+    if(!provinceDetails) {
+      return res.status(404).json({
+        resStatus: false,
+        resMessage: "Province id is correct but population data not found or broken",
+        resErrorCode: 2
+      });
+    }
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "Province population data fetched successfully",
+      resData: provinceDetails,
+      resOkCode: 1
+    });
+  } catch (error) {
+    console.log(error.message);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Database connection failed",
+      resErrorCode: 3
+    });
+  } finally {
+    if(client) client.release();
+  }
+});
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
 //fetch comments etc. This code helps with managing routes that are not defined on react frontend.
 app.get('*', (req, res) => {
