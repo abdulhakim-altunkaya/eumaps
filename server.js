@@ -728,6 +728,153 @@ app.get("/api/kac-milyon/get-province/:provinceId", async (req, res) => {
     if(client) client.release();
   }
 });
+
+
+app.get("/api/kac-milyon/get-districts/:provinceId", async (req, res) => {
+  let client;
+  const { provinceId } = req.params;
+  if(!provinceId) {
+    return res.status(404).json({
+      resStatus: false,
+      resMessage: "No province id",
+      resErrorCode: 1
+    });
+  }
+  try {
+    client = await pool.connect();
+    const result = await client.query(
+      `SELECT "provincename", "districtname", "2007", "2011", "2015", "2022", "2023", "2024", "provinceid"
+      FROM kacmilyon_districts
+      WHERE provinceid = $1
+      ORDER BY "2024" DESC`,
+      [provinceId]
+    );
+    const provinceDetails = result.rows;
+    if(!provinceDetails || provinceDetails.length === 0) {
+      return res.status(404).json({
+        resStatus: false,
+        resMessage: "Province id is correct but population data not found or broken",
+        resErrorCode: 2
+      });
+    }
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "Province population data fetched successfully",
+      resData: provinceDetails,
+      resOkCode: 1
+    });
+  } catch (error) {
+    console.log(error.message);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Database connection failed",
+      resErrorCode: 3
+    });
+  } finally {
+    if(client) client.release();
+  }
+});
+app.get("/api/kac-milyon/get-province-foreigners/:provinceId", async (req, res) => {
+  let client;
+  const { provinceId } = req.params;
+  if(!provinceId) {
+    return res.status(404).json({
+      resStatus: false,
+      resMessage: "No province id",
+      resErrorCode: 1
+    });
+  }
+  try {
+    client = await pool.connect();
+    const result = await client.query(
+      `SELECT * FROM kacmilyon_foreigners WHERE provinceid = $1`, [provinceId]
+    );
+    const provinceDetails = await result.rows[0];
+    if(!provinceDetails || provinceDetails.length === 0) {
+      return res.status(404).json({
+        resStatus: false,
+        resMessage: "Province id is correct but foreigners data not found or broken",
+        resErrorCode: 2
+      });
+    }
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "Province population data fetched successfully",
+      resData: provinceDetails,
+      resOkCode: 1
+    });
+  } catch (error) {
+    console.log(error.message);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Database connection failed",
+      resErrorCode: 3
+    });
+  } finally {
+    if(client) client.release();
+  }
+});
+app.get("/api/kac-milyon/get-province-origins/:provinceId", async (req, res) => {
+  let client;
+  const { provinceId } = req.params;
+  if(!provinceId) {
+    return res.status(404).json({
+      resStatus: false,
+      resMessage: "No province id",
+      resErrorCode: 1
+    });
+  }
+  try {
+    client = await pool.connect();
+    const result = await client.query(
+      'SELECT * FROM origins WHERE provinceid = $1', [provinceId]
+    );
+    const provinceOrigins = result.rows;
+
+    //People from a province list is unorganized. Here we are organizing it from big to small.
+    //Separate keys that are containing population
+    //Then sort the keys by their values from big to small.
+    const provinceOrigins2 = result.rows[0];
+    const { provinceid, provincename, ...rest } = provinceOrigins2;
+    const basicInfo = { provinceid, provincename };
+    const populationData = rest;
+
+    // Convert object to an array of key-value pairs
+    const dataArray = Object.entries(populationData);
+    // Sort the array by numeric value in descending order
+    dataArray.sort((a, b) => Number(b[1]) - Number(a[1]));
+    // Convert back to an object
+    const sortedList = Object.fromEntries(dataArray);
+    //Also lets send total number of people from a region
+    const totalPopulation = Object.values(sortedList).reduce((acc, value) => acc + Number(value), 0);
+    //I am adding array brackets here because frontend needs it in an array
+    const combinedData = [{ ...basicInfo, originPopulation: totalPopulation, ...sortedList }];
+
+    if (!combinedData || combinedData.length === 0) {
+      return res.status(404).json({
+        resStatus: false,
+        resMessage: "City details not found although city id is correct",
+        resErrorCode: 2
+      });
+    }
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "Origins population data fetched successfully",
+      resData: combinedData,
+      resOkCode: 1
+    });
+  } catch (error) {
+    console.log(error.message);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Database connection failed",
+      resErrorCode: 3
+    });
+  } finally {
+    if(client) client.release();
+  }
+});
+
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
 //fetch comments etc. This code helps with managing routes that are not defined on react frontend.
 app.get('*', (req, res) => {
