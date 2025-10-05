@@ -23,7 +23,9 @@ app.use(cors());
   'https://www.letonyaoturum.com',
   'https://letonyaoturum.com',
   'https://www.latviaresidency.org',
-  'https://latviaresidency.org'
+  'https://latviaresidency.org',
+  'https://www.kacmilyon.com',
+  'https://kacmilyon.com',
 ];
 app.use(cors({
   origin: function (origin, callback) {
@@ -661,6 +663,7 @@ app.post("/api/save-message/letonya-oturum-english", async (req, res) => {
   }
 });
 
+/*kacmilyon.com Homepage endpoint*/
 app.get("/api/kac-milyon/get-provinces", async (req, res) => {
   let client;
   try {
@@ -688,23 +691,29 @@ app.get("/api/kac-milyon/get-provinces", async (req, res) => {
     if(client) client.release();
   }
 })
-app.get("/api/kac-milyon/get-province/:provinceId", async (req, res) => {
-  const { provinceId } = req.params;
+
+/*kacmilyon.com province pages endpoints*/
+app.get("/api/kac-milyon/get-districts/:provinceId", async (req, res) => {
   let client;
+  const { provinceId } = req.params;
   if(!provinceId) {
     return res.status(404).json({
       resStatus: false,
-      resMessage: "No city id",
+      resMessage: "No province id",
       resErrorCode: 1
     });
   }
   try {
     client = await pool.connect();
     const result = await client.query(
-      `SELECT * FROM kacmilyon_provinces WHERE provinceid = $1`, [provinceId]
+      `SELECT "provincename", "districtname", "2007", "2011", "2015", "2022", "2023", "2024", "provinceid"
+      FROM kacmilyon_districts
+      WHERE provinceid = $1
+      ORDER BY "2024" DESC`,
+      [provinceId]
     );
-    const provinceDetails = await result.rows[0];
-    if(!provinceDetails) {
+    const provinceDetails = result.rows;
+    if(!provinceDetails || provinceDetails.length === 0) {
       return res.status(404).json({
         resStatus: false,
         resMessage: "Province id is correct but population data not found or broken",
@@ -728,29 +737,23 @@ app.get("/api/kac-milyon/get-province/:provinceId", async (req, res) => {
     if(client) client.release();
   }
 });
-
-
-app.get("/api/kac-milyon/get-districts/:provinceId", async (req, res) => {
-  let client;
+app.get("/api/kac-milyon/get-province/:provinceId", async (req, res) => {
   const { provinceId } = req.params;
+  let client;
   if(!provinceId) {
     return res.status(404).json({
       resStatus: false,
-      resMessage: "No province id",
+      resMessage: "No city id",
       resErrorCode: 1
     });
   }
   try {
     client = await pool.connect();
     const result = await client.query(
-      `SELECT "provincename", "districtname", "2007", "2011", "2015", "2022", "2023", "2024", "provinceid"
-      FROM kacmilyon_districts
-      WHERE provinceid = $1
-      ORDER BY "2024" DESC`,
-      [provinceId]
+      `SELECT * FROM kacmilyon_provinces WHERE provinceid = $1`, [provinceId]
     );
-    const provinceDetails = result.rows;
-    if(!provinceDetails || provinceDetails.length === 0) {
+    const provinceDetails = await result.rows[0];
+    if(!provinceDetails) {
       return res.status(404).json({
         resStatus: false,
         resMessage: "Province id is correct but population data not found or broken",
@@ -869,6 +872,104 @@ app.get("/api/kac-milyon/get-province-origins/:provinceId", async (req, res) => 
       resStatus: false,
       resMessage: "Database connection failed",
       resErrorCode: 3
+    });
+  } finally {
+    if(client) client.release();
+  }
+});
+
+/*kacmilyon.com country endpoints*/
+app.get("/api/kac-milyon/get-country-international", async (req, res) => {
+  let client;
+  try {
+    client = await pool.connect();
+    const result = await client.query(
+      `SELECT * FROM kacmilyon_international`
+    );
+    const countryDetails = await result.rows[0];
+    if(!countryDetails || countryDetails.length === 0) {
+      return res.status(404).json({
+        resStatus: false,
+        resMessage: "Endpoint works fine but international immigration data not found or broken",
+        resErrorCode: 1
+      });
+    }
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "Country international immigration data fetched successfully",
+      resData: countryDetails,
+      resOkCode: 1
+    });
+  } catch (error) {
+    console.log(error.message);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Database connection failed",
+      resErrorCode: 2
+    });
+  } finally {
+    if(client) client.release();
+  }
+});
+app.get("/api/kac-milyon/get-country-civil-status", async (req, res) => {
+  let client;
+  try {
+    client = await pool.connect();
+    const result = await client.query(
+      `SELECT * FROM kacmilyon_medeni`
+    );
+    const countryDetails = await result.rows[0];
+    if(!countryDetails || countryDetails.length === 0) {
+      return res.status(404).json({
+        resStatus: false,
+        resMessage: "Endpoint works fine but civil status data not found or broken",
+        resErrorCode: 1
+      });
+    }
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "Country civil status data fetched successfully",
+      resData: countryDetails,
+      resOkCode: 1
+    });
+  } catch (error) {
+    console.log(error.message);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Database connection failed",
+      resErrorCode: 2
+    });
+  } finally {
+    if(client) client.release();
+  }
+});
+app.get("/api/kac-milyon/get-country-population", async (req, res) => {
+  let client;
+  try {
+    client = await pool.connect();
+    const result = await client.query(
+      `SELECT * FROM kacmilyon_country_population`
+    );
+    const countryDetails = await result.rows[0];
+    if(!countryDetails || countryDetails.length === 0) {
+      return res.status(404).json({
+        resStatus: false,
+        resMessage: "Endpoint works fine but country population data not found or broken",
+        resErrorCode: 1
+      });
+    }
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "Country population data fetched successfully",
+      resData: countryDetails,
+      resOkCode: 1
+    });
+  } catch (error) {
+    console.log(error.message);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Database connection failed",
+      resErrorCode: 2
     });
   } finally {
     if(client) client.release();
