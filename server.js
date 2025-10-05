@@ -879,6 +879,38 @@ app.get("/api/kac-milyon/get-province-origins/:provinceId", async (req, res) => 
 });
 
 /*kacmilyon.com country endpoints*/
+app.get("/api/kac-milyon/get-country-population", async (req, res) => {
+  let client;
+  try {
+    client = await pool.connect();
+    const result = await client.query(
+      `SELECT * FROM kacmilyon_country_population`
+    );
+    const countryDetails = await result.rows[0];
+    if(!countryDetails || countryDetails.length === 0) {
+      return res.status(404).json({
+        resStatus: false,
+        resMessage: "Endpoint works fine but country population data not found or broken",
+        resErrorCode: 1
+      });
+    }
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "Country population data fetched successfully",
+      resData: countryDetails,
+      resOkCode: 1
+    });
+  } catch (error) {
+    console.log(error.message);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Database connection failed",
+      resErrorCode: 2
+    });
+  } finally {
+    if(client) client.release();
+  }
+});
 app.get("/api/kac-milyon/get-country-international", async (req, res) => {
   let client;
   try {
@@ -943,39 +975,6 @@ app.get("/api/kac-milyon/get-country-civil-status", async (req, res) => {
     if(client) client.release();
   }
 });
-app.get("/api/kac-milyon/get-country-population", async (req, res) => {
-  let client;
-  try {
-    client = await pool.connect();
-    const result = await client.query(
-      `SELECT * FROM kacmilyon_country_population`
-    );
-    const countryDetails = await result.rows[0];
-    if(!countryDetails || countryDetails.length === 0) {
-      return res.status(404).json({
-        resStatus: false,
-        resMessage: "Endpoint works fine but country population data not found or broken",
-        resErrorCode: 1
-      });
-    }
-    return res.status(200).json({
-      resStatus: true,
-      resMessage: "Country population data fetched successfully",
-      resData: countryDetails,
-      resOkCode: 1
-    });
-  } catch (error) {
-    console.log(error.message);
-    return res.status(500).json({
-      resStatus: false,
-      resMessage: "Database connection failed",
-      resErrorCode: 2
-    });
-  } finally {
-    if(client) client.release();
-  }
-});
-
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
 //fetch comments etc. This code helps with managing routes that are not defined on react frontend.
 app.get('*', (req, res) => {
