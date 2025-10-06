@@ -886,7 +886,7 @@ app.get("/api/kac-milyon/get-country-population", async (req, res) => {
     const result = await client.query(
       `SELECT * FROM kacmilyon_country_population`
     );
-    const countryDetails = await result.rows[0];
+    const countryDetails = await result.rows;
     if(!countryDetails || countryDetails.length === 0) {
       return res.status(404).json({
         resStatus: false,
@@ -918,7 +918,7 @@ app.get("/api/kac-milyon/get-country-international", async (req, res) => {
     const result = await client.query(
       `SELECT * FROM kacmilyon_international`
     );
-    const countryDetails = await result.rows[0];
+    const countryDetails = await result.rows;
     if(!countryDetails || countryDetails.length === 0) {
       return res.status(404).json({
         resStatus: false,
@@ -950,7 +950,7 @@ app.get("/api/kac-milyon/get-country-civil-status", async (req, res) => {
     const result = await client.query(
       `SELECT * FROM kacmilyon_medeni`
     );
-    const countryDetails = await result.rows[0];
+    const countryDetails = await result.rows;
     if(!countryDetails || countryDetails.length === 0) {
       return res.status(404).json({
         resStatus: false,
