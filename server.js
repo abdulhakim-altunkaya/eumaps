@@ -878,6 +878,48 @@ app.get("/api/kac-milyon/get-province-origins/:provinceId", async (req, res) => 
   }
 });
 
+/*kacmilyon.com district endpoints*/
+app.get("/api/kac-milyon/get-district/:districtId", async (req, res) => {
+  const { districtId } = req.params;
+  let client;
+  if(!districtId) {
+    return res.status(404).json({
+      resStatus: false,
+      resMessage: "No district id",
+      resErrorCode: 1
+    });
+  }
+  try {
+    client = await pool.connect();
+    const result = await client.query(
+      `SELECT * FROM kacmilyon_districts WHERE id = $1`, [districtId]
+    );
+    const districtDetails = await result.rows[0];
+    if(!districtDetails) {
+      return res.status(404).json({
+        resStatus: false,
+        resMessage: "District id is correct but population data not found or broken",
+        resErrorCode: 2
+      });
+    }
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "District population data fetched successfully",
+      resData: districtDetails,
+      resOkCode: 1
+    });
+  } catch (error) {
+    console.log(error.message);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Database connection failed",
+      resErrorCode: 3
+    });
+  } finally {
+    if(client) client.release();
+  }
+});
+
 /*kacmilyon.com country endpoints*/
 app.get("/api/kac-milyon/get-country-population", async (req, res) => {
   let client;
