@@ -29,8 +29,8 @@ function CustomsGasoline() {
   const [currencyName, setCurrencyName] = useState("");
   const [resultArea, setResultArea] = useState("");
 
-  const exchangeDollar = 40.56;
-  const exchangeEuro = 47.06;
+  const exchangeDollar = 41.82;
+  const exchangeEuro = 48.55;
 
   // Handle radio button changes
   const handleRadioChange = (e) => {
