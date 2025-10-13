@@ -1073,7 +1073,46 @@ app.post("/api/kac-milyon/save-comment", async (req, res) => {
     });
   }
 });
-
+app.get("/api/kac-milyon/get-comments/:pageId", async (req, res) => {
+  let client;
+  const { pageId } = req.params;
+  if (pageId < 0 || pageId >10000) {
+    return res.status(404).json({
+      resStatus: false,
+      resMessage: "Invalid page id",
+      resErrorCode: 1
+    });
+  }
+  try {
+    client = await pool.connect(); 
+    const result = await client.query(
+      `SELECT * FROM kacmilyon_comments WHERE sectionid = $1`, [pageId]
+    );
+    const allComments = await result.rows;
+    if(!allComments) {
+      return res.status(404).json({
+        resStatus: false,
+        resMessage: "No comments yet",
+        resErrorCode: 2
+      });
+    }
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "Comment fetched",
+      resData: allComments,
+      resOkCode: 1
+    });
+  } catch (error) {
+    console.log(error.message);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Database connection error",
+      resErrorCode: 3
+    });
+  } finally {
+    if(client) client.release();
+  }
+});
 
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
 //fetch comments etc. This code helps with managing routes that are not defined on react frontend.
