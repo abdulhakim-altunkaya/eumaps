@@ -1050,14 +1050,14 @@ app.post("/api/kac-milyon/save-comment", async (req, res) => {
     const msgLoad = {
       name1: messageObject.inputName.trim(),     // Ensure text values are trimmed
       message1: messageObject.inputMessage.trim(),     // Ensure date is trimmed (still stored as text in DB)
-      pageId1: messageObject.Number(pageId),
+      pageId1: messageObject.pageId,
       visitDate1: new Date().toLocaleDateString('en-GB')
     };
     client = await pool.connect();
     const result = await client.query(
       `INSERT INTO kacmilyon_comments (name, comment, date, sectionid) 
       VALUES ($1, $2, $3, $4)`, 
-      [msgLoad.name1, msgLoad.message1, msgLoad.visitDate1, msgLoad.pageId1]
+      [msgLoad.name1, msgLoad.message1, msgLoad.visitDate1, Number(msgLoad.pageId1)]
     );
     return res.status(200).json({
       resStatus: true,
