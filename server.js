@@ -1036,7 +1036,7 @@ app.post("/api/kac-milyon/save-comment", async (req, res) => {
     });
   }
   // Check if IP exists in cache and if last visit was less than approximately 16.67 minutes ago
-  if (ipCache11[ipVisitor] && Date.now() - ipCache11[ipVisitor] < 1000000) {
+  if (ipCache11[ipVisitor] && Date.now() - ipCache11[ipVisitor] < 1000) {
     return res.status(429).json({
       resStatus: false,
       resMessage: "Too many requests from this IP.",
@@ -1085,6 +1085,9 @@ const PORT = process.env.port || 5000;
 app.listen(PORT, () => {
   console.log("Port is open on " + PORT);
 });
+
+
+//fix the rate limiter accross all endpoints. Make sure they are 10 minutes
 
 //remove "build" from gitignore before production deployment
 //create "build" folder-- npm run build in client folder
