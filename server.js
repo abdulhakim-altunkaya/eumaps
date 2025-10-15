@@ -1151,7 +1151,7 @@ app.post("/api/kac-milyon/save-reply", async (req, res) => {
     const result = await client.query(
       `INSERT INTO kacmilyon_comments (name, comment, date, sectionid, parent_id) 
       VALUES ($1, $2, $3, $4, $5)`, 
-      [msgLoad.name1, msgLoad.message1, msgLoad.visitDate1, Number(msgLoad.pageId1), Number(commentId1)]
+      [msgLoad.name1, msgLoad.message1, msgLoad.visitDate1, Number(msgLoad.pageId1), Number(msgLoad.commentId1)]
     );
     return res.status(200).json({
       resStatus: true,
