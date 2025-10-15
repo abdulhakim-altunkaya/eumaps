@@ -1113,7 +1113,60 @@ app.get("/api/kac-milyon/get-comments/:pageId", async (req, res) => {
     if(client) client.release();
   }
 });
+app.post("/api/kac-milyon/save-reply", async (req, res) => {
+  //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
+  //and Render is using proxies or load balancers. Because of that I will see "::1" as ip data if I not use
+  //this line below
+  const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
+  let client;
+  
+  // Check if the IP is in the ignored list
+  if (ignoredIPs.includes(ipVisitor)) {
+    return res.status(403).json({
+      resStatus: false,
+      resMessage: "This IP is ignored from logging to Database",
+      resErrorCode: 1
+    });
+  }
+  // Check if IP exists in cache and if last visit was less than approximately 16.67 minutes ago
+  if (ipCache11[ipVisitor] && Date.now() - ipCache11[ipVisitor] < 1000) {
+    return res.status(429).json({
+      resStatus: false,
+      resMessage: "Too many requests from this IP.",
+      resErrorCode: 2
+    });
+  }
+  ipCache11[ipVisitor] = Date.now();//save visitor ip to ipCache11
 
+  const messageObject = req.body;
+  try {
+    const msgLoad = {
+      name1: messageObject.inputName.trim(),     // Ensure text values are trimmed
+      message1: messageObject.inputMessage.trim(),     // Ensure date is trimmed (still stored as text in DB)
+      pageId1: messageObject.pageId,
+      commentId1: messageObject.commentId,
+      visitDate1: new Date().toLocaleDateString('en-GB')
+    };
+    client = await pool.connect();
+    const result = await client.query(
+      `INSERT INTO kacmilyon_comments (name, comment, date, sectionid, parent_id) 
+      VALUES ($1, $2, $3, $4)`, 
+      [msgLoad.name1, msgLoad.message1, msgLoad.visitDate1, Number(msgLoad.pageId1), Number(commentId1)]
+    );
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "Reply saved",
+      resOkCode: 1
+    });
+  } catch (error) {
+    console.log(error.message);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Database connection error",
+      resErrorCode: 3
+    });
+  }
+});
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
 //fetch comments etc. This code helps with managing routes that are not defined on react frontend.
 app.get('*', (req, res) => {
