@@ -1005,7 +1005,7 @@ app.get("/api/kac-milyon/get-province-origins/:provinceId", async (req, res) => 
   try {
     client = await pool.connect();
     const result = await client.query(
-      'SELECT * FROM origins WHERE provinceid = $1', [provinceId2]
+      'SELECT * FROM kacmilyon_origins WHERE provinceid = $1', [provinceId2]
     );
     const provinceOrigins = result.rows;
 
