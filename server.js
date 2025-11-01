@@ -867,6 +867,7 @@ app.get("/api/kac-milyon/get-provinces", async (req, res) => {
 app.get("/api/kac-milyon/get-districts/:provinceId", async (req, res) => {
   let client;
   const { provinceId } = req.params;
+  provinceId = Number(provinceId);
   if(!provinceId) {
     return res.status(404).json({
       resStatus: false,
@@ -910,6 +911,7 @@ app.get("/api/kac-milyon/get-districts/:provinceId", async (req, res) => {
 });
 app.get("/api/kac-milyon/get-province/:provinceId", async (req, res) => {
   const { provinceId } = req.params;
+  provinceId = Number(provinceId);
   let client;
   if(!provinceId) {
     return res.status(404).json({
@@ -947,10 +949,11 @@ app.get("/api/kac-milyon/get-province/:provinceId", async (req, res) => {
   } finally {
     if(client) client.release();
   }
-});
+}); 
 app.get("/api/kac-milyon/get-province-foreigners/:provinceId", async (req, res) => {
   let client;
   const { provinceId } = req.params;
+  provinceId = Number(provinceId);
   if(!provinceId) {
     return res.status(404).json({
       resStatus: false,
@@ -991,6 +994,7 @@ app.get("/api/kac-milyon/get-province-foreigners/:provinceId", async (req, res) 
 app.get("/api/kac-milyon/get-province-origins/:provinceId", async (req, res) => {
   let client;
   const { provinceId } = req.params;
+  provinceId = Number(provinceId);
   if(!provinceId) {
     return res.status(404).json({
       resStatus: false,
