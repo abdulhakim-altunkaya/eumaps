@@ -8,8 +8,8 @@ const useragent = require('useragent');
 const axios = require('axios');
 
 const cors = require("cors");
-app.use(cors());
-/* const allowedOrigins = [
+//app.use(cors());
+const allowedOrigins = [
   'https://www.einsteincalculators.com',
   'https://einsteincalculators.com',
   'https://visacalculator.org',
@@ -38,9 +38,7 @@ app.use(cors({
     }
     return callback(new Error('Not allowed by CORS'));
   }
-}));  */
-
-
+}));
 
 app.set('trust proxy', true);
 
