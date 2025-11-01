@@ -867,8 +867,8 @@ app.get("/api/kac-milyon/get-provinces", async (req, res) => {
 app.get("/api/kac-milyon/get-districts/:provinceId", async (req, res) => {
   let client;
   const { provinceId } = req.params;
-  provinceId = Number(provinceId);
-  if(!provinceId) {
+  const provinceId2 = Number(provinceId);
+  if(!provinceId2) {
     return res.status(404).json({
       resStatus: false,
       resMessage: "No province id",
@@ -882,7 +882,7 @@ app.get("/api/kac-milyon/get-districts/:provinceId", async (req, res) => {
       FROM kacmilyon_districts
       WHERE provinceid = $1
       ORDER BY "2024" DESC`,
-      [provinceId]
+      [provinceId2]
     );
     const provinceDetails = result.rows;
     if(!provinceDetails || provinceDetails.length === 0) {
@@ -911,9 +911,9 @@ app.get("/api/kac-milyon/get-districts/:provinceId", async (req, res) => {
 });
 app.get("/api/kac-milyon/get-province/:provinceId", async (req, res) => {
   const { provinceId } = req.params;
-  provinceId = Number(provinceId);
+  const provinceId2 = Number(provinceId);
   let client;
-  if(!provinceId) {
+  if(!provinceId2) {
     return res.status(404).json({
       resStatus: false,
       resMessage: "No city id",
@@ -923,7 +923,7 @@ app.get("/api/kac-milyon/get-province/:provinceId", async (req, res) => {
   try {
     client = await pool.connect();
     const result = await client.query(
-      `SELECT * FROM kacmilyon_provinces WHERE provinceid = $1`, [provinceId]
+      `SELECT * FROM kacmilyon_provinces WHERE provinceid = $1`, [provinceId2]
     );
     const provinceDetails = await result.rows[0];
     if(!provinceDetails) {
@@ -953,8 +953,8 @@ app.get("/api/kac-milyon/get-province/:provinceId", async (req, res) => {
 app.get("/api/kac-milyon/get-province-foreigners/:provinceId", async (req, res) => {
   let client;
   const { provinceId } = req.params;
-  provinceId = Number(provinceId);
-  if(!provinceId) {
+  const provinceId2 = Number(provinceId);
+  if(!provinceId2) {
     return res.status(404).json({
       resStatus: false,
       resMessage: "No province id",
@@ -964,7 +964,7 @@ app.get("/api/kac-milyon/get-province-foreigners/:provinceId", async (req, res) 
   try {
     client = await pool.connect();
     const result = await client.query(
-      `SELECT * FROM kacmilyon_foreigners WHERE provinceid = $1`, [provinceId]
+      `SELECT * FROM kacmilyon_foreigners WHERE provinceid = $1`, [provinceId2]
     );
     const provinceDetails = await result.rows[0];
     if(!provinceDetails || provinceDetails.length === 0) {
@@ -994,8 +994,8 @@ app.get("/api/kac-milyon/get-province-foreigners/:provinceId", async (req, res) 
 app.get("/api/kac-milyon/get-province-origins/:provinceId", async (req, res) => {
   let client;
   const { provinceId } = req.params;
-  provinceId = Number(provinceId);
-  if(!provinceId) {
+  const provinceId2 = Number(provinceId);
+  if(!provinceId2) {
     return res.status(404).json({
       resStatus: false,
       resMessage: "No province id",
@@ -1005,7 +1005,7 @@ app.get("/api/kac-milyon/get-province-origins/:provinceId", async (req, res) => 
   try {
     client = await pool.connect();
     const result = await client.query(
-      'SELECT * FROM origins WHERE provinceid = $1', [provinceId]
+      'SELECT * FROM origins WHERE provinceid = $1', [provinceId2]
     );
     const provinceOrigins = result.rows;
 
@@ -1051,7 +1051,7 @@ app.get("/api/kac-milyon/get-province-origins/:provinceId", async (req, res) => 
   } finally {
     if(client) client.release();
   }
-});
+}); 
 app.get("/api/kac-milyon/get-district/:districtId", async (req, res) => {
   const { districtId } = req.params;
   let client;
