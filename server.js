@@ -571,10 +571,10 @@ app.post("/api/kac-milyon/save-visitor", async (req, res) => {
   }
   // Check if IP exists in cache and if last visit was less than approximately 4 minutes ago
   if (ipCache11[ipVisitor] && Date.now() - ipCache11[ipVisitor] < 250000) {
-    return res.status(429).json({
+    return res.status(200).json({
       resStatus: false,
       resMessage: "Too many requests from this IP.",
-      resErrorCode: 2
+      resOkCode: 2
     });
   }
 
