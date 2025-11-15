@@ -2,8 +2,8 @@ const express = require("express");
 const app = express();
 const path = require('path');
 
-const { pool } = require("./db");
-const useragent = require('useragent');
+const { pool, supabase, upload } = require("./db"); // Import configurations
+const useragent = require("useragent");
 // ADD THIS NEAR TOP
 const axios = require('axios');
 
@@ -1337,12 +1337,8 @@ app.post("/api/kac-milyon/save-reply", async (req, res) => {
 });
 
 /*MASTERS-LATVIA ENDPOINTS */
-app.post("/api/post/master-latvia/ads", 
-  upload.array("images", 5), 
-  async (req, res) => {
-  const ipVisitor =
-    req.headers["x-forwarded-for"]
-      ? req.headers["x-forwarded-for"].split(",")[0]
+app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, res) => {
+  const ipVisitor = req.headers["x-forwarded-for"] ? req.headers["x-forwarded-for"].split(",")[0]
       : req.socket.remoteAddress || req.ip;
   // -------------------------------
   // 1. Sanitize & Parse Input
@@ -1357,7 +1353,7 @@ app.post("/api/post/master-latvia/ads",
       resErrorCode: 1,
     });
   }
-  sanitizeObject(formData);
+  //sanitizeObject(formData);
   const {
     service,
     title,
