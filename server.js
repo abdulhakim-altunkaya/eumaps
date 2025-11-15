@@ -8,7 +8,8 @@ const useragent = require('useragent');
 const axios = require('axios');
 
 const cors = require("cors");
-//app.use(cors());
+app.use(cors()); 
+/* 
 const allowedOrigins = [
   'https://www.einsteincalculators.com',
   'https://einsteincalculators.com',
@@ -38,7 +39,7 @@ app.use(cors({
     }
     return callback(new Error('Not allowed by CORS'));
   }
-}));
+})); */
 
 app.set('trust proxy', true);
 
@@ -185,7 +186,7 @@ app.post("/serversavevisitor/:pageIdVisitorPage", async (req, res) => {
 })
 
 const ipCache5 = {}
-// IP-based geolocation endpoint
+// LOG VISITORS
 app.post("/api/get-coordinates-and-log-visitor", async (req, res) => {
     //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
   //and Render is using proxies or load balancers. Because of that I will see "::1" as ip data if I not use
@@ -313,7 +314,6 @@ app.post("/api/save-visitor/schengen", async (req, res) => {
     if(client) client.release();
   }
 });
-
 const ipCache4 = {}
 app.post("/api/save-visitor/einstein", async (req, res) => {
   //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
@@ -374,7 +374,6 @@ app.post("/api/save-visitor/einstein", async (req, res) => {
     if(client) client.release();
   }
 });
-
 const ipCache6 = {}
 app.post("/api/save-visitor/units", async (req, res) => {
   //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
@@ -672,7 +671,7 @@ app.post("/api/litvanya-yatirim/save-visitor", async (req, res) => {
   }
 });
 
-
+/* SAVE MESSAGE FORMS */
 const ipCache10 = {}
 app.post("/api/save-message/letonya-oturum-english", async (req, res) => {
   //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
@@ -1333,6 +1332,196 @@ app.post("/api/kac-milyon/save-reply", async (req, res) => {
       resStatus: false,
       resMessage: "Database connection error",
       resErrorCode: 3
+    });
+  }
+});
+
+/*MASTERS-LATVIA ENDPOINTS */
+app.post("/api/post/master-latvia/ads", 
+  upload.array("images", 5), 
+  async (req, res) => {
+  const ipVisitor =
+    req.headers["x-forwarded-for"]
+      ? req.headers["x-forwarded-for"].split(",")[0]
+      : req.socket.remoteAddress || req.ip;
+  // -------------------------------
+  // 1. Sanitize & Parse Input
+  // -------------------------------
+  let formData;
+  try {
+    formData = JSON.parse(req.body.formData);
+  } catch (err) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Invalid form data format",
+      resErrorCode: 1,
+    });
+  }
+  sanitizeObject(formData);
+  const {
+    service,
+    title,
+    price,
+    countryCode,
+    phoneNumber,
+    description,
+    regions,
+  } = formData;
+
+  // -------------------------------
+  // 2. Validate Inputs
+  // -------------------------------
+  // Name
+  if (!title || title.trim().length < 3 || title.trim().length > 40) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Name not valid",
+      resErrorCode: 2,
+    });
+  }
+
+  // Service
+  if (!service || service.trim().length < 3 || service.trim().length > 80) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Service not valid",
+      resErrorCode: 3,
+    });
+  }
+
+  // Price
+  if (!price || price.trim().length < 1 || price.trim().length > 25) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Price not valid",
+      resErrorCode: 4,
+    });
+  }
+
+  // Phone validation using dataset rules
+  const phoneMin = Number(formData.phoneMin);
+  const phoneMax = Number(formData.phoneMax);
+
+  if (
+    !phoneNumber ||
+    phoneNumber.trim().length < phoneMin ||
+    phoneNumber.trim().length > phoneMax
+  ) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Phone number length not valid",
+      resErrorCode: 5,
+    });
+  }
+
+  // Regions (max 5)
+  if (!Array.isArray(regions) || regions.length < 1 || regions.length > 5) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Regions not valid",
+      resErrorCode: 6,
+    });
+  }
+
+  // Description
+  if (!description || description.trim().length < 50 || description.trim().length > 1000) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Description not valid",
+      resErrorCode: 7,
+    });
+  }
+
+  // -------------------------------
+  // 3. Image Validation
+  // -------------------------------
+  const files = req.files;
+
+  if (!Array.isArray(files) || files.length < 1 || files.length > 5) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "1 to 5 images required",
+      resErrorCode: 8,
+    });
+  }
+
+  const allowedMimeTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+  for (const file of files) {
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      return res.status(400).json({
+        resStatus: false,
+        resMessage: "Unsupported file type",
+        resErrorCode: 9,
+      });
+    }
+  }
+
+  // -------------------------------
+  // 4. Upload images to Supabase
+  // -------------------------------
+  let uploadedImages = [];
+
+  for (const file of files) {
+    const fileName = `${Date.now()}-${file.originalname}`;
+
+    const { data, error } = await supabase.storage
+      .from("masters_latvia_storage")
+      .upload(fileName, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false,
+      });
+
+    if (error) {
+      console.error("Supabase Upload Error:", error);
+      return res.status(503).json({
+        resStatus: false,
+        resMessage: "Error uploading image",
+        resErrorCode: 10,
+      });
+    }
+
+    const url = `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_latvia_storage/${fileName}`;
+    uploadedImages.push(url);
+  }
+
+  // -------------------------------
+  // 5. Insert into masters_latvia_ads
+  // -------------------------------
+  try {
+    const { error } = await supabase
+      .from("masters_latvia_ads")
+      .insert({
+        service,
+        name: title,
+        price,
+        phone: countryCode + phoneNumber,
+        description,
+        regions,
+        images: uploadedImages,
+        ip: ipVisitor,
+        date: new Date().toISOString().slice(0, 10),
+      });
+
+    if (error) {
+      console.log(error);
+      return res.status(503).json({
+        resStatus: false,
+        resMessage: "Database insert failed",
+        resErrorCode: 11,
+      });
+    }
+
+    return res.status(201).json({
+      resStatus: true,
+      resMessage: "Master ad saved successfully",
+      resOkCode: 1,
+    });
+  } catch (err) {
+    console.log(err);
+    return res.status(503).json({
+      resStatus: false,
+      resMessage: "Unexpected server error",
+      resErrorCode: 12,
     });
   }
 });
