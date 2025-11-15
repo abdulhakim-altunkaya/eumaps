@@ -1338,186 +1338,154 @@ app.post("/api/kac-milyon/save-reply", async (req, res) => {
 
 /*MASTERS-LATVIA ENDPOINTS */
 app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, res) => {
-  const ipVisitor = req.headers["x-forwarded-for"] ? req.headers["x-forwarded-for"].split(",")[0]
-      : req.socket.remoteAddress || req.ip;
-  // -------------------------------
-  // 1. Sanitize & Parse Input
-  // -------------------------------
+  const ipVisitor = req.headers["x-forwarded-for"]
+    ? req.headers["x-forwarded-for"].split(",")[0]
+    : req.socket.remoteAddress || req.ip;
+  /* Parse Input */
   let formData;
   try {
     formData = JSON.parse(req.body.formData);
-  } catch (err) {
+  } catch {
     return res.status(400).json({
       resStatus: false,
-      resMessage: "Invalid form data format",
-      resErrorCode: 1,
+      resMessage: "Invalid form data",
+      resErrorCode: 1
     });
   }
-  //sanitizeObject(formData);
   const {
-    service,
-    title,
-    price,
+    inputService,
+    inputName,
+    inputPrice,
+    inputDescription,
     countryCode,
     phoneNumber,
-    description,
-    regions,
+    phoneMin,
+    phoneMax,
+    inputRegions
   } = formData;
 
-  // -------------------------------
-  // 2. Validate Inputs
-  // -------------------------------
-  // Name
-  if (!title || title.trim().length < 3 || title.trim().length > 40) {
+  /* Validation */
+  if (!inputName || inputName.length < 5 || inputName.length > 25)
     return res.status(400).json({
       resStatus: false,
       resMessage: "Name not valid",
-      resErrorCode: 2,
+      resErrorCode: 2
     });
-  }
 
-  // Service
-  if (!service || service.trim().length < 3 || service.trim().length > 80) {
+  if (!inputService || inputService.length < 3 || inputService.length > 80)
     return res.status(400).json({
       resStatus: false,
       resMessage: "Service not valid",
-      resErrorCode: 3,
+      resErrorCode: 3
     });
-  }
 
-  // Price
-  if (!price || price.trim().length < 1 || price.trim().length > 25) {
+  if (!inputPrice || inputPrice.length < 2 || inputPrice.length > 20)
     return res.status(400).json({
       resStatus: false,
       resMessage: "Price not valid",
-      resErrorCode: 4,
+      resErrorCode: 4
     });
-  }
 
-  // Phone validation using dataset rules
-  const phoneMin = Number(formData.phoneMin);
-  const phoneMax = Number(formData.phoneMax);
-
-  if (
-    !phoneNumber ||
-    phoneNumber.trim().length < phoneMin ||
-    phoneNumber.trim().length > phoneMax
-  ) {
+  if (!phoneNumber || phoneNumber.length < Number(phoneMin) || phoneNumber.length > Number(phoneMax))
     return res.status(400).json({
       resStatus: false,
-      resMessage: "Phone number length not valid",
-      resErrorCode: 5,
+      resMessage: "Phone number not valid",
+      resErrorCode: 5
     });
-  }
 
-  // Regions (max 5)
-  if (!Array.isArray(regions) || regions.length < 1 || regions.length > 5) {
+  if (!Array.isArray(inputRegions) || inputRegions.length < 1 || inputRegions.length > 5)
     return res.status(400).json({
       resStatus: false,
       resMessage: "Regions not valid",
-      resErrorCode: 6,
+      resErrorCode: 6
     });
-  }
 
-  // Description
-  if (!description || description.trim().length < 50 || description.trim().length > 1000) {
+  if (!inputDescription || inputDescription.length < 50 || inputDescription.length > 1000)
     return res.status(400).json({
       resStatus: false,
       resMessage: "Description not valid",
-      resErrorCode: 7,
+      resErrorCode: 7
     });
-  }
 
-  // -------------------------------
-  // 3. Image Validation
-  // -------------------------------
+  /* Images */
   const files = req.files;
 
-  if (!Array.isArray(files) || files.length < 1 || files.length > 5) {
+  if (!files || files.length < 1 || files.length > 5)
     return res.status(400).json({
       resStatus: false,
-      resMessage: "1 to 5 images required",
-      resErrorCode: 8,
+      resMessage: "1–5 images required",
+      resErrorCode: 8
     });
-  }
 
-  const allowedMimeTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-  for (const file of files) {
-    if (!allowedMimeTypes.includes(file.mimetype)) {
+  const allowed = ["image/jpeg","image/png","image/gif","image/webp"];
+  for (const f of files)
+    if (!allowed.includes(f.mimetype))
       return res.status(400).json({
         resStatus: false,
         resMessage: "Unsupported file type",
-        resErrorCode: 9,
+        resErrorCode: 9
       });
-    }
-  }
 
-  // -------------------------------
-  // 4. Upload images to Supabase
-  // -------------------------------
+  /* Upload to Supabase */
   let uploadedImages = [];
 
-  for (const file of files) {
-    const fileName = `${Date.now()}-${file.originalname}`;
+  for (const f of files) {
+    const fileName = `${Date.now()}-${f.originalname}`;
 
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from("masters_latvia_storage")
-      .upload(fileName, file.buffer, {
-        contentType: file.mimetype,
-        upsert: false,
-      });
+      .upload(fileName, f.buffer, { contentType: f.mimetype });
 
-    if (error) {
-      console.error("Supabase Upload Error:", error);
+    if (error)
       return res.status(503).json({
         resStatus: false,
-        resMessage: "Error uploading image",
-        resErrorCode: 10,
+        resMessage: "Image upload failed",
+        resErrorCode: 10
       });
-    }
 
-    const url = `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_latvia_storage/${fileName}`;
-    uploadedImages.push(url);
+    uploadedImages.push(
+      `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_latvia_storage/${fileName}`
+    );
   }
 
-  // -------------------------------
-  // 5. Insert into masters_latvia_ads
-  // -------------------------------
+  /* Insert into DB */
   try {
-    const { error } = await supabase
-      .from("masters_latvia_ads")
-      .insert({
-        service,
-        name: title,
-        price,
-        phone: countryCode + phoneNumber,
-        description,
-        regions,
-        images: uploadedImages,
-        ip: ipVisitor,
-        date: new Date().toISOString().slice(0, 10),
-      });
+    const { error } = await supabase.from("masters_latvia_ads").insert({
+      name: inputName,
+      title: inputService,
+      description: inputDescription,
+      price: inputPrice,
+      city: inputRegions,
+      telephone: Number(countryCode + phoneNumber),
+      image_url: uploadedImages,
+      ip: ipVisitor,
+      date: new Date().toISOString().slice(0, 10),
 
-    if (error) {
-      console.log(error);
+      /* Random placeholder fields */
+      main_group: Math.floor(Math.random() * 9) + 1,
+      sub_group: Math.floor(Math.random() * 9) + 1,
+      user_id: Math.floor(Math.random() * 999999) + 1,
+      update_date: new Date().toISOString().slice(0, 10)
+    });
+
+    if (error)
       return res.status(503).json({
         resStatus: false,
         resMessage: "Database insert failed",
-        resErrorCode: 11,
+        resErrorCode: 11
       });
-    }
 
     return res.status(201).json({
       resStatus: true,
-      resMessage: "Master ad saved successfully",
-      resOkCode: 1,
+      resMessage: "Master ad saved",
+      resOkCode: 1
     });
-  } catch (err) {
-    console.log(err);
+
+  } catch {
     return res.status(503).json({
       resStatus: false,
-      resMessage: "Unexpected server error",
-      resErrorCode: 12,
+      resMessage: "Server error",
+      resErrorCode: 12
     });
   }
 });
