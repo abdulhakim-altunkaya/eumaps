@@ -1506,18 +1506,23 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
   const ipVisitor = req.headers["x-forwarded-for"]
     ? req.headers["x-forwarded-for"].split(",")[0]
     : req.socket.remoteAddress || req.ip;
-  /* Parse Input */
+
   let client;
   let formData;
+
+  /* -------------------------------------------
+     PARSE JSON FORM DATA
+  ------------------------------------------- */
   try {
     formData = JSON.parse(req.body.formData);
-  } catch {
+  } catch (err) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Invalid form data",
       resErrorCode: 1
     });
   }
+
   const {
     inputService,
     inputName,
@@ -1527,43 +1532,103 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
     phoneNumber,
     inputRegions
   } = formData;
-  const uploadedImages = formData.uploadedImages || [];
+
+  /* -------------------------------------------
+     IMAGE VALIDATION + SUPABASE UPLOAD
+  ------------------------------------------- */
+  const files = req.files;
+
+  if (!files || files.length < 1 || files.length > 5) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "1–5 images required",
+      resErrorCode: 8
+    });
+  }
+
+  const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+  for (const f of files) {
+    if (!allowed.includes(f.mimetype)) {
+      return res.status(400).json({
+        resStatus: false,
+        resMessage: "Unsupported file type",
+        resErrorCode: 9
+      });
+    }
+  }
+
+  // Upload to Supabase
+  let uploadedImages = [];
+
+  for (const f of files) {
+    const fileName = `${Date.now()}-${f.originalname}`;
+
+    const { error } = await supabase.storage
+      .from("masters_latvia_storage")
+      .upload(fileName, f.buffer, { contentType: f.mimetype });
+
+    if (error) {
+      return res.status(503).json({
+        resStatus: false,
+        resMessage: "Image upload failed",
+        resErrorCode: 10
+      });
+    }
+
+    uploadedImages.push(
+      `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_latvia_storage/${fileName}`
+    );
+  }
+
+  /* -------------------------------------------
+     SAVE TO DATABASE (POSTGRES)
+  ------------------------------------------- */
   try {
     client = await pool.connect();
-    const insertQuery = ` INSERT INTO masters_latvia_ads 
-        (name, title, description, price, city, telephone, image_url, ip, date, 
-        main_group, sub_group, user_id, update_date) VALUES 
-        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`;
+
+    const insertQuery = `
+      INSERT INTO masters_latvia_ads 
+      (name, title, description, price, city, telephone, image_url, ip, date, 
+       main_group, sub_group, user_id, update_date) 
+      VALUES 
+      ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      RETURNING id
+    `;
+
     const values = [
       inputName,
       inputService,
       inputDescription,
       inputPrice,
-      JSON.stringify(inputRegions),
+      JSON.stringify(inputRegions),   // regions = JSON
       Number(countryCode + phoneNumber),
-      JSON.stringify(uploadedImages),
+      JSON.stringify(uploadedImages), // images = JSON
       ipVisitor,
       new Date().toISOString().slice(0, 10),
 
-      // Random temporary placeholder fields
+      // temporary placeholders
       Math.floor(Math.random() * 9) + 1,
       Math.floor(Math.random() * 9) + 1,
       Math.floor(Math.random() * 999999) + 1,
       new Date().toISOString().slice(0, 10)
     ];
-      const result = await client.query(insertQuery, values);
-      if (!result.rowCount) {
-        return res.status(503).json({
-          resStatus: false,
-          resMessage: "Database insert failed",
-          resErrorCode: 11
-        });
-      }
-      return res.status(201).json({
-        resStatus: true,
-        resMessage: "Master ad saved",
-        resOkCode: 1
+
+    const result = await client.query(insertQuery, values);
+
+    if (!result.rowCount) {
+      return res.status(503).json({
+        resStatus: false,
+        resMessage: "Database insert failed",
+        resErrorCode: 11
       });
+    }
+
+    return res.status(201).json({
+      resStatus: true,
+      resMessage: "Master ad saved",
+      resOkCode: 1
+    });
+
   } catch (err) {
     console.error("DATABASE INSERT ERROR:", err);
     return res.status(503).json({
@@ -1571,10 +1636,12 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
       resMessage: "Server error",
       resErrorCode: 12
     });
+
   } finally {
     if (client) client.release();
   }
 });
+
 
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
 //fetch comments etc. This code helps with managing routes that are not defined on react frontend.
