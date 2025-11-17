@@ -1502,7 +1502,7 @@ try {
   }
 
 });
-app.post("/api/post/master-latvia/ads",  async (req, res) => {
+app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, res) => {
   const ipVisitor = req.headers["x-forwarded-for"]
     ? req.headers["x-forwarded-for"].split(",")[0]
     : req.socket.remoteAddress || req.ip;
