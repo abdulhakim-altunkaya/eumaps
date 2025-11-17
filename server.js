@@ -1527,7 +1527,7 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
     phoneNumber,
     inputRegions
   } = formData;
-
+  const uploadedImages = formData.uploadedImages || [];
 try {
   client = await pool.connect();
 
