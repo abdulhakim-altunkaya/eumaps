@@ -41,6 +41,10 @@ app.use(cors({
   }
 })); */
 
+/*Google login for masters latvia*/
+import { OAuth2Client } from "google-auth-library";
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID); // FIXED
+
 app.set('trust proxy', true);
 
 //we need this as we use req.body to send data from frontend to backend
@@ -1641,7 +1645,65 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
     if (client) client.release();
   }
 });
+app.post("/api/post/master-latvia/auth/google", async (req, res) => {
+  const ipVisitor = req.headers["x-forwarded-for"] ? req.headers["x-forwarded-for"].split(",")[0]
+    : req.socket.remoteAddress || req.ip;
+  const { idToken } = req.body;
+  if (!idToken) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Missing Google token",
+      resErrorCode: 4
+    });
+  }
+  let client;
+  try {
+    const ticket = await googleClient.verifyIdToken({ idToken, audience: process.env.GOOGLE_CLIENT_ID });
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, name } = payload;
+    client = await pool.connect();
+    const query = `
+      INSERT INTO masters_latvia_users (google_id, email, name, date, number_ads, ip)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (google_id)
+      DO UPDATE SET email = EXCLUDED.email, name = EXCLUDED.name, ip = EXCLUDED.ip
+      RETURNING google_id;
+    `;
+    const values = [ googleId, email, name, new Date().toISOString().slice(0, 10), 0, ipVisitor ];
+    const result = await client.query(query, values);
+    const userId = result.rows[0].google_id;
+    const sessionId = await createSessionForUser(userId);
+    res.cookie("session_id", sessionId, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      maxAge: 1000 * 60 * 60 * 24 * 7
+    });
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "User authenticated",
+      resOkCode: 1,
+      user: { google_id: userId, email, name, session_id: sessionId }
+    });
 
+  } catch (error) {
+    console.error(error);
+    if (error.message?.includes("Invalid") || error.message?.includes("JWT")) {
+      return res.status(401).json({
+        resStatus: false,
+        resMessage: "Invalid Google token",
+        resErrorCode: 2
+      });
+    }
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Database connection error",
+      resErrorCode: 3
+    });
+  } finally {
+    if (client) client.release();
+  }
+});
 
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
 //fetch comments etc. This code helps with managing routes that are not defined on react frontend.
