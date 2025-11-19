@@ -42,7 +42,7 @@ app.use(cors({
 })); */
 
 /*Google login for masters latvia*/
-import { OAuth2Client } from "google-auth-library";
+const { OAuth2Client } = require("google-auth-library");
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID); // FIXED
 
 app.set('trust proxy', true);
