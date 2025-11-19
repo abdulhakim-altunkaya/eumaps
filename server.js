@@ -8,8 +8,8 @@ const useragent = require("useragent");
 const axios = require('axios');
 
 const cors = require("cors");
-app.use(cors()); 
-/* 
+//app.use(cors()); 
+
 const allowedOrigins = [
   'https://www.einsteincalculators.com',
   'https://einsteincalculators.com',
@@ -29,6 +29,8 @@ const allowedOrigins = [
   'https://kacmilyon.com',
   'https://www.litvanyayatirim.com',
   'https://litvanyayatirim.com',
+  "http://127.0.0.1:8080",
+  "http://192.168.8.103:8080",
 ];
 app.use(cors({
   origin: function (origin, callback) {
@@ -38,8 +40,9 @@ app.use(cors({
       return callback(null, true);
     }
     return callback(new Error('Not allowed by CORS'));
-  }
-})); */
+  },
+  credentials: true
+}));
 
 /*Google login for masters latvia*/
 const { OAuth2Client } = require("google-auth-library");
@@ -1341,171 +1344,7 @@ app.post("/api/kac-milyon/save-reply", async (req, res) => {
 });
 
 /*MASTERS-LATVIA ENDPOINTS */
-app.post("/api/post/master-latvia/ads999999",  async (req, res) => {
-  const ipVisitor = req.headers["x-forwarded-for"]
-    ? req.headers["x-forwarded-for"].split(",")[0]
-    : req.socket.remoteAddress || req.ip;
-  /* Parse Input */
-  let formData;
-  try {
-    formData = JSON.parse(req.body.formData);
-  } catch {
-    return res.status(400).json({
-      resStatus: false,
-      resMessage: "Invalid form data",
-      resErrorCode: 1
-    });
-  }
-  const {
-    inputService,
-    inputName,
-    inputPrice,
-    inputDescription,
-    countryCode,
-    phoneNumber,
-    inputRegions
-  } = formData;
 
-  /* Validation Disabled for testing 
-  if (!inputName || inputName.length < 5 || inputName.length > 25)
-    return res.status(400).json({
-      resStatus: false,
-      resMessage: "Name not valid",
-      resErrorCode: 2
-    });
-
-  if (!inputService || inputService.length < 3 || inputService.length > 80)
-    return res.status(400).json({
-      resStatus: false,
-      resMessage: "Service not valid",
-      resErrorCode: 3
-    });
-
-  if (!inputPrice || inputPrice.length < 2 || inputPrice.length > 20)
-    return res.status(400).json({
-      resStatus: false,
-      resMessage: "Price not valid",
-      resErrorCode: 4
-    });
-
-  if (!phoneNumber || phoneNumber.length < Number(phoneMin) || phoneNumber.length > Number(phoneMax))
-    return res.status(400).json({
-      resStatus: false,
-      resMessage: "Phone number not valid",
-      resErrorCode: 5
-    });
-
-  if (!Array.isArray(inputRegions) || inputRegions.length < 1 || inputRegions.length > 5)
-    return res.status(400).json({
-      resStatus: false,
-      resMessage: "Regions not valid",
-      resErrorCode: 6
-    });
-
-  if (!inputDescription || inputDescription.length < 50 || inputDescription.length > 1000)
-    return res.status(400).json({
-      resStatus: false,
-      resMessage: "Description not valid",
-      resErrorCode: 7
-    });
-*/
-  /* Images 
-  const files = req.files;
-
-  if (!files || files.length < 1 || files.length > 5)
-    return res.status(400).json({
-      resStatus: false,
-      resMessage: "1–5 images required",
-      resErrorCode: 8
-    });
-
-  const allowed = ["image/jpeg","image/png","image/gif","image/webp"];
-  for (const f of files)
-    if (!allowed.includes(f.mimetype))
-      return res.status(400).json({
-        resStatus: false,
-        resMessage: "Unsupported file type",
-        resErrorCode: 9
-      });
-
-   Upload to Supabase 
-  let uploadedImages = [];
-
-  for (const f of files) {
-    const fileName = `${Date.now()}-${f.originalname}`;
-
-    const { error } = await supabase.storage
-      .from("masters_latvia_storage")
-      .upload(fileName, f.buffer, { contentType: f.mimetype });
-
-    if (error)
-      return res.status(503).json({
-        resStatus: false,
-        resMessage: "Image upload failed",
-        resErrorCode: 10
-      });
-
-    uploadedImages.push(
-      `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_latvia_storage/${fileName}`
-    );
-  }
-*/
-  /* Insert into DB */
-
-try {
-  client = await pool.connect();
-
-  const insertQuery = ` INSERT INTO masters_latvia_ads 
-      (name, title, description, price, city, telephone, image_url, ip, date, 
-       main_group, sub_group, user_id, update_date) VALUES 
-      ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`;
-  const values = [
-    inputName,
-    inputService,
-    inputDescription,
-    inputPrice,
-    inputRegions,                      // array of regions
-    Number(countryCode + phoneNumber),
-    uploadedImages,                    // array of image URLs
-    ipVisitor,
-    new Date().toISOString().slice(0, 10),
-
-    // Random temporary placeholder fields
-    Math.floor(Math.random() * 9) + 1,
-    Math.floor(Math.random() * 9) + 1,
-    Math.floor(Math.random() * 999999) + 1,
-    new Date().toISOString().slice(0, 10)
-  ];
-
-    const result = await client.query(insertQuery, values);
-
-    if (!result.rowCount) {
-      return res.status(503).json({
-        resStatus: false,
-        resMessage: "Database insert failed",
-        resErrorCode: 11
-      });
-    }
-
-    return res.status(201).json({
-      resStatus: true,
-      resMessage: "Master ad saved",
-      resOkCode: 1
-    });
-
-  } catch (err) {
-    console.error("DATABASE INSERT ERROR:", err);
-    return res.status(503).json({
-      resStatus: false,
-      resMessage: "Server error",
-      resErrorCode: 12
-    });
-
-  } finally {
-    if (client) client.release();
-  }
-
-});
 app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, res) => {
   const ipVisitor = req.headers["x-forwarded-for"]
     ? req.headers["x-forwarded-for"].split(",")[0]
@@ -1666,7 +1505,7 @@ app.post("/api/post/master-latvia/auth/google", async (req, res) => {
       INSERT INTO masters_latvia_users (google_id, email, name, date, number_ads, ip)
       VALUES ($1, $2, $3, $4, $5, $6)
       ON CONFLICT (google_id)
-      DO UPDATE SET email = EXCLUDED.email, name = EXCLUDED.name, ip = EXCLUDED.ip
+      DO UPDATE SET email = EXCLUDED.email, name = EXCLUDED.name
       RETURNING google_id;
     `;
     const values = [ googleId, email, name, new Date().toISOString().slice(0, 10), 0, ipVisitor ];
@@ -1675,7 +1514,7 @@ app.post("/api/post/master-latvia/auth/google", async (req, res) => {
     const sessionId = await createSessionForUser(userId);
     res.cookie("session_id", sessionId, {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: 1000 * 60 * 60 * 24 * 7
     });
@@ -1687,7 +1526,7 @@ app.post("/api/post/master-latvia/auth/google", async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("Google Auth Error Backend:", error);
     if (error.message?.includes("Invalid") || error.message?.includes("JWT")) {
       return res.status(401).json({
         resStatus: false,
