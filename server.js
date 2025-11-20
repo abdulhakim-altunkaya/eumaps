@@ -1515,7 +1515,7 @@ app.post("/api/post/master-latvia/auth/google", async (req, res) => {
     res.cookie("session_id", sessionId, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      sameSite: "none",
       maxAge: 1000 * 60 * 60 * 24 * 7
     });
     return res.status(200).json({
