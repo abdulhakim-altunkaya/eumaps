@@ -31,6 +31,12 @@ const allowedOrigins = [
   'https://litvanyayatirim.com',
   "http://127.0.0.1:8080",
   "http://192.168.8.103:8080",
+  "https://latvia-masters.netlify.app",
+  "https://www.latvia-masters.netlify.app",
+  "https://www.latvia-masters.netlify.app/register",
+  "https://www.latvia-masters.netlify.app/register.html",
+  "https://latvia-masters.netlify.app/register",
+  "https://latvia-masters.netlify.app/register.html"
 ];
 app.use(cors({
   origin: function (origin, callback) {
