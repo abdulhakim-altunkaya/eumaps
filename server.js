@@ -2,6 +2,8 @@ const express = require("express");
 const app = express();
 const path = require('path');
 
+const crypto = require("crypto");//FOR latvia masters google login endpoint
+
 const { pool, supabase, upload } = require("./db"); // Import configurations
 const useragent = require("useragent");
 // ADD THIS NEAR TOP
@@ -1490,6 +1492,15 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
     if (client) client.release();
   }
 });
+//this function below is for google auth login of latvia masters
+async function createSessionForUser(googleId) {
+  const sessionId = crypto.randomUUID(); // generate inline
+  await pool.query(
+    `INSERT INTO masters_latvia_sessions (session_id, google_id) VALUES ($1, $2)`,
+    [sessionId, googleId]
+  );
+  return sessionId;
+}
 app.post("/api/post/master-latvia/auth/google", async (req, res) => {
   const ipVisitor = req.headers["x-forwarded-for"] ? req.headers["x-forwarded-for"].split(",")[0]
     : req.socket.remoteAddress || req.ip;
