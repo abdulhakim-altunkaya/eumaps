@@ -2,7 +2,10 @@ const express = require("express");
 const app = express();
 const path = require('path');
 
-const crypto = require("crypto");//FOR latvia masters google login endpoint
+//crypto and cookieParser are for latvia masters google login endpoint
+const crypto = require("crypto");
+const cookieParser = require("cookie-parser");
+app.use(cookieParser());
 
 const { pool, supabase, upload } = require("./db"); // Import configurations
 const useragent = require("useragent");
@@ -1560,6 +1563,69 @@ app.post("/api/post/master-latvia/auth/google", async (req, res) => {
     if (client) client.release();
   }
 });
+
+// Check current session user
+app.get("/api/get/master-latvia/session-user", async (req, res) => {
+  const sessionId = req.cookies?.session_id;
+
+  // No cookie -> not logged in, but it's not an "error"
+  if (!sessionId) {
+    return res.status(200).json({
+      resStatus: false,
+      resMessage: "No active session",
+      resErrorCode: 1,
+      loggedIn: false
+    });
+  }
+
+  try {
+    const query = `
+      SELECT masters_latvia_users.google_id,
+             masters_latvia_users.email,
+             masters_latvia_users.name
+      FROM sessions
+      JOIN masters_latvia_users
+        ON masters_latvia_users.google_id = sessions.google_id
+      WHERE sessions.session_id = $1
+      LIMIT 1;
+    `;
+    const result = await pool.query(query, [sessionId]);
+
+    if (result.rowCount === 0) {
+      // Cookie exists but session not found (expired/invalid)
+      return res.status(200).json({
+        resStatus: false,
+        resMessage: "No active session",
+        resErrorCode: 2,
+        loggedIn: false
+      });
+    }
+
+    const user = result.rows[0];
+
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "User session active",
+      resOkCode: 1,
+      loggedIn: true,
+      user: {
+        google_id: user.google_id,
+        email: user.email,
+        name: user.name
+      }
+    });
+
+  } catch (error) {
+    console.error("Session check error:", error);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Database connection error",
+      resErrorCode: 3,
+      loggedIn: false
+    });
+  }
+});
+
 
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
 //fetch comments etc. This code helps with managing routes that are not defined on react frontend.
