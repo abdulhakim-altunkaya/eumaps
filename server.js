@@ -1585,7 +1585,7 @@ app.get("/api/get/master-latvia/session-user", async (req, res) => {
              masters_latvia_users.name
       FROM masters_latvia_sessions
       JOIN masters_latvia_users
-        ON masters_latvia_users.google_id = sessions.google_id
+        ON masters_latvia_users.google_id = masters_latvia_sessions.google_id
       WHERE masters_latvia_sessions.session_id = $1
       LIMIT 1;
     `;
