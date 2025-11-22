@@ -1583,10 +1583,10 @@ app.get("/api/get/master-latvia/session-user", async (req, res) => {
       SELECT masters_latvia_users.google_id,
              masters_latvia_users.email,
              masters_latvia_users.name
-      FROM sessions
+      FROM masters_latvia_sessions
       JOIN masters_latvia_users
         ON masters_latvia_users.google_id = sessions.google_id
-      WHERE sessions.session_id = $1
+      WHERE masters_latvia_sessions.session_id = $1
       LIMIT 1;
     `;
     const result = await pool.query(query, [sessionId]);
