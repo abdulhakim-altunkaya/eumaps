@@ -1563,8 +1563,6 @@ app.post("/api/post/master-latvia/auth/google", async (req, res) => {
     if (client) client.release();
   }
 });
-
-// Check current session user
 app.get("/api/get/master-latvia/session-user", async (req, res) => {
   const sessionId = req.cookies?.session_id;
 
@@ -1624,6 +1622,22 @@ app.get("/api/get/master-latvia/session-user", async (req, res) => {
       loggedIn: false
     });
   }
+});
+app.post("/api/post/master-latvia/logout", async (req, res) => {
+  const sessionId = req.cookies.session_id;
+  await pool.query(`DELETE FROM masters_latvia_sessions WHERE session_id=$1`, [sessionId]);
+
+  res.clearCookie("session_id", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "none"
+  });
+
+  return res.status(200).json({
+    resStatus: true,
+    resMessage: "Logged out",
+    resOkCode: 1
+  });
 });
 
 
