@@ -1666,6 +1666,65 @@ app.post("/api/post/master-latvia/logout", async (req, res) => {
     resOkCode: 1
   });
 });
+app.get("/api/get/master-latvia/user-ads", async (req, res) => {
+  const sessionId = req.cookies?.session_id;
+
+  if (!sessionId) {
+    return res.status(200).json({
+      resStatus: false,
+      resMessage: "No active session",
+      resErrorCode: 1,
+      ads: []
+    });
+  }
+
+  try {
+    // find google_id from session
+    const sessionQuery = `
+      SELECT google_id
+      FROM masters_latvia_sessions
+      WHERE session_id = $1
+      LIMIT 1;
+    `;
+    const sessionRes = await pool.query(sessionQuery, [sessionId]);
+
+    if (!sessionRes.rowCount) {
+      return res.status(200).json({
+        resStatus: false,
+        resMessage: "No active session",
+        resErrorCode: 2,
+        ads: []
+      });
+    }
+
+    const googleId = sessionRes.rows[0].google_id;
+
+    // fetch ads for this user
+    const adsQuery = `
+      SELECT id, title, description, price, city, image_url, date
+      FROM masters_latvia_ads
+      WHERE google_id = $1
+      ORDER BY date DESC, id DESC;
+    `;
+    const adsRes = await pool.query(adsQuery, [googleId]);
+
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "User ads loaded",
+      resOkCode: 1,
+      ads: adsRes.rows
+    });
+
+  } catch (error) {
+    console.error("User ads fetch error:", error);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Database connection error",
+      resErrorCode: 3,
+      ads: []
+    });
+  }
+});
 
 
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
