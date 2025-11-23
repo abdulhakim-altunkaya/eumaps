@@ -1388,8 +1388,35 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
   } = formData;
 
   /* -------------------------------------------
-     IMAGE VALIDATION + SUPABASE UPLOAD
+     GET GOOGLE ID - ONLY LOGGED IN PEOPLE CAN POST
   ------------------------------------------- */
+    const sessionId = req.cookies?.session_id;
+    if (!sessionId) {
+      return res.status(401).json({
+        resStatus: false,
+        resMessage: "Not logged in",
+        resErrorCode: 13
+      });
+    }
+    // Lookup user from session table
+    const userQuery = `
+      SELECT google_id
+      FROM masters_latvia_sessions
+      WHERE session_id = $1
+      LIMIT 1;
+    `;
+    const userRes = await pool.query(userQuery, [sessionId]);
+    if (!userRes.rowCount) {
+      return res.status(401).json({
+        resStatus: false,
+        resMessage: "Invalid session",
+        resErrorCode: 14
+      });
+    }
+    const googleId = userRes.rows[0].google_id;
+    /* -------------------------------------------
+      IMAGE VALIDATION + SUPABASE UPLOAD
+    ------------------------------------------- */
   const files = req.files;
 
   if (!files || files.length < 1 || files.length > 5) {
@@ -1443,9 +1470,9 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
     const insertQuery = `
       INSERT INTO masters_latvia_ads 
       (name, title, description, price, city, telephone, image_url, ip, date, 
-       main_group, sub_group, user_id, update_date) 
+       main_group, sub_group, user_id, google_id, update_date) 
       VALUES 
-      ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING id
     `;
 
@@ -1460,10 +1487,10 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
       ipVisitor,
       new Date().toISOString().slice(0, 10),
 
-      // temporary placeholders
       Math.floor(Math.random() * 9) + 1,
       Math.floor(Math.random() * 9) + 1,
       Math.floor(Math.random() * 999999) + 1,
+      googleId,
       new Date().toISOString().slice(0, 10)
     ];
 
