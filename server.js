@@ -1673,7 +1673,6 @@ app.post("/api/post/master-latvia/logout", async (req, res) => {
 });
 app.get("/api/get/master-latvia/user-ads", async (req, res) => {
   const sessionId = req.cookies?.session_id;
-
   if (!sessionId) {
     return res.status(200).json({
       resStatus: false,
@@ -1682,7 +1681,6 @@ app.get("/api/get/master-latvia/user-ads", async (req, res) => {
       ads: []
     });
   }
-
   try {
     // find google_id from session
     const sessionQuery = `
@@ -1692,7 +1690,6 @@ app.get("/api/get/master-latvia/user-ads", async (req, res) => {
       LIMIT 1;
     `;
     const sessionRes = await pool.query(sessionQuery, [sessionId]);
-
     if (!sessionRes.rowCount) {
       return res.status(200).json({
         resStatus: false,
@@ -1701,9 +1698,7 @@ app.get("/api/get/master-latvia/user-ads", async (req, res) => {
         ads: []
       });
     }
-
     const googleId = sessionRes.rows[0].google_id;
-
     // fetch ads for this user
     const adsQuery = `
       SELECT 
@@ -1721,14 +1716,12 @@ app.get("/api/get/master-latvia/user-ads", async (req, res) => {
       ORDER BY date DESC, id DESC;
     `;
     const adsRes = await pool.query(adsQuery, [googleId]);
-
     return res.status(200).json({
       resStatus: true,
       resMessage: "User ads loaded",
       resOkCode: 1,
       ads: adsRes.rows
     });
-
   } catch (error) {
     console.error("User ads fetch error:", error);
     return res.status(500).json({
@@ -1739,8 +1732,57 @@ app.get("/api/get/master-latvia/user-ads", async (req, res) => {
     });
   }
 });
+app.post("/api/post/master-latvia/toggle-activation/:id", async (req, res) => {
+  const adId = req.params.id;
 
+  try {
+    // Check if ad exists
+    const check = await pool.query(
+      "SELECT is_active FROM masters_latvia_ads WHERE id = $1 LIMIT 1;",
+      [adId]
+    );
 
+    if (!check.rowCount) {
+      return res.status(200).json({
+        resStatus: false,
+        resMessage: "Ad not found",
+        resErrorCode: 1
+      });
+    }
+
+    const current = check.rows[0].is_active;
+    const newState = !current; // toggle true → false, false → true
+
+    // Update activation state
+    const update = await pool.query(
+      "UPDATE masters_latvia_ads SET is_active = $1 WHERE id = $2 RETURNING id;",
+      [newState, adId]
+    );
+
+    if (!update.rowCount) {
+      return res.status(200).json({
+        resStatus: false,
+        resMessage: "Failed to update ad activation state",
+        resErrorCode: 2
+      });
+    }
+
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: newState ? "Ad activated" : "Ad deactivated",
+      resOkCode: 1,
+      is_active: newState
+    });
+
+  } catch (err) {
+    console.error("Toggle error:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Server error",
+      resErrorCode: 3
+    });
+  }
+});
 
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
 //fetch comments etc. This code helps with managing routes that are not defined on react frontend.
