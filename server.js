@@ -219,8 +219,8 @@ app.post("/api/get-coordinates-and-log-visitor", async (req, res) => {
       resErrorCode: 1
     });
   }
-  // Check if IP exists in cache and if last visit was less than 3 seconds ago (30000 ms)
-  if (ipCache5[ipVisitor] && Date.now() - ipCache5[ipVisitor] < 3000) {
+  // Check if IP exists in cache and if last visit was less than 9 seconds ago (90000 ms)
+  if (ipCache5[ipVisitor] && Date.now() - ipCache5[ipVisitor] < 9000) {
     return res.status(429).json({
       resStatus: false,
       resMessage: "Too many requests from this IP.",
