@@ -1466,24 +1466,25 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
   ------------------------------------------- */
   try {
     client = await pool.connect();
-
     const insertQuery = `
       INSERT INTO masters_latvia_ads 
       (name, title, description, price, city, telephone, image_url, ip, date, 
-       main_group, sub_group, user_id, google_id, update_date) 
+      main_group, sub_group, user_id, google_id, update_date,
+      created_at, is_active)
       VALUES 
-      ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      ($1, $2, $3, $4, $5, $6, $7, $8, $9, 
+      $10, $11, $12, $13, $14,
+      $15, $16)
       RETURNING id
     `;
-
     const values = [
       inputName,
       inputService,
       inputDescription,
       inputPrice,
-      JSON.stringify(inputRegions),   // regions = JSON
+      JSON.stringify(inputRegions),
       Number(countryCode + phoneNumber),
-      JSON.stringify(uploadedImages), // images = JSON
+      JSON.stringify(uploadedImages),
       ipVisitor,
       new Date().toISOString().slice(0, 10),
 
@@ -1491,8 +1492,12 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
       Math.floor(Math.random() * 9) + 1,
       Math.floor(Math.random() * 999999) + 1,
       googleId,
-      new Date().toISOString().slice(0, 10)
+      new Date().toISOString().slice(0, 10),
+
+      new Date(),       // <-- created_at (REAL timestamp)
+      true              // <-- is_active default
     ];
+
 
     const result = await client.query(insertQuery, values);
 
@@ -1701,7 +1706,16 @@ app.get("/api/get/master-latvia/user-ads", async (req, res) => {
 
     // fetch ads for this user
     const adsQuery = `
-      SELECT id, title, description, price, city, image_url, date
+      SELECT 
+        id, 
+        title, 
+        description, 
+        price, 
+        city, 
+        image_url, 
+        date,
+        created_at,      
+        is_active       
       FROM masters_latvia_ads
       WHERE google_id = $1
       ORDER BY date DESC, id DESC;
@@ -1725,6 +1739,7 @@ app.get("/api/get/master-latvia/user-ads", async (req, res) => {
     });
   }
 });
+
 
 
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
