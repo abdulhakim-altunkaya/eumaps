@@ -1964,11 +1964,17 @@ app.put("/api/put/master-latvia/update-ad/:id", upload.array("images", 5), async
     --------------------------------*/
     const files = req.files;
     const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-
     let finalImages = [];
-
+    let oldImages = [];
+    try {
+      oldImages = Array.isArray(adQ.rows[0].image_url)
+        ? adQ.rows[0].image_url
+        : JSON.parse(adQ.rows[0].image_url);
+    } catch {
+      oldImages = [];
+    }
+    // Validate new images if any
     if (files && files.length > 0) {
-      // Validate
       for (const f of files) {
         if (!allowed.includes(f.mimetype)) {
           return res.status(400).json({
@@ -1978,15 +1984,13 @@ app.put("/api/put/master-latvia/update-ad/:id", upload.array("images", 5), async
           });
         }
       }
-
-      // Upload new images
+      // Upload to Supabase
+      const uploadedImages = [];
       for (const f of files) {
         const fileName = `${Date.now()}-${f.originalname}`;
-
         const { error } = await supabase.storage
           .from("masters_latvia_storage")
           .upload(fileName, f.buffer, { contentType: f.mimetype });
-
         if (error) {
           return res.status(503).json({
             resStatus: false,
@@ -1994,19 +1998,15 @@ app.put("/api/put/master-latvia/update-ad/:id", upload.array("images", 5), async
             resErrorCode: 10
           });
         }
-
-        finalImages.push(
+        uploadedImages.push(
           `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_latvia_storage/${fileName}`
         );
       }
-    } else {
-      // Keep old images if none uploaded
-      try {
-        const parsed = JSON.parse(adQ.rows[0].image_url);
-        if (Array.isArray(parsed)) finalImages = parsed;
-      } catch {
-        finalImages = [];
-      }
+      finalImages = uploadedImages;   // USE NEW IMAGES
+    }
+    // If NO new images → keep OLD ones
+    else {
+      finalImages = oldImages;
     }
 
     /* -------------------------------
