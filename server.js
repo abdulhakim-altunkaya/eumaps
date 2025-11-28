@@ -1355,7 +1355,6 @@ app.post("/api/kac-milyon/save-reply", async (req, res) => {
 });
 
 /*MASTERS-LATVIA ENDPOINTS */
-
 app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, res) => {
   const ipVisitor = req.headers["x-forwarded-for"]
     ? req.headers["x-forwarded-for"].split(",")[0]
@@ -1838,6 +1837,197 @@ app.post("/api/post/master-latvia/delete-ad/:id", async (req, res) => {
       resStatus: false,
       resMessage: "Server error",
       resErrorCode: 4
+    });
+  }
+});
+app.put("/api/put/master-latvia/update-ad/:id", upload.array("images", 5), async (req, res) => {
+  const adId = req.params.id;
+
+  /* -------------------------------
+     CHECK LOGIN SESSION
+  --------------------------------*/
+  const sessionId = req.cookies?.session_id;
+  if (!sessionId) {
+    return res.status(401).json({
+      resStatus: false,
+      resMessage: "Not logged in",
+      resErrorCode: 13
+    });
+  }
+
+  try {
+    const userQ = await pool.query(
+      `SELECT google_id 
+       FROM masters_latvia_sessions 
+       WHERE session_id = $1 
+       LIMIT 1`,
+      [sessionId]
+    );
+
+    if (!userQ.rowCount) {
+      return res.status(401).json({
+        resStatus: false,
+        resMessage: "Invalid session",
+        resErrorCode: 14
+      });
+    }
+
+    const googleId = userQ.rows[0].google_id;
+
+    /* -------------------------------
+       CHECK IF AD BELONGS TO USER
+    --------------------------------*/
+    const adQ = await pool.query(
+      `SELECT image_url, google_id 
+       FROM masters_latvia_ads 
+       WHERE id = $1 
+       LIMIT 1`,
+      [adId]
+    );
+
+    if (!adQ.rowCount) {
+      return res.json({
+        resStatus: false,
+        resMessage: "Ad not found",
+        resErrorCode: 20
+      });
+    }
+
+    if (adQ.rows[0].google_id !== googleId) {
+      return res.status(403).json({
+        resStatus: false,
+        resMessage: "Unauthorized",
+        resErrorCode: 21
+      });
+    }
+
+    /* -------------------------------
+       PARSE JSON FORM DATA
+    --------------------------------*/
+    let formData;
+    try {
+      formData = JSON.parse(req.body.formData);
+    } catch (err) {
+      return res.status(400).json({
+        resStatus: false,
+        resMessage: "Invalid form data",
+        resErrorCode: 1
+      });
+    }
+
+    const {
+      inputService,
+      inputName,
+      inputPrice,
+      inputDescription,
+      countryCode,
+      phoneNumber,
+      inputRegions
+    } = formData;
+
+    /* -------------------------------
+       HANDLE NEW IMAGE UPLOADS
+    --------------------------------*/
+    const files = req.files;
+    const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+
+    let finalImages = [];
+
+    if (files && files.length > 0) {
+      // Validate
+      for (const f of files) {
+        if (!allowed.includes(f.mimetype)) {
+          return res.status(400).json({
+            resStatus: false,
+            resMessage: "Unsupported file type",
+            resErrorCode: 9
+          });
+        }
+      }
+
+      // Upload new images
+      for (const f of files) {
+        const fileName = `${Date.now()}-${f.originalname}`;
+
+        const { error } = await supabase.storage
+          .from("masters_latvia_storage")
+          .upload(fileName, f.buffer, { contentType: f.mimetype });
+
+        if (error) {
+          return res.status(503).json({
+            resStatus: false,
+            resMessage: "Image upload failed",
+            resErrorCode: 10
+          });
+        }
+
+        finalImages.push(
+          `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_latvia_storage/${fileName}`
+        );
+      }
+    } else {
+      // Keep old images if none uploaded
+      try {
+        const parsed = JSON.parse(adQ.rows[0].image_url);
+        if (Array.isArray(parsed)) finalImages = parsed;
+      } catch {
+        finalImages = [];
+      }
+    }
+
+    /* -------------------------------
+       UPDATE DATABASE
+    --------------------------------*/
+    const updateQ = `
+      UPDATE masters_latvia_ads 
+      SET 
+        name        = $1,
+        title       = $2,
+        description = $3,
+        price       = $4,
+        city        = $5,
+        telephone   = $6,
+        image_url   = $7,
+        update_date = $8
+      WHERE id = $9 AND google_id = $10
+      RETURNING id
+    `;
+
+    const values = [
+      inputName,
+      inputService,
+      inputDescription,
+      inputPrice,
+      JSON.stringify(inputRegions),
+      Number(countryCode + phoneNumber),
+      JSON.stringify(finalImages),
+      new Date().toISOString().slice(0, 10),
+      adId,
+      googleId
+    ];
+
+    const result = await pool.query(updateQ, values);
+
+    if (!result.rowCount) {
+      return res.json({
+        resStatus: false,
+        resMessage: "Update failed",
+        resErrorCode: 22
+      });
+    }
+
+    return res.json({
+      resStatus: true,
+      resMessage: "Ad updated successfully",
+      resOkCode: 1
+    });
+
+  } catch (err) {
+    console.error("UPDATE ERROR:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Server error",
+      resErrorCode: 23
     });
   }
 });
