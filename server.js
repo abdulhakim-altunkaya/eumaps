@@ -1783,6 +1783,65 @@ app.post("/api/post/master-latvia/toggle-activation/:id", async (req, res) => {
     });
   }
 });
+app.post("/api/post/master-latvia/delete-ad/:id", async (req, res) => {
+  const adId = req.params.id;
+  const sessionId = req.cookies?.session_id;
+  if (!sessionId) {
+    return res.status(401).json({
+      resStatus: false,
+      resMessage: "No active session",
+      resErrorCode: 1
+    });
+  }
+  try {
+    // Validate session
+    const sessionQuery = `
+      SELECT google_id
+      FROM masters_latvia_sessions
+      WHERE session_id = $1
+      LIMIT 1;
+    `;
+    const sessionRes = await pool.query(sessionQuery, [sessionId]);
+    if (!sessionRes.rowCount) {
+      return res.status(401).json({
+        resStatus: false,
+        resMessage: "Invalid session",
+        resErrorCode: 2
+      });
+    }
+    const googleId = sessionRes.rows[0].google_id;
+    // Make sure this ad belongs to this user
+    const checkQuery = `
+      SELECT id
+      FROM masters_latvia_ads
+      WHERE id = $1 AND google_id = $2
+      LIMIT 1;
+    `;
+    const checkRes = await pool.query(checkQuery, [adId, googleId]);
+    if (!checkRes.rowCount) {
+      return res.status(403).json({
+        resStatus: false,
+        resMessage: "Not allowed to delete this ad",
+        resErrorCode: 3
+      });
+    }
+    // Delete the ad
+    await pool.query(`DELETE FROM masters_latvia_ads WHERE id = $1`, [adId]);
+    return res.json({
+      resStatus: true,
+      resMessage: "Ad deleted successfully",
+      resOkCode: 1
+    });
+  } catch (err) {
+    console.error("Delete ad error:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Server error",
+      resErrorCode: 4
+    });
+  }
+});
+
 
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
 //fetch comments etc. This code helps with managing routes that are not defined on react frontend.
