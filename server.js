@@ -1956,7 +1956,8 @@ app.put("/api/put/master-latvia/update-ad/:id", upload.array("images", 5), async
       inputDescription,
       countryCode,
       phoneNumber,
-      inputRegions
+      inputRegions,
+      existingImages
     } = formData;
 
     /* -------------------------------
@@ -1964,15 +1965,8 @@ app.put("/api/put/master-latvia/update-ad/:id", upload.array("images", 5), async
     --------------------------------*/
     const files = req.files;
     const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-    let finalImages = [];
-    let oldImages = [];
-    try {
-      oldImages = Array.isArray(adQ.rows[0].image_url)
-        ? adQ.rows[0].image_url
-        : JSON.parse(adQ.rows[0].image_url);
-    } catch {
-      oldImages = [];
-    }
+    let finalImages = Array.isArray(existingImages) ? existingImages : [];
+
     // Validate new images if any
     if (files && files.length > 0) {
       for (const f of files) {
@@ -2003,10 +1997,6 @@ app.put("/api/put/master-latvia/update-ad/:id", upload.array("images", 5), async
         );
       }
       finalImages = uploadedImages;   // USE NEW IMAGES
-    }
-    // If NO new images → keep OLD ones
-    else {
-      finalImages = oldImages;
     }
 
     /* -------------------------------
