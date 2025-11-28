@@ -1594,66 +1594,6 @@ app.post("/api/post/master-latvia/auth/google", async (req, res) => {
     if (client) client.release();
   }
 });
-app.get("/api/get/master-latvia/session-user", async (req, res) => {
-  const sessionId = req.cookies?.session_id;
-
-  // No cookie -> not logged in, but it's not an "error"
-  if (!sessionId) {
-    return res.status(200).json({
-      resStatus: false,
-      resMessage: "No active session",
-      resErrorCode: 1,
-      loggedIn: false
-    });
-  }
-
-  try {
-    const query = `
-      SELECT masters_latvia_users.google_id,
-             masters_latvia_users.email,
-             masters_latvia_users.name
-      FROM masters_latvia_sessions
-      JOIN masters_latvia_users
-        ON masters_latvia_users.google_id = masters_latvia_sessions.google_id
-      WHERE masters_latvia_sessions.session_id = $1
-      LIMIT 1;
-    `;
-    const result = await pool.query(query, [sessionId]);
-
-    if (result.rowCount === 0) {
-      // Cookie exists but session not found (expired/invalid)
-      return res.status(200).json({
-        resStatus: false,
-        resMessage: "No active session",
-        resErrorCode: 2,
-        loggedIn: false
-      });
-    }
-
-    const user = result.rows[0];
-
-    return res.status(200).json({
-      resStatus: true,
-      resMessage: "User session active",
-      resOkCode: 1,
-      loggedIn: true,
-      user: {
-        google_id: user.google_id,
-        email: user.email,
-        name: user.name
-      }
-    });
-
-  } catch (error) {
-    console.error("Session check error:", error);
-    return res.status(500).json({
-      resStatus: false,
-      resMessage: "Database connection error",
-      resErrorCode: 3,
-      loggedIn: false
-    });
-  }
-});
 app.post("/api/post/master-latvia/logout", async (req, res) => {
   const sessionId = req.cookies.session_id;
   await pool.query(`DELETE FROM masters_latvia_sessions WHERE session_id=$1`, [sessionId]);
@@ -1669,67 +1609,6 @@ app.post("/api/post/master-latvia/logout", async (req, res) => {
     resMessage: "Logged out",
     resOkCode: 1
   });
-});
-app.get("/api/get/master-latvia/user-ads", async (req, res) => {
-  const sessionId = req.cookies?.session_id;
-  if (!sessionId) {
-    return res.status(200).json({
-      resStatus: false,
-      resMessage: "No active session",
-      resErrorCode: 1,
-      ads: []
-    });
-  }
-  try {
-    // find google_id from session
-    const sessionQuery = `
-      SELECT google_id
-      FROM masters_latvia_sessions
-      WHERE session_id = $1
-      LIMIT 1;
-    `;
-    const sessionRes = await pool.query(sessionQuery, [sessionId]);
-    if (!sessionRes.rowCount) {
-      return res.status(200).json({
-        resStatus: false,
-        resMessage: "No active session",
-        resErrorCode: 2,
-        ads: []
-      });
-    }
-    const googleId = sessionRes.rows[0].google_id;
-    // fetch ads for this user
-    const adsQuery = `
-      SELECT 
-        id, 
-        title, 
-        description, 
-        price, 
-        city, 
-        image_url, 
-        date,
-        created_at,      
-        is_active       
-      FROM masters_latvia_ads
-      WHERE google_id = $1
-      ORDER BY date DESC, id DESC;
-    `;
-    const adsRes = await pool.query(adsQuery, [googleId]);
-    return res.status(200).json({
-      resStatus: true,
-      resMessage: "User ads loaded",
-      resOkCode: 1,
-      ads: adsRes.rows
-    });
-  } catch (error) {
-    console.error("User ads fetch error:", error);
-    return res.status(500).json({
-      resStatus: false,
-      resMessage: "Database connection error",
-      resErrorCode: 3,
-      ads: []
-    });
-  }
 });
 app.post("/api/post/master-latvia/toggle-activation/:id", async (req, res) => {
   const adId = req.params.id;
@@ -1837,6 +1716,161 @@ app.post("/api/post/master-latvia/delete-ad/:id", async (req, res) => {
       resStatus: false,
       resMessage: "Server error",
       resErrorCode: 4
+    });
+  }
+});
+app.get("/api/get/master-latvia/session-user", async (req, res) => {
+  const sessionId = req.cookies?.session_id;
+
+  // No cookie -> not logged in, but it's not an "error"
+  if (!sessionId) {
+    return res.status(200).json({
+      resStatus: false,
+      resMessage: "No active session",
+      resErrorCode: 1,
+      loggedIn: false
+    });
+  }
+
+  try {
+    const query = `
+      SELECT masters_latvia_users.google_id,
+             masters_latvia_users.email,
+             masters_latvia_users.name
+      FROM masters_latvia_sessions
+      JOIN masters_latvia_users
+        ON masters_latvia_users.google_id = masters_latvia_sessions.google_id
+      WHERE masters_latvia_sessions.session_id = $1
+      LIMIT 1;
+    `;
+    const result = await pool.query(query, [sessionId]);
+
+    if (result.rowCount === 0) {
+      // Cookie exists but session not found (expired/invalid)
+      return res.status(200).json({
+        resStatus: false,
+        resMessage: "No active session",
+        resErrorCode: 2,
+        loggedIn: false
+      });
+    }
+
+    const user = result.rows[0];
+
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "User session active",
+      resOkCode: 1,
+      loggedIn: true,
+      user: {
+        google_id: user.google_id,
+        email: user.email,
+        name: user.name
+      }
+    });
+
+  } catch (error) {
+    console.error("Session check error:", error);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Database connection error",
+      resErrorCode: 3,
+      loggedIn: false
+    });
+  }
+});
+app.get("/api/get/master-latvia/ad/:id", async (req, res) => {
+  const adId = req.params.id;
+
+  try {
+    const q = `
+      SELECT 
+        id, name, title, description, price, city,
+        telephone, image_url, google_id
+      FROM masters_latvia_ads
+      WHERE id = $1
+      LIMIT 1
+    `;
+    const r = await pool.query(q, [adId]);
+
+    if (!r.rowCount) {
+      return res.json({
+        resStatus: false,
+        resMessage: "Ad not found"
+      });
+    }
+
+    return res.json({
+      resStatus: true,
+      ad: r.rows[0]
+    });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Server error"
+    });
+  }
+});
+app.get("/api/get/master-latvia/user-ads", async (req, res) => {
+  const sessionId = req.cookies?.session_id;
+  if (!sessionId) {
+    return res.status(200).json({
+      resStatus: false,
+      resMessage: "No active session",
+      resErrorCode: 1,
+      ads: []
+    });
+  }
+  try {
+    // find google_id from session
+    const sessionQuery = `
+      SELECT google_id
+      FROM masters_latvia_sessions
+      WHERE session_id = $1
+      LIMIT 1;
+    `;
+    const sessionRes = await pool.query(sessionQuery, [sessionId]);
+    if (!sessionRes.rowCount) {
+      return res.status(200).json({
+        resStatus: false,
+        resMessage: "No active session",
+        resErrorCode: 2,
+        ads: []
+      });
+    }
+    const googleId = sessionRes.rows[0].google_id;
+    // fetch ads for this user
+    const adsQuery = `
+      SELECT 
+        id, 
+        title, 
+        description, 
+        price, 
+        city, 
+        image_url, 
+        date,
+        created_at,      
+        is_active       
+      FROM masters_latvia_ads
+      WHERE google_id = $1
+      ORDER BY date DESC, id DESC;
+    `;
+    const adsRes = await pool.query(adsQuery, [googleId]);
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "User ads loaded",
+      resOkCode: 1,
+      ads: adsRes.rows
+    });
+  } catch (error) {
+    console.error("User ads fetch error:", error);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Database connection error",
+      resErrorCode: 3,
+      ads: []
     });
   }
 });
