@@ -1901,6 +1901,58 @@ app.get("/api/get/master-latvia/user-ads", async (req, res) => {
     });
   }
 });
+app.get("/api/get/master-latvia/browse", async (req, res) => {
+  const { main, sub } = req.query;
+
+  try {
+    let query = `
+      SELECT *
+      FROM masters_latvia_ads
+      WHERE is_active = true
+    `;
+    const params = [];
+
+    if (main) {
+      params.push(main);
+      query += ` AND main_group = $${params.length}`;
+    }
+
+    if (sub) {
+      params.push(sub);
+      query += ` AND sub_group = $${params.length}`;
+    }
+
+    query += ` ORDER BY created_at DESC`;
+
+    const adsRes = await pool.query(query, params);
+
+    if (!adsRes.rowCount) {
+      return res.status(200).json({
+        resStatus: false,
+        resMessage: "No ads found",
+        resErrorCode: 1,
+        ads: []
+      });
+    }
+
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "Ads loaded successfully",
+      resOkCode: 1,
+      count: adsRes.rowCount,
+      ads: adsRes.rows
+    });
+
+  } catch (err) {
+    console.error("Browse error:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Server error",
+      resErrorCode: 2
+    });
+  }
+});
+
 app.put("/api/put/master-latvia/update-ad/:id", upload.array("images", 5), async (req, res) => {
   const adId = req.params.id;
 
