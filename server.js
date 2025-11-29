@@ -128,7 +128,6 @@ app.post("/serversavecommentreply", async (req, res) => {
     if(client) client.release();
   }
 });
-
 app.get("/servergetcomments/:pageId", async (req, res) => {
   let client;
   const { pageId } = req.params;
@@ -1612,14 +1611,12 @@ app.post("/api/post/master-latvia/logout", async (req, res) => {
 });
 app.post("/api/post/master-latvia/toggle-activation/:id", async (req, res) => {
   const adId = req.params.id;
-
   try {
     // Check if ad exists
     const check = await pool.query(
       "SELECT is_active FROM masters_latvia_ads WHERE id = $1 LIMIT 1;",
       [adId]
     );
-
     if (!check.rowCount) {
       return res.status(200).json({
         resStatus: false,
@@ -1627,16 +1624,13 @@ app.post("/api/post/master-latvia/toggle-activation/:id", async (req, res) => {
         resErrorCode: 1
       });
     }
-
     const current = check.rows[0].is_active;
     const newState = !current; // toggle true → false, false → true
-
     // Update activation state
     const update = await pool.query(
-      "UPDATE masters_latvia_ads SET is_active = $1 WHERE id = $2 RETURNING id;",
+      "UPDATE masters_latvia_ads SET is_active = $1, created_at = NOW() WHERE id = $2 RETURNING id;",
       [newState, adId]
     );
-
     if (!update.rowCount) {
       return res.status(200).json({
         resStatus: false,
@@ -1644,14 +1638,12 @@ app.post("/api/post/master-latvia/toggle-activation/:id", async (req, res) => {
         resErrorCode: 2
       });
     }
-
     return res.status(200).json({
       resStatus: true,
       resMessage: newState ? "Ad activated" : "Ad deactivated",
       resOkCode: 1,
       is_active: newState
     });
-
   } catch (err) {
     console.error("Toggle error:", err);
     return res.status(500).json({
@@ -2055,7 +2047,6 @@ app.put("/api/put/master-latvia/update-ad/:id", upload.array("images", 5), async
     });
   }
 });
-
 
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
 //fetch comments etc. This code helps with managing routes that are not defined on react frontend.
