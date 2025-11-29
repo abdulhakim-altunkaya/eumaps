@@ -1996,7 +1996,7 @@ app.put("/api/put/master-latvia/update-ad/:id", upload.array("images", 5), async
           `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_latvia_storage/${fileName}`
         );
       }
-      finalImages = uploadedImages;   // USE NEW IMAGES
+      finalImages = [...finalImages, ...uploadedImages];
     }
 
     /* -------------------------------
