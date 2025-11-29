@@ -1656,6 +1656,7 @@ app.post("/api/post/master-latvia/toggle-activation/:id", async (req, res) => {
 app.post("/api/post/master-latvia/delete-ad/:id", async (req, res) => {
   const adId = req.params.id;
   const sessionId = req.cookies?.session_id;
+
   if (!sessionId) {
     return res.status(401).json({
       resStatus: false,
@@ -1663,6 +1664,7 @@ app.post("/api/post/master-latvia/delete-ad/:id", async (req, res) => {
       resErrorCode: 1
     });
   }
+
   try {
     // Validate session
     const sessionQuery = `
@@ -1679,29 +1681,62 @@ app.post("/api/post/master-latvia/delete-ad/:id", async (req, res) => {
         resErrorCode: 2
       });
     }
+
     const googleId = sessionRes.rows[0].google_id;
-    // Make sure this ad belongs to this user
-    const checkQuery = `
-      SELECT id
+
+    // Fetch ad + images (IMPORTANT)
+    const adQuery = `
+      SELECT image_url
       FROM masters_latvia_ads
       WHERE id = $1 AND google_id = $2
       LIMIT 1;
     `;
-    const checkRes = await pool.query(checkQuery, [adId, googleId]);
-    if (!checkRes.rowCount) {
+    const adRes = await pool.query(adQuery, [adId, googleId]);
+
+    if (!adRes.rowCount) {
       return res.status(403).json({
         resStatus: false,
         resMessage: "Not allowed to delete this ad",
         resErrorCode: 3
       });
     }
-    // Delete the ad
+
+    // Parse image list
+    let images = [];
+    try {
+      images = Array.isArray(adRes.rows[0].image_url)
+        ? adRes.rows[0].image_url
+        : JSON.parse(adRes.rows[0].image_url);
+    } catch {
+      images = [];
+    }
+
+    // Extract filenames from full URLs
+    const filesToDelete = images
+      .map(url => url.split("/").pop()) // take last part of URL
+      .filter(Boolean); // remove empty
+
+    // Delete from Supabase storage
+    if (filesToDelete.length > 0) {
+      const { error } = await supabase.storage
+        .from("masters_latvia_storage")
+        .remove(filesToDelete);
+
+      if (error) {
+        console.error("Supabase delete error:", error);
+        // NOT failing the whole request — image deletion shouldn't block ad deletion
+      }
+    }
+
+    // Delete database record
     await pool.query(`DELETE FROM masters_latvia_ads WHERE id = $1`, [adId]);
+
     return res.json({
       resStatus: true,
       resMessage: "Ad deleted successfully",
       resOkCode: 1
     });
+
   } catch (err) {
     console.error("Delete ad error:", err);
     return res.status(500).json({
