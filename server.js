@@ -1358,10 +1358,8 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
   const ipVisitor = req.headers["x-forwarded-for"]
     ? req.headers["x-forwarded-for"].split(",")[0]
     : req.socket.remoteAddress || req.ip;
-
   let client;
   let formData;
-
   /* -------------------------------------------
      PARSE JSON FORM DATA
   ------------------------------------------- */
@@ -1374,7 +1372,6 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
       resErrorCode: 1
     });
   }
-
   const {
     inputService,
     inputName,
@@ -1382,39 +1379,42 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
     inputDescription,
     countryCode,
     phoneNumber,
-    inputRegions
+    inputRegions,
+    main_group,
+    sub_group
   } = formData;
 
   /* -------------------------------------------
-     GET GOOGLE ID - ONLY LOGGED IN PEOPLE CAN POST
+     GET GOOGLE ID (only logged users)
   ------------------------------------------- */
-    const sessionId = req.cookies?.session_id;
-    if (!sessionId) {
-      return res.status(401).json({
-        resStatus: false,
-        resMessage: "Not logged in",
-        resErrorCode: 13
-      });
-    }
-    // Lookup user from session table
-    const userQuery = `
-      SELECT google_id
-      FROM masters_latvia_sessions
-      WHERE session_id = $1
-      LIMIT 1;
-    `;
-    const userRes = await pool.query(userQuery, [sessionId]);
-    if (!userRes.rowCount) {
-      return res.status(401).json({
-        resStatus: false,
-        resMessage: "Invalid session",
-        resErrorCode: 14
-      });
-    }
-    const googleId = userRes.rows[0].google_id;
-    /* -------------------------------------------
-      IMAGE VALIDATION + SUPABASE UPLOAD
-    ------------------------------------------- */
+  const sessionId = req.cookies?.session_id;
+
+  if (!sessionId) {
+    return res.status(401).json({
+      resStatus: false,
+      resMessage: "Not logged in",
+      resErrorCode: 13
+    });
+  }
+
+  const userRes = await pool.query(
+    `SELECT google_id FROM masters_latvia_sessions WHERE session_id = $1 LIMIT 1`,
+    [sessionId]
+  );
+
+  if (!userRes.rowCount) {
+    return res.status(401).json({
+      resStatus: false,
+      resMessage: "Invalid session",
+      resErrorCode: 14
+    });
+  }
+
+  const googleId = userRes.rows[0].google_id;
+
+  /* -------------------------------------------
+     IMAGE VALIDATION + SUPABASE UPLOAD
+  ------------------------------------------- */
   const files = req.files;
 
   if (!files || files.length < 1 || files.length > 5) {
@@ -1460,21 +1460,23 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
   }
 
   /* -------------------------------------------
-     SAVE TO DATABASE (POSTGRES)
+     SAVE TO DATABASE (NO RANDOM GROUPS!)
   ------------------------------------------- */
   try {
     client = await pool.connect();
+
     const insertQuery = `
       INSERT INTO masters_latvia_ads 
-      (name, title, description, price, city, telephone, image_url, ip, date, 
-      main_group, sub_group, user_id, google_id, update_date,
-      created_at, is_active)
+      (name, title, description, price, city, telephone, image_url, ip, date,
+       main_group, sub_group, user_id, google_id, update_date,
+       created_at, is_active)
       VALUES 
-      ($1, $2, $3, $4, $5, $6, $7, $8, $9, 
-      $10, $11, $12, $13, $14,
-      $15, $16)
+      ($1, $2, $3, $4, $5, $6, $7, $8, $9,
+       $10, $11, $12, $13, $14,
+       $15, $16)
       RETURNING id
     `;
+
     const values = [
       inputName,
       inputService,
@@ -1485,17 +1487,14 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
       JSON.stringify(uploadedImages),
       ipVisitor,
       new Date().toISOString().slice(0, 10),
-
-      Math.floor(Math.random() * 9) + 1,
-      Math.floor(Math.random() * 9) + 1,
-      Math.floor(Math.random() * 999999) + 1,
+      main_group,           // ✅ real main group ID
+      sub_group,            // ✅ real sub group ID
+      0,                    // user_id (keep your logic)
       googleId,
       new Date().toISOString().slice(0, 10),
-
-      new Date(),       // <-- created_at (REAL timestamp)
-      true              // <-- is_active default
+      new Date(),           // created_at
+      true                  // is_active
     ];
-
 
     const result = await client.query(insertQuery, values);
 
@@ -1525,6 +1524,7 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
     if (client) client.release();
   }
 });
+
 //this function below is for google auth login of latvia masters
 async function createSessionForUser(googleId) {
   const sessionId = crypto.randomUUID(); // generate inline
@@ -1952,7 +1952,6 @@ app.get("/api/get/master-latvia/browse", async (req, res) => {
     });
   }
 });
-
 app.put("/api/put/master-latvia/update-ad/:id", upload.array("images", 5), async (req, res) => {
   const adId = req.params.id;
 
