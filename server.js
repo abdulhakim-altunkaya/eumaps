@@ -1398,7 +1398,7 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
   }
 
   const userRes = await pool.query(
-    `SELECT google_id FROM masters_latvia_sessions WHERE session_id = $1 LIMIT 1`,
+    `SELECT google_id, user_id FROM masters_latvia_sessions WHERE session_id = $1 LIMIT 1`,
     [sessionId]
   );
 
@@ -1411,6 +1411,7 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
   }
 
   const googleId = userRes.rows[0].google_id;
+  const dbUserId = userRes.rows[0].user_id;
 
   /* -------------------------------------------
      IMAGE VALIDATION + SUPABASE UPLOAD
@@ -1487,9 +1488,9 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
       JSON.stringify(uploadedImages),
       ipVisitor,
       new Date().toISOString().slice(0, 10),
-      main_group,           // ✅ real main group ID
-      sub_group,            // ✅ real sub group ID
-      0,                    // user_id (keep your logic)
+      main_group,           
+      sub_group,            
+      dbUserId,                    
       googleId,
       new Date().toISOString().slice(0, 10),
       new Date(),           // created_at
