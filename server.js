@@ -68,6 +68,19 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'client/build')));
 //For serving from build directory, you need to install path package and initiate it:
 
+//This function for now will be used safely convert image file names to alphanumerical values
+//currently used by latvia masters
+//can be used by any endpoint in the future
+// example value: 30/11/2025_111aaa.jpg
+function makeSafeName() {
+  const d = new Date();
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const rand = Math.random().toString(36).substring(2, 8); // 6 chars
+  return `${dd}${mm}${yyyy}_${rand}`;
+}
+
 //A temporary cache to save ip addresses and it will prevent spam comments and replies for 1 minute.
 //I can do that by checking each ip with database ip addresses but then it will be too many requests to db
 const ipCache2 = {}
@@ -1355,32 +1368,24 @@ app.post("/api/kac-milyon/save-reply", async (req, res) => {
 
 /*MASTERS-LATVIA ENDPOINTS */
 app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, res) => {
-  console.log("\n========================");
-  console.log("📌 NEW UPLOAD REQUEST");
-  console.log("========================");
-
   const ipVisitor = req.headers["x-forwarded-for"]
     ? req.headers["x-forwarded-for"].split(",")[0]
     : req.socket.remoteAddress || req.ip;
 
   let client;
   let formData;
-
   /* -------------------------------------------
      PARSE JSON FORM DATA
   ------------------------------------------- */
   try {
     formData = JSON.parse(req.body.formData);
-    console.log("📌 Parsed formData:", formData);
   } catch (err) {
-    console.log("❌ FAILED TO PARSE formData");
     return res.status(400).json({
       resStatus: false,
       resMessage: "Invalid form data",
       resErrorCode: 1
     });
   }
-
   const {
     inputService,
     inputName,
@@ -1392,31 +1397,22 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
     main_group,
     sub_group
   } = formData;
-
   /* -------------------------------------------
      SESSION VALIDATION
   ------------------------------------------- */
   const sessionId = req.cookies?.session_id;
-  console.log("📌 session_id cookie:", sessionId);
-
   if (!sessionId) {
-    console.log("❌ No session cookie.");
     return res.status(401).json({
       resStatus: false,
       resMessage: "Not logged in",
       resErrorCode: 13
     });
   }
-
   const userRes = await pool.query(
     `SELECT google_id, user_id FROM masters_latvia_sessions WHERE session_id = $1 LIMIT 1`,
     [sessionId]
   );
-
-  console.log("📌 Session lookup result:", userRes.rows);
-
   if (!userRes.rowCount) {
-    console.log("❌ session_id not found in DB");
     return res.status(401).json({
       resStatus: false,
       resMessage: "Invalid session",
@@ -1427,17 +1423,12 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
   const googleId = userRes.rows[0].google_id;
   const dbUserId = userRes.rows[0].user_id;
 
-  console.log("📌 google_id:", googleId);
-  console.log("📌 user_id:", dbUserId);
-
   /* -------------------------------------------
      IMAGE VALIDATION
   ------------------------------------------- */
   const files = req.files;
-  console.log("📌 Uploaded files count:", files?.length);
 
   if (!files || files.length < 1 || files.length > 5) {
-    console.log("❌ Invalid image count");
     return res.status(400).json({
       resStatus: false,
       resMessage: "1–5 images required",
@@ -1448,15 +1439,12 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
   // Upload images
   let uploadedImages = [];
   for (const f of files) {
-    const fileName = `${Date.now()}-${f.originalname}`;
-    console.log(`📌 Uploading image: ${fileName}`);
-
+    const fileName = makeSafeName();
     const { error } = await supabase.storage
       .from("masters_latvia_storage")
       .upload(fileName, f.buffer, { contentType: f.mimetype });
 
     if (error) {
-      console.log("❌ Supabase upload failed:", error);
       return res.status(503).json({
         resStatus: false,
         resMessage: "Image upload failed",
@@ -1474,8 +1462,6 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
   ------------------------------------------- */
   try {
     client = await pool.connect();
-
-    console.log("📌 FINAL INSERT VALUES:");
     console.log({
       inputName,
       inputService,
@@ -1522,10 +1508,7 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
     ];
 
     const result = await client.query(insertQuery, values);
-    console.log("📌 Insert result:", result.rows);
-
     if (!result.rowCount) {
-      console.log("❌ Insert returned 0 rows.");
       return res.status(503).json({
         resStatus: false,
         resMessage: "Database insert failed",
@@ -1540,7 +1523,6 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
     });
 
   } catch (err) {
-    console.error("❌ DATABASE INSERT ERROR:", err);
     return res.status(503).json({
       resStatus: false,
       resMessage: "Server error",
