@@ -1355,23 +1355,32 @@ app.post("/api/kac-milyon/save-reply", async (req, res) => {
 
 /*MASTERS-LATVIA ENDPOINTS */
 app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, res) => {
+  console.log("\n========================");
+  console.log("📌 NEW UPLOAD REQUEST");
+  console.log("========================");
+
   const ipVisitor = req.headers["x-forwarded-for"]
     ? req.headers["x-forwarded-for"].split(",")[0]
     : req.socket.remoteAddress || req.ip;
+
   let client;
   let formData;
+
   /* -------------------------------------------
      PARSE JSON FORM DATA
   ------------------------------------------- */
   try {
     formData = JSON.parse(req.body.formData);
+    console.log("📌 Parsed formData:", formData);
   } catch (err) {
+    console.log("❌ FAILED TO PARSE formData");
     return res.status(400).json({
       resStatus: false,
       resMessage: "Invalid form data",
       resErrorCode: 1
     });
   }
+
   const {
     inputService,
     inputName,
@@ -1385,11 +1394,13 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
   } = formData;
 
   /* -------------------------------------------
-     GET GOOGLE ID (only logged users)
+     SESSION VALIDATION
   ------------------------------------------- */
   const sessionId = req.cookies?.session_id;
+  console.log("📌 session_id cookie:", sessionId);
 
   if (!sessionId) {
+    console.log("❌ No session cookie.");
     return res.status(401).json({
       resStatus: false,
       resMessage: "Not logged in",
@@ -1402,7 +1413,10 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
     [sessionId]
   );
 
+  console.log("📌 Session lookup result:", userRes.rows);
+
   if (!userRes.rowCount) {
+    console.log("❌ session_id not found in DB");
     return res.status(401).json({
       resStatus: false,
       resMessage: "Invalid session",
@@ -1413,12 +1427,17 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
   const googleId = userRes.rows[0].google_id;
   const dbUserId = userRes.rows[0].user_id;
 
+  console.log("📌 google_id:", googleId);
+  console.log("📌 user_id:", dbUserId);
+
   /* -------------------------------------------
-     IMAGE VALIDATION + SUPABASE UPLOAD
+     IMAGE VALIDATION
   ------------------------------------------- */
   const files = req.files;
+  console.log("📌 Uploaded files count:", files?.length);
 
   if (!files || files.length < 1 || files.length > 5) {
+    console.log("❌ Invalid image count");
     return res.status(400).json({
       resStatus: false,
       resMessage: "1–5 images required",
@@ -1426,28 +1445,18 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
     });
   }
 
-  const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-  for (const f of files) {
-    if (!allowed.includes(f.mimetype)) {
-      return res.status(400).json({
-        resStatus: false,
-        resMessage: "Unsupported file type",
-        resErrorCode: 9
-      });
-    }
-  }
-
-  // Upload to Supabase
+  // Upload images
   let uploadedImages = [];
-
   for (const f of files) {
     const fileName = `${Date.now()}-${f.originalname}`;
+    console.log(`📌 Uploading image: ${fileName}`);
 
     const { error } = await supabase.storage
       .from("masters_latvia_storage")
       .upload(fileName, f.buffer, { contentType: f.mimetype });
 
     if (error) {
+      console.log("❌ Supabase upload failed:", error);
       return res.status(503).json({
         resStatus: false,
         resMessage: "Image upload failed",
@@ -1461,10 +1470,25 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
   }
 
   /* -------------------------------------------
-     SAVE TO DATABASE (NO RANDOM GROUPS!)
+     DATABASE INSERT
   ------------------------------------------- */
   try {
     client = await pool.connect();
+
+    console.log("📌 FINAL INSERT VALUES:");
+    console.log({
+      inputName,
+      inputService,
+      inputDescription,
+      inputPrice,
+      inputRegions,
+      phone: Number(countryCode + phoneNumber),
+      uploadedImages,
+      main_group,
+      sub_group,
+      dbUserId,
+      googleId
+    });
 
     const insertQuery = `
       INSERT INTO masters_latvia_ads 
@@ -1488,18 +1512,20 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
       JSON.stringify(uploadedImages),
       ipVisitor,
       new Date().toISOString().slice(0, 10),
-      main_group,           
-      sub_group,            
-      dbUserId,                    
+      main_group,
+      sub_group,
+      dbUserId,   // <-- THIS MUST NOT BE NULL
       googleId,
       new Date().toISOString().slice(0, 10),
-      new Date(),           // created_at
-      true                  // is_active
+      new Date(),
+      true
     ];
 
     const result = await client.query(insertQuery, values);
+    console.log("📌 Insert result:", result.rows);
 
     if (!result.rowCount) {
+      console.log("❌ Insert returned 0 rows.");
       return res.status(503).json({
         resStatus: false,
         resMessage: "Database insert failed",
@@ -1514,7 +1540,7 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
     });
 
   } catch (err) {
-    console.error("DATABASE INSERT ERROR:", err);
+    console.error("❌ DATABASE INSERT ERROR:", err);
     return res.status(503).json({
       resStatus: false,
       resMessage: "Server error",
@@ -1561,7 +1587,6 @@ app.post("/api/post/master-latvia/auth/google", async (req, res) => {
     `;
     const values = [ googleId, email, name, new Date().toISOString().slice(0, 10), 0, ipVisitor ];
     const result = await client.query(query, values);
-    const userId = result.rows[0].google_id;
 
     const dbUserId = result.rows[0].id;
     const dbGoogleId = result.rows[0].google_id;
