@@ -1526,11 +1526,11 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
 });
 
 //this function below is for google auth login of latvia masters
-async function createSessionForUser(googleId) {
+async function createSessionForUser(dbGoogleId, dbUserId) {
   const sessionId = crypto.randomUUID(); // generate inline
   await pool.query(
-    `INSERT INTO masters_latvia_sessions (session_id, google_id) VALUES ($1, $2)`,
-    [sessionId, googleId]
+    `INSERT INTO masters_latvia_sessions (session_id, google_id, user_id) VALUES ($1, $2, $3)`,
+    [sessionId, dbGoogleId, dbUserId]
   );
   return sessionId;
 }
@@ -1556,12 +1556,16 @@ app.post("/api/post/master-latvia/auth/google", async (req, res) => {
       VALUES ($1, $2, $3, $4, $5, $6)
       ON CONFLICT (google_id)
       DO UPDATE SET email = EXCLUDED.email, name = EXCLUDED.name
-      RETURNING google_id;
+      RETURNING id, google_id;
     `;
     const values = [ googleId, email, name, new Date().toISOString().slice(0, 10), 0, ipVisitor ];
     const result = await client.query(query, values);
     const userId = result.rows[0].google_id;
-    const sessionId = await createSessionForUser(userId);
+
+    const dbUserId = result.rows[0].id;
+    const dbGoogleId = result.rows[0].google_id;
+
+    const sessionId = await createSessionForUser(dbGoogleId, dbUserId);
     res.cookie("session_id", sessionId, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -1572,7 +1576,7 @@ app.post("/api/post/master-latvia/auth/google", async (req, res) => {
       resStatus: true,
       resMessage: "User authenticated",
       resOkCode: 1,
-      user: { google_id: userId, email, name, session_id: sessionId }
+      user: { google_id: dbGoogleId, email, name, session_id: sessionId }
     });
 
   } catch (error) {
