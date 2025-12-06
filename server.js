@@ -1825,7 +1825,7 @@ app.get("/api/get/master-latvia/ad/:id", async (req, res) => {
     const q = `
       SELECT 
         id, name, title, description, price, city,
-        telephone, image_url, google_id
+        telephone, image_url, google_id, main_group, sub_group
       FROM masters_latvia_ads
       WHERE id = $1
       LIMIT 1
@@ -2071,7 +2071,7 @@ app.put("/api/put/master-latvia/update-ad/:id", upload.array("images", 5), async
       // Upload to Supabase
       const uploadedImages = [];
       for (const f of files) {
-        const fileName = `${Date.now()}-${f.originalname}`;
+        const fileName = makeSafeName();
         const { error } = await supabase.storage
           .from("masters_latvia_storage")
           .upload(fileName, f.buffer, { contentType: f.mimetype });
