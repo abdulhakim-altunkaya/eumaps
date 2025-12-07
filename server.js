@@ -1759,85 +1759,125 @@ app.post("/api/post/master-latvia/delete-ad/:id", async (req, res) => {
   }
 });
 app.post("/api/post/master-latvia/like", async (req, res) => {
-  const { liker_id, ad_id, master_id } = req.body;
+  const { liker_id, ad_id } = req.body;
+
+  if (!liker_id || !ad_id) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Missing fields"
+    });
+  }
 
   try {
     const likerNum = Number(liker_id);
 
-    // 1) Check existing row
+    // Check existing row
     const selectQ = `
       SELECT id, likers
       FROM masters_latvia_likes
-      WHERE ad_id = $1 AND master_id = $2
+      WHERE ad_id = $1
       LIMIT 1
     `;
-    const selectR = await pool.query(selectQ, [ad_id, master_id]);
+    const selectR = await pool.query(selectQ, [ad_id]);
 
-    // --------------------------
-    // CASE A — Row exists
-    // --------------------------
+    // Row exists → update
     if (selectR.rowCount) {
       const row = selectR.rows[0];
       let likers = (row.likers || []).map(n => Number(n));
 
-      const hasLiked = likers.includes(likerNum);
+      if (!likers.includes(likerNum)) {
+        likers.push(likerNum);
 
-      // A1 — User already liked
-      if (hasLiked) {
-        return res.json({
-          resStatus: true,
-          resOkCode: 1,
-          hasLiked: true,
-          likersCount: likers.length
-        });
+        const updateQ = `
+          UPDATE masters_latvia_likes
+          SET likers = $1
+          WHERE id = $2
+        `;
+        await pool.query(updateQ, [JSON.stringify(likers), row.id]);
       }
-
-      // A2 — New like → add + update
-      likers.push(likerNum);
-
-      const updateQ = `
-        UPDATE masters_latvia_likes
-        SET likers = $1
-        WHERE id = $2
-      `;
-      await pool.query(updateQ, [JSON.stringify(likers), row.id]);
 
       return res.json({
         resStatus: true,
-        resOkCode: 2,
-        hasLiked: false,
-        likersCount: likers.length
+        resOkCode: 1,
+        resMessage: "Like saved"
       });
     }
 
-    // --------------------------
-    // CASE B — No row exists
-    // --------------------------
+    // No row → insert new
     const newArray = JSON.stringify([likerNum]);
 
     const insertQ = `
-      INSERT INTO masters_latvia_likes (master_id, ad_id, likers)
-      VALUES ($1, $2, $3)
+      INSERT INTO masters_latvia_likes (ad_id, likers)
+      VALUES ($1, $2)
     `;
-    await pool.query(insertQ, [master_id, ad_id, newArray]);
+    await pool.query(insertQ, [ad_id, newArray]);
 
     return res.json({
       resStatus: true,
-      resOkCode: 3,
-      hasLiked: false,
-      likersCount: 1
+      resOkCode: 2,
+      resMessage: "Like saved (new row created)"
     });
 
   } catch (err) {
     console.error(err);
     return res.status(500).json({
       resStatus: false,
-      resErrorCode: 1,
+      resErrorCode: 2,
       resMessage: "Server error"
     });
   }
 });
+app.get("/api/get/master-latvia/like-status", async (req, res) => {
+  const { liker_id, ad_id } = req.query;
 
+  if (!liker_id || !ad_id) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Missing fields"
+    });
+  }
+
+  try {
+    const likerNum = Number(liker_id);
+
+    const q = `
+      SELECT likers
+      FROM masters_latvia_likes
+      WHERE ad_id = $1
+      LIMIT 1
+    `;
+    const r = await pool.query(q, [ad_id]);
+
+    // No row → no likes yet
+    if (!r.rowCount) {
+      return res.json({
+        resStatus: true,
+        resOkCode: 1,
+        hasLiked: false,
+        likersCount: 0
+      });
+    }
+
+    const likers = (r.rows[0].likers || []).map(n => Number(n));
+
+    return res.json({
+      resStatus: true,
+      resOkCode: 2,
+      hasLiked: likers.includes(likerNum),
+      likersCount: likers.length
+    });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      resStatus: false,
+      resErrorCode: 2,
+      resMessage: "Server error"
+    });
+  }
+});
 app.get("/api/get/master-latvia/session-user", async (req, res) => {
   const sessionId = req.cookies?.session_id;
 
