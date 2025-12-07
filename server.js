@@ -1992,8 +1992,28 @@ app.get("/api/get/master-latvia/session-user", async (req, res) => {
     });
   }
 });
+// helper to normalize IP
+function getRealIp(req) {
+  let ip =
+    req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+    req.connection?.remoteAddress ||
+    req.socket?.remoteAddress ||
+    req.ip;
+
+  // remove IPv6 prefix "::ffff:"
+  if (ip && ip.startsWith("::ffff:")) {
+    ip = ip.replace("::ffff:", "");
+  }
+
+  // local IPv6 loopback → IPv4
+  if (ip === "::1") ip = "127.0.0.1";
+
+  return ip;
+}
+
 app.get("/api/get/master-latvia/ad/:id", async (req, res) => {
   const adId = req.params.id;
+
   try {
     const q = `
       SELECT 
@@ -2012,30 +2032,22 @@ app.get("/api/get/master-latvia/ad/:id", async (req, res) => {
         resErrorCode: 1
       });
     }
-
     const ad = r.rows[0];
-
     // ------------------------------------------
     // 20-second per-ad per-IP cooldown
     // ------------------------------------------
-
-    // extract visitor IP
-    const ipVisitor = req.headers["x-forwarded-for"]
-      ? req.headers["x-forwarded-for"].split(",")[0].trim()
-      : req.socket.remoteAddress || req.ip;
-
-    // global in-memory cache
+    const ipVisitor = getRealIp(req);
+    // initialize global in-memory cache
     if (!global.viewCache) global.viewCache = {};
 
+    // unique key: each visitor for each ad
     const key = `${ipVisitor}|${adId}`;
     const now = Date.now();
-    const COOLDOWN = 60 * 1000; // 60 seconds
-
+    const COOLDOWN = 60 * 1000; // 20 seconds
+    // only increment if cooldown expired
     if (!(global.viewCache[key] && now - global.viewCache[key] < COOLDOWN)) {
-      // update timestamp
       global.viewCache[key] = now;
 
-      // increment view count
       try {
         const updateQ = `
           UPDATE masters_latvia_ads
@@ -2043,23 +2055,20 @@ app.get("/api/get/master-latvia/ad/:id", async (req, res) => {
           WHERE id = $1
         `;
         await pool.query(updateQ, [adId]);
-
         // reflect increment in response
         ad.views = Number(ad.views || 0) + 1;
       } catch (err) {
         console.error("View increment error:", err);
       }
     }
-
     // ------------------------------------------
-    // response
+    // SUCCESS RESPONSE
     // ------------------------------------------
     return res.json({
       resStatus: true,
       resOkCode: 1,
       ad
     });
-
   } catch (err) {
     console.error(err);
     return res.status(500).json({
