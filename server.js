@@ -1758,6 +1758,33 @@ app.post("/api/post/master-latvia/delete-ad/:id", async (req, res) => {
     });
   }
 });
+app.post("/api/post/master-latvia/ad-view", async (req, res) => {
+  const { ad_id } = req.body;
+  if (!ad_id) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Missing ad_id"
+    });
+  }
+  try {
+    const q = `UPDATE masters_latvia_ads SET views = views + 1 WHERE id = $1`;
+    await pool.query(q, [ad_id]);
+    return res.json({
+      resStatus: true,
+      resOkCode: 1,
+      resMessage: "View recorded"
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      resStatus: false,
+      resErrorCode: 2,
+      resMessage: "Server error"
+    });
+  }
+});
+
 app.post("/api/post/master-latvia/like", async (req, res) => {
   const { liker_id, ad_id } = req.body;
   if (!liker_id || !ad_id) {
