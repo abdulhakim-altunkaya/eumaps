@@ -1883,7 +1883,7 @@ app.get("/api/get/master-latvia/ad/:id", async (req, res) => {
   try {
     const q = `
       SELECT 
-        id, name, title, description, price, city,
+        id, name, title, description, price, city, user_id,
         telephone, image_url, google_id, main_group, sub_group
       FROM masters_latvia_ads
       WHERE id = $1
