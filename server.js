@@ -1759,43 +1759,46 @@ app.post("/api/post/master-latvia/delete-ad/:id", async (req, res) => {
   }
 });
 app.post("/api/save/master-latvia/like", async (req, res) => {
-  const { liker_id, ad_id, master_id } = req.body;
+  let { liker_id, ad_id, master_id } = req.body;
 
   if (!liker_id || !ad_id || !master_id) {
-    return res.json({
-      resStatus: false,
-      resMessage: "Missing fields"
-    });
+    return res.json({ resStatus: false, resMessage: "Missing fields" });
   }
+
+  // convert to numbers
+  const liker = Number(liker_id);
+  const ad = Number(ad_id);
+  const master = Number(master_id);
+
   try {
-    // 1) Get existing row
     const selectQ = `
       SELECT id, likers
       FROM masters_latvia_likes
       WHERE ad_id = $1 AND master_id = $2
       LIMIT 1
     `;
-    const selectR = await pool.query(selectQ, [ad_id, master_id]);
+    const selectR = await pool.query(selectQ, [ad, master]);
+
     let likers = [];
     let likeRowId = null;
+
     if (selectR.rowCount) {
       likeRowId = selectR.rows[0].id;
-      likers = selectR.rows[0].likers || [];
+      likers = (selectR.rows[0].likers || []).map(n => Number(n));
     }
-    // 2) Add liker if not present
-    if (!likers.includes(liker_id)) {
-      likers.push(liker_id);
+
+    // add liker if missing
+    if (!likers.includes(liker)) {
+      likers.push(liker);
     }
-    // 3) INSERT if row doesn't exist
+
     if (!selectR.rowCount) {
       const insertQ = `
         INSERT INTO masters_latvia_likes (master_id, ad_id, likers)
         VALUES ($1, $2, $3)
       `;
-      await pool.query(insertQ, [master_id, ad_id, likers]);
-    }
-    // 4) UPDATE if row exists
-    else {
+      await pool.query(insertQ, [master, ad, likers]);
+    } else {
       const updateQ = `
         UPDATE masters_latvia_likes
         SET likers = $1
@@ -1803,10 +1806,9 @@ app.post("/api/save/master-latvia/like", async (req, res) => {
       `;
       await pool.query(updateQ, [likers, likeRowId]);
     }
-    return res.json({
-      resStatus: true,
-      likersCount: likers.length
-    });
+
+    return res.json({ resStatus: true, likersCount: likers.length });
+
   } catch (err) {
     console.error(err);
     return res.status(500).json({
