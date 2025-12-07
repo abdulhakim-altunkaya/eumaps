@@ -1759,55 +1759,23 @@ app.post("/api/post/master-latvia/delete-ad/:id", async (req, res) => {
   }
 });
 app.post("/api/save/master-latvia/like", async (req, res) => {
-  let { liker_id, ad_id, master_id } = req.body;
-
-  if (!liker_id || !ad_id || !master_id) {
-    return res.json({ resStatus: false, resMessage: "Missing fields" });
-  }
-
-  // convert to numbers
-  const liker = Number(liker_id);
-  const ad = Number(ad_id);
-  const master = Number(master_id);
+  const { liker_id, ad_id, master_id } = req.body;
 
   try {
-    const selectQ = `
-      SELECT id, likers
-      FROM masters_latvia_likes
-      WHERE ad_id = $1 AND master_id = $2
-      LIMIT 1
+    // build json array
+    const likersArray = JSON.stringify([liker_id]);
+
+    const insertQ = `
+      INSERT INTO masters_latvia_likes (master_id, ad_id, likers)
+      VALUES ($1, $2, $3)
     `;
-    const selectR = await pool.query(selectQ, [ad, master]);
 
-    let likers = [];
-    let likeRowId = null;
+    await pool.query(insertQ, [master_id, ad_id, likersArray]);
 
-    if (selectR.rowCount) {
-      likeRowId = selectR.rows[0].id;
-      likers = (selectR.rows[0].likers || []).map(n => Number(n));
-    }
-
-    // add liker if missing
-    if (!likers.includes(liker)) {
-      likers.push(liker);
-    }
-
-    if (!selectR.rowCount) {
-      const insertQ = `
-        INSERT INTO masters_latvia_likes (master_id, ad_id, likers)
-        VALUES ($1, $2, $3)
-      `;
-      await pool.query(insertQ, [master, ad, likers]);
-    } else {
-      const updateQ = `
-        UPDATE masters_latvia_likes
-        SET likers = $1
-        WHERE id = $2
-      `;
-      await pool.query(updateQ, [likers, likeRowId]);
-    }
-
-    return res.json({ resStatus: true, likersCount: likers.length });
+    return res.json({
+      resStatus: true,
+      resMessage: "Saved"
+    });
 
   } catch (err) {
     console.error(err);
@@ -1817,6 +1785,7 @@ app.post("/api/save/master-latvia/like", async (req, res) => {
     });
   }
 });
+
 app.get("/api/get/master-latvia/session-user", async (req, res) => {
   const sessionId = req.cookies?.session_id;
 
