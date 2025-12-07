@@ -1829,15 +1829,16 @@ app.get("/api/get/master-latvia/session-user", async (req, res) => {
       loggedIn: false
     });
   }
-
   try {
     const query = `
-      SELECT masters_latvia_users.google_id,
-             masters_latvia_users.email,
-             masters_latvia_users.name
+      SELECT 
+        masters_latvia_users.id,
+        masters_latvia_users.google_id,
+        masters_latvia_users.email,
+        masters_latvia_users.name
       FROM masters_latvia_sessions
       JOIN masters_latvia_users
-        ON masters_latvia_users.google_id = masters_latvia_sessions.google_id
+        ON masters_latvia_users.id = masters_latvia_sessions.user_id
       WHERE masters_latvia_sessions.session_id = $1
       LIMIT 1;
     `;
@@ -1861,6 +1862,7 @@ app.get("/api/get/master-latvia/session-user", async (req, res) => {
       resOkCode: 1,
       loggedIn: true,
       user: {
+        id: user.id,
         google_id: user.google_id,
         email: user.email,
         name: user.name
