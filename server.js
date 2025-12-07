@@ -1758,6 +1758,63 @@ app.post("/api/post/master-latvia/delete-ad/:id", async (req, res) => {
     });
   }
 });
+app.post("/api/save/master-latvia/like", async (req, res) => {
+  const { liker_id, ad_id, master_id } = req.body;
+
+  if (!liker_id || !ad_id || !master_id) {
+    return res.json({
+      resStatus: false,
+      resMessage: "Missing fields"
+    });
+  }
+  try {
+    // 1) Get existing row
+    const selectQ = `
+      SELECT id, likers
+      FROM masters_latvia_likes
+      WHERE ad_id = $1 AND master_id = $2
+      LIMIT 1
+    `;
+    const selectR = await pool.query(selectQ, [ad_id, master_id]);
+    let likers = [];
+    let likeRowId = null;
+    if (selectR.rowCount) {
+      likeRowId = selectR.rows[0].id;
+      likers = selectR.rows[0].likers || [];
+    }
+    // 2) Add liker if not present
+    if (!likers.includes(liker_id)) {
+      likers.push(liker_id);
+    }
+    // 3) INSERT if row doesn't exist
+    if (!selectR.rowCount) {
+      const insertQ = `
+        INSERT INTO masters_latvia_likes (master_id, ad_id, likers)
+        VALUES ($1, $2, $3)
+      `;
+      await pool.query(insertQ, [master_id, ad_id, likers]);
+    }
+    // 4) UPDATE if row exists
+    else {
+      const updateQ = `
+        UPDATE masters_latvia_likes
+        SET likers = $1
+        WHERE id = $2
+      `;
+      await pool.query(updateQ, [likers, likeRowId]);
+    }
+    return res.json({
+      resStatus: true,
+      likersCount: likers.length
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Server error"
+    });
+  }
+});
 app.get("/api/get/master-latvia/session-user", async (req, res) => {
   const sessionId = req.cookies?.session_id;
 
