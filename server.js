@@ -1760,7 +1760,6 @@ app.post("/api/post/master-latvia/delete-ad/:id", async (req, res) => {
 });
 app.post("/api/post/master-latvia/like", async (req, res) => {
   const { liker_id, ad_id } = req.body;
-
   if (!liker_id || !ad_id) {
     return res.json({
       resStatus: false,
@@ -1768,11 +1767,9 @@ app.post("/api/post/master-latvia/like", async (req, res) => {
       resMessage: "Missing fields"
     });
   }
-
   try {
     const likerNum = Number(liker_id);
-
-    // Check existing row
+    // Check existing record
     const selectQ = `
       SELECT id, likers
       FROM masters_latvia_likes
@@ -1780,23 +1777,50 @@ app.post("/api/post/master-latvia/like", async (req, res) => {
       LIMIT 1
     `;
     const selectR = await pool.query(selectQ, [ad_id]);
-
-    // Row exists → update
+    // ---------------------------------------
+    // CASE A: Row exists → update or delete
+    // ---------------------------------------
     if (selectR.rowCount) {
       const row = selectR.rows[0];
       let likers = (row.likers || []).map(n => Number(n));
-
-      if (!likers.includes(likerNum)) {
-        likers.push(likerNum);
-
+      const alreadyLiked = likers.includes(likerNum);
+      // REMOVE if already liked (dislike)
+      if (alreadyLiked) {
+        likers = likers.filter(id => id !== likerNum);
+        // If array becomes empty → delete row
+        if (likers.length === 0) {
+          const deleteQ = `
+            DELETE FROM masters_latvia_likes
+            WHERE id = $1
+          `;
+          await pool.query(deleteQ, [row.id]);
+          return res.json({
+            resStatus: true,
+            resOkCode: 3,
+            resMessage: "Like removed (row deleted)"
+          });
+        }
+        // Otherwise update row
         const updateQ = `
           UPDATE masters_latvia_likes
           SET likers = $1
           WHERE id = $2
         `;
         await pool.query(updateQ, [JSON.stringify(likers), row.id]);
+        return res.json({
+          resStatus: true,
+          resOkCode: 4,
+          resMessage: "Like removed"
+        });
       }
-
+      // ADD like if not yet in array
+      likers.push(likerNum);
+      const updateQ = `
+        UPDATE masters_latvia_likes
+        SET likers = $1
+        WHERE id = $2
+      `;
+      await pool.query(updateQ, [JSON.stringify(likers), row.id]);
       return res.json({
         resStatus: true,
         resOkCode: 1,
@@ -1804,7 +1828,9 @@ app.post("/api/post/master-latvia/like", async (req, res) => {
       });
     }
 
-    // No row → insert new
+    // ---------------------------------------
+    // CASE B: No row exists → insert new like
+    // ---------------------------------------
     const newArray = JSON.stringify([likerNum]);
 
     const insertQ = `
