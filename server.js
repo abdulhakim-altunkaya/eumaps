@@ -1999,7 +1999,7 @@ app.get("/api/get/master-latvia/ad/:id", async (req, res) => {
   try {
     const q = `
       SELECT 
-        id, name, title, description, price, city, user_id,
+        id, name, title, description, price, city, user_id, date,
         telephone, image_url, google_id, main_group, sub_group
       FROM masters_latvia_ads
       WHERE id = $1
@@ -2141,7 +2141,6 @@ app.get("/api/get/master-latvia/browse", async (req, res) => {
 });
 app.put("/api/put/master-latvia/update-ad/:id", upload.array("images", 5), async (req, res) => {
   const adId = req.params.id;
-
   /* -------------------------------
      CHECK LOGIN SESSION
   --------------------------------*/
@@ -2153,7 +2152,6 @@ app.put("/api/put/master-latvia/update-ad/:id", upload.array("images", 5), async
       resErrorCode: 13
     });
   }
-
   try {
     const userQ = await pool.query(
       `SELECT google_id 
@@ -2162,7 +2160,6 @@ app.put("/api/put/master-latvia/update-ad/:id", upload.array("images", 5), async
        LIMIT 1`,
       [sessionId]
     );
-
     if (!userQ.rowCount) {
       return res.status(401).json({
         resStatus: false,
@@ -2170,9 +2167,7 @@ app.put("/api/put/master-latvia/update-ad/:id", upload.array("images", 5), async
         resErrorCode: 14
       });
     }
-
     const googleId = userQ.rows[0].google_id;
-
     /* -------------------------------
        CHECK IF AD BELONGS TO USER
     --------------------------------*/
@@ -2183,7 +2178,6 @@ app.put("/api/put/master-latvia/update-ad/:id", upload.array("images", 5), async
        LIMIT 1`,
       [adId]
     );
-
     if (!adQ.rowCount) {
       return res.json({
         resStatus: false,
