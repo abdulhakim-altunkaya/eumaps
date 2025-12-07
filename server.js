@@ -1758,8 +1758,10 @@ app.post("/api/post/master-latvia/delete-ad/:id", async (req, res) => {
     });
   }
 });
+const visitCacheLM = {};
 app.post("/api/post/master-latvia/ad-view", async (req, res) => {
   const { ad_id } = req.body;
+
   if (!ad_id) {
     return res.json({
       resStatus: false,
@@ -1767,20 +1769,51 @@ app.post("/api/post/master-latvia/ad-view", async (req, res) => {
       resMessage: "Missing ad_id"
     });
   }
+
+  let ipVisitor =
+    req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+    req.socket.remoteAddress ||
+    req.ip;
+
+  if (ipVisitor.startsWith("::ffff:")) ipVisitor = ipVisitor.replace("::ffff:", "");
+  if (ipVisitor === "::1") ipVisitor = "127.0.0.1";
+
+  const now = Date.now();
+  const COOLDOWN = 60 * 1000;
+
+  if (!visitCacheLM[ipVisitor]) visitCacheLM[ipVisitor] = {};
+  if (!visitCacheLM[ipVisitor][ad_id]) visitCacheLM[ipVisitor][ad_id] = 0;
+
+  const lastView = visitCacheLM[ipVisitor][ad_id];
+
+  if (now - lastView < COOLDOWN) {
+    return res.json({
+      resStatus: true,
+      resOkCode: 2,
+      resMessage: "View ignored (cooldown)"
+    });
+  }
+
+  visitCacheLM[ipVisitor][ad_id] = now;
+
   try {
-    const q = `UPDATE masters_latvia_ads SET views = views + 1 WHERE id = $1`;
-    await pool.query(q, [ad_id]);
+    await pool.query(
+      "UPDATE masters_latvia_ads SET views = views + 1 WHERE id = $1",
+      [ad_id]
+    );
+
     return res.json({
       resStatus: true,
       resOkCode: 1,
       resMessage: "View recorded"
     });
+
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({
+    console.error("View save error:", err);
+    return res.json({
       resStatus: false,
-      resErrorCode: 2,
-      resMessage: "Server error"
+      resErrorCode: 3,
+      resMessage: "Database error"
     });
   }
 });
@@ -1993,16 +2026,8 @@ app.get("/api/get/master-latvia/session-user", async (req, res) => {
   }
 });
 
-const visitCounterMasters = {};
 app.get("/api/get/master-latvia/ad/:id", async (req, res) => {
-
-  const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
-  
   const adId = req.params.id;
-
-  const key = `${ipVisitor}|${adId}`;
-  const now = Date.now();
-  const COOLDOWN = 60 * 1000; // 60 seconds
 
   try {
     const q = `
@@ -2018,41 +2043,19 @@ app.get("/api/get/master-latvia/ad/:id", async (req, res) => {
     if (!r.rowCount) {
       return res.json({
         resStatus: false,
-        resMessage: "Ad not found",
-        resErrorCode: 1
+        resErrorCode: 1,
+        resMessage: "Ad not found"
       });
     }
 
-    const ad = r.rows[0];
-
-    // --- check last visit ---
-    const lastVisit = visitCounterMasters[key];
-    const visitedTooSoon = lastVisit && now - lastVisit < COOLDOWN;
-
-    // --- UPDATE VIEW IF NOT TOO SOON ---
-    if (!visitedTooSoon) {
-      visitCounterMasters[key] = now;
-
-      try {
-        await pool.query(
-          "UPDATE masters_latvia_ads SET views = views + 1 WHERE id = $1",
-          [adId]
-        );
-
-        ad.views = Number(ad.views || 0) + 1; // reflect for frontend
-      } catch (err) {
-        console.error("View increment error:", err);
-      }
-    }
-    // --- always return full ad data ---
     return res.json({
       resStatus: true,
       resOkCode: 1,
-      ad
+      ad: r.rows[0]
     });
 
   } catch (err) {
-    console.error(err);
+    console.error("GET ad error:", err);
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 2,
@@ -2060,6 +2063,7 @@ app.get("/api/get/master-latvia/ad/:id", async (req, res) => {
     });
   }
 });
+
 
 app.get("/api/get/master-latvia/user-ads", async (req, res) => {
   const sessionId = req.cookies?.session_id;
