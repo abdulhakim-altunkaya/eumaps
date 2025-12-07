@@ -1992,27 +1992,17 @@ app.get("/api/get/master-latvia/session-user", async (req, res) => {
     });
   }
 });
-// helper to normalize IP
-function getRealIp(req) {
-  let ip =
-    req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-    req.connection?.remoteAddress ||
-    req.socket?.remoteAddress ||
-    req.ip;
 
-  // remove IPv6 prefix "::ffff:"
-  if (ip && ip.startsWith("::ffff:")) {
-    ip = ip.replace("::ffff:", "");
-  }
-
-  // local IPv6 loopback → IPv4
-  if (ip === "::1") ip = "127.0.0.1";
-
-  return ip;
-}
-
+const visitCounterMasters = {};
 app.get("/api/get/master-latvia/ad/:id", async (req, res) => {
+
+  const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
+  
   const adId = req.params.id;
+
+  const key = `${ipVisitor}|${adId}`;
+  const now = Date.now();
+  const COOLDOWN = 60 * 1000; // 60 seconds
 
   try {
     const q = `
@@ -2032,49 +2022,41 @@ app.get("/api/get/master-latvia/ad/:id", async (req, res) => {
         resErrorCode: 1
       });
     }
-    const ad = r.rows[0];
-    // ------------------------------------------
-    // 20-second per-ad per-IP cooldown
-    // ------------------------------------------
-    const ipVisitor = getRealIp(req);
-    // initialize global in-memory cache
-    if (!global.viewCache) global.viewCache = {};
 
-    // unique key: each visitor for each ad
-    const key = `${ipVisitor}|${adId}`;
-    const now = Date.now();
-    const COOLDOWN = 60 * 1000; // 20 seconds
-    // only increment if cooldown expired
-    if (!(global.viewCache[key] && now - global.viewCache[key] < COOLDOWN)) {
-      global.viewCache[key] = now;
+    const ad = r.rows[0];
+
+    // --- check last visit ---
+    const lastVisit = visitCounterMasters[key];
+    const visitedTooSoon = lastVisit && now - lastVisit < COOLDOWN;
+
+    // --- UPDATE VIEW IF NOT TOO SOON ---
+    if (!visitedTooSoon) {
+      visitCounterMasters[key] = now;
 
       try {
-        const updateQ = `
-          UPDATE masters_latvia_ads
-          SET views = views + 1
-          WHERE id = $1
-        `;
-        await pool.query(updateQ, [adId]);
-        // reflect increment in response
-        ad.views = Number(ad.views || 0) + 1;
+        await pool.query(
+          "UPDATE masters_latvia_ads SET views = views + 1 WHERE id = $1",
+          [adId]
+        );
+
+        ad.views = Number(ad.views || 0) + 1; // reflect for frontend
       } catch (err) {
         console.error("View increment error:", err);
       }
     }
-    // ------------------------------------------
-    // SUCCESS RESPONSE
-    // ------------------------------------------
+    // --- always return full ad data ---
     return res.json({
       resStatus: true,
       resOkCode: 1,
       ad
     });
+
   } catch (err) {
     console.error(err);
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Server error",
-      resErrorCode: 2
+      resErrorCode: 2,
+      resMessage: "Server error"
     });
   }
 });
