@@ -1758,29 +1758,81 @@ app.post("/api/post/master-latvia/delete-ad/:id", async (req, res) => {
     });
   }
 });
-app.post("/api/save/master-latvia/like", async (req, res) => {
+app.post("/api/post/master-latvia/like", async (req, res) => {
   const { liker_id, ad_id, master_id } = req.body;
 
   try {
-    // build json array
-    const likersArray = JSON.stringify([liker_id]);
+    const likerNum = Number(liker_id);
+
+    // 1) Check existing row
+    const selectQ = `
+      SELECT id, likers
+      FROM masters_latvia_likes
+      WHERE ad_id = $1 AND master_id = $2
+      LIMIT 1
+    `;
+    const selectR = await pool.query(selectQ, [ad_id, master_id]);
+
+    // --------------------------
+    // CASE A — Row exists
+    // --------------------------
+    if (selectR.rowCount) {
+      const row = selectR.rows[0];
+      let likers = (row.likers || []).map(n => Number(n));
+
+      const hasLiked = likers.includes(likerNum);
+
+      // A1 — User already liked
+      if (hasLiked) {
+        return res.json({
+          resStatus: true,
+          resOkCode: 1,
+          hasLiked: true,
+          likersCount: likers.length
+        });
+      }
+
+      // A2 — New like → add + update
+      likers.push(likerNum);
+
+      const updateQ = `
+        UPDATE masters_latvia_likes
+        SET likers = $1
+        WHERE id = $2
+      `;
+      await pool.query(updateQ, [JSON.stringify(likers), row.id]);
+
+      return res.json({
+        resStatus: true,
+        resOkCode: 2,
+        hasLiked: false,
+        likersCount: likers.length
+      });
+    }
+
+    // --------------------------
+    // CASE B — No row exists
+    // --------------------------
+    const newArray = JSON.stringify([likerNum]);
 
     const insertQ = `
       INSERT INTO masters_latvia_likes (master_id, ad_id, likers)
       VALUES ($1, $2, $3)
     `;
-
-    await pool.query(insertQ, [master_id, ad_id, likersArray]);
+    await pool.query(insertQ, [master_id, ad_id, newArray]);
 
     return res.json({
       resStatus: true,
-      resMessage: "Saved"
+      resOkCode: 3,
+      hasLiked: false,
+      likersCount: 1
     });
 
   } catch (err) {
     console.error(err);
     return res.status(500).json({
       resStatus: false,
+      resErrorCode: 1,
       resMessage: "Server error"
     });
   }
