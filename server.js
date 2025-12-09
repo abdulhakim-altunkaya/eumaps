@@ -1817,6 +1817,109 @@ app.post("/api/post/master-latvia/ad-view", async (req, res) => {
     });
   }
 });
+app.post("/api/post/master-latvia/review", async (req, res) => {
+  const { reviewer_name, review_text, reviewer_id, receiver, rating } = req.body;
+
+  if (!reviewer_name || !review_text || !reviewer_id || !receiver || !rating) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Missing fields"
+    });
+  }
+
+  // Format date dd/mm/yyyy
+  const now = new Date();
+  const dateStr =
+    String(now.getDate()).padStart(2, "0") + "/" +
+    String(now.getMonth() + 1).padStart(2, "0") + "/" +
+    now.getFullYear();
+
+  try {
+    const q = `
+      INSERT INTO masters_latvia_reviews 
+      (reviewer_name, review_text, date, reviewer_id, receiver, parent, rating)
+      VALUES ($1, $2, $3, $4, $5, NULL, $6)
+      RETURNING id
+    `;
+
+    const r = await pool.query(q, [
+      reviewer_name,
+      review_text,
+      dateStr,
+      reviewer_id,
+      receiver,
+      rating
+    ]);
+
+    return res.json({
+      resStatus: true,
+      resOkCode: 1,
+      resMessage: "Review saved",
+      review_id: r.rows[0].id
+    });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      resStatus: false,
+      resErrorCode: 2,
+      resMessage: "Server error"
+    });
+  }
+});
+app.post("/api/post/master-latvia/reply", async (req, res) => {
+  const { reviewer_name, review_text, reviewer_id, receiver, parent } = req.body;
+
+  if (!reviewer_name || !review_text || !reviewer_id || !receiver || !parent) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Missing fields"
+    });
+  }
+
+  // Format date dd/mm/yyyy
+  const now = new Date();
+  const dateStr =
+    String(now.getDate()).padStart(2, "0") + "/" +
+    String(now.getMonth() + 1).padStart(2, "0") + "/" +
+    now.getFullYear();
+
+  try {
+    const q = `
+      INSERT INTO masters_latvia_reviews
+      (reviewer_name, review_text, date, reviewer_id, receiver, parent, rating)
+      VALUES ($1, $2, $3, $4, $5, $6, NULL)
+      RETURNING id
+    `;
+
+    const r = await pool.query(q, [
+      reviewer_name,
+      review_text,
+      dateStr,
+      reviewer_id,
+      receiver,
+      parent
+    ]);
+
+    return res.json({
+      resStatus: true,
+      resOkCode: 1,
+      resMessage: "Reply saved",
+      reply_id: r.rows[0].id
+    });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      resStatus: false,
+      resErrorCode: 2,
+      resMessage: "Server error"
+    });
+  }
+});
+
 app.post("/api/post/master-latvia/like", async (req, res) => {
   const { liker_id, ad_id } = req.body;
   if (!liker_id || !ad_id) {
@@ -2025,7 +2128,6 @@ app.get("/api/get/master-latvia/session-user", async (req, res) => {
     });
   }
 });
-
 app.get("/api/get/master-latvia/ad/:id", async (req, res) => {
   const adId = req.params.id;
 
@@ -2063,8 +2165,6 @@ app.get("/api/get/master-latvia/ad/:id", async (req, res) => {
     });
   }
 });
-
-
 app.get("/api/get/master-latvia/user-ads", async (req, res) => {
   const sessionId = req.cookies?.session_id;
   if (!sessionId) {
