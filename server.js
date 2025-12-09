@@ -2065,6 +2065,51 @@ app.get("/api/get/master-latvia/like-status", async (req, res) => {
     });
   }
 });
+app.get("/api/get/master-latvia/reviews/:ad_id", async (req, res) => {
+  const adId = req.params.ad_id;
+
+  if (!adId) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Missing ad_id"
+    });
+  }
+
+  try {
+    const q = `
+      SELECT 
+        id,
+        reviewer_name,
+        review_text,
+        date,
+        reviewer_id,
+        receiver,
+        parent,
+        rating
+      FROM masters_latvia_reviews
+      WHERE receiver = $1
+      ORDER BY id ASC
+    `;
+
+    const r = await pool.query(q, [adId]);
+
+    return res.json({
+      resStatus: true,
+      resOkCode: 1,
+      reviews: r.rows
+    });
+
+  } catch (err) {
+    console.error("Get reviews error:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resErrorCode: 2,
+      resMessage: "Server error"
+    });
+  }
+});
+
 app.get("/api/get/master-latvia/session-user", async (req, res) => {
   const sessionId = req.cookies?.session_id;
 
