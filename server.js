@@ -1919,7 +1919,6 @@ app.post("/api/post/master-latvia/reply", async (req, res) => {
     });
   }
 });
-
 app.post("/api/post/master-latvia/like", async (req, res) => {
   const { liker_id, ad_id } = req.body;
   if (!liker_id || !ad_id) {
