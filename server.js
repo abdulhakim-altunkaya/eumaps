@@ -1409,7 +1409,7 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
     });
   }
   const userRes = await pool.query(
-    `SELECT google_id, user_id FROM masters_latvia_sessions WHERE session_id = $1 LIMIT 1`,
+    `SELECT google_id FROM masters_latvia_sessions WHERE session_id = $1 LIMIT 1`,
     [sessionId]
   );
   if (!userRes.rowCount) {
@@ -1421,7 +1421,6 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
   }
 
   const googleId = userRes.rows[0].google_id;
-  const dbUserId = userRes.rows[0].user_id;
 
   /* -------------------------------------------
      IMAGE VALIDATION
@@ -1472,19 +1471,18 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
       uploadedImages,
       main_group,
       sub_group,
-      dbUserId,
       googleId
     });
 
     const insertQuery = `
       INSERT INTO masters_latvia_ads 
       (name, title, description, price, city, telephone, image_url, ip, date,
-       main_group, sub_group, user_id, google_id, update_date,
+       main_group, sub_group, google_id, update_date,
        created_at, is_active)
       VALUES 
       ($1, $2, $3, $4, $5, $6, $7, $8, $9,
        $10, $11, $12, $13, $14,
-       $15, $16)
+       $15)
       RETURNING id
     `;
 
@@ -1500,7 +1498,6 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
       new Date().toISOString().slice(0, 10),
       main_group,
       sub_group,
-      dbUserId,   // <-- THIS MUST NOT BE NULL
       googleId,
       new Date().toISOString().slice(0, 10),
       new Date(),
@@ -1533,13 +1530,187 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
     if (client) client.release();
   }
 });
+app.put("/api/put/master-latvia/update-ad/:id", upload.array("images", 5), async (req, res) => {
+  const adId = req.params.id;
+  /* -------------------------------
+     CHECK LOGIN SESSION
+  --------------------------------*/
+  const sessionId = req.cookies?.session_id;
+  if (!sessionId) {
+    return res.status(401).json({
+      resStatus: false,
+      resMessage: "Not logged in",
+      resErrorCode: 13
+    });
+  }
+  try {
+    const userQ = await pool.query(
+      `SELECT google_id 
+       FROM masters_latvia_sessions 
+       WHERE session_id = $1 
+       LIMIT 1`,
+      [sessionId]
+    );
+    if (!userQ.rowCount) {
+      return res.status(401).json({
+        resStatus: false,
+        resMessage: "Invalid session",
+        resErrorCode: 14
+      });
+    }
+    const googleId = userQ.rows[0].google_id;
+    /* -------------------------------
+       CHECK IF AD BELONGS TO USER
+    --------------------------------*/
+    const adQ = await pool.query(
+      `SELECT image_url, google_id 
+       FROM masters_latvia_ads 
+       WHERE id = $1 
+       LIMIT 1`,
+      [adId]
+    );
+    if (!adQ.rowCount) {
+      return res.json({
+        resStatus: false,
+        resMessage: "Ad not found",
+        resErrorCode: 20
+      });
+    }
 
+    if (adQ.rows[0].google_id !== googleId) {
+      return res.status(403).json({
+        resStatus: false,
+        resMessage: "Unauthorized",
+        resErrorCode: 21
+      });
+    }
+
+    /* -------------------------------
+       PARSE JSON FORM DATA
+    --------------------------------*/
+    let formData;
+    try {
+      formData = JSON.parse(req.body.formData);
+    } catch (err) {
+      return res.status(400).json({
+        resStatus: false,
+        resMessage: "Invalid form data",
+        resErrorCode: 1
+      });
+    }
+
+    const {
+      inputService,
+      inputName,
+      inputPrice,
+      inputDescription,
+      countryCode,
+      phoneNumber,
+      inputRegions,
+      existingImages
+    } = formData;
+
+    /* -------------------------------
+       HANDLE NEW IMAGE UPLOADS
+    --------------------------------*/
+    const files = req.files;
+    const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    let finalImages = Array.isArray(existingImages) ? existingImages : [];
+
+    // Validate new images if any
+    if (files && files.length > 0) {
+      for (const f of files) {
+        if (!allowed.includes(f.mimetype)) {
+          return res.status(400).json({
+            resStatus: false,
+            resMessage: "Unsupported file type",
+            resErrorCode: 9
+          });
+        }
+      }
+      // Upload to Supabase
+      const uploadedImages = [];
+      for (const f of files) {
+        const fileName = makeSafeName();
+        const { error } = await supabase.storage
+          .from("masters_latvia_storage")
+          .upload(fileName, f.buffer, { contentType: f.mimetype });
+        if (error) {
+          return res.status(503).json({
+            resStatus: false,
+            resMessage: "Image upload failed",
+            resErrorCode: 10
+          });
+        }
+        uploadedImages.push(
+          `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_latvia_storage/${fileName}`
+        );
+      }
+      finalImages = [...finalImages, ...uploadedImages];
+    }
+
+    /* -------------------------------
+       UPDATE DATABASE
+    --------------------------------*/
+    const updateQ = `
+      UPDATE masters_latvia_ads 
+      SET 
+        name        = $1,
+        title       = $2,
+        description = $3,
+        price       = $4,
+        city        = $5,
+        telephone   = $6,
+        image_url   = $7,
+        update_date = $8
+      WHERE id = $9 AND google_id = $10
+      RETURNING id
+    `;
+
+    const values = [
+      inputName,
+      inputService,
+      inputDescription,
+      inputPrice,
+      JSON.stringify(inputRegions),
+      Number(countryCode + phoneNumber),
+      JSON.stringify(finalImages),
+      new Date().toISOString().slice(0, 10),
+      adId,
+      googleId
+    ];
+
+    const result = await pool.query(updateQ, values);
+
+    if (!result.rowCount) {
+      return res.json({
+        resStatus: false,
+        resMessage: "Update failed",
+        resErrorCode: 22
+      });
+    }
+
+    return res.json({
+      resStatus: true,
+      resMessage: "Ad updated successfully",
+      resOkCode: 1
+    });
+
+  } catch (err) {
+    console.error("UPDATE ERROR:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Server error",
+      resErrorCode: 23
+    });
+  }
+});
 //this function below is for google auth login of latvia masters
-async function createSessionForUser(dbGoogleId, dbUserId) {
+async function createSessionForUser(dbGoogleId) {
   const sessionId = crypto.randomUUID(); // generate inline
   await pool.query(
-    `INSERT INTO masters_latvia_sessions (session_id, google_id, user_id) VALUES ($1, $2, $3)`,
-    [sessionId, dbGoogleId, dbUserId]
+    `INSERT INTO masters_latvia_sessions (session_id, google_id) VALUES ($1, $2)`,
+    [sessionId, dbGoogleId]
   );
   return sessionId;
 }
@@ -1565,15 +1736,14 @@ app.post("/api/post/master-latvia/auth/google", async (req, res) => {
       VALUES ($1, $2, $3, $4, $5, $6)
       ON CONFLICT (google_id)
       DO UPDATE SET email = EXCLUDED.email, name = EXCLUDED.name
-      RETURNING id, google_id;
+      RETURNING google_id;
     `;
     const values = [ googleId, email, name, new Date().toISOString().slice(0, 10), 0, ipVisitor ];
     const result = await client.query(query, values);
 
-    const dbUserId = result.rows[0].id;
     const dbGoogleId = result.rows[0].google_id;
 
-    const sessionId = await createSessionForUser(dbGoogleId, dbUserId);
+    const sessionId = await createSessionForUser(dbGoogleId);
     res.cookie("session_id", sessionId, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -1818,17 +1988,20 @@ app.post("/api/post/master-latvia/ad-view", async (req, res) => {
   }
 });
 app.post("/api/post/master-latvia/review", async (req, res) => {
-  const { reviewer_name, review_text, reviewer_id, receiver, rating } = req.body;
+  const { review_text, adId, rating } = req.body;
 
-  if (!reviewer_name || !review_text || !reviewer_id || !receiver || !rating) {
+  // 🔐 take reviewer from session, NOT body
+  const reviewer_id = req.session?.user?.google_id;
+  const reviewer_name = req.session?.user?.name;
+
+  if (!reviewer_id || !reviewer_name || !review_text || !adId || !rating) {
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Missing fields"
+      resMessage: "Missing fields or not authenticated"
     });
   }
 
-  // Format date dd/mm/yyyy
   const now = new Date();
   const dateStr =
     String(now.getDate()).padStart(2, "0") + "/" +
@@ -1837,8 +2010,8 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
 
   try {
     const q = `
-      INSERT INTO masters_latvia_reviews 
-      (reviewer_name, review_text, date, reviewer_id, receiver, parent, rating)
+      INSERT INTO masters_latvia_reviews
+      (reviewer_name, review_text, date, reviewer_id, ad_id, parent, rating)
       VALUES ($1, $2, $3, $4, $5, NULL, $6)
       RETURNING id
     `;
@@ -1847,8 +2020,8 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
       reviewer_name,
       review_text,
       dateStr,
-      reviewer_id,
-      receiver,
+      reviewer_id, // ✅ Google ID
+      adId,
       rating
     ]);
 
@@ -1868,10 +2041,10 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
     });
   }
 });
-app.post("/api/post/master-latvia/reply", async (req, res) => {
-  const { reviewer_name, review_text, reviewer_id, receiver, parent } = req.body;
+/* app.post("/api/post/master-latvia/reply", async (req, res) => {
+  const { reviewer_name, review_text, reviewer_id, adId, parent } = req.body;
 
-  if (!reviewer_name || !review_text || !reviewer_id || !receiver || !parent) {
+  if (!reviewer_name || !review_text || !reviewer_id || !adId || !parent) {
     return res.json({
       resStatus: false,
       resErrorCode: 1,
@@ -1889,7 +2062,7 @@ app.post("/api/post/master-latvia/reply", async (req, res) => {
   try {
     const q = `
       INSERT INTO masters_latvia_reviews
-      (reviewer_name, review_text, date, reviewer_id, receiver, parent, rating)
+      (reviewer_name, review_text, date, reviewer_id, ad_id, parent, rating)
       VALUES ($1, $2, $3, $4, $5, $6, NULL)
       RETURNING id
     `;
@@ -1899,7 +2072,7 @@ app.post("/api/post/master-latvia/reply", async (req, res) => {
       review_text,
       dateStr,
       reviewer_id,
-      receiver,
+      adId,
       parent
     ]);
 
@@ -1918,18 +2091,39 @@ app.post("/api/post/master-latvia/reply", async (req, res) => {
       resMessage: "Server error"
     });
   }
-});
+}); */
 app.post("/api/post/master-latvia/like", async (req, res) => {
-  const { liker_id, ad_id } = req.body;
-  if (!liker_id || !ad_id) {
+  const sessionId = req.cookies?.session_id;
+  const { ad_id } = req.body;
+
+  if (!sessionId || !ad_id) {
     return res.json({
       resStatus: false,
       resErrorCode: 1,
       resMessage: "Missing fields"
     });
   }
+
   try {
-    const likerNum = Number(liker_id);
+    // get google_id from session
+    const sessionQ = `
+      SELECT google_id
+      FROM masters_latvia_sessions
+      WHERE session_id = $1
+      LIMIT 1
+    `;
+    const sessionR = await pool.query(sessionQ, [sessionId]);
+
+    if (!sessionR.rowCount) {
+      return res.json({
+        resStatus: false,
+        resErrorCode: 2,
+        resMessage: "Invalid session"
+      });
+    }
+
+    const google_id = sessionR.rows[0].google_id;
+
     // Check existing record
     const selectQ = `
       SELECT id, likers
@@ -1938,17 +2132,19 @@ app.post("/api/post/master-latvia/like", async (req, res) => {
       LIMIT 1
     `;
     const selectR = await pool.query(selectQ, [ad_id]);
+
     // ---------------------------------------
     // CASE A: Row exists → update or delete
     // ---------------------------------------
     if (selectR.rowCount) {
       const row = selectR.rows[0];
-      let likers = (row.likers || []).map(n => Number(n));
-      const alreadyLiked = likers.includes(likerNum);
-      // REMOVE if already liked (dislike)
+      let likers = row.likers || [];
+      const alreadyLiked = likers.includes(google_id);
+
+      // REMOVE like
       if (alreadyLiked) {
-        likers = likers.filter(id => id !== likerNum);
-        // If array becomes empty → delete row
+        likers = likers.filter(id => id !== google_id);
+
         if (likers.length === 0) {
           const deleteQ = `
             DELETE FROM masters_latvia_likes
@@ -1961,7 +2157,7 @@ app.post("/api/post/master-latvia/like", async (req, res) => {
             resMessage: "Like removed (row deleted)"
           });
         }
-        // Otherwise update row
+
         const updateQ = `
           UPDATE masters_latvia_likes
           SET likers = $1
@@ -1974,14 +2170,16 @@ app.post("/api/post/master-latvia/like", async (req, res) => {
           resMessage: "Like removed"
         });
       }
-      // ADD like if not yet in array
-      likers.push(likerNum);
+
+      // ADD like
+      likers.push(google_id);
       const updateQ = `
         UPDATE masters_latvia_likes
         SET likers = $1
         WHERE id = $2
       `;
       await pool.query(updateQ, [JSON.stringify(likers), row.id]);
+
       return res.json({
         resStatus: true,
         resOkCode: 1,
@@ -1992,13 +2190,11 @@ app.post("/api/post/master-latvia/like", async (req, res) => {
     // ---------------------------------------
     // CASE B: No row exists → insert new like
     // ---------------------------------------
-    const newArray = JSON.stringify([likerNum]);
-
     const insertQ = `
       INSERT INTO masters_latvia_likes (ad_id, likers)
       VALUES ($1, $2)
     `;
-    await pool.query(insertQ, [ad_id, newArray]);
+    await pool.query(insertQ, [ad_id, JSON.stringify([google_id])]);
 
     return res.json({
       resStatus: true,
@@ -2010,15 +2206,16 @@ app.post("/api/post/master-latvia/like", async (req, res) => {
     console.error(err);
     return res.status(500).json({
       resStatus: false,
-      resErrorCode: 2,
+      resErrorCode: 3,
       resMessage: "Server error"
     });
   }
 });
 app.get("/api/get/master-latvia/like-status", async (req, res) => {
-  const { liker_id, ad_id } = req.query;
+  const sessionId = req.cookies?.session_id;
+  const { ad_id } = req.query;
 
-  if (!liker_id || !ad_id) {
+  if (!sessionId || !ad_id) {
     return res.json({
       resStatus: false,
       resErrorCode: 1,
@@ -2027,7 +2224,24 @@ app.get("/api/get/master-latvia/like-status", async (req, res) => {
   }
 
   try {
-    const likerNum = Number(liker_id);
+    // get google_id from session
+    const sessionQ = `
+      SELECT google_id
+      FROM masters_latvia_sessions
+      WHERE session_id = $1
+      LIMIT 1
+    `;
+    const sessionR = await pool.query(sessionQ, [sessionId]);
+
+    if (!sessionR.rowCount) {
+      return res.json({
+        resStatus: false,
+        resErrorCode: 2,
+        resMessage: "Invalid session"
+      });
+    }
+
+    const google_id = sessionR.rows[0].google_id;
 
     const q = `
       SELECT likers
@@ -2047,12 +2261,12 @@ app.get("/api/get/master-latvia/like-status", async (req, res) => {
       });
     }
 
-    const likers = (r.rows[0].likers || []).map(n => Number(n));
+    const likers = r.rows[0].likers || [];
 
     return res.json({
       resStatus: true,
       resOkCode: 2,
-      hasLiked: likers.includes(likerNum),
+      hasLiked: likers.includes(google_id),
       likersCount: likers.length
     });
 
@@ -2060,11 +2274,13 @@ app.get("/api/get/master-latvia/like-status", async (req, res) => {
     console.error(err);
     return res.status(500).json({
       resStatus: false,
-      resErrorCode: 2,
+      resErrorCode: 3,
       resMessage: "Server error"
     });
   }
 });
+
+
 app.get("/api/get/master-latvia/reviews/:ad_id", async (req, res) => {
   const adId = req.params.ad_id;
 
@@ -2084,11 +2300,10 @@ app.get("/api/get/master-latvia/reviews/:ad_id", async (req, res) => {
         review_text,
         date,
         reviewer_id,
-        receiver,
         parent,
         rating
       FROM masters_latvia_reviews
-      WHERE receiver = $1
+      WHERE ad_id = $1
       ORDER BY id ASC
     `;
 
@@ -2122,19 +2337,20 @@ app.get("/api/get/master-latvia/session-user", async (req, res) => {
       loggedIn: false
     });
   }
+
   try {
     const query = `
       SELECT 
-        masters_latvia_users.id,
         masters_latvia_users.google_id,
         masters_latvia_users.email,
         masters_latvia_users.name
       FROM masters_latvia_sessions
       JOIN masters_latvia_users
-        ON masters_latvia_users.id = masters_latvia_sessions.user_id
+        ON masters_latvia_users.google_id = masters_latvia_sessions.google_id
       WHERE masters_latvia_sessions.session_id = $1
       LIMIT 1;
     `;
+
     const result = await pool.query(query, [sessionId]);
 
     if (result.rowCount === 0) {
@@ -2155,7 +2371,6 @@ app.get("/api/get/master-latvia/session-user", async (req, res) => {
       resOkCode: 1,
       loggedIn: true,
       user: {
-        id: user.id,
         google_id: user.google_id,
         email: user.email,
         name: user.name
@@ -2172,13 +2387,14 @@ app.get("/api/get/master-latvia/session-user", async (req, res) => {
     });
   }
 });
+
 app.get("/api/get/master-latvia/ad/:id", async (req, res) => {
   const adId = req.params.id;
 
   try {
     const q = `
       SELECT 
-        id, name, title, description, price, city, user_id, date, views,
+        id, name, title, description, price, city, date, views,
         telephone, image_url, google_id, main_group, sub_group
       FROM masters_latvia_ads
       WHERE id = $1
@@ -2321,181 +2537,7 @@ app.get("/api/get/master-latvia/browse", async (req, res) => {
     });
   }
 });
-app.put("/api/put/master-latvia/update-ad/:id", upload.array("images", 5), async (req, res) => {
-  const adId = req.params.id;
-  /* -------------------------------
-     CHECK LOGIN SESSION
-  --------------------------------*/
-  const sessionId = req.cookies?.session_id;
-  if (!sessionId) {
-    return res.status(401).json({
-      resStatus: false,
-      resMessage: "Not logged in",
-      resErrorCode: 13
-    });
-  }
-  try {
-    const userQ = await pool.query(
-      `SELECT google_id 
-       FROM masters_latvia_sessions 
-       WHERE session_id = $1 
-       LIMIT 1`,
-      [sessionId]
-    );
-    if (!userQ.rowCount) {
-      return res.status(401).json({
-        resStatus: false,
-        resMessage: "Invalid session",
-        resErrorCode: 14
-      });
-    }
-    const googleId = userQ.rows[0].google_id;
-    /* -------------------------------
-       CHECK IF AD BELONGS TO USER
-    --------------------------------*/
-    const adQ = await pool.query(
-      `SELECT image_url, google_id 
-       FROM masters_latvia_ads 
-       WHERE id = $1 
-       LIMIT 1`,
-      [adId]
-    );
-    if (!adQ.rowCount) {
-      return res.json({
-        resStatus: false,
-        resMessage: "Ad not found",
-        resErrorCode: 20
-      });
-    }
 
-    if (adQ.rows[0].google_id !== googleId) {
-      return res.status(403).json({
-        resStatus: false,
-        resMessage: "Unauthorized",
-        resErrorCode: 21
-      });
-    }
-
-    /* -------------------------------
-       PARSE JSON FORM DATA
-    --------------------------------*/
-    let formData;
-    try {
-      formData = JSON.parse(req.body.formData);
-    } catch (err) {
-      return res.status(400).json({
-        resStatus: false,
-        resMessage: "Invalid form data",
-        resErrorCode: 1
-      });
-    }
-
-    const {
-      inputService,
-      inputName,
-      inputPrice,
-      inputDescription,
-      countryCode,
-      phoneNumber,
-      inputRegions,
-      existingImages
-    } = formData;
-
-    /* -------------------------------
-       HANDLE NEW IMAGE UPLOADS
-    --------------------------------*/
-    const files = req.files;
-    const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-    let finalImages = Array.isArray(existingImages) ? existingImages : [];
-
-    // Validate new images if any
-    if (files && files.length > 0) {
-      for (const f of files) {
-        if (!allowed.includes(f.mimetype)) {
-          return res.status(400).json({
-            resStatus: false,
-            resMessage: "Unsupported file type",
-            resErrorCode: 9
-          });
-        }
-      }
-      // Upload to Supabase
-      const uploadedImages = [];
-      for (const f of files) {
-        const fileName = makeSafeName();
-        const { error } = await supabase.storage
-          .from("masters_latvia_storage")
-          .upload(fileName, f.buffer, { contentType: f.mimetype });
-        if (error) {
-          return res.status(503).json({
-            resStatus: false,
-            resMessage: "Image upload failed",
-            resErrorCode: 10
-          });
-        }
-        uploadedImages.push(
-          `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_latvia_storage/${fileName}`
-        );
-      }
-      finalImages = [...finalImages, ...uploadedImages];
-    }
-
-    /* -------------------------------
-       UPDATE DATABASE
-    --------------------------------*/
-    const updateQ = `
-      UPDATE masters_latvia_ads 
-      SET 
-        name        = $1,
-        title       = $2,
-        description = $3,
-        price       = $4,
-        city        = $5,
-        telephone   = $6,
-        image_url   = $7,
-        update_date = $8
-      WHERE id = $9 AND google_id = $10
-      RETURNING id
-    `;
-
-    const values = [
-      inputName,
-      inputService,
-      inputDescription,
-      inputPrice,
-      JSON.stringify(inputRegions),
-      Number(countryCode + phoneNumber),
-      JSON.stringify(finalImages),
-      new Date().toISOString().slice(0, 10),
-      adId,
-      googleId
-    ];
-
-    const result = await pool.query(updateQ, values);
-
-    if (!result.rowCount) {
-      return res.json({
-        resStatus: false,
-        resMessage: "Update failed",
-        resErrorCode: 22
-      });
-    }
-
-    return res.json({
-      resStatus: true,
-      resMessage: "Ad updated successfully",
-      resOkCode: 1
-    });
-
-  } catch (err) {
-    console.error("UPDATE ERROR:", err);
-    return res.status(500).json({
-      resStatus: false,
-      resMessage: "Server error",
-      resErrorCode: 23
-    });
-  }
-});
 
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
 //fetch comments etc. This code helps with managing routes that are not defined on react frontend.
