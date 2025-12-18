@@ -1988,10 +1988,23 @@ app.post("/api/post/master-latvia/ad-view", async (req, res) => {
   }
 });
 app.post("/api/post/master-latvia/review", async (req, res) => {
+  console.log("=== REVIEW ENDPOINT HIT ===");
+  console.log("Cookies:", req.cookies);
+  console.log("Body:", req.body);
+
   const sessionId = req.cookies?.session_id;
   const { reviewer_name, review_text, adId, rating } = req.body;
 
+  console.log("Parsed values:", {
+    sessionId,
+    reviewer_name,
+    review_text,
+    adId,
+    rating
+  });
+
   if (!sessionId || !reviewer_name || !review_text || !adId || !rating) {
+    console.log("❌ Missing fields or no session");
     return res.json({
       resStatus: false,
       resErrorCode: 1,
@@ -2000,13 +2013,17 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
   }
 
   try {
-    // 1) get reviewer google_id from session
+    // 1️⃣ session lookup
+    console.log("🔍 Looking up session...");
     const sessionR = await pool.query(
       `SELECT google_id FROM masters_latvia_sessions WHERE session_id = $1 LIMIT 1`,
       [sessionId]
     );
 
+    console.log("Session query result:", sessionR.rows);
+
     if (!sessionR.rowCount) {
+      console.log("❌ Session not found");
       return res.json({
         resStatus: false,
         resErrorCode: 2,
@@ -2015,15 +2032,19 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
     }
 
     const reviewer_google_id = sessionR.rows[0].google_id;
+    console.log("Reviewer google_id:", reviewer_google_id);
 
-    // 2) date
+    // 2️⃣ date
     const now = new Date();
     const dateStr =
       String(now.getDate()).padStart(2, "0") + "/" +
       String(now.getMonth() + 1).padStart(2, "0") + "/" +
       now.getFullYear();
 
-    // 3) insert review
+    console.log("Date string:", dateStr);
+
+    // 3️⃣ insert review
+    console.log("📝 Inserting review...");
     const q = `
       INSERT INTO masters_latvia_reviews
       (reviewer_name, review_text, date, reviewer_id, ad_id, parent, rating)
@@ -2040,6 +2061,8 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
       rating
     ]);
 
+    console.log("✅ Review inserted:", r.rows[0]);
+
     return res.json({
       resStatus: true,
       resOkCode: 1,
@@ -2048,7 +2071,12 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
     });
 
   } catch (err) {
-    console.error("REVIEW ERROR:", err);
+    console.error("🔥 REVIEW SERVER ERROR 🔥");
+    console.error(err);           // <-- THIS LINE IS KEY
+    console.error(err.message);
+    console.error(err.detail);
+    console.error(err.constraint);
+
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 99,
@@ -2056,6 +2084,7 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
     });
   }
 });
+
 
 /* app.post("/api/post/master-latvia/reply", async (req, res) => {
   const { reviewer_name, review_text, reviewer_id, adId, parent } = req.body;
