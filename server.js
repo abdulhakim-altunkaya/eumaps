@@ -2105,7 +2105,9 @@ app.post("/api/post/master-latvia/like", async (req, res) => {
   }
 
   try {
-    // get google_id from session
+    // ---------------------------------------
+    // 1) GET LIKER GOOGLE ID (FROM SESSION)
+    // ---------------------------------------
     const sessionQ = `
       SELECT google_id
       FROM masters_latvia_sessions
@@ -2122,9 +2124,32 @@ app.post("/api/post/master-latvia/like", async (req, res) => {
       });
     }
 
-    const google_id = sessionR.rows[0].google_id;
+    const liker_google_id = sessionR.rows[0].google_id;
 
-    // Check existing record
+    // ---------------------------------------
+    // 2) GET AD OWNER GOOGLE ID (MASTER)
+    // ---------------------------------------
+    const adQ = `
+      SELECT google_id
+      FROM masters_latvia_ads
+      WHERE id = $1
+      LIMIT 1
+    `;
+    const adR = await pool.query(adQ, [ad_id]);
+
+    if (!adR.rowCount) {
+      return res.json({
+        resStatus: false,
+        resErrorCode: 3,
+        resMessage: "Ad not found"
+      });
+    }
+
+    const master_google_id = adR.rows[0].google_id;
+
+    // ---------------------------------------
+    // 3) CHECK EXISTING LIKE ROW
+    // ---------------------------------------
     const selectQ = `
       SELECT id, likers
       FROM masters_latvia_likes
@@ -2134,23 +2159,27 @@ app.post("/api/post/master-latvia/like", async (req, res) => {
     const selectR = await pool.query(selectQ, [ad_id]);
 
     // ---------------------------------------
-    // CASE A: Row exists → update or delete
+    // CASE A: ROW EXISTS
     // ---------------------------------------
     if (selectR.rowCount) {
       const row = selectR.rows[0];
       let likers = row.likers || [];
-      const alreadyLiked = likers.includes(google_id);
 
-      // REMOVE like
+      if (typeof likers === "string") {
+        likers = JSON.parse(likers);
+      }
+
+      const alreadyLiked = likers.includes(liker_google_id);
+
+      // REMOVE LIKE
       if (alreadyLiked) {
-        likers = likers.filter(id => id !== google_id);
+        likers = likers.filter(id => id !== liker_google_id);
 
-        if (likers.length === 0) {
-          const deleteQ = `
-            DELETE FROM masters_latvia_likes
-            WHERE id = $1
-          `;
-          await pool.query(deleteQ, [row.id]);
+        if (!likers.length) {
+          await pool.query(
+            `DELETE FROM masters_latvia_likes WHERE id = $1`,
+            [row.id]
+          );
           return res.json({
             resStatus: true,
             resOkCode: 3,
@@ -2158,12 +2187,11 @@ app.post("/api/post/master-latvia/like", async (req, res) => {
           });
         }
 
-        const updateQ = `
-          UPDATE masters_latvia_likes
-          SET likers = $1
-          WHERE id = $2
-        `;
-        await pool.query(updateQ, [JSON.stringify(likers), row.id]);
+        await pool.query(
+          `UPDATE masters_latvia_likes SET likers = $1 WHERE id = $2`,
+          [JSON.stringify(likers), row.id]
+        );
+
         return res.json({
           resStatus: true,
           resOkCode: 4,
@@ -2171,14 +2199,13 @@ app.post("/api/post/master-latvia/like", async (req, res) => {
         });
       }
 
-      // ADD like
-      likers.push(google_id);
-      const updateQ = `
-        UPDATE masters_latvia_likes
-        SET likers = $1
-        WHERE id = $2
-      `;
-      await pool.query(updateQ, [JSON.stringify(likers), row.id]);
+      // ADD LIKE
+      likers.push(liker_google_id);
+
+      await pool.query(
+        `UPDATE masters_latvia_likes SET likers = $1 WHERE id = $2`,
+        [JSON.stringify(likers), row.id]
+      );
 
       return res.json({
         resStatus: true,
@@ -2188,13 +2215,17 @@ app.post("/api/post/master-latvia/like", async (req, res) => {
     }
 
     // ---------------------------------------
-    // CASE B: No row exists → insert new like
+    // CASE B: NO ROW → CREATE NEW
     // ---------------------------------------
     const insertQ = `
-      INSERT INTO masters_latvia_likes (ad_id, likers)
-      VALUES ($1, $2)
+      INSERT INTO masters_latvia_likes (ad_id, master_id, likers)
+      VALUES ($1, $2, $3)
     `;
-    await pool.query(insertQ, [ad_id, JSON.stringify([google_id])]);
+    await pool.query(insertQ, [
+      ad_id,
+      master_google_id,
+      JSON.stringify([liker_google_id])
+    ]);
 
     return res.json({
       resStatus: true,
@@ -2206,11 +2237,12 @@ app.post("/api/post/master-latvia/like", async (req, res) => {
     console.error(err);
     return res.status(500).json({
       resStatus: false,
-      resErrorCode: 3,
+      resErrorCode: 99,
       resMessage: "Server error"
     });
   }
 });
+
 app.get("/api/get/master-latvia/like-status", async (req, res) => {
   const sessionId = req.cookies?.session_id;
   const { ad_id } = req.query;
