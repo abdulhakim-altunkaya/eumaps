@@ -2084,12 +2084,11 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
     });
   }
 });
+app.post("/api/post/master-latvia/reply", async (req, res) => {
+  const sessionId = req.cookies?.session_id;
+  const { review_text, adId, parent } = req.body;
 
-
-/* app.post("/api/post/master-latvia/reply", async (req, res) => {
-  const { reviewer_name, review_text, reviewer_id, adId, parent } = req.body;
-
-  if (!reviewer_name || !review_text || !reviewer_id || !adId || !parent) {
+  if (!sessionId || !review_text || !adId || !parent) {
     return res.json({
       resStatus: false,
       resErrorCode: 1,
@@ -2097,26 +2096,62 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
     });
   }
 
-  // Format date dd/mm/yyyy
-  const now = new Date();
-  const dateStr =
-    String(now.getDate()).padStart(2, "0") + "/" +
-    String(now.getMonth() + 1).padStart(2, "0") + "/" +
-    now.getFullYear();
-
   try {
-    const q = `
+    // 1️⃣ get google_id from session
+    const sessionQ = `
+      SELECT google_id
+      FROM masters_latvia_sessions
+      WHERE session_id = $1
+      LIMIT 1
+    `;
+    const sessionR = await pool.query(sessionQ, [sessionId]);
+
+    if (!sessionR.rowCount) {
+      return res.json({
+        resStatus: false,
+        resErrorCode: 2,
+        resMessage: "Invalid session"
+      });
+    }
+
+    const ownerGoogleId = sessionR.rows[0].google_id;
+
+    // 2️⃣ verify owner owns this ad
+    const adQ = `
+      SELECT google_id
+      FROM masters_latvia_ads
+      WHERE id = $1
+      LIMIT 1
+    `;
+    const adR = await pool.query(adQ, [adId]);
+
+    if (!adR.rowCount || String(adR.rows[0].google_id) !== String(ownerGoogleId)) {
+      return res.json({
+        resStatus: false,
+        resErrorCode: 3,
+        resMessage: "Not ad owner"
+      });
+    }
+
+    // 3️⃣ format date
+    const now = new Date();
+    const dateStr =
+      String(now.getDate()).padStart(2, "0") + "/" +
+      String(now.getMonth() + 1).padStart(2, "0") + "/" +
+      now.getFullYear();
+
+    // 4️⃣ insert reply
+    const insertQ = `
       INSERT INTO masters_latvia_reviews
       (reviewer_name, review_text, date, reviewer_id, ad_id, parent, rating)
-      VALUES ($1, $2, $3, $4, $5, $6, NULL)
+      VALUES ('Owner', $1, $2, $3, $4, $5, NULL)
       RETURNING id
     `;
 
-    const r = await pool.query(q, [
-      reviewer_name,
+    const r = await pool.query(insertQ, [
       review_text,
       dateStr,
-      reviewer_id,
+      ownerGoogleId, // reviewer_id = owner google_id
       adId,
       parent
     ]);
@@ -2129,14 +2164,15 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
     });
 
   } catch (err) {
-    console.error(err);
+    console.error("Reply error:", err);
     return res.status(500).json({
       resStatus: false,
-      resErrorCode: 2,
+      resErrorCode: 4,
       resMessage: "Server error"
     });
   }
-}); */
+});
+
 app.post("/api/post/master-latvia/like", async (req, res) => {
   const sessionId = req.cookies?.session_id;
   const { ad_id } = req.body;
@@ -2287,7 +2323,6 @@ app.post("/api/post/master-latvia/like", async (req, res) => {
     });
   }
 });
-
 app.get("/api/get/master-latvia/like-status", async (req, res) => {
   const sessionId = req.cookies?.session_id;
   const { ad_id } = req.query;
@@ -2356,8 +2391,6 @@ app.get("/api/get/master-latvia/like-status", async (req, res) => {
     });
   }
 });
-
-
 app.get("/api/get/master-latvia/reviews/:ad_id", async (req, res) => {
   const adId = req.params.ad_id;
 
@@ -2401,7 +2434,6 @@ app.get("/api/get/master-latvia/reviews/:ad_id", async (req, res) => {
     });
   }
 });
-
 app.get("/api/get/master-latvia/session-user", async (req, res) => {
   const sessionId = req.cookies?.session_id;
 
@@ -2464,7 +2496,6 @@ app.get("/api/get/master-latvia/session-user", async (req, res) => {
     });
   }
 });
-
 app.get("/api/get/master-latvia/ad/:id", async (req, res) => {
   const adId = req.params.id;
 
