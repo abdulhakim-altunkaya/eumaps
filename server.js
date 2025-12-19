@@ -2172,6 +2172,101 @@ app.post("/api/post/master-latvia/reply", async (req, res) => {
     });
   }
 });
+app.post("/api/post/master-latvia/delete-reply", async (req, res) => {
+  const sessionId = req.cookies?.session_id;
+  const { replyId, adId } = req.body;
+
+  if (!sessionId || !replyId || !adId) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Missing fields"
+    });
+  }
+
+  try {
+    // 1️⃣ get google_id from session
+    const sessionQ = `
+      SELECT google_id
+      FROM masters_latvia_sessions
+      WHERE session_id = $1
+      LIMIT 1
+    `;
+    const sessionR = await pool.query(sessionQ, [sessionId]);
+
+    if (!sessionR.rowCount) {
+      return res.json({
+        resStatus: false,
+        resErrorCode: 2,
+        resMessage: "Invalid session"
+      });
+    }
+
+    const ownerGoogleId = sessionR.rows[0].google_id;
+
+    // 2️⃣ verify ad ownership
+    const adQ = `
+      SELECT google_id
+      FROM masters_latvia_ads
+      WHERE id = $1
+      LIMIT 1
+    `;
+    const adR = await pool.query(adQ, [adId]);
+
+    if (!adR.rowCount || String(adR.rows[0].google_id) !== String(ownerGoogleId)) {
+      return res.json({
+        resStatus: false,
+        resErrorCode: 3,
+        resMessage: "Not ad owner"
+      });
+    }
+
+    // 3️⃣ verify reply belongs to this ad + owner + is a reply
+    const replyQ = `
+      SELECT id
+      FROM masters_latvia_reviews
+      WHERE id = $1
+        AND ad_id = $2
+        AND parent IS NOT NULL
+        AND reviewer_id = $3
+      LIMIT 1
+    `;
+    const replyR = await pool.query(replyQ, [
+      replyId,
+      adId,
+      ownerGoogleId
+    ]);
+
+    if (!replyR.rowCount) {
+      return res.json({
+        resStatus: false,
+        resErrorCode: 4,
+        resMessage: "Reply not found or not allowed"
+      });
+    }
+
+    // 4️⃣ delete reply
+    const deleteQ = `
+      DELETE FROM masters_latvia_reviews
+      WHERE id = $1
+    `;
+    await pool.query(deleteQ, [replyId]);
+
+    return res.json({
+      resStatus: true,
+      resOkCode: 1,
+      resMessage: "Reply deleted"
+    });
+
+  } catch (err) {
+    console.error("Delete reply error:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resErrorCode: 5,
+      resMessage: "Server error"
+    });
+  }
+});
 
 app.post("/api/post/master-latvia/like", async (req, res) => {
   const sessionId = req.cookies?.session_id;
