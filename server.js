@@ -1434,7 +1434,6 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
       resErrorCode: 8
     });
   }
-
   // Upload images
   let uploadedImages = [];
   for (const f of files) {
@@ -1450,7 +1449,6 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
         resErrorCode: 10
       });
     }
-
     uploadedImages.push(
       `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_latvia_storage/${fileName}`
     );
