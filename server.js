@@ -2308,7 +2308,49 @@ app.get("/api/get/master-latvia/search", async (req, res) => {
     });
   }
 });
+app.post("/api/post/master-latvia/message", async (req, res) => {
+  const name = (req.body.name || "").trim();
+  const email = (req.body.email || "").trim();
+  const message = (req.body.message || "").trim();
+  if (!name || !email || !message) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Missing required fields"
+    });
+  }
+  try {
+    const d = new Date();
+    const visitdate = `${String(d.getDate()).padStart(2, "0")}/${String(
+      d.getMonth() + 1
+    ).padStart(2, "0")}/${d.getFullYear()}`;
 
+    const insertQ = `
+      INSERT INTO messages_masters_latvia
+        (name, email, message, date)
+      VALUES ($1, $2, $3, $4)
+    `;
+
+    await pool.query(insertQ, [
+      name,
+      email,
+      message,
+      visitdate
+    ]);
+
+    return res.json({
+      resStatus: true,
+      resOkCode: 1
+    });
+  } catch (err) {
+    console.error("Save message error:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resErrorCode: 2,
+      resMessage: "Server error"
+    });
+  }
+});
 app.post("/api/post/master-latvia/like", async (req, res) => {
   const sessionId = req.cookies?.session_id;
   const { ad_id } = req.body;
