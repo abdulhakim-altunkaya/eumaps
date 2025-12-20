@@ -2265,6 +2265,49 @@ app.post("/api/post/master-latvia/delete-reply", async (req, res) => {
     });
   }
 });
+app.get("/api/get/master-latvia/search", async (req, res) => {
+  const q = (req.query.q || "").trim();
+  if (q.length < 3) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Search query too short"
+    });
+  }
+  try {
+    const searchQ = `
+      SELECT *
+      FROM masters_latvia_ads
+      WHERE active = true
+        AND (
+          title ILIKE $1
+          OR description ILIKE $1
+        )
+      ORDER BY date DESC
+      LIMIT 100
+    `;
+    const searchR = await pool.query(searchQ, [`%${q}%`]);
+    if (!searchR.rowCount) {
+      return res.json({
+        resStatus: true,
+        resOkCode: 1,
+        ads: []
+      });
+    }
+    return res.json({
+      resStatus: true,
+      resOkCode: 2,
+      ads: searchR.rows
+    });
+  } catch (err) {
+    console.error("Search error:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resErrorCode: 2,
+      resMessage: "Server error"
+    });
+  }
+});
 
 app.post("/api/post/master-latvia/like", async (req, res) => {
   const sessionId = req.cookies?.session_id;
