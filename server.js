@@ -2278,7 +2278,7 @@ app.get("/api/get/master-latvia/search", async (req, res) => {
     const searchQ = `
       SELECT *
       FROM masters_latvia_ads
-      WHERE active = true
+      WHERE is_active = true
         AND (
           title ILIKE $1
           OR description ILIKE $1
