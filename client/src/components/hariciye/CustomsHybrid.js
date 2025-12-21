@@ -29,8 +29,8 @@ function CustomsHybrid() {
   const [currencyName, setCurrencyName] = useState("");
   const [resultArea, setResultArea] = useState("");
 
-  const exchangeDollar = 41.82;
-  const exchangeEuro = 48.55;
+  const exchangeDollar = 42.75;
+  const exchangeEuro = 50.18;
 
   // Handle radio button changes
   const handleRadioChange = (e) => {

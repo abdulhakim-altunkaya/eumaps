@@ -29,8 +29,8 @@ function CustomsGasoline() {
   const [currencyName, setCurrencyName] = useState("");
   const [resultArea, setResultArea] = useState("");
 
-  const exchangeDollar = 41.82;
-  const exchangeEuro = 48.55;
+  const exchangeDollar = 42.75;
+  const exchangeEuro = 50.18;
 
   // Handle radio button changes
   const handleRadioChange = (e) => {
@@ -54,14 +54,12 @@ function CustomsGasoline() {
     const productionYear2 = formData.get('productionYear');
     const customsRegYear2 = formData.get('customsRegYear');
     const engineCapacity2 = formData.get('engineCapacity');
-    const navlunAmount2 = formData.get('navlunAmount');
 
     const invoiceAmount3 = Number(invoiceAmount2);
     const invoiceYear3 = Number(invoiceYear2);
     const productionYear3 = Number(productionYear2);
     const customsRegYear3 = Number(customsRegYear2);
     const engineCapacity3 = Number(engineCapacity2);
-    const navlunAmount3 = Number(navlunAmount2);
 
     if (invoiceAmount3 === "" || invoiceAmount3 < 100 || invoiceAmount3 > 10000000) {
       alert("Geçersiz meblağ. Fatura'daki KDV hariç fiyatı giriniz.");
@@ -77,9 +75,6 @@ function CustomsGasoline() {
       return;
     } else if (engineCapacity3 === "" || engineCapacity3 < 100 || engineCapacity3 > 10000) {
       alert("Geçersiz motor gücü. Aracın motor gücünü sadece rakam olarak giriniz.");
-      return;
-    } else if (navlunAmount3 === "" || navlunAmount3 < 1 || navlunAmount3 > 10000) {
-      alert("Geçersiz navlun bedeli. Navlun-Sigorta bedelini giriniz");
       return;
     } else if (currency === null) {
       alert("Para biriminizi Dolar veya Euro seçiniz.");
@@ -109,20 +104,26 @@ function CustomsGasoline() {
       if (invoiceYear3 - productionYear3 >= 1) {
         alert("Üretim ile fatura yılları arasında fark olan araçlar yeni olsalar bile İkinci el araç olarak muamele görürler.");
         firstYear = 0;
-      } else if(yearDifference === 8) {
+      } else if(yearDifference >= 8) {
         firstYear = 0;
       } else {
-        firstYear = 10*invoiceAmount3/100;
+        firstYear = 1;
       }
     } else {
       alert("Aracın eski  veya yeni olup olmadığı tespit edilemedi");
       return;
     }
 
-    let discount = 10*yearDifference*invoiceAmount3/100;
-    discount = discount + firstYear;
-    const basePrice = invoiceAmount3 - discount;
-    const basePriceLira = basePrice * currency;
+    let amortismanPercentage = 10*(yearDifference+firstYear);
+    let discount = (amortismanPercentage*invoiceAmount3)/100;
+    let basePrice = invoiceAmount3 - discount;
+    console.log(`
+      amortismanPercentage: ${amortismanPercentage}
+      discount: ${discount}
+      basePrice: ${basePrice}
+    `);
+
+    let basePriceLira = basePrice * currency;
 
     let percentage;
     if (engineCapacity3 <1401 && basePriceLira<650001) {
@@ -148,18 +149,34 @@ function CustomsGasoline() {
     } else if (engineCapacity3 > 2000) {
       percentage = 220/100;
     }
-    const amountNavlun = Math.round(navlunAmount3);
-    const finalBasePrice = basePrice + 200 + amountNavlun;
-    const amountOTV = Math.round(finalBasePrice*percentage);
-    const amountKDV = Math.round((amountOTV+finalBasePrice)*20/100);
-    const amountSum = amountKDV + amountOTV + amountNavlun + 200;
 
+    let amountNavlun = Math.round(basePrice*0.2);
+    let taxYurticiGider = 200;
+    let taxDamga = 28;
+    let taxBandrol = 15;
+    let otherTaxes = taxYurticiGider + taxDamga + taxBandrol;
+
+    let finalBasePrice = basePrice + amountNavlun + otherTaxes;
+
+
+    let amountOTV = Math.round(finalBasePrice*percentage);
+    let amountKDV = Math.round((amountOTV+finalBasePrice)*20/100);
+    let amountSum = amountKDV + amountOTV;
+
+    console.log(`
+      amountNavlun: ${amountNavlun}
+      amountTaxes: ${otherTaxes}
+      finalBasePrice: ${finalBasePrice}
+      amountOTV: ${amountOTV}
+      amountKDV: ${amountKDV}
+      amountSum: ${amountSum}
+    `);
     setResultArea(
       <div>
         <span>ÖTV meblağı: {amountOTV} {currencyName}</span> <br/>
         <span>KDV meblağı: {amountKDV} {currencyName}</span> <br/>
-        <span>Navlun ve Sigorta harcı: {amountNavlun} {currencyName}</span> <br/>
-        <span>Bandrol + Damga + Yurtiçi gider: 200 {currencyName}</span><br/>
+        <span>Navlun (AB, Ortadoğu ve KKTC araçları için %2): {amountNavlun} {currencyName}</span> <br/>
+        <span>Bandrol + Damga + Yurtiçi gider:{otherTaxes} {currencyName}</span><br/>
         <span>Toplam vergi: <strong>{amountSum} {currencyName}</strong></span> <br/> <br/>
                 <span>Gümrük Müşaviri*: <strong>500 {currencyName}</strong></span> <br/> <br/>
         <span>Toplam vergi + Gümrük Müşaviri: <strong>{500 + amountSum} {currencyName}</strong></span> <br/> <br/>
@@ -253,42 +270,9 @@ function CustomsGasoline() {
                   <input className='input2' type='number' name='engineCapacity' id='engineCapacity'
                     aria-label='Motor hacmini giriniz.' required/> &nbsp; &nbsp;
                   <label htmlFor='engineCapacity'>Motor Hacmi <i>("1500", "2000" gibi)</i></label> <br/>
-
-                  <input className='input2' type='number' name='navlunAmount' id='navlunAmount'
-                    aria-label='Aşağıdaki tabloya göre Navlun ve Sigorta harcını giriniz.' min="100" max="5000" required/> &nbsp; &nbsp;
-                  <label htmlFor='navlunAmount'>"Navlun ve sigorta" (Tabloya göre)</label> <br/> <br/>
-
-                  <table className="customsTable">
-                      <tbody>
-                        <tr className="customsRow">
-                          <td>AĞIRLIK(kg)</td>
-                          <td>Avrupa Menşeli</td>
-                          <td>ABD/Uzakdoğu Menşeli</td>
-                          <td>Avrupa'dan gelen Uzakdoğu Menşeli</td>
-                        </tr>
-                        <tr className="customsRow">
-                          <td>0-1200</td>
-                          <td>150 €</td>
-                          <td>650 $</td>
-                          <td>300 $ + 150 €</td>
-                        </tr>
-                        <tr className="customsRow">
-                          <td>1200-1600</td>
-                          <td>200 €</td>
-                          <td>700 $</td>
-                          <td>400 $ + 200 €</td>
-                        </tr>
-                        <tr className="customsRow">
-                          <td>1600 üzeri</td>
-                          <td>230 €</td>
-                          <td>800 $</td>
-                          <td>500 $ + 230 €</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                    <br/>
-                    <button className='button102' type="submit">Hesapla</button>
-                    <button className='button102' onClick={clearCarForm}>Sil</button>
+                  <br/>
+                  <button className='button102' type="submit">Hesapla</button>
+                  <button className='button102' onClick={clearCarForm}>Sil</button>
                 </form>
                 <br/>
                 <div>{resultArea}</div>
