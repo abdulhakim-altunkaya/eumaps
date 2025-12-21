@@ -104,19 +104,20 @@ function CustomsBike() {
       if (invoiceYear3 - productionYear3 >= 1) {
         alert("Üretim ile fatura yılları arasında fark olan motorsikletler yeni olsalar bile İkinci el motorsiklet olarak muamele görürler.");
         firstYear = 0;
-      } else if(yearDifference === 8) {
+      } else if(yearDifference >= 8) {
         firstYear = 0;
       } else {
-        firstYear = 10*invoiceAmount3/100;
+        firstYear = 1;
       }
     } else {
       alert("Motorsikletin eski veya yeni olup olmadığı tespit edilemedi");
       return;
     }
 
-    let discount = 10*yearDifference*invoiceAmount3/100;
-    discount = discount + firstYear;
-    const basePrice = invoiceAmount3 - discount;
+    let amortismanPercentage = 10*(yearDifference+firstYear);
+    let discount = (amortismanPercentage*invoiceAmount3)/100;
+    let basePrice = invoiceAmount3 - discount;
+
     //const basePriceLira = basePrice * currency;//no need for basePriceLira as percentage is not depending on it
 
     let percentage;
@@ -126,9 +127,18 @@ function CustomsBike() {
         percentage = 37/100;
     }
 
-    const amountOTV = Math.round(basePrice*percentage);
-    const amountKDV = Math.round((amountOTV+basePrice)*20/100);
-    const amountSum = amountKDV + amountOTV;
+    let amountNavlun = Math.round(basePrice*0.02);
+    let taxYurticiGider = 200;
+    let taxDamga = 28;
+    let taxBandrol = 15;
+    let otherTaxes = taxYurticiGider + taxDamga + taxBandrol;
+
+    let finalBasePrice = basePrice + amountNavlun + otherTaxes;
+
+
+    let amountOTV = Math.round(finalBasePrice*percentage);
+    let amountKDV = Math.round((amountOTV+finalBasePrice)*20/100);
+    let amountSum = amountKDV + amountOTV;
 
     setResultArea(
       <div>

@@ -150,7 +150,7 @@ function CustomsGasoline() {
       percentage = 220/100;
     }
 
-    let amountNavlun = Math.round(basePrice*0.2);
+    let amountNavlun = Math.round(basePrice*0.02);
     let taxYurticiGider = 200;
     let taxDamga = 28;
     let taxBandrol = 15;

@@ -6,7 +6,7 @@ function SidebarNav() {
   const navigate = useNavigate();
 
   const [wordToolsToggle, setWordToolsToggle] = useState(false);
-  const [mfaCalculatorsToggle, setMfaCalculatorsToggle] = useState(false);
+  const [mfaCalculatorsToggle, setMfaCalculatorsToggle] = useState(true);
 
   const toggleWordTools = () => {
     setWordToolsToggle(!wordToolsToggle);
@@ -14,7 +14,6 @@ function SidebarNav() {
   }
 
   const toggleMFACalculators = () => {
-    setMfaCalculatorsToggle(!mfaCalculatorsToggle);
     navigate("/hariciye");
   }
  
