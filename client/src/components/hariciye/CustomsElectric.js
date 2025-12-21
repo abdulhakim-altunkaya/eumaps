@@ -143,14 +143,15 @@ function CustomsElectric() {
 
     let amountOTV = Math.round(finalBasePrice*percentage);
     let amountKDV = Math.round((amountOTV+finalBasePrice)*20/100);
-    let amountSum = amountKDV + amountOTV;
+    let amountSum = amountKDV + amountOTV + amountNavlun + otherTaxes;
 
 
     setResultArea(
       <div>
         <span>ÖTV meblağı: {amountOTV} {currencyName}</span> <br/>
         <span>KDV meblağı: {amountKDV} {currencyName}</span> <br/>
-        <span>Bandrol + Damga Vergisi + Yurtiçi gider: 200 {currencyName}</span><br/>
+        <span>Navlun (AB, Ortadoğu ve KKTC araçları için %2): {amountNavlun} {currencyName}</span> <br/>
+        <span>Bandrol + Damga + Yurtiçi gider:{otherTaxes} {currencyName}</span><br/>
         <span>Toplam vergi: <strong>{amountSum} {currencyName}</strong></span> <br/> <br/>
                 <span>Gümrük Müşaviri*: <strong>500 {currencyName}</strong></span> <br/> <br/>
         <span>Toplam vergi + Gümrük Müşaviri: <strong>{500 + amountSum} {currencyName}</strong></span> <br/> <br/>
@@ -165,7 +166,7 @@ function CustomsElectric() {
         <br/>
         <span>
           <em>
-          *2025 itibariyle gümrük işlerini iyice zorlaştırdıkları için sizi gümrük müşavirine mecbur bırakıyorlar.
+          *2025 itibariyle gümrük işlerini zorlaştırdıkları için sizi gümrük müşavirine mecbur bırakıyorlar.
           Gümrük müşavirleri herşey dahil hizmet 500 Euro civarı ücret istiyor.
           </em>
         </span>

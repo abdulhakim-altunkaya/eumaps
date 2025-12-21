@@ -161,7 +161,7 @@ function CustomsGasoline() {
 
     let amountOTV = Math.round(finalBasePrice*percentage);
     let amountKDV = Math.round((amountOTV+finalBasePrice)*20/100);
-    let amountSum = amountKDV + amountOTV;
+    let amountSum = amountKDV + amountOTV + amountNavlun + otherTaxes;
 
     console.log(`
       amountNavlun: ${amountNavlun}
@@ -191,7 +191,7 @@ function CustomsGasoline() {
         <br/>
         <span>
           <em>
-          *2025 itibariyle gümrük işlerini iyice zorlaştırdıkları için sizi gümrük müşavirine mecbur bırakıyorlar.
+          *2025 itibariyle gümrük işlerini zorlaştırdıkları için sizi gümrük müşavirine mecbur bırakıyorlar.
           Gümrük müşavirleri herşey dahil hizmet 500 Euro civarı ücret istiyor.
           </em>
         </span>

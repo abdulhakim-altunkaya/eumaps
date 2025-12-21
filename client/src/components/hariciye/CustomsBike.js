@@ -138,12 +138,14 @@ function CustomsBike() {
 
     let amountOTV = Math.round(finalBasePrice*percentage);
     let amountKDV = Math.round((amountOTV+finalBasePrice)*20/100);
-    let amountSum = amountKDV + amountOTV;
+    let amountSum = amountKDV + amountOTV + amountNavlun + otherTaxes;
 
     setResultArea(
       <div>
         <span>ÖTV meblağı: {amountOTV} {currencyName}</span> <br/>
         <span>KDV meblağı: {amountKDV} {currencyName}</span> <br/>
+        <span>Navlun (AB, Ortadoğu ve KKTC araçları için %2): {amountNavlun} {currencyName}</span> <br/>
+        <span>Bandrol + Damga + Yurtiçi gider:{otherTaxes} {currencyName}</span><br/>
         <span>Toplam vergi: <strong>{amountSum} {currencyName}</strong></span> <br/> <br/>
         <span>Not: Rakamlar tahminidir.</span> <br/>
       </div>
