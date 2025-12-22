@@ -2613,18 +2613,45 @@ app.get("/api/get/master-latvia/reviews/:ad_id", async (req, res) => {
   }
 });
 app.get("/api/get/master-latvia/profile-reviews", async (req, res) => {
-  if (!req.session || !req.session.user || !req.session.user.id) {
-    return res.json({
+  const sessionId = req.cookies?.session_id;
+
+  if (!sessionId) {
+    return res.status(200).json({
       resStatus: false,
+      resMessage: "No active session",
       resErrorCode: 1,
-      resMessage: "Unauthorized"
+      reviews: []
     });
   }
 
-  const reviewerId = req.session.user.id; // google id
-
   try {
-    const q = `
+    /* ---------------------------
+       GET GOOGLE ID FROM SESSION
+    ---------------------------- */
+    const sessionQuery = `
+      SELECT google_id
+      FROM masters_latvia_sessions
+      WHERE session_id = $1
+      LIMIT 1;
+    `;
+
+    const sessionRes = await pool.query(sessionQuery, [sessionId]);
+
+    if (!sessionRes.rowCount) {
+      return res.status(200).json({
+        resStatus: false,
+        resMessage: "No active session",
+        resErrorCode: 2,
+        reviews: []
+      });
+    }
+
+    const googleId = sessionRes.rows[0].google_id;
+
+    /* ---------------------------
+       FETCH USER REVIEWS
+    ---------------------------- */
+    const reviewsQuery = `
       SELECT
         id,
         reviewer_name,
@@ -2634,74 +2661,103 @@ app.get("/api/get/master-latvia/profile-reviews", async (req, res) => {
         ad_id
       FROM masters_latvia_reviews
       WHERE reviewer_id = $1
-      ORDER BY id DESC
+      ORDER BY id DESC;
     `;
 
-    const r = await pool.query(q, [reviewerId]);
+    const reviewsRes = await pool.query(reviewsQuery, [googleId]);
 
-    return res.json({
+    return res.status(200).json({
       resStatus: true,
+      resMessage: "User reviews loaded",
       resOkCode: 1,
-      reviews: r.rows
+      reviews: reviewsRes.rows
     });
 
-  } catch (err) {
-    console.error("Profile reviews error:", err);
-    return res.json({
+  } catch (error) {
+    console.error("Profile reviews fetch error:", error);
+    return res.status(500).json({
       resStatus: false,
-      resErrorCode: 2,
-      resMessage: "Server error"
+      resMessage: "Database connection error",
+      resErrorCode: 3,
+      reviews: []
     });
   }
 });
 app.delete("/api/delete/master-latvia/review/:id", async (req, res) => {
-  if (!req.session || !req.session.user || !req.session.user.id) {
-    return res.json({
+  const sessionId = req.cookies?.session_id;
+
+  if (!sessionId) {
+    return res.status(200).json({
       resStatus: false,
-      resErrorCode: 1,
-      resMessage: "Unauthorized"
+      resMessage: "No active session",
+      resErrorCode: 1
     });
   }
 
   const reviewId = req.params.id;
-  const reviewerId = req.session.user.id; // google id
 
   if (!reviewId) {
-    return res.json({
+    return res.status(200).json({
       resStatus: false,
-      resErrorCode: 2,
-      resMessage: "Missing review id"
+      resMessage: "Missing review id",
+      resErrorCode: 2
     });
   }
 
   try {
-    const q = `
-      DELETE FROM masters_latvia_reviews
-      WHERE id = $1
-        AND reviewer_id = $2
+    /* ---------------------------
+       GET GOOGLE ID FROM SESSION
+    ---------------------------- */
+    const sessionQuery = `
+      SELECT google_id
+      FROM masters_latvia_sessions
+      WHERE session_id = $1
+      LIMIT 1;
     `;
 
-    const r = await pool.query(q, [reviewId, reviewerId]);
+    const sessionRes = await pool.query(sessionQuery, [sessionId]);
 
-    if (r.rowCount === 0) {
-      return res.json({
+    if (!sessionRes.rowCount) {
+      return res.status(200).json({
         resStatus: false,
-        resErrorCode: 3,
-        resMessage: "Review not found or not allowed"
+        resMessage: "No active session",
+        resErrorCode: 3
       });
     }
 
-    return res.json({
+    const googleId = sessionRes.rows[0].google_id;
+
+    /* ---------------------------
+       DELETE REVIEW
+    ---------------------------- */
+    const deleteQuery = `
+      DELETE FROM masters_latvia_reviews
+      WHERE id = $1
+        AND reviewer_id = $2;
+    `;
+
+    const deleteRes = await pool.query(deleteQuery, [reviewId, googleId]);
+
+    if (!deleteRes.rowCount) {
+      return res.status(200).json({
+        resStatus: false,
+        resMessage: "Review not found or not allowed",
+        resErrorCode: 4
+      });
+    }
+
+    return res.status(200).json({
       resStatus: true,
-      resOkCode: 1
+      resOkCode: 1,
+      resMessage: "Review deleted"
     });
 
-  } catch (err) {
-    console.error("Delete review error:", err);
-    return res.json({
+  } catch (error) {
+    console.error("Delete review error:", error);
+    return res.status(500).json({
       resStatus: false,
-      resErrorCode: 4,
-      resMessage: "Server error"
+      resMessage: "Database connection error",
+      resErrorCode: 5
     });
   }
 });
