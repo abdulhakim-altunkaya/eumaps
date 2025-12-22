@@ -2612,6 +2612,100 @@ app.get("/api/get/master-latvia/reviews/:ad_id", async (req, res) => {
     });
   }
 });
+app.get("/api/get/master-latvia/profile-reviews", async (req, res) => {
+  if (!req.session || !req.session.user || !req.session.user.id) {
+    return res.status(401).json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Unauthorized"
+    });
+  }
+
+  const reviewerId = req.session.user.id; // google id
+
+  try {
+    const q = `
+      SELECT
+        id,
+        reviewer_name,
+        review_text,
+        date,
+        reviewer_id,
+        ad_id
+      FROM masters_latvia_reviews
+      WHERE reviewer_id = $1
+      ORDER BY id DESC
+    `;
+
+    const r = await pool.query(q, [reviewerId]);
+
+    return res.json({
+      resStatus: true,
+      resOkCode: 1,
+      reviews: r.rows
+    });
+
+  } catch (err) {
+    console.error("Profile reviews error:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resErrorCode: 2,
+      resMessage: "Server error"
+    });
+  }
+});
+app.delete("/api/delete/master-latvia/review/:id", async (req, res) => {
+  if (!req.session || !req.session.user || !req.session.user.id) {
+    return res.status(401).json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Unauthorized"
+    });
+  }
+
+  const reviewId = req.params.id;
+  const reviewerId = req.session.user.id; // google id
+
+  if (!reviewId) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 2,
+      resMessage: "Missing review id"
+    });
+  }
+
+  try {
+    const q = `
+      DELETE FROM masters_latvia_reviews
+      WHERE id = $1
+        AND reviewer_id = $2
+    `;
+
+    const r = await pool.query(q, [reviewId, reviewerId]);
+
+    if (r.rowCount === 0) {
+      return res.json({
+        resStatus: false,
+        resErrorCode: 3,
+        resMessage: "Review not found or not allowed"
+      });
+    }
+
+    return res.json({
+      resStatus: true,
+      resOkCode: 1
+    });
+
+  } catch (err) {
+    console.error("Delete review error:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resErrorCode: 4,
+      resMessage: "Server error"
+    });
+  }
+});
+
 app.get("/api/get/master-latvia/session-user", async (req, res) => {
   const sessionId = req.cookies?.session_id;
 
