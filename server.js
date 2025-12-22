@@ -2614,7 +2614,7 @@ app.get("/api/get/master-latvia/reviews/:ad_id", async (req, res) => {
 });
 app.get("/api/get/master-latvia/profile-reviews", async (req, res) => {
   if (!req.session || !req.session.user || !req.session.user.id) {
-    return res.status(401).json({
+    return res.json({
       resStatus: false,
       resErrorCode: 1,
       resMessage: "Unauthorized"
@@ -2647,7 +2647,7 @@ app.get("/api/get/master-latvia/profile-reviews", async (req, res) => {
 
   } catch (err) {
     console.error("Profile reviews error:", err);
-    return res.status(500).json({
+    return res.json({
       resStatus: false,
       resErrorCode: 2,
       resMessage: "Server error"
@@ -2656,7 +2656,7 @@ app.get("/api/get/master-latvia/profile-reviews", async (req, res) => {
 });
 app.delete("/api/delete/master-latvia/review/:id", async (req, res) => {
   if (!req.session || !req.session.user || !req.session.user.id) {
-    return res.status(401).json({
+    return res.json({
       resStatus: false,
       resErrorCode: 1,
       resMessage: "Unauthorized"
@@ -2698,14 +2698,13 @@ app.delete("/api/delete/master-latvia/review/:id", async (req, res) => {
 
   } catch (err) {
     console.error("Delete review error:", err);
-    return res.status(500).json({
+    return res.json({
       resStatus: false,
       resErrorCode: 4,
       resMessage: "Server error"
     });
   }
 });
-
 app.get("/api/get/master-latvia/session-user", async (req, res) => {
   const sessionId = req.cookies?.session_id;
 
