@@ -2612,6 +2612,7 @@ app.get("/api/get/master-latvia/reviews/:ad_id", async (req, res) => {
     });
   }
 });
+//this only get reviews, no ad owner name, no ad owner title, no ad owner picture
 app.get("/api/get/master-latvia/profile-reviews", async (req, res) => {
   const sessionId = req.cookies?.session_id;
 
@@ -2684,6 +2685,81 @@ app.get("/api/get/master-latvia/profile-reviews", async (req, res) => {
     });
   }
 });
+//this gets reviews and relevant ad data (owner name, title, picture)
+//We are using this endpoint in profile page because it allows better performance
+//otherwise we will have to make two requests to the backend instead of one here.
+app.get("/api/get/master-latvia/profile-reviews-ads", async (req, res) => {
+  const sessionId = req.cookies?.session_id;
+
+  if (!sessionId) {
+    return res.status(200).json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "No active session",
+      reviews: []
+    });
+  }
+
+  try {
+    /* get google id from session */
+    const sessionQuery = `
+      SELECT google_id
+      FROM masters_latvia_sessions
+      WHERE session_id = $1
+      LIMIT 1;
+    `;
+
+    const sessionRes = await pool.query(sessionQuery, [sessionId]);
+
+    if (!sessionRes.rowCount) {
+      return res.status(200).json({
+        resStatus: false,
+        resErrorCode: 2,
+        resMessage: "No active session",
+        reviews: []
+      });
+    }
+
+    const googleId = sessionRes.rows[0].google_id;
+
+    /* reviews + ad data (NO aliases) */
+    const reviewsQuery = `
+      SELECT
+        masters_latvia_reviews.id,
+        masters_latvia_reviews.review_text,
+        masters_latvia_reviews.rating,
+        masters_latvia_reviews.date,
+        masters_latvia_reviews.ad_id,
+
+        masters_latvia_ads.name  AS ad_owner_name,
+        masters_latvia_ads.title AS ad_title,
+        masters_latvia_ads.image_url AS ad_image_url
+      FROM masters_latvia_reviews
+      JOIN masters_latvia_ads
+        ON masters_latvia_ads.id = masters_latvia_reviews.ad_id
+      WHERE masters_latvia_reviews.reviewer_id = $1
+      ORDER BY masters_latvia_reviews.id DESC;
+    `;
+
+    const reviewsRes = await pool.query(reviewsQuery, [googleId]);
+
+    return res.status(200).json({
+      resStatus: true,
+      resOkCode: 1,
+      reviews: reviewsRes.rows
+    });
+
+  } catch (err) {
+    console.error("Profile reviews fetch error:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resErrorCode: 3,
+      resMessage: "Server error",
+      reviews: []
+    });
+  }
+});
+
 app.delete("/api/delete/master-latvia/review/:id", async (req, res) => {
   const sessionId = req.cookies?.session_id;
 
@@ -2762,6 +2838,7 @@ app.delete("/api/delete/master-latvia/review/:id", async (req, res) => {
     });
   }
 });
+
 app.get("/api/get/master-latvia/session-user", async (req, res) => {
   const sessionId = req.cookies?.session_id;
 
