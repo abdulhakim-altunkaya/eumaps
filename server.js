@@ -2658,6 +2658,7 @@ app.get("/api/get/master-latvia/profile-reviews", async (req, res) => {
         review_text,
         date,
         reviewer_id,
+        rating,
         ad_id
       FROM masters_latvia_reviews
       WHERE reviewer_id = $1
