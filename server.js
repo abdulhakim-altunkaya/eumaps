@@ -2724,6 +2724,7 @@ app.get("/api/get/master-latvia/profile-reviews-ads", async (req, res) => {
       JOIN masters_latvia_ads
         ON masters_latvia_ads.id = masters_latvia_reviews.ad_id
       WHERE masters_latvia_reviews.reviewer_id = $1
+        AND masters_latvia_reviews.is_deleted = false
       ORDER BY masters_latvia_reviews.id DESC;
     `;
 
