@@ -2782,16 +2782,13 @@ app.delete("/api/delete/master-latvia/review/:id", async (req, res) => {
   }
 
   try {
-    /* ---------------------------
-       GET GOOGLE ID FROM SESSION
-    ---------------------------- */
+    /* GET GOOGLE ID FROM SESSION */
     const sessionQuery = `
       SELECT google_id
       FROM masters_latvia_sessions
       WHERE session_id = $1
       LIMIT 1;
     `;
-
     const sessionRes = await pool.query(sessionQuery, [sessionId]);
 
     if (!sessionRes.rowCount) {
@@ -2804,23 +2801,49 @@ app.delete("/api/delete/master-latvia/review/:id", async (req, res) => {
 
     const googleId = sessionRes.rows[0].google_id;
 
-    /* ---------------------------
-       DELETE REVIEW
-    ---------------------------- */
-    const deleteQuery = `
-      DELETE FROM masters_latvia_reviews
+    /* VERIFY USER OWNS THIS REVIEW (ONLY MAIN REVIEW, NOT REPLY) */
+    const reviewQuery = `
+      SELECT id
+      FROM masters_latvia_reviews
       WHERE id = $1
-        AND reviewer_id = $2;
+        AND reviewer_id = $2
+        AND parent IS NULL
+      LIMIT 1;
     `;
+    const reviewRes = await pool.query(reviewQuery, [reviewId, googleId]);
 
-    const deleteRes = await pool.query(deleteQuery, [reviewId, googleId]);
-
-    if (!deleteRes.rowCount) {
+    if (!reviewRes.rowCount) {
       return res.status(200).json({
         resStatus: false,
         resMessage: "Review not found or not allowed",
         resErrorCode: 4
       });
+    }
+
+    /* CHECK IF REVIEW HAS REPLY */
+    const replyQuery = `
+      SELECT id
+      FROM masters_latvia_reviews
+      WHERE parent = $1
+      LIMIT 1;
+    `;
+    const replyRes = await pool.query(replyQuery, [reviewId]);
+
+    if (replyRes.rowCount) {
+      /* HAS REPLY -> SOFT DELETE BOTH REVIEW + REPLY */
+      const softDeleteQuery = `
+        UPDATE masters_latvia_reviews
+        SET is_deleted = true
+        WHERE id = $1 OR parent = $1;
+      `;
+      await pool.query(softDeleteQuery, [reviewId]);
+    } else {
+      /* NO REPLY -> HARD DELETE */
+      const hardDeleteQuery = `
+        DELETE FROM masters_latvia_reviews
+        WHERE id = $1;
+      `;
+      await pool.query(hardDeleteQuery, [reviewId]);
     }
 
     return res.status(200).json({
