@@ -2746,7 +2746,7 @@ app.get("/api/get/master-latvia/profile-replies-ads", async (req, res) => {
 
     const googleId = sessionRes.rows[0].google_id;
 
-    /* replies to user's reviews + ad data (NO aliases) */
+    /* replies written BY the user */
     const repliesQuery = `
       SELECT
         masters_latvia_reviews.id,
@@ -2758,11 +2758,9 @@ app.get("/api/get/master-latvia/profile-replies-ads", async (req, res) => {
         masters_latvia_ads.title AS ad_title,
         masters_latvia_ads.image_url AS ad_image_url
       FROM masters_latvia_reviews
-      JOIN masters_latvia_reviews parent_review
-        ON masters_latvia_reviews.parent = parent_review.id
       JOIN masters_latvia_ads
         ON masters_latvia_ads.id = masters_latvia_reviews.ad_id
-      WHERE parent_review.reviewer_id = $1
+      WHERE masters_latvia_reviews.reviewer_id = $1
         AND masters_latvia_reviews.parent IS NOT NULL
         AND masters_latvia_reviews.is_deleted = false
       ORDER BY masters_latvia_reviews.id DESC;
@@ -2786,6 +2784,7 @@ app.get("/api/get/master-latvia/profile-replies-ads", async (req, res) => {
     });
   }
 });
+
 
 app.delete("/api/delete/master-latvia/review/:id", async (req, res) => {
   const sessionId = req.cookies?.session_id;
