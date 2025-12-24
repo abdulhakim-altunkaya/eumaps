@@ -1986,23 +1986,10 @@ app.post("/api/post/master-latvia/ad-view", async (req, res) => {
   }
 });
 app.post("/api/post/master-latvia/review", async (req, res) => {
-  console.log("=== REVIEW ENDPOINT HIT ===");
-  console.log("Cookies:", req.cookies);
-  console.log("Body:", req.body);
-
   const sessionId = req.cookies?.session_id;
   const { reviewer_name, review_text, adId, rating } = req.body;
 
-  console.log("Parsed values:", {
-    sessionId,
-    reviewer_name,
-    review_text,
-    adId,
-    rating
-  });
-
   if (!sessionId || !reviewer_name || !review_text || !adId || !rating) {
-    console.log("❌ Missing fields or no session");
     return res.json({
       resStatus: false,
       resErrorCode: 1,
@@ -2012,16 +1999,17 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
 
   try {
     // 1️⃣ session lookup
-    console.log("🔍 Looking up session...");
-    const sessionR = await pool.query(
-      `SELECT google_id FROM masters_latvia_sessions WHERE session_id = $1 LIMIT 1`,
+    const sessionResult = await pool.query(
+      `
+      SELECT google_id
+      FROM masters_latvia_sessions
+      WHERE session_id = $1
+      LIMIT 1
+      `,
       [sessionId]
     );
 
-    console.log("Session query result:", sessionR.rows);
-
-    if (!sessionR.rowCount) {
-      console.log("❌ Session not found");
+    if (!sessionResult.rowCount) {
       return res.json({
         resStatus: false,
         resErrorCode: 2,
@@ -2029,52 +2017,87 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
       });
     }
 
-    const reviewer_google_id = sessionR.rows[0].google_id;
-    console.log("Reviewer google_id:", reviewer_google_id);
+    const reviewer_google_id = sessionResult.rows[0].google_id;
 
-    // 2️⃣ date
+    // 2️⃣ BLOCK if ACTIVE review already exists
+    const activeReviewCheck = await pool.query(
+      `
+      SELECT 1
+      FROM masters_latvia_reviews
+      WHERE ad_id = $1
+        AND reviewer_id = $2
+        AND parent IS NULL
+        AND is_deleted = false
+      LIMIT 1
+      `,
+      [adId, reviewer_google_id]
+    );
+
+    if (activeReviewCheck.rowCount) {
+      return res.json({
+        resStatus: false,
+        resErrorCode: 3,
+        resMessage: "You have already posted a review for this ad"
+      });
+    }
+
+    // 3️⃣ BLOCK if review existed, had reply, and was soft-deleted
+    const deletedWithReplyCheck = await pool.query(
+      `
+      SELECT 1
+      FROM masters_latvia_reviews
+      WHERE ad_id = $1
+        AND reviewer_id = $2
+        AND parent IS NULL
+        AND is_deleted = true
+      LIMIT 1
+      `,
+      [adId, reviewer_google_id]
+    );
+
+    if (deletedWithReplyCheck.rowCount) {
+      return res.json({
+        resStatus: false,
+        resErrorCode: 4,
+        resMessage:
+          "You cannot post another review for this ad after the owner replied to your previous one"
+      });
+    }
+
+    // 4️⃣ date
     const now = new Date();
     const dateStr =
       String(now.getDate()).padStart(2, "0") + "/" +
       String(now.getMonth() + 1).padStart(2, "0") + "/" +
       now.getFullYear();
 
-    console.log("Date string:", dateStr);
-
-    // 3️⃣ insert review
-    console.log("📝 Inserting review...");
-    const q = `
+    // 5️⃣ insert review
+    const insertReviewResult = await pool.query(
+      `
       INSERT INTO masters_latvia_reviews
       (reviewer_name, review_text, date, reviewer_id, ad_id, parent, rating)
       VALUES ($1, $2, $3, $4, $5, NULL, $6)
       RETURNING id
-    `;
-
-    const r = await pool.query(q, [
-      reviewer_name,
-      review_text,
-      dateStr,
-      reviewer_google_id,
-      adId,
-      rating
-    ]);
-
-    console.log("✅ Review inserted:", r.rows[0]);
+      `,
+      [
+        reviewer_name,
+        review_text,
+        dateStr,
+        reviewer_google_id,
+        adId,
+        rating
+      ]
+    );
 
     return res.json({
       resStatus: true,
       resOkCode: 1,
       resMessage: "Review saved",
-      review_id: r.rows[0].id
+      review_id: insertReviewResult.rows[0].id
     });
 
-  } catch (err) {
-    console.error("🔥 REVIEW SERVER ERROR 🔥");
-    console.error(err);           // <-- THIS LINE IS KEY
-    console.error(err.message);
-    console.error(err.detail);
-    console.error(err.constraint);
-
+  } catch (error) {
+    console.error(error);
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 99,
@@ -2082,6 +2105,7 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
     });
   }
 });
+
 app.post("/api/post/master-latvia/reply", async (req, res) => {
   const sessionId = req.cookies?.session_id;
   const { review_text, adId, parent } = req.body;
@@ -2613,64 +2637,6 @@ app.get("/api/get/master-latvia/reviews/:ad_id", async (req, res) => {
     });
   }
 });
-app.get("/api/get/master-latvia/profile-reviews", async (req, res) => {
-  const sessionId = req.cookies?.session_id;
-  if (!sessionId) {
-    return res.status(200).json({
-      resStatus: false,
-      resMessage: "No active session",
-      resErrorCode: 1,
-      reviews: []
-    });
-  }
-  try {
-    const sessionQuery = `
-      SELECT google_id
-      FROM masters_latvia_sessions
-      WHERE session_id = $1
-      LIMIT 1;
-    `;
-    const sessionRes = await pool.query(sessionQuery, [sessionId]);
-    if (!sessionRes.rowCount) {
-      return res.status(200).json({
-        resStatus: false,
-        resMessage: "No active session",
-        resErrorCode: 2,
-        reviews: []
-      });
-    }
-    const googleId = sessionRes.rows[0].google_id;
-    const reviewsQuery = `
-      SELECT
-        id,
-        reviewer_name,
-        review_text,
-        date,
-        reviewer_id,
-        rating,
-        ad_id
-      FROM masters_latvia_reviews
-      WHERE reviewer_id = $1
-      ORDER BY id DESC;
-    `;
-    const reviewsRes = await pool.query(reviewsQuery, [googleId]);
-    return res.status(200).json({
-      resStatus: true,
-      resMessage: "User reviews loaded",
-      resOkCode: 1,
-      reviews: reviewsRes.rows
-    });
-  } catch (error) {
-    console.error("Profile reviews fetch error:", error);
-    return res.status(500).json({
-      resStatus: false,
-      resMessage: "Database connection error",
-      resErrorCode: 3,
-      reviews: []
-    });
-  }
-});
-
 //this gets reviews from reviews table and ad data from ads table (owner name, title, picture)
 //We are using this endpoint in profile page because it allows better performance
 //otherwise we will have to make two requests to the backend-database instead of one here.
