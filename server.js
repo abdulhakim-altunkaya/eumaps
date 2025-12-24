@@ -2592,6 +2592,7 @@ app.get("/api/get/master-latvia/reviews/:ad_id", async (req, res) => {
         rating
       FROM masters_latvia_reviews
       WHERE ad_id = $1
+        AND is_deleted = false
       ORDER BY id ASC
     `;
 
@@ -2612,10 +2613,8 @@ app.get("/api/get/master-latvia/reviews/:ad_id", async (req, res) => {
     });
   }
 });
-//this only get reviews, no ad owner name, no ad owner title, no ad owner picture
 app.get("/api/get/master-latvia/profile-reviews", async (req, res) => {
   const sessionId = req.cookies?.session_id;
-
   if (!sessionId) {
     return res.status(200).json({
       resStatus: false,
@@ -2624,20 +2623,14 @@ app.get("/api/get/master-latvia/profile-reviews", async (req, res) => {
       reviews: []
     });
   }
-
   try {
-    /* ---------------------------
-       GET GOOGLE ID FROM SESSION
-    ---------------------------- */
     const sessionQuery = `
       SELECT google_id
       FROM masters_latvia_sessions
       WHERE session_id = $1
       LIMIT 1;
     `;
-
     const sessionRes = await pool.query(sessionQuery, [sessionId]);
-
     if (!sessionRes.rowCount) {
       return res.status(200).json({
         resStatus: false,
@@ -2646,12 +2639,7 @@ app.get("/api/get/master-latvia/profile-reviews", async (req, res) => {
         reviews: []
       });
     }
-
     const googleId = sessionRes.rows[0].google_id;
-
-    /* ---------------------------
-       FETCH USER REVIEWS
-    ---------------------------- */
     const reviewsQuery = `
       SELECT
         id,
@@ -2665,16 +2653,13 @@ app.get("/api/get/master-latvia/profile-reviews", async (req, res) => {
       WHERE reviewer_id = $1
       ORDER BY id DESC;
     `;
-
     const reviewsRes = await pool.query(reviewsQuery, [googleId]);
-
     return res.status(200).json({
       resStatus: true,
       resMessage: "User reviews loaded",
       resOkCode: 1,
       reviews: reviewsRes.rows
     });
-
   } catch (error) {
     console.error("Profile reviews fetch error:", error);
     return res.status(500).json({
@@ -2685,9 +2670,10 @@ app.get("/api/get/master-latvia/profile-reviews", async (req, res) => {
     });
   }
 });
-//this gets reviews and relevant ad data (owner name, title, picture)
+
+//this gets reviews from reviews table and ad data from ads table (owner name, title, picture)
 //We are using this endpoint in profile page because it allows better performance
-//otherwise we will have to make two requests to the backend instead of one here.
+//otherwise we will have to make two requests to the backend-database instead of one here.
 app.get("/api/get/master-latvia/profile-reviews-ads", async (req, res) => {
   const sessionId = req.cookies?.session_id;
 
