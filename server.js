@@ -2712,6 +2712,80 @@ app.get("/api/get/master-latvia/profile-reviews-ads", async (req, res) => {
     });
   }
 });
+app.get("/api/get/master-latvia/profile-replies-ads", async (req, res) => {
+  const sessionId = req.cookies?.session_id;
+
+  if (!sessionId) {
+    return res.status(200).json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "No active session",
+      reviews: []
+    });
+  }
+
+  try {
+    /* get google id from session */
+    const sessionQuery = `
+      SELECT google_id
+      FROM masters_latvia_sessions
+      WHERE session_id = $1
+      LIMIT 1;
+    `;
+
+    const sessionRes = await pool.query(sessionQuery, [sessionId]);
+
+    if (!sessionRes.rowCount) {
+      return res.status(200).json({
+        resStatus: false,
+        resErrorCode: 2,
+        resMessage: "No active session",
+        reviews: []
+      });
+    }
+
+    const googleId = sessionRes.rows[0].google_id;
+
+    /* replies to user's reviews + ad data (NO aliases) */
+    const repliesQuery = `
+      SELECT
+        masters_latvia_reviews.id,
+        masters_latvia_reviews.review_text,
+        masters_latvia_reviews.date,
+        masters_latvia_reviews.ad_id,
+
+        masters_latvia_ads.name  AS ad_owner_name,
+        masters_latvia_ads.title AS ad_title,
+        masters_latvia_ads.image_url AS ad_image_url
+      FROM masters_latvia_reviews
+      JOIN masters_latvia_reviews parent_review
+        ON masters_latvia_reviews.parent = parent_review.id
+      JOIN masters_latvia_ads
+        ON masters_latvia_ads.id = masters_latvia_reviews.ad_id
+      WHERE parent_review.reviewer_id = $1
+        AND masters_latvia_reviews.parent IS NOT NULL
+        AND masters_latvia_reviews.is_deleted = false
+      ORDER BY masters_latvia_reviews.id DESC;
+    `;
+
+    const repliesRes = await pool.query(repliesQuery, [googleId]);
+
+    return res.status(200).json({
+      resStatus: true,
+      resOkCode: 1,
+      reviews: repliesRes.rows
+    });
+
+  } catch (err) {
+    console.error("Profile replies fetch error:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resErrorCode: 3,
+      resMessage: "Server error",
+      reviews: []
+    });
+  }
+});
 
 app.delete("/api/delete/master-latvia/review/:id", async (req, res) => {
   const sessionId = req.cookies?.session_id;
