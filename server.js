@@ -2691,6 +2691,7 @@ app.get("/api/get/master-latvia/profile-reviews-ads", async (req, res) => {
         ON masters_latvia_ads.id = masters_latvia_reviews.ad_id
       WHERE masters_latvia_reviews.reviewer_id = $1
         AND masters_latvia_reviews.is_deleted = false
+        AND masters_latvia_reviews.parent IS NULL
       ORDER BY masters_latvia_reviews.id DESC;
     `;
 
@@ -2784,8 +2785,8 @@ app.get("/api/get/master-latvia/profile-replies-ads", async (req, res) => {
     });
   }
 });
-
-
+//deletes both reviews of the user and replies of the user.
+//reviews of user with reply of the owner is not deleted. It is made hidden.
 app.delete("/api/delete/master-latvia/review/:id", async (req, res) => {
   const sessionId = req.cookies?.session_id;
   const reviewId = req.params.id;
@@ -2902,8 +2903,6 @@ app.delete("/api/delete/master-latvia/review/:id", async (req, res) => {
     });
   }
 });
-
-
 app.get("/api/get/master-latvia/session-user", async (req, res) => {
   const sessionId = req.cookies?.session_id;
 
