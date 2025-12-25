@@ -3063,7 +3063,8 @@ app.get("/api/get/master-latvia/user-ads", async (req, res) => {
     });
   }
 });
-app.get("/api/get/master-latvia/browse", async (req, res) => {
+
+/* app.get("/api/get/master-latvia/browse", async (req, res) => {
   const { main, sub } = req.query;
 
   try {
@@ -3113,8 +3114,63 @@ app.get("/api/get/master-latvia/browse", async (req, res) => {
       resErrorCode: 2
     });
   }
-});
+}); */
 
+app.get("/api/get/master-latvia/browse", async (req, res) => {
+  const { main, sub, cursor } = req.query;
+  const limit = 12;
+
+  try {
+    let query = `
+      SELECT *
+      FROM masters_latvia_ads
+      WHERE is_active = true
+    `;
+    const params = [];
+
+    if (main) {
+      params.push(main);
+      query += ` AND main_group = $${params.length}`;
+    }
+
+    if (sub) {
+      params.push(sub);
+      query += ` AND sub_group = $${params.length}`;
+    }
+
+    if (cursor) {
+      params.push(cursor);
+      query += ` AND created_at < $${params.length}`;
+    }
+
+    query += ` ORDER BY created_at DESC`;
+    params.push(limit);
+    query += ` LIMIT $${params.length}`;
+
+    const adsRes = await pool.query(query, params);
+
+    if (!adsRes.rowCount) {
+      return res.status(200).json({
+        resStatus: true,
+        ads: [],
+        nextCursor: null
+      });
+    }
+
+    return res.status(200).json({
+      resStatus: true,
+      ads: adsRes.rows,
+      nextCursor: adsRes.rows[adsRes.rows.length - 1].created_at
+    });
+
+  } catch (err) {
+    console.error("Browse error:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Server error"
+    });
+  }
+});
 
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
 //fetch comments etc. This code helps with managing routes that are not defined on react frontend.
