@@ -1996,7 +1996,13 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
       resMessage: "Missing fields or not authenticated"
     });
   }
-
+  if (rating < 0 || rating > 10) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 6,
+      resMessage: "Invalid rating value"
+    });
+  }
   try {
     /* ---------- SESSION LOOKUP ---------- */
     const sessionResult = await pool.query(
@@ -2008,7 +2014,6 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
       `,
       [sessionId]
     );
-
     if (!sessionResult.rowCount) {
       return res.json({
         resStatus: false,
@@ -2016,9 +2021,7 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
         resMessage: "Not authenticated"
       });
     }
-
     const reviewer_google_id = sessionResult.rows[0].google_id;
-
     /* ---------- BLOCK DUPLICATE ACTIVE REVIEW ---------- */
     const activeReviewCheck = await pool.query(
       `
@@ -2032,7 +2035,6 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
       `,
       [adId, reviewer_google_id]
     );
-
     if (activeReviewCheck.rowCount) {
       return res.json({
         resStatus: false,
@@ -2040,7 +2042,6 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
         resMessage: "You have already posted a review for this ad"
       });
     }
-
     /* ---------- BLOCK RE-POST AFTER SOFT DELETE ---------- */
     const deletedWithReplyCheck = await pool.query(
       `
@@ -2054,7 +2055,6 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
       `,
       [adId, reviewer_google_id]
     );
-
     if (deletedWithReplyCheck.rowCount) {
       return res.json({
         resStatus: false,
@@ -2063,7 +2063,6 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
           "You cannot post another review for this ad after the owner replied to your previous one"
       });
     }
-
     /* ---------- DATE ---------- */
     const now = new Date();
     const dateStr =
@@ -2088,7 +2087,6 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
         rating
       ]
     );
-
     /* ---------- RECALCULATE AD STATS ---------- */
     await pool.query(
       `
@@ -2109,14 +2107,12 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
       `,
       [adId]
     );
-
     return res.json({
       resStatus: true,
       resOkCode: 1,
       resMessage: "Review saved",
       review_id: insertReviewResult.rows[0].id
     });
-
   } catch (error) {
     console.error("Post review error:", error);
     return res.status(500).json({
@@ -3158,6 +3154,70 @@ app.get("/api/get/master-latvia/browse", async (req, res) => {
 
   } catch (err) {
     console.error("Browse error:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Server error"
+    });
+  }
+});
+app.get("/api/get/master-latvia/filter", async (req, res) => {
+  const { title, city, minRating, minReviews } = req.query;
+
+  try {
+    const conditions = [];
+    const values = [];
+    let i = 1;
+
+    // Title / profession (text-based for now)
+    if (title) {
+      conditions.push(`title ILIKE $${i}`);
+      values.push(`%${title}%`);
+      i++;
+    }
+
+    // City (stored as INT[])
+    if (city) {
+      conditions.push(`cities @> ARRAY[$${i}]::INT[]`);
+      values.push(Number(city));
+      i++;
+    }
+
+    // Minimum rating
+    if (minRating) {
+      conditions.push(`average_rating >= $${i}`);
+      values.push(Number(minRating));
+      i++;
+    }
+
+    // Minimum reviews
+    if (minReviews) {
+      conditions.push(`reviews_count >= $${i}`);
+      values.push(Number(minReviews));
+      i++;
+    }
+
+    const whereClause = conditions.length
+      ? `WHERE ${conditions.join(" AND ")}`
+      : "";
+
+    const query = `
+      SELECT *
+      FROM masters_latvia_ads
+      ${whereClause}
+      ORDER BY created_at DESC
+      LIMIT 50;
+    `;
+
+    const { rows } = await pool.query(query, values);
+
+    return res.json({
+      resStatus: true,
+      count: rows.length,
+      ads: rows
+    });
+
+  } catch (err) {
+    console.error("Filter ads error:", err);
     return res.status(500).json({
       resStatus: false,
       resMessage: "Server error"
