@@ -1998,7 +1998,7 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
   }
 
   try {
-    // 1️⃣ session lookup
+    /* ---------- SESSION LOOKUP ---------- */
     const sessionResult = await pool.query(
       `
       SELECT google_id
@@ -2019,7 +2019,7 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
 
     const reviewer_google_id = sessionResult.rows[0].google_id;
 
-    // 2️⃣ BLOCK if ACTIVE review already exists
+    /* ---------- BLOCK DUPLICATE ACTIVE REVIEW ---------- */
     const activeReviewCheck = await pool.query(
       `
       SELECT 1
@@ -2041,7 +2041,7 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
       });
     }
 
-    // 3️⃣ BLOCK if review existed, had reply, and was soft-deleted
+    /* ---------- BLOCK RE-POST AFTER SOFT DELETE ---------- */
     const deletedWithReplyCheck = await pool.query(
       `
       SELECT 1
@@ -2064,14 +2064,14 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
       });
     }
 
-    // 4️⃣ date
+    /* ---------- DATE ---------- */
     const now = new Date();
     const dateStr =
       String(now.getDate()).padStart(2, "0") + "/" +
       String(now.getMonth() + 1).padStart(2, "0") + "/" +
       now.getFullYear();
 
-    // 5️⃣ insert review
+    /* ---------- INSERT REVIEW ---------- */
     const insertReviewResult = await pool.query(
       `
       INSERT INTO masters_latvia_reviews
@@ -2089,6 +2089,27 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
       ]
     );
 
+    /* ---------- RECALCULATE AD STATS ---------- */
+    await pool.query(
+      `
+      UPDATE masters_latvia_ads
+      SET
+        average_rating = COALESCE(sub.avg, 0),
+        reviews_count  = COALESCE(sub.cnt, 0)
+      FROM (
+        SELECT
+          ROUND(AVG(rating), 1) AS avg,
+          COUNT(*) AS cnt
+        FROM masters_latvia_reviews
+        WHERE ad_id = $1
+          AND is_deleted = false
+          AND parent IS NULL
+      ) sub
+      WHERE id = $1;
+      `,
+      [adId]
+    );
+
     return res.json({
       resStatus: true,
       resOkCode: 1,
@@ -2097,7 +2118,7 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("Post review error:", error);
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 99,
@@ -2105,7 +2126,6 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
     });
   }
 });
-
 app.post("/api/post/master-latvia/reply", async (req, res) => {
   const sessionId = req.cookies?.session_id;
   const { review_text, adId, parent } = req.body;
@@ -2809,13 +2829,15 @@ app.delete("/api/delete/master-latvia/review/:id", async (req, res) => {
 
   try {
     /* GET GOOGLE ID FROM SESSION */
-    const sessionQuery = `
+    const sessionRes = await pool.query(
+      `
       SELECT google_id
       FROM masters_latvia_sessions
       WHERE session_id = $1
       LIMIT 1;
-    `;
-    const sessionRes = await pool.query(sessionQuery, [sessionId]);
+      `,
+      [sessionId]
+    );
 
     if (!sessionRes.rowCount) {
       return res.status(200).json({
@@ -2827,15 +2849,17 @@ app.delete("/api/delete/master-latvia/review/:id", async (req, res) => {
 
     const googleId = sessionRes.rows[0].google_id;
 
-    /* VERIFY USER OWNS THIS ENTRY (REVIEW OR REPLY) */
-    const ownershipQuery = `
-      SELECT id, parent
+    /* VERIFY OWNERSHIP + GET ad_id */
+    const ownershipRes = await pool.query(
+      `
+      SELECT id, parent, ad_id
       FROM masters_latvia_reviews
       WHERE id = $1
         AND reviewer_id = $2
       LIMIT 1;
-    `;
-    const ownershipRes = await pool.query(ownershipQuery, [reviewId, googleId]);
+      `,
+      [reviewId, googleId]
+    );
 
     if (!ownershipRes.rowCount) {
       return res.status(200).json({
@@ -2845,48 +2869,68 @@ app.delete("/api/delete/master-latvia/review/:id", async (req, res) => {
       });
     }
 
-    const parentId = ownershipRes.rows[0].parent;
+    const { parent, ad_id: adId } = ownershipRes.rows[0];
 
-    /* IF THIS IS A REPLY → HARD DELETE */
-    if (parentId !== null) {
+    /* ---------- DELETE LOGIC ---------- */
+
+    // Reply → hard delete
+    if (parent !== null) {
       await pool.query(
         `DELETE FROM masters_latvia_reviews WHERE id = $1;`,
-        [reviewId]
-      );
-
-      return res.status(200).json({
-        resStatus: true,
-        resOkCode: 1,
-        resMessage: "Reply deleted"
-      });
-    }
-
-    /* MAIN REVIEW → CHECK IF IT HAS REPLIES */
-    const replyCheckQuery = `
-      SELECT id
-      FROM masters_latvia_reviews
-      WHERE parent = $1
-      LIMIT 1;
-    `;
-    const replyRes = await pool.query(replyCheckQuery, [reviewId]);
-
-    if (replyRes.rowCount) {
-      /* HAS REPLY → SOFT DELETE REVIEW + REPLIES */
-      await pool.query(
-        `
-        UPDATE masters_latvia_reviews
-        SET is_deleted = true
-        WHERE id = $1 OR parent = $1;
-        `,
         [reviewId]
       );
     } else {
-      /* NO REPLY → HARD DELETE REVIEW */
-      await pool.query(
-        `DELETE FROM masters_latvia_reviews WHERE id = $1;`,
+      // Main review → check replies
+      const replyRes = await pool.query(
+        `
+        SELECT 1
+        FROM masters_latvia_reviews
+        WHERE parent = $1
+        LIMIT 1;
+        `,
         [reviewId]
       );
+
+      if (replyRes.rowCount) {
+        // Soft delete review + replies
+        await pool.query(
+          `
+          UPDATE masters_latvia_reviews
+          SET is_deleted = true
+          WHERE id = $1 OR parent = $1;
+          `,
+          [reviewId]
+        );
+      } else {
+        // Hard delete review
+        await pool.query(
+          `DELETE FROM masters_latvia_reviews WHERE id = $1;`,
+          [reviewId]
+        );
+      }
     }
+
+    /* ---------- RECALCULATE STATS ---------- */
+
+    await pool.query(
+      `
+      UPDATE masters_latvia_ads
+      SET
+        average_rating = COALESCE(sub.avg, 0),
+        reviews_count  = COALESCE(sub.cnt, 0)
+      FROM (
+        SELECT
+          ROUND(AVG(rating), 1) AS avg,
+          COUNT(*) AS cnt
+        FROM masters_latvia_reviews
+        WHERE ad_id = $1
+          AND is_deleted = false
+          AND parent IS NULL
+      ) sub
+      WHERE id = $1;
+      `,
+      [adId]
+    );
 
     return res.status(200).json({
       resStatus: true,
@@ -2903,6 +2947,7 @@ app.delete("/api/delete/master-latvia/review/:id", async (req, res) => {
     });
   }
 });
+
 app.get("/api/get/master-latvia/session-user", async (req, res) => {
   const sessionId = req.cookies?.session_id;
 
@@ -3063,58 +3108,6 @@ app.get("/api/get/master-latvia/user-ads", async (req, res) => {
     });
   }
 });
-
-/* app.get("/api/get/master-latvia/browse", async (req, res) => {
-  const { main, sub } = req.query;
-
-  try {
-    let query = `
-      SELECT *
-      FROM masters_latvia_ads
-      WHERE is_active = true
-    `;
-    const params = [];
-
-    if (main) {
-      params.push(main);
-      query += ` AND main_group = $${params.length}`;
-    }
-
-    if (sub) {
-      params.push(sub);
-      query += ` AND sub_group = $${params.length}`;
-    }
-
-    query += ` ORDER BY created_at DESC`;
-
-    const adsRes = await pool.query(query, params);
-
-    if (!adsRes.rowCount) {
-      return res.status(200).json({
-        resStatus: false,
-        resMessage: "No ads found",
-        resErrorCode: 1,
-        ads: []
-      });
-    }
-
-    return res.status(200).json({
-      resStatus: true,
-      resMessage: "Ads loaded successfully",
-      resOkCode: 1,
-      count: adsRes.rowCount,
-      ads: adsRes.rows
-    });
-
-  } catch (err) {
-    console.error("Browse error:", err);
-    return res.status(500).json({
-      resStatus: false,
-      resMessage: "Server error",
-      resErrorCode: 2
-    });
-  }
-}); */
 
 app.get("/api/get/master-latvia/browse", async (req, res) => {
   const { main, sub, cursor } = req.query;
