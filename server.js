@@ -3161,21 +3161,22 @@ app.get("/api/get/master-latvia/browse", async (req, res) => {
   }
 });
 app.get("/api/get/master-latvia/filter", async (req, res) => {
-  const { title, city, minRating, minReviews } = req.query;
+  const { title, city, minRating, minReviews, cursor } = req.query;
+  const limit = 12;
 
   try {
     const conditions = [];
     const values = [];
     let i = 1;
 
-    // TITLE (text)
+    // TITLE
     if (typeof title === "string" && title.trim() !== "") {
       conditions.push(`title ILIKE $${i}`);
       values.push(`%${title.trim()}%`);
       i++;
     }
 
-    // CITY (int[] column!)
+    // CITY (int[] stored as jsonb)
     if (city !== undefined && city !== "") {
       const cityId = Number(city);
       if (!Number.isNaN(cityId)) {
@@ -3205,6 +3206,13 @@ app.get("/api/get/master-latvia/filter", async (req, res) => {
       }
     }
 
+    // CURSOR (pagination)
+    if (cursor) {
+      conditions.push(`created_at < $${i}`);
+      values.push(cursor);
+      i++;
+    }
+
     const whereClause = conditions.length
       ? `WHERE ${conditions.join(" AND ")}`
       : "";
@@ -3214,15 +3222,19 @@ app.get("/api/get/master-latvia/filter", async (req, res) => {
       FROM masters_latvia_ads
       ${whereClause}
       ORDER BY created_at DESC
-      LIMIT 50;
+      LIMIT $${i};
     `;
+
+    values.push(limit);
 
     const { rows } = await pool.query(query, values);
 
     return res.json({
       resStatus: true,
-      count: rows.length,
-      ads: rows   // [] is VALID
+      ads: rows,
+      nextCursor: rows.length
+        ? rows[rows.length - 1].created_at
+        : null
     });
 
   } catch (err) {
@@ -3233,6 +3245,7 @@ app.get("/api/get/master-latvia/filter", async (req, res) => {
     });
   }
 });
+
 
 
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
