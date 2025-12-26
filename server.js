@@ -3168,32 +3168,41 @@ app.get("/api/get/master-latvia/filter", async (req, res) => {
     const values = [];
     let i = 1;
 
-    // Title / profession (text-based for now)
-    if (title) {
+    // TITLE (text)
+    if (typeof title === "string" && title.trim() !== "") {
       conditions.push(`title ILIKE $${i}`);
-      values.push(`%${title}%`);
+      values.push(`%${title.trim()}%`);
       i++;
     }
 
-    // City (stored as INT[])
-    if (city) {
-      conditions.push(`cities @> ARRAY[$${i}]::INT[]`);
-      values.push(Number(city));
-      i++;
+    // CITY (int[] column!)
+    if (city !== undefined && city !== "") {
+      const cityId = Number(city);
+      if (!Number.isNaN(cityId)) {
+        conditions.push(`city @> ARRAY[$${i}]::int[]`);
+        values.push(cityId);
+        i++;
+      }
     }
 
-    // Minimum rating
-    if (minRating) {
-      conditions.push(`average_rating >= $${i}`);
-      values.push(Number(minRating));
-      i++;
+    // MIN RATING
+    if (minRating !== undefined && minRating !== "") {
+      const rating = Number(minRating);
+      if (!Number.isNaN(rating)) {
+        conditions.push(`average_rating >= $${i}`);
+        values.push(rating);
+        i++;
+      }
     }
 
-    // Minimum reviews
-    if (minReviews) {
-      conditions.push(`reviews_count >= $${i}`);
-      values.push(Number(minReviews));
-      i++;
+    // MIN REVIEWS
+    if (minReviews !== undefined && minReviews !== "") {
+      const reviews = Number(minReviews);
+      if (!Number.isNaN(reviews)) {
+        conditions.push(`reviews_count >= $${i}`);
+        values.push(reviews);
+        i++;
+      }
     }
 
     const whereClause = conditions.length
@@ -3213,7 +3222,7 @@ app.get("/api/get/master-latvia/filter", async (req, res) => {
     return res.json({
       resStatus: true,
       count: rows.length,
-      ads: rows
+      ads: rows   // [] is VALID
     });
 
   } catch (err) {
@@ -3224,6 +3233,7 @@ app.get("/api/get/master-latvia/filter", async (req, res) => {
     });
   }
 });
+
 
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
 //fetch comments etc. This code helps with managing routes that are not defined on react frontend.
