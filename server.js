@@ -2305,49 +2305,6 @@ app.post("/api/post/master-latvia/delete-reply", async (req, res) => {
     });
   }
 });
-app.get("/api/get/master-latvia/search", async (req, res) => {
-  const q = (req.query.q || "").trim();
-  if (q.length < 3) {
-    return res.json({
-      resStatus: false,
-      resErrorCode: 1,
-      resMessage: "Search query too short"
-    });
-  }
-  try {
-    const searchQ = `
-      SELECT *
-      FROM masters_latvia_ads
-      WHERE is_active = true
-        AND (
-          title ILIKE $1
-          OR description ILIKE $1
-        )
-      ORDER BY date DESC
-      LIMIT 100
-    `;
-    const searchR = await pool.query(searchQ, [`%${q}%`]);
-    if (!searchR.rowCount) {
-      return res.json({
-        resStatus: true,
-        resOkCode: 1,
-        ads: []
-      });
-    }
-    return res.json({
-      resStatus: true,
-      resOkCode: 2,
-      ads: searchR.rows
-    });
-  } catch (err) {
-    console.error("Search error:", err);
-    return res.status(500).json({
-      resStatus: false,
-      resErrorCode: 2,
-      resMessage: "Server error"
-    });
-  }
-});
 app.post("/api/post/master-latvia/message", async (req, res) => {
   const name = (req.body.name || "").trim();
   const email = (req.body.email || "").trim();
@@ -3101,6 +3058,91 @@ app.get("/api/get/master-latvia/user-ads", async (req, res) => {
       resMessage: "Database connection error",
       resErrorCode: 3,
       ads: []
+    });
+  }
+});
+app.get("/api/get/master-latvia/search", async (req, res) => {
+  const q = (req.query.q || "").trim();
+
+  const PAGE_SIZE = 12;
+  const HARD_CAP = 1000;
+
+  let page = parseInt(req.query.page, 10) || 1;
+  if (page < 1) page = 1;
+
+  const limit = PAGE_SIZE;
+  const offset = (page - 1) * limit;
+
+  if (q.length < 3) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Search query too short"
+    });
+  }
+
+  // 🚫 block deep offsets
+  if (offset >= HARD_CAP) {
+    return res.json({
+      resStatus: true,
+      resOkCode: 1,
+      ads: [],
+      pagination: {
+        page,
+        pageSize: PAGE_SIZE,
+        totalResults: HARD_CAP,
+        totalPages: Math.ceil(HARD_CAP / PAGE_SIZE)
+      }
+    });
+  }
+
+  try {
+    // 1️⃣ capped count
+    const countQ = `
+      SELECT COUNT(*)
+      FROM masters_latvia_ads
+      WHERE is_active = true
+        AND (title ILIKE $1 OR description ILIKE $1)
+    `;
+    const countR = await pool.query(countQ, [`%${q}%`]);
+
+    const realTotal = parseInt(countR.rows[0].count, 10);
+    const totalResults = Math.min(realTotal, HARD_CAP);
+    const totalPages = Math.ceil(totalResults / PAGE_SIZE);
+
+    // 2️⃣ paged data
+    const dataQ = `
+      SELECT *
+      FROM masters_latvia_ads
+      WHERE is_active = true
+        AND (title ILIKE $1 OR description ILIKE $1)
+      ORDER BY date DESC
+      LIMIT $2 OFFSET $3
+    `;
+    const dataR = await pool.query(dataQ, [
+      `%${q}%`,
+      limit,
+      offset
+    ]);
+
+    return res.json({
+      resStatus: true,
+      resOkCode: 1,
+      ads: dataR.rows,
+      pagination: {
+        page,
+        pageSize: PAGE_SIZE,
+        totalResults,
+        totalPages,
+        hardCap: HARD_CAP
+      }
+    });
+  } catch (err) {
+    console.error("Search error:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resErrorCode: 2,
+      resMessage: "Server error"
     });
   }
 });
