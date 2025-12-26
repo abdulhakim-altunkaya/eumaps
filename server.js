@@ -3179,8 +3179,8 @@ app.get("/api/get/master-latvia/filter", async (req, res) => {
     if (city !== undefined && city !== "") {
       const cityId = Number(city);
       if (!Number.isNaN(cityId)) {
-        conditions.push(`city @> ARRAY[$${i}]::int[]`);
-        values.push(cityId);
+        conditions.push(`city::jsonb @> $${i}::jsonb`);
+        values.push(JSON.stringify([cityId]));
         i++;
       }
     }
