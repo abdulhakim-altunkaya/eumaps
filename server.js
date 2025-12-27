@@ -3154,7 +3154,7 @@ app.get("/api/get/master-latvia/search-filter", async (req, res) => {
     });
   }
 
-  const { city, minRating, minReviews } = req.query;
+  const { title, city, minRating, minReviews } = req.query;
 
   const PAGE_SIZE = 12;
   const HARD_CAP = 1000;
@@ -3183,13 +3183,20 @@ app.get("/api/get/master-latvia/search-filter", async (req, res) => {
     const values = [];
     let i = 1;
 
-    // base search (always)
+    // base search
     conditions.push(`is_active = true`);
     conditions.push(`(title ILIKE $${i} OR description ILIKE $${i})`);
     values.push(`%${q}%`);
     i++;
 
-    // filters
+    // profession filter
+    if (title) {
+      conditions.push(`title = $${i}`);
+      values.push(title);
+      i++;
+    }
+
+    // city filter
     if (city) {
       const cityId = Number(city);
       if (!Number.isNaN(cityId)) {
@@ -3199,6 +3206,7 @@ app.get("/api/get/master-latvia/search-filter", async (req, res) => {
       }
     }
 
+    // rating filter
     if (minRating) {
       const r = Number(minRating);
       if (!Number.isNaN(r)) {
@@ -3208,6 +3216,7 @@ app.get("/api/get/master-latvia/search-filter", async (req, res) => {
       }
     }
 
+    // reviews filter
     if (minReviews) {
       const rc = Number(minReviews);
       if (!Number.isNaN(rc)) {
@@ -3259,6 +3268,7 @@ app.get("/api/get/master-latvia/search-filter", async (req, res) => {
     });
   }
 });
+
 app.get("/api/get/master-latvia/browse", async (req, res) => {
   const { main, sub, cursor } = req.query;
   const limit = 12;
