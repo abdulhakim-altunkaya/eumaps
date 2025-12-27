@@ -3324,24 +3324,45 @@ app.get("/api/get/master-latvia/browse", async (req, res) => {
     });
   }
 });
-app.get("/api/get/master-latvia/filter", async (req, res) => {
-  const { title, city, minRating, minReviews, cursor } = req.query;
+app.get("/api/get/master-latvia/browse-filter", async (req, res) => {
+  const {
+    main,
+    sub,
+    title,
+    city,
+    minRating,
+    minReviews,
+    cursor
+  } = req.query;
+
   const limit = 12;
 
   try {
-    const conditions = [];
+    const conditions = [`is_active = true`];
     const values = [];
     let i = 1;
 
-    // TITLE
-    if (typeof title === "string" && title.trim() !== "") {
+    // BROWSE SCOPE
+    if (main) {
+      conditions.push(`main_group = $${i}`);
+      values.push(main);
+      i++;
+    }
+
+    if (sub) {
+      conditions.push(`sub_group = $${i}`);
+      values.push(sub);
+      i++;
+    }
+
+    // FILTERS
+    if (title) {
       conditions.push(`title ILIKE $${i}`);
       values.push(`%${title.trim()}%`);
       i++;
     }
 
-    // CITY (int[] stored as jsonb)
-    if (city !== undefined && city !== "") {
+    if (city) {
       const cityId = Number(city);
       if (!Number.isNaN(cityId)) {
         conditions.push(`city::jsonb @> $${i}::jsonb`);
@@ -3350,43 +3371,37 @@ app.get("/api/get/master-latvia/filter", async (req, res) => {
       }
     }
 
-    // MIN RATING
-    if (minRating !== undefined && minRating !== "") {
-      const rating = Number(minRating);
-      if (!Number.isNaN(rating)) {
+    if (minRating) {
+      const r = Number(minRating);
+      if (!Number.isNaN(r)) {
         conditions.push(`average_rating >= $${i}`);
-        values.push(rating);
+        values.push(r);
         i++;
       }
     }
 
-    // MIN REVIEWS
-    if (minReviews !== undefined && minReviews !== "") {
-      const reviews = Number(minReviews);
-      if (!Number.isNaN(reviews)) {
+    if (minReviews) {
+      const rc = Number(minReviews);
+      if (!Number.isNaN(rc)) {
         conditions.push(`reviews_count >= $${i}`);
-        values.push(reviews);
+        values.push(rc);
         i++;
       }
     }
 
-    // CURSOR (pagination)
+    // CURSOR (show more)
     if (cursor) {
       conditions.push(`created_at < $${i}`);
       values.push(cursor);
       i++;
     }
 
-    const whereClause = conditions.length
-      ? `WHERE ${conditions.join(" AND ")}`
-      : "";
-
     const query = `
       SELECT *
       FROM masters_latvia_ads
-      ${whereClause}
+      WHERE ${conditions.join(" AND ")}
       ORDER BY created_at DESC
-      LIMIT $${i};
+      LIMIT $${i}
     `;
 
     values.push(limit);
@@ -3402,7 +3417,7 @@ app.get("/api/get/master-latvia/filter", async (req, res) => {
     });
 
   } catch (err) {
-    console.error("Filter ads error:", err);
+    console.error("Browse filter error:", err);
     return res.status(500).json({
       resStatus: false,
       resMessage: "Server error"
