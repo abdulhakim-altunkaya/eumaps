@@ -2900,7 +2900,6 @@ app.delete("/api/delete/master-latvia/review/:id", async (req, res) => {
     });
   }
 });
-
 app.get("/api/get/master-latvia/session-user", async (req, res) => {
   const sessionId = req.cookies?.session_id;
 
@@ -3146,7 +3145,120 @@ app.get("/api/get/master-latvia/search", async (req, res) => {
     });
   }
 });
+app.get("/api/get/master-latvia/search-filter", async (req, res) => {
+  const q = (req.query.q || "").trim();
+  if (q.length < 3) {
+    return res.json({
+      resStatus: false,
+      resMessage: "Search query too short"
+    });
+  }
 
+  const { city, minRating, minReviews } = req.query;
+
+  const PAGE_SIZE = 12;
+  const HARD_CAP = 1000;
+
+  let page = parseInt(req.query.page, 10) || 1;
+  if (page < 1) page = 1;
+
+  const limit = PAGE_SIZE;
+  const offset = (page - 1) * limit;
+
+  if (offset >= HARD_CAP) {
+    return res.json({
+      resStatus: true,
+      ads: [],
+      pagination: {
+        page,
+        pageSize: PAGE_SIZE,
+        totalResults: HARD_CAP,
+        totalPages: Math.ceil(HARD_CAP / PAGE_SIZE)
+      }
+    });
+  }
+
+  try {
+    const conditions = [];
+    const values = [];
+    let i = 1;
+
+    // base search (always)
+    conditions.push(`is_active = true`);
+    conditions.push(`(title ILIKE $${i} OR description ILIKE $${i})`);
+    values.push(`%${q}%`);
+    i++;
+
+    // filters
+    if (city) {
+      const cityId = Number(city);
+      if (!Number.isNaN(cityId)) {
+        conditions.push(`city::jsonb @> $${i}::jsonb`);
+        values.push(JSON.stringify([cityId]));
+        i++;
+      }
+    }
+
+    if (minRating) {
+      const r = Number(minRating);
+      if (!Number.isNaN(r)) {
+        conditions.push(`average_rating >= $${i}`);
+        values.push(r);
+        i++;
+      }
+    }
+
+    if (minReviews) {
+      const rc = Number(minReviews);
+      if (!Number.isNaN(rc)) {
+        conditions.push(`reviews_count >= $${i}`);
+        values.push(rc);
+        i++;
+      }
+    }
+
+    const whereClause = `WHERE ${conditions.join(" AND ")}`;
+
+    const countQ = `
+      SELECT COUNT(*)
+      FROM masters_latvia_ads
+      ${whereClause}
+    `;
+    const countR = await pool.query(countQ, values);
+
+    const realTotal = parseInt(countR.rows[0].count, 10);
+    const totalResults = Math.min(realTotal, HARD_CAP);
+    const totalPages = Math.ceil(totalResults / PAGE_SIZE);
+
+    const dataQ = `
+      SELECT *
+      FROM masters_latvia_ads
+      ${whereClause}
+      ORDER BY date DESC
+      LIMIT $${i} OFFSET $${i + 1}
+    `;
+
+    const dataR = await pool.query(dataQ, [...values, limit, offset]);
+
+    return res.json({
+      resStatus: true,
+      ads: dataR.rows,
+      pagination: {
+        page,
+        pageSize: PAGE_SIZE,
+        totalResults,
+        totalPages
+      }
+    });
+
+  } catch (err) {
+    console.error("Search filter error:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Server error"
+    });
+  }
+});
 app.get("/api/get/master-latvia/browse", async (req, res) => {
   const { main, sub, cursor } = req.query;
   const limit = 12;
