@@ -2987,7 +2987,8 @@ app.get("/api/get/master-latvia/ad/:id", async (req, res) => {
     const q = `
       SELECT 
         id, name, title, description, price, city, date, views,
-        telephone, image_url, google_id, main_group, sub_group
+        telephone, image_url, google_id, main_group, sub_group,
+        average_rating, reviews_count
       FROM masters_latvia_ads
       WHERE id = $1
       LIMIT 1
