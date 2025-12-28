@@ -2984,10 +2984,64 @@ app.get("/api/get/master-latvia/ad/:id", async (req, res) => {
       });
     }
 
+    const ad = r.rows[0];
+    const { main_group, sub_group } = ad;
+
+    let newerId = null;
+    let olderId = null;
+
+    if (sub_group) {
+      const newerQ = `
+        SELECT id FROM masters_latvia_ads
+        WHERE main_group = $2
+          AND sub_group = $3
+          AND id > $1
+        ORDER BY id ASC
+        LIMIT 1
+      `;
+      const olderQ = `
+        SELECT id FROM masters_latvia_ads
+        WHERE main_group = $2
+          AND sub_group = $3
+          AND id < $1
+        ORDER BY id DESC
+        LIMIT 1
+      `;
+
+      const newerR = await pool.query(newerQ, [adId, main_group, sub_group]);
+      const olderR = await pool.query(olderQ, [adId, main_group, sub_group]);
+
+      newerId = newerR.rows[0]?.id || null;
+      olderId = olderR.rows[0]?.id || null;
+    } else {
+      const newerQ = `
+        SELECT id FROM masters_latvia_ads
+        WHERE main_group = $2
+          AND id > $1
+        ORDER BY id ASC
+        LIMIT 1
+      `;
+      const olderQ = `
+        SELECT id FROM masters_latvia_ads
+        WHERE main_group = $2
+          AND id < $1
+        ORDER BY id DESC
+        LIMIT 1
+      `;
+
+      const newerR = await pool.query(newerQ, [adId, main_group]);
+      const olderR = await pool.query(olderQ, [adId, main_group]);
+
+      newerId = newerR.rows[0]?.id || null;
+      olderId = olderR.rows[0]?.id || null;
+    }
+
     return res.json({
       resStatus: true,
       resOkCode: 1,
-      ad: r.rows[0]
+      ad,
+      newerId,
+      olderId
     });
 
   } catch (err) {
@@ -2999,6 +3053,7 @@ app.get("/api/get/master-latvia/ad/:id", async (req, res) => {
     });
   }
 });
+
 app.get("/api/get/master-latvia/user-ads", async (req, res) => {
   const sessionId = req.cookies?.session_id;
   if (!sessionId) {
