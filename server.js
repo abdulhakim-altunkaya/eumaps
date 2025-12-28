@@ -81,6 +81,36 @@ function makeSafeName() {
   return `${dd}${mm}${yyyy}_${rand}`;
 }
 
+//MIDDLEWARE TO BLOCK SPAM IP ADDRESSES
+// List of IPs to ignore (server centers, ad bots, my ip etc)
+//The list is updated to let web crawlers to pass and visit website
+//block ip list currently has 2 decoy ip to prevent error on middleware code.
+// List of blocked IPs
+const ignoredIPs = [
+  "66.249.1111168.5",
+  "66.249.68.421323221"
+];
+function getClientIp(req) {
+  const xf = req.headers["x-forwarded-for"];
+  let ip = xf ? xf.split(",")[0].trim() : req.socket?.remoteAddress || req.ip;
+  if (ip && ip.startsWith("::ffff:")) {
+    ip = ip.slice(7);
+  }
+  return ip;
+}
+function blockSpamIPs(req, res, next) {
+  const ip = getClientIp(req);
+  if (!ip) return next();
+  if (ignoredIPs.includes(ip)) {
+    return res.status(403).json({
+      resStatus: false,
+      resMessage: "Access denied",
+      resErrorCode: 100
+    });
+  }
+  next();
+}
+
 //A temporary cache to save ip addresses and it will prevent spam comments and replies for 1 minute.
 //I can do that by checking each ip with database ip addresses but then it will be too many requests to db
 const ipCache2 = {}
@@ -166,10 +196,6 @@ app.get("/servergetcomments/:pageId", async (req, res) => {
 //I can do that by checking each ip with database ip addresses but then it will be too many requests to db
 //We will save each visitor data to database. 
 const ipCache = {}
-// List of IPs to ignore (server centers, ad bots, my ip etc)
-//The list is updated to let web crawlers to pass and visit website
-//block ip list currently has 2 decoy ip to prevent error on middleware code.
-const ignoredIPs = ["66.249.1111168.5", "66.249.68.421323221"];
 
 app.post("/serversavevisitor/:pageIdVisitorPage", async (req, res) => {
   //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
@@ -1367,7 +1393,7 @@ app.post("/api/kac-milyon/save-reply", async (req, res) => {
 });
 
 /*MASTERS-LATVIA ENDPOINTS */
-app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, res) => {
+app.post("/api/post/master-latvia/ads", blockSpamIPs, upload.array("images", 5), async (req, res) => {
   const ipVisitor = req.headers["x-forwarded-for"]
     ? req.headers["x-forwarded-for"].split(",")[0]
     : req.socket.remoteAddress || req.ip;
@@ -1528,7 +1554,7 @@ app.post("/api/post/master-latvia/ads", upload.array("images", 5), async (req, r
     if (client) client.release();
   }
 });
-app.put("/api/put/master-latvia/update-ad/:id", upload.array("images", 5), async (req, res) => {
+app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, upload.array("images", 5), async (req, res) => {
   const adId = req.params.id;
   /* -------------------------------
      CHECK LOGIN SESSION
@@ -1712,7 +1738,7 @@ async function createSessionForUser(dbGoogleId) {
   );
   return sessionId;
 }
-app.post("/api/post/master-latvia/auth/google", async (req, res) => {
+app.post("/api/post/master-latvia/auth/google", blockSpamIPs, async (req, res) => {
   const ipVisitor = req.headers["x-forwarded-for"] ? req.headers["x-forwarded-for"].split(",")[0]
     : req.socket.remoteAddress || req.ip;
   const { idToken } = req.body;
@@ -1773,7 +1799,7 @@ app.post("/api/post/master-latvia/auth/google", async (req, res) => {
     if (client) client.release();
   }
 });
-app.post("/api/post/master-latvia/logout", async (req, res) => {
+app.post("/api/post/master-latvia/logout", blockSpamIPs, async (req, res) => {
   const sessionId = req.cookies.session_id;
   await pool.query(`DELETE FROM masters_latvia_sessions WHERE session_id=$1`, [sessionId]);
 
@@ -1789,7 +1815,7 @@ app.post("/api/post/master-latvia/logout", async (req, res) => {
     resOkCode: 1
   });
 });
-app.post("/api/post/master-latvia/toggle-activation/:id", async (req, res) => {
+app.post("/api/post/master-latvia/toggle-activation/:id", blockSpamIPs, async (req, res) => {
   const adId = req.params.id;
   try {
     // Check if ad exists
@@ -1833,7 +1859,7 @@ app.post("/api/post/master-latvia/toggle-activation/:id", async (req, res) => {
     });
   }
 });
-app.post("/api/post/master-latvia/delete-ad/:id", async (req, res) => {
+app.post("/api/post/master-latvia/delete-ad/:id", blockSpamIPs, async (req, res) => {
   const adId = req.params.id;
   const sessionId = req.cookies?.session_id;
   if (!sessionId) {
@@ -1945,7 +1971,7 @@ app.post("/api/post/master-latvia/delete-ad/:id", async (req, res) => {
 });
 
 const visitCacheLM = {};
-app.post("/api/post/master-latvia/ad-view", async (req, res) => {
+app.post("/api/post/master-latvia/ad-view", blockSpamIPs, async (req, res) => {
   const { ad_id } = req.body;
 
   if (!ad_id) {
@@ -2003,7 +2029,7 @@ app.post("/api/post/master-latvia/ad-view", async (req, res) => {
     });
   }
 });
-app.post("/api/post/master-latvia/review", async (req, res) => {
+app.post("/api/post/master-latvia/review", blockSpamIPs, async (req, res) => {
   const sessionId = req.cookies?.session_id;
   const { reviewer_name, review_text, adId, rating } = req.body;
 
@@ -2140,7 +2166,7 @@ app.post("/api/post/master-latvia/review", async (req, res) => {
     });
   }
 });
-app.post("/api/post/master-latvia/reply", async (req, res) => {
+app.post("/api/post/master-latvia/reply", blockSpamIPs, async (req, res) => {
   const sessionId = req.cookies?.session_id;
   const { review_text, adId, parent } = req.body;
 
@@ -2228,7 +2254,7 @@ app.post("/api/post/master-latvia/reply", async (req, res) => {
     });
   }
 });
-app.post("/api/post/master-latvia/delete-reply", async (req, res) => {
+app.post("/api/post/master-latvia/delete-reply", blockSpamIPs, async (req, res) => {
   const sessionId = req.cookies?.session_id;
   const { replyId, adId } = req.body;
 
@@ -2323,7 +2349,7 @@ app.post("/api/post/master-latvia/delete-reply", async (req, res) => {
     });
   }
 });
-app.post("/api/post/master-latvia/message", async (req, res) => {
+app.post("/api/post/master-latvia/message", blockSpamIPs, async (req, res) => {
   const name = (req.body.name || "").trim();
   const email = (req.body.email || "").trim();
   const message = (req.body.message || "").trim();
@@ -2366,7 +2392,7 @@ app.post("/api/post/master-latvia/message", async (req, res) => {
     });
   }
 });
-app.post("/api/post/master-latvia/like", async (req, res) => {
+app.post("/api/post/master-latvia/like", blockSpamIPs, async (req, res) => {
   const sessionId = req.cookies?.session_id;
   const { ad_id } = req.body;
 
@@ -2778,7 +2804,7 @@ app.get("/api/get/master-latvia/profile-replies-ads", async (req, res) => {
 });
 //deletes both reviews of the user and replies of the user.
 //reviews of user with reply of the owner is not deleted. It is made hidden.
-app.delete("/api/delete/master-latvia/review/:id", async (req, res) => {
+app.delete("/api/delete/master-latvia/review/:id", blockSpamIPs, async (req, res) => {
   const sessionId = req.cookies?.session_id;
   const reviewId = req.params.id;
 
@@ -2918,7 +2944,7 @@ app.delete("/api/delete/master-latvia/review/:id", async (req, res) => {
     });
   }
 });
-app.get("/api/get/master-latvia/session-user", async (req, res) => {
+app.get("/api/get/master-latvia/session-user", blockSpamIPs, async (req, res) => {
   const sessionId = req.cookies?.session_id;
 
   // No cookie -> not logged in, but it's not an "error"
@@ -3134,7 +3160,7 @@ app.get("/api/get/master-latvia/user-ads", async (req, res) => {
     });
   }
 });
-app.get("/api/get/master-latvia/search", async (req, res) => {
+app.get("/api/get/master-latvia/search", blockSpamIPs, async (req, res) => {
   const q = (req.query.q || "").trim();
 
   const PAGE_SIZE = 12;
@@ -3219,7 +3245,7 @@ app.get("/api/get/master-latvia/search", async (req, res) => {
     });
   }
 });
-app.get("/api/get/master-latvia/search-filter", async (req, res) => {
+app.get("/api/get/master-latvia/search-filter", blockSpamIPs, async (req, res) => {
   const q = (req.query.q || "").trim();
   if (q.length < 3) {
     return res.json({
@@ -3343,7 +3369,7 @@ app.get("/api/get/master-latvia/search-filter", async (req, res) => {
   }
 });
 
-app.get("/api/get/master-latvia/browse", async (req, res) => {
+app.get("/api/get/master-latvia/browse", blockSpamIPs, async (req, res) => {
   const { main, sub, cursor } = req.query;
   const limit = 12;
 
@@ -3398,7 +3424,7 @@ app.get("/api/get/master-latvia/browse", async (req, res) => {
     });
   }
 });
-app.get("/api/get/master-latvia/browse-filter", async (req, res) => {
+app.get("/api/get/master-latvia/browse-filter", blockSpamIPs, async (req, res) => {
   const {
     main,
     sub,
