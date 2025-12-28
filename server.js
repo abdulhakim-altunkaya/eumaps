@@ -1836,7 +1836,6 @@ app.post("/api/post/master-latvia/toggle-activation/:id", async (req, res) => {
 app.post("/api/post/master-latvia/delete-ad/:id", async (req, res) => {
   const adId = req.params.id;
   const sessionId = req.cookies?.session_id;
-
   if (!sessionId) {
     return res.status(401).json({
       resStatus: false,
@@ -1844,16 +1843,18 @@ app.post("/api/post/master-latvia/delete-ad/:id", async (req, res) => {
       resErrorCode: 1
     });
   }
-
   try {
-    // Validate session
-    const sessionQuery = `
+    /* ---------- SESSION VALIDATION ---------- */
+    const sessionRes = await pool.query(
+      `
       SELECT google_id
       FROM masters_latvia_sessions
       WHERE session_id = $1
       LIMIT 1;
-    `;
-    const sessionRes = await pool.query(sessionQuery, [sessionId]);
+      `,
+      [sessionId]
+    );
+
     if (!sessionRes.rowCount) {
       return res.status(401).json({
         resStatus: false,
@@ -1864,14 +1865,16 @@ app.post("/api/post/master-latvia/delete-ad/:id", async (req, res) => {
 
     const googleId = sessionRes.rows[0].google_id;
 
-    // Fetch ad + images (IMPORTANT)
-    const adQuery = `
+    /* ---------- VERIFY OWNERSHIP + GET IMAGES ---------- */
+    const adRes = await pool.query(
+      `
       SELECT image_url
       FROM masters_latvia_ads
       WHERE id = $1 AND google_id = $2
       LIMIT 1;
-    `;
-    const adRes = await pool.query(adQuery, [adId, googleId]);
+      `,
+      [adId, googleId]
+    );
 
     if (!adRes.rowCount) {
       return res.status(403).json({
@@ -1881,7 +1884,7 @@ app.post("/api/post/master-latvia/delete-ad/:id", async (req, res) => {
       });
     }
 
-    // Parse image list
+    /* ---------- PARSE IMAGES ---------- */
     let images = [];
     try {
       images = Array.isArray(adRes.rows[0].image_url)
@@ -1891,12 +1894,28 @@ app.post("/api/post/master-latvia/delete-ad/:id", async (req, res) => {
       images = [];
     }
 
-    // Extract filenames from full URLs
     const filesToDelete = images
-      .map(url => url.split("/").pop()) // take last part of URL
-      .filter(Boolean); // remove empty
+      .map(url => url.split("/").pop())
+      .filter(Boolean);
 
-    // Delete from Supabase storage
+    /* ---------- DB TRANSACTION ---------- */
+    await pool.query("BEGIN");
+
+    // Hard delete ALL reviews + replies
+    await pool.query(
+      `DELETE FROM masters_latvia_reviews WHERE ad_id = $1;`,
+      [adId]
+    );
+
+    // Hard delete ad
+    await pool.query(
+      `DELETE FROM masters_latvia_ads WHERE id = $1;`,
+      [adId]
+    );
+
+    await pool.query("COMMIT");
+
+    /* ---------- DELETE IMAGES (NON-BLOCKING) ---------- */
     if (filesToDelete.length > 0) {
       const { error } = await supabase.storage
         .from("masters_latvia_storage")
@@ -1904,20 +1923,18 @@ app.post("/api/post/master-latvia/delete-ad/:id", async (req, res) => {
 
       if (error) {
         console.error("Supabase delete error:", error);
-        // NOT failing the whole request — image deletion shouldn't block ad deletion
       }
     }
 
-    // Delete database record
-    await pool.query(`DELETE FROM masters_latvia_ads WHERE id = $1`, [adId]);
-
     return res.json({
       resStatus: true,
-      resMessage: "Ad deleted successfully",
+      resMessage: "Ad and related reviews deleted",
       resOkCode: 1
     });
 
   } catch (err) {
+    await pool.query("ROLLBACK");
+
     console.error("Delete ad error:", err);
     return res.status(500).json({
       resStatus: false,
@@ -1926,6 +1943,7 @@ app.post("/api/post/master-latvia/delete-ad/:id", async (req, res) => {
     });
   }
 });
+
 const visitCacheLM = {};
 app.post("/api/post/master-latvia/ad-view", async (req, res) => {
   const { ad_id } = req.body;
