@@ -111,6 +111,64 @@ function blockSpamIPs(req, res, next) {
   next();
 }
 
+//MIDDLEAWARE RATE LIMITER
+//Write: 20 requests per minute
+//Read: 80 requests per minute
+//Currently used only by Latvijas meistari
+const rateStore = Object.create(null);
+
+function rateLimitWrite(req, res, next) {
+  const ip = getClientIp(req);
+  const now = Date.now();
+  const WINDOW = 60_000; // 1 min
+  const LIMIT = 20;
+  if (!rateStore[ip]) {
+    rateStore[ip] = { w: { count: 1, start: now } };
+    return next();
+  }
+  const w = rateStore[ip].w || { count: 0, start: now };
+  if (now - w.start > WINDOW) {
+    rateStore[ip].w = { count: 1, start: now };
+    return next();
+  }
+  w.count++;
+  rateStore[ip].w = w;
+  if (w.count > LIMIT) {
+    return res.status(429).json({
+      resStatus: false,
+      resMessage: "Too many write requests",
+      resErrorCode: 110
+    });
+  }
+  next();
+}
+
+function rateLimitRead(req, res, next) {
+  const ip = getClientIp(req);
+  const now = Date.now();
+  const WINDOW = 60_000; // 1 min
+  const LIMIT = 80;
+  if (!rateStore[ip]) {
+    rateStore[ip] = { r: { count: 1, start: now } };
+    return next();
+  }
+  const r = rateStore[ip].r || { count: 0, start: now };
+  if (now - r.start > WINDOW) {
+    rateStore[ip].r = { count: 1, start: now };
+    return next();
+  }
+  r.count++;
+  rateStore[ip].r = r;
+  if (r.count > LIMIT) {
+    return res.status(429).json({
+      resStatus: false,
+      resMessage: "Too many requests",
+      resErrorCode: 111
+    });
+  }
+  next();
+}
+
 //A temporary cache to save ip addresses and it will prevent spam comments and replies for 1 minute.
 //I can do that by checking each ip with database ip addresses but then it will be too many requests to db
 const ipCache2 = {}
@@ -1393,7 +1451,7 @@ app.post("/api/kac-milyon/save-reply", async (req, res) => {
 });
 
 /*MASTERS-LATVIA ENDPOINTS */
-app.post("/api/post/master-latvia/ads", blockSpamIPs, upload.array("images", 5), async (req, res) => {
+app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite, upload.array("images", 5), async (req, res) => {
   const ipVisitor = req.headers["x-forwarded-for"]
     ? req.headers["x-forwarded-for"].split(",")[0]
     : req.socket.remoteAddress || req.ip;
@@ -1554,7 +1612,7 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, upload.array("images", 5),
     if (client) client.release();
   }
 });
-app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, upload.array("images", 5), async (req, res) => {
+app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, rateLimitWrite, upload.array("images", 5), async (req, res) => {
   const adId = req.params.id;
   /* -------------------------------
      CHECK LOGIN SESSION
@@ -1738,7 +1796,7 @@ async function createSessionForUser(dbGoogleId) {
   );
   return sessionId;
 }
-app.post("/api/post/master-latvia/auth/google", blockSpamIPs, async (req, res) => {
+app.post("/api/post/master-latvia/auth/google", blockSpamIPs, rateLimitWrite, async (req, res) => {
   const ipVisitor = req.headers["x-forwarded-for"] ? req.headers["x-forwarded-for"].split(",")[0]
     : req.socket.remoteAddress || req.ip;
   const { idToken } = req.body;
@@ -1799,7 +1857,7 @@ app.post("/api/post/master-latvia/auth/google", blockSpamIPs, async (req, res) =
     if (client) client.release();
   }
 });
-app.post("/api/post/master-latvia/logout", blockSpamIPs, async (req, res) => {
+app.post("/api/post/master-latvia/logout", blockSpamIPs, rateLimitWrite, async (req, res) => {
   const sessionId = req.cookies.session_id;
   await pool.query(`DELETE FROM masters_latvia_sessions WHERE session_id=$1`, [sessionId]);
 
@@ -1815,7 +1873,7 @@ app.post("/api/post/master-latvia/logout", blockSpamIPs, async (req, res) => {
     resOkCode: 1
   });
 });
-app.post("/api/post/master-latvia/toggle-activation/:id", blockSpamIPs, async (req, res) => {
+app.post("/api/post/master-latvia/toggle-activation/:id", blockSpamIPs, rateLimitWrite, async (req, res) => {
   const adId = req.params.id;
   try {
     // Check if ad exists
@@ -1859,7 +1917,7 @@ app.post("/api/post/master-latvia/toggle-activation/:id", blockSpamIPs, async (r
     });
   }
 });
-app.post("/api/post/master-latvia/delete-ad/:id", blockSpamIPs, async (req, res) => {
+app.post("/api/post/master-latvia/delete-ad/:id", blockSpamIPs, rateLimitWrite, async (req, res) => {
   const adId = req.params.id;
   const sessionId = req.cookies?.session_id;
   if (!sessionId) {
@@ -1971,7 +2029,7 @@ app.post("/api/post/master-latvia/delete-ad/:id", blockSpamIPs, async (req, res)
 });
 
 const visitCacheLM = {};
-app.post("/api/post/master-latvia/ad-view", blockSpamIPs, async (req, res) => {
+app.post("/api/post/master-latvia/ad-view", blockSpamIPs, rateLimitWrite, async (req, res) => {
   const { ad_id } = req.body;
 
   if (!ad_id) {
@@ -2029,7 +2087,7 @@ app.post("/api/post/master-latvia/ad-view", blockSpamIPs, async (req, res) => {
     });
   }
 });
-app.post("/api/post/master-latvia/review", blockSpamIPs, async (req, res) => {
+app.post("/api/post/master-latvia/review", blockSpamIPs, rateLimitWrite, async (req, res) => {
   const sessionId = req.cookies?.session_id;
   const { reviewer_name, review_text, adId, rating } = req.body;
 
@@ -2166,7 +2224,7 @@ app.post("/api/post/master-latvia/review", blockSpamIPs, async (req, res) => {
     });
   }
 });
-app.post("/api/post/master-latvia/reply", blockSpamIPs, async (req, res) => {
+app.post("/api/post/master-latvia/reply", blockSpamIPs, rateLimitWrite, async (req, res) => {
   const sessionId = req.cookies?.session_id;
   const { review_text, adId, parent } = req.body;
 
@@ -2254,7 +2312,7 @@ app.post("/api/post/master-latvia/reply", blockSpamIPs, async (req, res) => {
     });
   }
 });
-app.post("/api/post/master-latvia/delete-reply", blockSpamIPs, async (req, res) => {
+app.post("/api/post/master-latvia/delete-reply", blockSpamIPs, rateLimitWrite, async (req, res) => {
   const sessionId = req.cookies?.session_id;
   const { replyId, adId } = req.body;
 
@@ -2349,7 +2407,7 @@ app.post("/api/post/master-latvia/delete-reply", blockSpamIPs, async (req, res) 
     });
   }
 });
-app.post("/api/post/master-latvia/message", blockSpamIPs, async (req, res) => {
+app.post("/api/post/master-latvia/message", blockSpamIPs, rateLimitWrite, async (req, res) => {
   const name = (req.body.name || "").trim();
   const email = (req.body.email || "").trim();
   const message = (req.body.message || "").trim();
@@ -2392,7 +2450,7 @@ app.post("/api/post/master-latvia/message", blockSpamIPs, async (req, res) => {
     });
   }
 });
-app.post("/api/post/master-latvia/like", blockSpamIPs, async (req, res) => {
+app.post("/api/post/master-latvia/like", blockSpamIPs, rateLimitWrite, async (req, res) => {
   const sessionId = req.cookies?.session_id;
   const { ad_id } = req.body;
 
@@ -2542,7 +2600,7 @@ app.post("/api/post/master-latvia/like", blockSpamIPs, async (req, res) => {
     });
   }
 });
-app.get("/api/get/master-latvia/like-status", async (req, res) => {
+app.get("/api/get/master-latvia/like-status", rateLimitRead, async (req, res) => {
   const sessionId = req.cookies?.session_id;
   const { ad_id } = req.query;
 
@@ -2610,7 +2668,7 @@ app.get("/api/get/master-latvia/like-status", async (req, res) => {
     });
   }
 });
-app.get("/api/get/master-latvia/reviews/:ad_id", async (req, res) => {
+app.get("/api/get/master-latvia/reviews/:ad_id", rateLimitRead, async (req, res) => {
   const adId = req.params.ad_id;
 
   if (!adId) {
@@ -2657,7 +2715,7 @@ app.get("/api/get/master-latvia/reviews/:ad_id", async (req, res) => {
 //this gets reviews from reviews table and ad data from ads table (owner name, title, picture)
 //We are using this endpoint in profile page because it allows better performance
 //otherwise we will have to make two requests to the backend-database instead of one here.
-app.get("/api/get/master-latvia/profile-reviews-ads", async (req, res) => {
+app.get("/api/get/master-latvia/profile-reviews-ads", rateLimitRead, async (req, res) => {
   const sessionId = req.cookies?.session_id;
 
   if (!sessionId) {
@@ -2730,7 +2788,7 @@ app.get("/api/get/master-latvia/profile-reviews-ads", async (req, res) => {
     });
   }
 });
-app.get("/api/get/master-latvia/profile-replies-ads", async (req, res) => {
+app.get("/api/get/master-latvia/profile-replies-ads", rateLimitRead, async (req, res) => {
   const sessionId = req.cookies?.session_id;
 
   if (!sessionId) {
@@ -2804,7 +2862,7 @@ app.get("/api/get/master-latvia/profile-replies-ads", async (req, res) => {
 });
 //deletes both reviews of the user and replies of the user.
 //reviews of user with reply of the owner is not deleted. It is made hidden.
-app.delete("/api/delete/master-latvia/review/:id", blockSpamIPs, async (req, res) => {
+app.delete("/api/delete/master-latvia/review/:id", blockSpamIPs, rateLimitWrite, async (req, res) => {
   const sessionId = req.cookies?.session_id;
   const reviewId = req.params.id;
 
@@ -2944,7 +3002,7 @@ app.delete("/api/delete/master-latvia/review/:id", blockSpamIPs, async (req, res
     });
   }
 });
-app.get("/api/get/master-latvia/session-user", blockSpamIPs, async (req, res) => {
+app.get("/api/get/master-latvia/session-user", blockSpamIPs, rateLimitRead, async (req, res) => {
   const sessionId = req.cookies?.session_id;
 
   // No cookie -> not logged in, but it's not an "error"
@@ -3006,7 +3064,7 @@ app.get("/api/get/master-latvia/session-user", blockSpamIPs, async (req, res) =>
     });
   }
 });
-app.get("/api/get/master-latvia/ad/:id", async (req, res) => {
+app.get("/api/get/master-latvia/ad/:id", rateLimitRead, async (req, res) => {
   const adId = req.params.id;
 
   try {
@@ -3099,7 +3157,7 @@ app.get("/api/get/master-latvia/ad/:id", async (req, res) => {
   }
 });
 
-app.get("/api/get/master-latvia/user-ads", async (req, res) => {
+app.get("/api/get/master-latvia/user-ads", rateLimitRead, async (req, res) => {
   const sessionId = req.cookies?.session_id;
   if (!sessionId) {
     return res.status(200).json({
@@ -3160,7 +3218,7 @@ app.get("/api/get/master-latvia/user-ads", async (req, res) => {
     });
   }
 });
-app.get("/api/get/master-latvia/search", blockSpamIPs, async (req, res) => {
+app.get("/api/get/master-latvia/search", blockSpamIPs, rateLimitRead, async (req, res) => {
   const q = (req.query.q || "").trim();
 
   const PAGE_SIZE = 12;
@@ -3245,7 +3303,7 @@ app.get("/api/get/master-latvia/search", blockSpamIPs, async (req, res) => {
     });
   }
 });
-app.get("/api/get/master-latvia/search-filter", blockSpamIPs, async (req, res) => {
+app.get("/api/get/master-latvia/search-filter", rateLimitRead, blockSpamIPs, async (req, res) => {
   const q = (req.query.q || "").trim();
   if (q.length < 3) {
     return res.json({
@@ -3369,7 +3427,7 @@ app.get("/api/get/master-latvia/search-filter", blockSpamIPs, async (req, res) =
   }
 });
 
-app.get("/api/get/master-latvia/browse", blockSpamIPs, async (req, res) => {
+app.get("/api/get/master-latvia/browse", blockSpamIPs, rateLimitRead, async (req, res) => {
   const { main, sub, cursor } = req.query;
   const limit = 12;
 
@@ -3424,7 +3482,7 @@ app.get("/api/get/master-latvia/browse", blockSpamIPs, async (req, res) => {
     });
   }
 });
-app.get("/api/get/master-latvia/browse-filter", blockSpamIPs, async (req, res) => {
+app.get("/api/get/master-latvia/browse-filter", blockSpamIPs, rateLimitRead, async (req, res) => {
   const {
     main,
     sub,
