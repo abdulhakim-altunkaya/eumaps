@@ -116,7 +116,6 @@ function blockSpamIPs(req, res, next) {
 //Read: 80 requests per minute
 //Currently used only by Latvijas meistari
 const rateStore = Object.create(null);
-
 function rateLimitWrite(req, res, next) {
   const ip = getClientIp(req);
   const now = Date.now();
@@ -142,7 +141,6 @@ function rateLimitWrite(req, res, next) {
   }
   next();
 }
-
 function rateLimitRead(req, res, next) {
   const ip = getClientIp(req);
   const now = Date.now();
@@ -168,6 +166,33 @@ function rateLimitRead(req, res, next) {
   }
   next();
 }
+
+//MIDDLEWARE REQ.BODY AND REQ.QUERY SANITIZER
+//Currently used only by Latvijas meistari
+function sanitizeInputs(req, res, next) {
+  function sanitize(value) {
+    if (typeof value !== "string") return value;
+    return value
+      .trim()
+      .replace(/[\u0000-\u001F\u007F]/g, "") // control chars
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+  function walk(obj) {
+    if (!obj || typeof obj !== "object") return;
+    for (const key in obj) {
+      if (typeof obj[key] === "string") {
+        obj[key] = sanitize(obj[key]);
+      } else if (typeof obj[key] === "object") {
+        walk(obj[key]);
+      }
+    }
+  }
+  walk(req.body);
+  walk(req.query);
+  next();
+}
+
 
 //A temporary cache to save ip addresses and it will prevent spam comments and replies for 1 minute.
 //I can do that by checking each ip with database ip addresses but then it will be too many requests to db
@@ -1451,7 +1476,8 @@ app.post("/api/kac-milyon/save-reply", async (req, res) => {
 });
 
 /*MASTERS-LATVIA ENDPOINTS */
-app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite, upload.array("images", 5), async (req, res) => {
+app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite, sanitizeInputs,
+  upload.array("images", 5), async (req, res) => {
   const ipVisitor = req.headers["x-forwarded-for"]
     ? req.headers["x-forwarded-for"].split(",")[0]
     : req.socket.remoteAddress || req.ip;
@@ -1612,7 +1638,8 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite, upload.arr
     if (client) client.release();
   }
 });
-app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, rateLimitWrite, upload.array("images", 5), async (req, res) => {
+app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, rateLimitWrite, sanitizeInputs,
+  upload.array("images", 5), async (req, res) => {
   const adId = req.params.id;
   /* -------------------------------
      CHECK LOGIN SESSION
@@ -2027,7 +2054,6 @@ app.post("/api/post/master-latvia/delete-ad/:id", blockSpamIPs, rateLimitWrite, 
     });
   }
 });
-
 const visitCacheLM = {};
 app.post("/api/post/master-latvia/ad-view", blockSpamIPs, rateLimitWrite, async (req, res) => {
   const { ad_id } = req.body;
@@ -2087,7 +2113,7 @@ app.post("/api/post/master-latvia/ad-view", blockSpamIPs, rateLimitWrite, async 
     });
   }
 });
-app.post("/api/post/master-latvia/review", blockSpamIPs, rateLimitWrite, async (req, res) => {
+app.post("/api/post/master-latvia/review", blockSpamIPs, rateLimitWrite, sanitizeInputs, async (req, res) => {
   const sessionId = req.cookies?.session_id;
   const { reviewer_name, review_text, adId, rating } = req.body;
 
@@ -2224,7 +2250,7 @@ app.post("/api/post/master-latvia/review", blockSpamIPs, rateLimitWrite, async (
     });
   }
 });
-app.post("/api/post/master-latvia/reply", blockSpamIPs, rateLimitWrite, async (req, res) => {
+app.post("/api/post/master-latvia/reply", blockSpamIPs, rateLimitWrite, sanitizeInputs, async (req, res) => {
   const sessionId = req.cookies?.session_id;
   const { review_text, adId, parent } = req.body;
 
@@ -2407,7 +2433,7 @@ app.post("/api/post/master-latvia/delete-reply", blockSpamIPs, rateLimitWrite, a
     });
   }
 });
-app.post("/api/post/master-latvia/message", blockSpamIPs, rateLimitWrite, async (req, res) => {
+app.post("/api/post/master-latvia/message", blockSpamIPs, rateLimitWrite, sanitizeInputs, async (req, res) => {
   const name = (req.body.name || "").trim();
   const email = (req.body.email || "").trim();
   const message = (req.body.message || "").trim();
@@ -3156,7 +3182,6 @@ app.get("/api/get/master-latvia/ad/:id", rateLimitRead, async (req, res) => {
     });
   }
 });
-
 app.get("/api/get/master-latvia/user-ads", rateLimitRead, async (req, res) => {
   const sessionId = req.cookies?.session_id;
   if (!sessionId) {
@@ -3426,7 +3451,6 @@ app.get("/api/get/master-latvia/search-filter", rateLimitRead, blockSpamIPs, asy
     });
   }
 });
-
 app.get("/api/get/master-latvia/browse", blockSpamIPs, rateLimitRead, async (req, res) => {
   const { main, sub, cursor } = req.query;
   const limit = 12;
@@ -3582,8 +3606,6 @@ app.get("/api/get/master-latvia/browse-filter", blockSpamIPs, rateLimitRead, asy
     });
   }
 });
-
-
 
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
 //fetch comments etc. This code helps with managing routes that are not defined on react frontend.
