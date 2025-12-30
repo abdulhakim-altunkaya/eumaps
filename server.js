@@ -2434,14 +2434,30 @@ app.post("/api/post/master-latvia/delete-reply", blockSpamIPs, rateLimitWrite, a
   }
 });
 app.post("/api/post/master-latvia/message", blockSpamIPs, rateLimitWrite, sanitizeInputs, async (req, res) => {
-  const name = (req.body.name || "").trim();
-  const email = (req.body.email || "").trim();
-  const message = (req.body.message || "").trim();
-  if (!name || !email || !message) {
+  const clean = (v, max) =>
+    String(v || "")
+      .trim()
+      .slice(0, max)
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;");
+
+  const name = clean(req.body.name, 40);
+  const email = clean(req.body.email, 40);
+  const message = clean(req.body.message, 500);
+  // length + presence checks
+  if (name.length < 2 || email.length < 5 || message.length < 5) {
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Missing required fields"
+      resMessage: "Invalid input"
+    });
+  }
+  // basic email sanity check
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 2,
+      resMessage: "Invalid email"
     });
   }
   try {
