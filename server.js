@@ -2115,15 +2115,26 @@ app.post("/api/post/master-latvia/ad-view", blockSpamIPs, rateLimitWrite, async 
 });
 app.post("/api/post/master-latvia/review", blockSpamIPs, rateLimitWrite, sanitizeInputs, async (req, res) => {
   const sessionId = req.cookies?.session_id;
-  const { reviewer_name, review_text, adId, rating } = req.body;
 
-  if (!sessionId || !reviewer_name || !review_text || !adId || !rating) {
-    return res.json({
-      resStatus: false,
-      resErrorCode: 1,
-      resMessage: "Missing fields or not authenticated"
-    });
-  }
+  const clean = (v, max) =>
+    String(v || "")
+      .trim()
+      .slice(0, max)
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+  const reviewer_name = clean(req.body.reviewer_name, 19);
+  const review_text   = clean(req.body.review_text, 400);
+  const adId = req.body.adId;
+  const rating = Number(req.body.rating);
+
+  if (!sessionId || reviewer_name.length < 5 || review_text.length < 5 || !adId || !Number.isInteger(rating)) {
+      return res.json({
+        resStatus: false,
+        resErrorCode: 1,
+        resMessage: "Invalid or missing fields"
+      });
+    }
   if (rating < 0 || rating > 10) {
     return res.json({
       resStatus: false,
