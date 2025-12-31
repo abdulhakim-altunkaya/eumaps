@@ -3289,6 +3289,21 @@ app.get("/api/get/master-latvia/search", blockSpamIPs, rateLimitRead, async (req
       resMessage: "Search query too short"
     });
   }
+  if (q.length < 3) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Search query too short"
+    });
+  }
+  if (!/^[^<>]{3,60}$/.test(q)) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 3,
+      resMessage: "Invalid search query"
+    });
+  }
+
 
   // 🚫 block deep offsets
   if (offset >= HARD_CAP) {
