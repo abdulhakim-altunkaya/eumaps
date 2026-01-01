@@ -3772,6 +3772,38 @@ app.get("/api/get/master-latvia/browse-filter", blockSpamIPs, rateLimitRead, asy
     });
   }
 });
+app.get("/api/get/master-latvia/homepage/carousel", async (req, res) => {
+  try {
+    const q = `
+      SELECT
+        id,
+        title,
+        name,
+        price,
+        city,
+        image_url ->> 0 AS image
+      FROM masters_latvia_carousel
+      ORDER BY id DESC
+    `;
+
+    const result = await pool.query(q);
+
+    return res.json({
+      resStatus: true,
+      resOkCode: 1,
+      resData: result.rows
+    });
+
+  } catch (err) {
+    console.error("CAROUSEL FETCH ERROR:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Failed to fetch carousel ads",
+      resErrorCode: 2
+    });
+  }
+});
+
 
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
 //fetch comments etc. This code helps with managing routes that are not defined on react frontend.
