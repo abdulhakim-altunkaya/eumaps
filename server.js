@@ -3407,18 +3407,11 @@ app.get("/api/get/master-latvia/search", blockSpamIPs, rateLimitRead, async (req
   const limit = PAGE_SIZE;
   const offset = (page - 1) * limit;
 
-  if (q.length < 3) {
+  if (q.length < 3 || q.length > 60) {
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Search query too short"
-    });
-  }
-  if (q.length < 3) {
-    return res.json({
-      resStatus: false,
-      resErrorCode: 1,
-      resMessage: "Search query too short"
+      resMessage: "Search query too short or long"
     });
   }
   if (!/^[^<>]{3,60}$/.test(q)) {
@@ -3497,15 +3490,21 @@ app.get("/api/get/master-latvia/search", blockSpamIPs, rateLimitRead, async (req
 });
 app.get("/api/get/master-latvia/search-filter", rateLimitRead, blockSpamIPs, async (req, res) => {
   const q = (req.query.q || "").trim();
-  if (q.length < 3) {
+  if (q.length < 3 || q.length > 60) {
     return res.json({
       resStatus: false,
-      resMessage: "Search query too short"
+      resErrorCode: 1,
+      resMessage: "Search query too short or long"
     });
   }
-
+  if (!/^[^<>]{3,60}$/.test(q)) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 3,
+      resMessage: "Invalid search query"
+    });
+  }
   const { title, city, minRating, minReviews } = req.query;
-
   const PAGE_SIZE = 12;
   const HARD_CAP = 1000;
 
