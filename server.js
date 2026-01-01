@@ -1507,6 +1507,69 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite, sanitizeIn
     main_group,
     sub_group
   } = formData;
+  if (!inputService || !inputName || !inputPrice || !inputDescription || !phoneNumber) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Missing required fields",
+      resErrorCode: 2
+    });
+  }
+  if (!/^\p{L}+(\s\p{L}+)+$/u.test(inputName)) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Invalid name format",
+      resErrorCode: 3
+    });
+  }
+  if (/<[^>]+>/.test(inputPrice) || /[\p{Cc}]/u.test(inputPrice)) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Invalid price value",
+      resErrorCode: 4
+    });
+  }
+  if (/<[^>]+>/.test(inputDescription) || /[\p{Cc}]/u.test(inputDescription)) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Invalid description",
+      resErrorCode: 5
+    });
+  }
+  if (phoneNumber.trim().length < 7 || phoneNumber.trim().length > 12) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Invalid phone number length",
+      resErrorCode: 6
+    });
+  }
+  if (!Array.isArray(inputRegions) || inputRegions.length === 0) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "No regions selected",
+      resErrorCode: 7
+    });
+  }
+  if (inputName.length < 5 || inputName.length > 19) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Invalid name length",
+      resErrorCode: 15
+    });
+  }
+  if (inputPrice.length < 1 || inputPrice.length > 15) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Invalid price length",
+      resErrorCode: 16
+    });
+  }
+  if (inputDescription.length < 50 || inputDescription.length > 1000) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Invalid description length",
+      resErrorCode: 18
+    });
+  }
   /* -------------------------------------------
      SESSION VALIDATION
   ------------------------------------------- */
@@ -1718,7 +1781,69 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, rateLimitWrite, sa
       inputRegions,
       existingImages
     } = formData;
-
+     if (!inputService || !inputName || !inputPrice || !inputDescription || !phoneNumber) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Missing required fields",
+      resErrorCode: 2
+    });
+  }
+  if (!/^\p{L}+(\s\p{L}+)+$/u.test(inputName)) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Invalid name format",
+      resErrorCode: 3
+    });
+  }
+  if (/<[^>]+>/.test(inputPrice) || /[\p{Cc}]/u.test(inputPrice)) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Invalid price value",
+      resErrorCode: 4
+    });
+  }
+  if (/<[^>]+>/.test(inputDescription) || /[\p{Cc}]/u.test(inputDescription)) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Invalid description",
+      resErrorCode: 5
+    });
+  }
+  if (phoneNumber.trim().length < 7 || phoneNumber.trim().length > 12) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Invalid phone number length",
+      resErrorCode: 6
+    });
+  }
+  if (!Array.isArray(inputRegions) || inputRegions.length === 0) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "No regions selected",
+      resErrorCode: 7
+    });
+  }
+  if (inputName.length < 5 || inputName.length > 19) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Invalid name length",
+      resErrorCode: 15
+    });
+  }
+  if (inputPrice.length < 1 || inputPrice.length > 15) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Invalid price length",
+      resErrorCode: 16
+    });
+  }
+  if (inputDescription.length < 50 || inputDescription.length > 1000) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Invalid description length",
+      resErrorCode: 18
+    });
+  }
     /* -------------------------------
        HANDLE NEW IMAGE UPLOADS
     --------------------------------*/
