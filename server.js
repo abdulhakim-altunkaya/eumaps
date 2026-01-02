@@ -722,8 +722,8 @@ app.post("/api/save-visitor/letonya-oturum-english", async (req, res) => {
     if(client) client.release();
   }
 });
-
-app.post("/api/kac-milyon/save-visitor", visitLoggingMiddleware(5 * 60 * 1000), async (req, res) => {
+//5 minutes
+app.post("/api/kac-milyon/save-visitor", visitLoggingMiddleware(3 * 60 * 1000), async (req, res) => {
   let client;
   // silently skip if throttled
   if (!req.shouldLogVisit) {
@@ -765,7 +765,7 @@ app.post("/api/kac-milyon/save-visitor", visitLoggingMiddleware(5 * 60 * 1000), 
     if(client) client.release();
   }
 });
-app.post("/api/litvanya-yatirim/save-visitor", visitLoggingMiddleware(5 * 60 * 1000), async (req, res) => {
+app.post("/api/litvanya-yatirim/save-visitor", visitLoggingMiddleware(3 * 60 * 1000), async (req, res) => {
   let client;
   // silently skip if throttled
   if (!req.shouldLogVisit) {
@@ -777,7 +777,6 @@ app.post("/api/litvanya-yatirim/save-visitor", visitLoggingMiddleware(5 * 60 * 1
   }
   const userAgentString = req.get("User-Agent") || "";
   const agent = useragent.parse(userAgentString);
-
   try {
     //save visitor to database
     client = await pool.connect();
@@ -807,8 +806,7 @@ app.post("/api/litvanya-yatirim/save-visitor", visitLoggingMiddleware(5 * 60 * 1
     if(client) client.release();
   }
 });
-//5 minutes
-app.post("/api/post/master-latvia/save-visitor",  visitLoggingMiddleware(5 * 60 * 1000), async (req, res) => {
+app.post("/api/post/master-latvia/save-visitor",  visitLoggingMiddleware(3 * 60 * 1000), async (req, res) => {
     // silently skip if throttled
     if (!req.shouldLogVisit) {
       return res.status(200).json({
