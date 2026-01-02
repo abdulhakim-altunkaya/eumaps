@@ -722,48 +722,32 @@ app.post("/api/save-visitor/letonya-oturum-english", async (req, res) => {
     if(client) client.release();
   }
 });
-const ipCache11 = {}
-app.post("/api/kac-milyon/save-visitor", async (req, res) => {
-  //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
-  //and Render is using proxies or load balancers. Because of that I will see "::1" as ip data if I not use
-  //this line below
-  const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
+
+app.post("/api/kac-milyon/save-visitor", visitLoggingMiddleware(5 * 60 * 1000), async (req, res) => {
   let client;
-  
-  // Check if the IP is in the ignored list
-  if (ignoredIPs.includes(ipVisitor)) {
-    return res.status(403).json({
+  // silently skip if throttled
+  if (!req.shouldLogVisit) {
+    return res.status(200).json({
       resStatus: false,
-      resMessage: "This IP is ignored from logging",
+      resMessage: "Cooldown triggered or logging skipped",
       resErrorCode: 1
     });
   }
-  // Check if IP exists in cache and if last visit was less than approximately 4 minutes ago
-  if (ipCache11[ipVisitor] && Date.now() - ipCache11[ipVisitor] < 250000) {
-    return res.status(200).json({
-      resStatus: false,
-      resMessage: "Too many requests from this IP.",
-      resOkCode: 2
-    });
-  }
-
-  ipCache11[ipVisitor] = Date.now();//save visitor ip to ipCache11
-  const userAgentString = req.get('User-Agent') || '';
+  const userAgentString = req.get("User-Agent") || "";
   const agent = useragent.parse(userAgentString);
 
   try {
-    const visitorData = {
-      ip: ipVisitor,
-      os: agent.os.toString(), // operating system
-      browser: agent.toAgent(), // browser
-      visitDate: new Date().toLocaleDateString('en-GB')
-    };
     //save visitor to database
     client = await pool.connect();
     const result = await client.query(
       `INSERT INTO visitors_kac_milyon (ip, op, browser, date) 
       VALUES ($1, $2, $3, $4)`, 
-      [visitorData.ip, visitorData.os, visitorData.browser, visitorData.visitDate]
+      [
+        req.clientIp,
+        agent.os.toString(),
+        agent.toAgent(),
+        new Date().toLocaleDateString("en-GB")
+      ]
     );
     return res.status(200).json({
       resStatus: true,
@@ -781,48 +765,31 @@ app.post("/api/kac-milyon/save-visitor", async (req, res) => {
     if(client) client.release();
   }
 });
-const ipCache12 = {}
-app.post("/api/litvanya-yatirim/save-visitor", async (req, res) => {
-  //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
-  //and Render is using proxies or load balancers. Because of that I will see "::1" as ip data if I not use
-  //this line below
-  const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
+app.post("/api/litvanya-yatirim/save-visitor", visitLoggingMiddleware(5 * 60 * 1000), async (req, res) => {
   let client;
-  
-  // Check if the IP is in the ignored list
-  if (ignoredIPs.includes(ipVisitor)) {
-    return res.status(403).json({
+  // silently skip if throttled
+  if (!req.shouldLogVisit) {
+    return res.status(200).json({
       resStatus: false,
-      resMessage: "This IP is ignored from logging",
+      resMessage: "Cooldown triggered or logging skipped",
       resErrorCode: 1
     });
   }
-  // Check if IP exists in cache and if last visit was less than approximately 4 minutes ago
-  if (ipCache12[ipVisitor] && Date.now() - ipCache12[ipVisitor] < 250000) {
-    return res.status(429).json({
-      resStatus: false,
-      resMessage: "Too many requests from this IP.",
-      resErrorCode: 2
-    });
-  }
-
-  ipCache12[ipVisitor] = Date.now();//save visitor ip to ipCache12
-  const userAgentString = req.get('User-Agent') || '';
+  const userAgentString = req.get("User-Agent") || "";
   const agent = useragent.parse(userAgentString);
 
   try {
-    const visitorData = {
-      ip: ipVisitor,
-      os: agent.os.toString(), // operating system
-      browser: agent.toAgent(), // browser
-      visitDate: new Date().toLocaleDateString('en-GB')
-    };
     //save visitor to database
     client = await pool.connect();
     const result = await client.query(
       `INSERT INTO visitors_litvanyayatirim (ip, op, browser, date) 
       VALUES ($1, $2, $3, $4)`, 
-      [visitorData.ip, visitorData.os, visitorData.browser, visitorData.visitDate]
+      [
+        req.clientIp,
+        agent.os.toString(),
+        agent.toAgent(),
+        new Date().toLocaleDateString("en-GB")
+      ]
     );
     return res.status(200).json({
       resStatus: true,
