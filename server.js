@@ -2262,7 +2262,7 @@ app.post("/api/post/master-latvia/review", blockSpamIPs, rateLimitWrite, sanitiz
   const adId = req.body.adId;
   const rating = Number(req.body.rating);
 
-  if (!sessionId || reviewer_name.length < 5 || review_text.length < 5 || !adId || !Number.isInteger(rating)) {
+  if (!sessionId || reviewer_name.length < 5 || review_text.length < 5 || !adId ) {
       return res.json({
         resStatus: false,
         resErrorCode: 1,
