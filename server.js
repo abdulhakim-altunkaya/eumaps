@@ -193,6 +193,37 @@ function sanitizeInputs(req, res, next) {
   next();
 }
 
+//MIDDLEWARE - VISITOR LOGGING
+const visitorCache = {}; //This object array is for cooldown
+//This array is for ip addresses that we dont want to save in visitors table at all.
+//It is for bot ip addresses. They can visit the website but we will not save them.
+const ignoredLoggingIps = new Set([ 
+  "127.0.0.1xxxx",
+  "::1xxxx"
+]);
+function visitLoggingMiddleware(waitingTime) {
+  return (req, res, next) => {
+    const ip =
+      req.headers["x-forwarded-for"]
+        ? req.headers["x-forwarded-for"].split(",")[0].trim()
+        : req.socket.remoteAddress || req.ip;
+    req.clientIp = ip;
+    //Some ip addresses, we can ignore them at all. No need to check cooldowns
+    if (ignoredLoggingIps.has(ip)) {
+      req.shouldLogVisit = false;
+      return next();
+    }
+    const lastVisit = visitorCache[ip];
+    if (lastVisit && Date.now() - lastVisit < waitingTime) {
+      req.shouldLogVisit = false; // silently skip
+    } else {
+      visitorCache[ip] = Date.now();
+      req.shouldLogVisit = true;
+    }
+    next();
+  };
+}
+
 
 //A temporary cache to save ip addresses and it will prevent spam comments and replies for 1 minute.
 //I can do that by checking each ip with database ip addresses but then it will be too many requests to db
@@ -809,6 +840,55 @@ app.post("/api/litvanya-yatirim/save-visitor", async (req, res) => {
     if(client) client.release();
   }
 });
+//5 minutes
+app.post("/api/post/master-latvia/save-visitor",  visitLoggingMiddleware(5 * 60 * 1000), async (req, res) => {
+    // silently skip if throttled
+    if (!req.shouldLogVisit) {
+      return res.status(200).json({
+        resStatus: false,
+        resMessage: "Cooldown triggered or logging skipped",
+        resErrorCode: 1
+      });
+    }
+    const userAgentString = req.get("User-Agent") || "";
+    const agent = useragent.parse(userAgentString);
+    let client;
+    try {
+      client = await pool.connect();
+      await client.query(
+        `
+        INSERT INTO visitors_masters_latvia (
+          ip,
+          op,
+          browser,
+          date
+        ) VALUES ($1, $2, $3, $4)
+        `,
+        [
+          req.clientIp,
+          agent.os.toString(),
+          agent.toAgent(),
+          new Date().toLocaleDateString("en-GB")
+        ]
+      );
+      return res.status(200).json({
+        resStatus: true,
+        resMessage: "Visitor logging succeeded",
+        resOkCode: 1
+      });
+    } catch (err) {
+      console.error("Visitor log error (Masters Latvia):", err);
+      return res.status(200).json({
+        resStatus: false,
+        resMessage: "Visitor logging failed - internal error",
+        resErrorCode: 2
+      });
+    } finally {
+      if (client) client.release();
+    }
+  }
+);
+
 
 /* SAVE MESSAGE FORMS */
 const ipCache10 = {}
