@@ -1485,8 +1485,18 @@ app.post("/api/kac-milyon/save-reply", async (req, res) => {
 });
 
 /*MASTERS-LATVIA ENDPOINTS */
-app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite, sanitizeInputs,
-  upload.array("images", 5), async (req, res) => {
+app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite, 
+  sanitizeInputs, upload.array("images", 5), async (req, res) => {
+  const MIN_IMAGE_SIZE = 2 * 1024;           // 2 KB
+  const MAX_IMAGE_SIZE = 1.9 * 1024 * 1024;  // 1.8 MB. Normally I should say 1.8 but just give some
+  //error room to the frontend here I am saying 1.9
+  const ALLOWED_IMAGE_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp"
+  ];
+
   const ipVisitor = req.headers["x-forwarded-for"]
     ? req.headers["x-forwarded-for"].split(",")[0]
     : req.socket.remoteAddress || req.ip;
@@ -1619,6 +1629,27 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite, sanitizeIn
   // Upload images
   let uploadedImages = [];
   for (const f of files) {
+    if (!ALLOWED_IMAGE_TYPES.includes(f.mimetype)) {
+      return res.status(400).json({
+        resStatus: false,
+        resMessage: "Unsupported file type",
+        resErrorCode: 9
+      });
+    }
+    if (f.size < MIN_IMAGE_SIZE) {
+      return res.status(400).json({
+        resStatus: false,
+        resMessage: "Image file is corrupted or empty",
+        resErrorCode: 24
+      });
+    }
+    if (f.size > MAX_IMAGE_SIZE) {
+      return res.status(400).json({
+        resStatus: false,
+        resMessage: "Image exceeds maximum allowed size (1.8 MB)",
+        resErrorCode: 25
+      });
+    }
     const fileName = makeSafeName();
     const { error } = await supabase.storage
       .from("masters_latvia_storage")
@@ -1710,9 +1741,19 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite, sanitizeIn
     if (client) client.release();
   }
 });
-app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, rateLimitWrite, sanitizeInputs,
-  upload.array("images", 5), async (req, res) => {
+app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, rateLimitWrite, 
+  sanitizeInputs,  upload.array("images", 5), async (req, res) => {
   const adId = req.params.id;
+  const MIN_IMAGE_SIZE = 2 * 1024;           // 2 KB
+  const MAX_IMAGE_SIZE = 1.9 * 1024 * 1024;  // 1.8 MB. Normally I should say 1.8 but just give some
+  //error room to the frontend here I am saying 1.9
+  const ALLOWED_IMAGE_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp"
+  ];
+
   /* -------------------------------
      CHECK LOGIN SESSION
   --------------------------------*/
@@ -1857,17 +1898,31 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, rateLimitWrite, sa
        HANDLE NEW IMAGE UPLOADS
     --------------------------------*/
     const files = req.files;
-    const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp"];
     let finalImages = Array.isArray(existingImages) ? existingImages : [];
 
     // Validate new images if any
     if (files && files.length > 0) {
+      //image checks before uploading
       for (const f of files) {
-        if (!allowed.includes(f.mimetype)) {
+        if (!ALLOWED_IMAGE_TYPES.includes(f.mimetype)) {
           return res.status(400).json({
             resStatus: false,
             resMessage: "Unsupported file type",
             resErrorCode: 9
+          });
+        }
+        if (f.size < MIN_IMAGE_SIZE) {
+          return res.status(400).json({
+            resStatus: false,
+            resMessage: "Image file is corrupted or empty",
+            resErrorCode: 24
+          });
+        }
+        if (f.size > MAX_IMAGE_SIZE) {
+          return res.status(400).json({
+            resStatus: false,
+            resMessage: "Image exceeds maximum allowed size (1.8 MB)",
+            resErrorCode: 25
           });
         }
       }
@@ -2249,14 +2304,6 @@ app.post("/api/post/master-latvia/ad-view", blockSpamIPs, rateLimitWrite, async 
 });
 app.post("/api/post/master-latvia/review", blockSpamIPs, rateLimitWrite, sanitizeInputs, async (req, res) => {
   const sessionId = req.cookies?.session_id;
-
-  const clean = (v, max) =>
-    String(v || "")
-      .trim()
-      .slice(0, max)
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-
   const reviewer_name = req.body.reviewer_name.trim();
   const review_text   = req.body.review_text.trim();
   const adId = req.body.adId;
