@@ -3837,6 +3837,7 @@ app.get("/api/get/master-latvia/homepage/carousel", async (req, res) => {
         name,
         price,
         city,
+        description,
         image_url ->> 0 AS image
       FROM masters_latvia_carousel
       ORDER BY id DESC
