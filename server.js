@@ -1672,19 +1672,6 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite,
   ------------------------------------------- */
   try {
     client = await pool.connect();
-    console.log({
-      inputName,
-      inputService,
-      inputDescription,
-      inputPrice,
-      inputRegions,
-      phone: Number(countryCode + phoneNumber),
-      uploadedImages,
-      main_group,
-      sub_group,
-      googleId
-    });
-
     const insertQuery = `
       INSERT INTO masters_latvia_ads 
       (name, title, description, price, city, telephone, image_url, ip, date,
@@ -1829,6 +1816,8 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, rateLimitWrite,
       countryCode,
       phoneNumber,
       inputRegions,
+      main_group,
+      sub_group,
       existingImages
     } = formData;
      if (!inputService || !inputName || !inputPrice || !inputDescription || !phoneNumber) {
@@ -1878,6 +1867,22 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, rateLimitWrite,
       resStatus: false,
       resMessage: "Invalid name length",
       resErrorCode: 15
+    });
+  }
+  const mainVal = Number(main_group);
+  if (isNaN(mainVal) || mainVal < 1 || mainVal > 10) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Galvenā kategorija ir ārpus atļautā diapazona.",
+      resErrorCode: 26
+    });
+  }
+  const subVal = Number(sub_group);
+  if (isNaN(subVal) || subVal < 1 || subVal > 10) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Apakškategorija ir ārpus atļautā diapazona.",
+      resErrorCode: 27
     });
   }
   if (inputPrice.length < 1 || inputPrice.length > 15) {
@@ -1960,8 +1965,10 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, rateLimitWrite,
         city        = $5,
         telephone   = $6,
         image_url   = $7,
-        update_date = $8
-      WHERE id = $9 AND google_id = $10
+        main_group  = $8,
+        sub_group   = $9,
+        update_date = $10
+      WHERE id = $11 AND google_id = $12
       RETURNING id
     `;
 
@@ -1973,6 +1980,8 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, rateLimitWrite,
       JSON.stringify(inputRegions),
       Number(countryCode + phoneNumber),
       JSON.stringify(finalImages),
+      main_group,
+      sub_group,
       new Date().toISOString().slice(0, 10),
       adId,
       googleId
