@@ -2367,6 +2367,21 @@ app.post("/api/post/master-latvia/review", blockSpamIPs, rateLimitWrite, sanitiz
       });
     }
     const reviewer_google_id = sessionResult.rows[0].google_id;
+
+    /* ---------- BLOCK SELF-REVIEW ---------- */
+    const adOwnerCheck = await pool.query(
+      `SELECT google_id FROM masters_latvia_ads WHERE id = $1 LIMIT 1`,
+      [adId]
+    );
+    // If the ad exists and the owner is the same as the reviewer
+    if (adOwnerCheck.rows[0]?.google_id === reviewer_google_id) {
+      return res.json({
+        resStatus: false,
+        resErrorCode: 7, // New error code for self-review
+        resMessage: "You cannot review your own ad"
+      });
+    }
+
     /* ---------- BLOCK DUPLICATE ACTIVE REVIEW ---------- */
     const activeReviewCheck = await pool.query(
       `
