@@ -1533,6 +1533,22 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite,
       resErrorCode: 2
     });
   }
+  const mainVal = Number(main_group);
+  if (isNaN(mainVal) || mainVal < 1 || mainVal > 10) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Galvenā kategorija ir ārpus atļautā diapazona.",
+      resErrorCode: 26
+    });
+  }
+  const subVal = Number(sub_group);
+  if (isNaN(subVal) || subVal < 1 || subVal > 10) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Apakškategorija ir ārpus atļautā diapazona.",
+      resErrorCode: 27
+    });
+  }
   if (!/^\p{L}+(\s\p{L}+)+$/u.test(inputName)) {
     return res.status(400).json({
       resStatus: false,
@@ -3519,7 +3535,10 @@ app.get("/api/get/master-latvia/search", blockSpamIPs, rateLimitRead, async (req
 
     // 2️⃣ paged data
     const dataQ = `
-      SELECT *
+      SELECT 
+        id, name, title, description, price, city, date, views,
+        telephone, image_url, google_id, main_group, sub_group,
+        average_rating, reviews_count
       FROM masters_latvia_ads
       WHERE is_active = true
         AND (title ILIKE $1 OR description ILIKE $1)
@@ -3654,7 +3673,10 @@ app.get("/api/get/master-latvia/search-filter", rateLimitRead, blockSpamIPs, asy
     const totalPages = Math.ceil(totalResults / PAGE_SIZE);
 
     const dataQ = `
-      SELECT *
+      SELECT 
+        id, name, title, description, price, city, date, views,
+        telephone, image_url, google_id, main_group, sub_group,
+        average_rating, reviews_count
       FROM masters_latvia_ads
       ${whereClause}
       ORDER BY date DESC
@@ -3688,7 +3710,10 @@ app.get("/api/get/master-latvia/browse", blockSpamIPs, rateLimitRead, async (req
 
   try {
     let query = `
-      SELECT *
+      SELECT 
+        id, name, title, description, price, city, date, views,
+        telephone, image_url, google_id, main_group, sub_group,
+        average_rating, reviews_count
       FROM masters_latvia_ads
       WHERE is_active = true
     `;
@@ -3810,7 +3835,10 @@ app.get("/api/get/master-latvia/browse-filter", blockSpamIPs, rateLimitRead, asy
     }
 
     const query = `
-      SELECT *
+      SELECT 
+        id, name, title, description, price, city, date, views,
+        telephone, image_url, google_id, main_group, sub_group,
+        average_rating, reviews_count
       FROM masters_latvia_ads
       WHERE ${conditions.join(" AND ")}
       ORDER BY created_at DESC
