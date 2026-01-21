@@ -1727,6 +1727,11 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite,
       });
     }
 
+    await client.query(
+      "UPDATE masters_latvia_users SET number_ads = number_ads + 1 WHERE google_id = $1",
+      [googleId]
+    );
+
     return res.status(201).json({
       resStatus: true,
       resMessage: "Master ad saved",
@@ -2055,13 +2060,13 @@ app.post("/api/post/master-latvia/auth/google", blockSpamIPs, rateLimitWrite, as
     const { sub: googleId, email, name } = payload;
     client = await pool.connect();
     const query = `
-      INSERT INTO masters_latvia_users (google_id, email, name, date, number_ads, ip)
+      INSERT INTO masters_latvia_users (google_id, email, name, date, ip)
       VALUES ($1, $2, $3, $4, $5, $6)
       ON CONFLICT (google_id)
       DO UPDATE SET email = EXCLUDED.email, name = EXCLUDED.name
       RETURNING google_id;
     `;
-    const values = [ googleId, email, name, new Date().toISOString().slice(0, 10), 0, ipVisitor ];
+    const values = [ googleId, email, name, new Date().toISOString().slice(0, 10), ipVisitor ];
     const result = await client.query(query, values);
 
     const dbGoogleId = result.rows[0].google_id;
