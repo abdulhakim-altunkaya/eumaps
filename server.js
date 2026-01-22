@@ -1538,7 +1538,7 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite,
     return res.status(400).json({
       resStatus: false,
       resMessage: "Galvenā kategorija ir ārpus atļautā diapazona.",
-      resErrorCode: 26
+      resErrorCode: 3
     });
   }
   const subVal = Number(sub_group);
@@ -1546,63 +1546,63 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite,
     return res.status(400).json({
       resStatus: false,
       resMessage: "Apakškategorija ir ārpus atļautā diapazona.",
-      resErrorCode: 27
+      resErrorCode: 4
     });
   }
   if (!/^\p{L}+(\s\p{L}+)+$/u.test(inputName)) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Invalid name format",
-      resErrorCode: 3
+      resErrorCode: 5
     });
   }
   if (/<[^>]+>/.test(inputPrice) || /[\p{Cc}]/u.test(inputPrice)) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Invalid price value",
-      resErrorCode: 4
+      resErrorCode: 6
     });
   }
   if (/<[^>]+>/.test(inputDescription) || /[\p{Cc}]/u.test(inputDescription)) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Invalid description",
-      resErrorCode: 5
+      resErrorCode: 7
     });
   }
   if (phoneNumber.trim().length < 7 || phoneNumber.trim().length > 12) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Invalid phone number length",
-      resErrorCode: 6
+      resErrorCode: 8
     });
   }
   if (!Array.isArray(inputRegions) || inputRegions.length === 0) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "No regions selected",
-      resErrorCode: 7
+      resErrorCode: 9
     });
   }
   if (inputName.length < 5 || inputName.length > 19) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Invalid name length",
-      resErrorCode: 15
+      resErrorCode: 10
     });
   }
   if (inputPrice.length < 1 || inputPrice.length > 15) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Invalid price length",
-      resErrorCode: 16
+      resErrorCode: 11
     });
   }
   if (inputDescription.length < 50 || inputDescription.length > 1000) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Invalid description length",
-      resErrorCode: 18
+      resErrorCode: 12
     });
   }
   /* -------------------------------------------
@@ -1630,6 +1630,19 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite,
 
   const googleId = userRes.rows[0].google_id;
 
+  const userAdNumberCheck = await client.query(
+    "SELECT number_ads FROM masters_latvia_users WHERE google_id = $1",
+    [googleId]
+  );
+
+  if (userAdNumberCheck.rows[0]?.number_ads >= 5) {
+    return res.status(403).json({
+      resStatus: false,
+      resMessage: "Ad limit reached",
+      resErrorCode: 15
+    });
+  }
+
   /* -------------------------------------------
      IMAGE VALIDATION
   ------------------------------------------- */
@@ -1639,7 +1652,7 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite,
     return res.status(400).json({
       resStatus: false,
       resMessage: "1–5 images required",
-      resErrorCode: 8
+      resErrorCode: 16
     });
   }
   // Upload images
@@ -1649,21 +1662,21 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite,
       return res.status(400).json({
         resStatus: false,
         resMessage: "Unsupported file type",
-        resErrorCode: 9
+        resErrorCode: 17
       });
     }
     if (f.size < MIN_IMAGE_SIZE) {
       return res.status(400).json({
         resStatus: false,
         resMessage: "Image file is corrupted or empty",
-        resErrorCode: 24
+        resErrorCode: 18
       });
     }
     if (f.size > MAX_IMAGE_SIZE) {
       return res.status(400).json({
         resStatus: false,
         resMessage: "Image exceeds maximum allowed size (1.8 MB)",
-        resErrorCode: 25
+        resErrorCode: 19
       });
     }
     const fileName = makeSafeName();
@@ -1675,7 +1688,7 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite,
       return res.status(503).json({
         resStatus: false,
         resMessage: "Image upload failed",
-        resErrorCode: 10
+        resErrorCode: 20
       });
     }
     uploadedImages.push(
@@ -1723,7 +1736,7 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite,
       return res.status(503).json({
         resStatus: false,
         resMessage: "Database insert failed",
-        resErrorCode: 11
+        resErrorCode: 21
       });
     }
 
@@ -1742,7 +1755,7 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite,
     return res.status(503).json({
       resStatus: false,
       resMessage: "Server error",
-      resErrorCode: 12
+      resErrorCode: 22
     });
 
   } finally {
