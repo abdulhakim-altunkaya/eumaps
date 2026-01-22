@@ -1630,18 +1630,25 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite,
 
   const googleId = userRes.rows[0].google_id;
 
-  const userAdNumberCheck = await client.query(
-    "SELECT number_ads FROM masters_latvia_users WHERE google_id = $1",
-    [googleId]
-  );
-
-  if (userAdNumberCheck.rows[0]?.number_ads >= 5) {
-    return res.status(403).json({
-      resStatus: false,
-      resMessage: "Ad limit reached",
-      resErrorCode: 15
-    });
+  try {
+    client = await pool.connect();
+    const userAdNumberCheck = await client.query(
+      "SELECT number_ads FROM masters_latvia_users WHERE google_id = $1",
+      [googleId]
+    );
+    if (userAdNumberCheck.rows[0]?.number_ads >= 5) {
+      return res.status(403).json({
+        resStatus: false,
+        resMessage: "Ad limit reached",
+        resErrorCode: 15
+      });
+    }
+  } finally {
+    if (client) client.release();
   }
+
+
+
 
   /* -------------------------------------------
      IMAGE VALIDATION
