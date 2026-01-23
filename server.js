@@ -1630,8 +1630,14 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite,
 
   const googleId = userRes.rows[0].google_id;
 
+/* -------------------------------------------
+    1 ad per subsection
+    5 ads total 
+  ------------------------------------------- */
+
   try {
     client = await pool.connect();
+    // 1. Check total ad limit
     const userAdNumberCheck = await client.query(
       "SELECT number_ads FROM masters_latvia_users WHERE google_id = $1",
       [googleId]
@@ -1639,10 +1645,31 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite,
     if (userAdNumberCheck.rows[0]?.number_ads >= 5) {
       return res.status(403).json({
         resStatus: false,
-        resMessage: "Ad limit reached",
+        resMessage: "Ad limit reached (Max 5 total)",
         resErrorCode: 15
       });
     }
+    // 2. NEW: Check if ad already exists in this specific subsection
+    const existingAdCheck = await client.query(
+      `SELECT id FROM masters_latvia_ads 
+      WHERE google_id = $1 AND main_group = $2 AND sub_group = $3 
+      LIMIT 1`,
+      [googleId, mainVal, subVal]
+    );
+    if (existingAdCheck.rowCount > 0) {
+      return res.status(403).json({
+        resStatus: false,
+        resMessage: "Šajā apakškategorijā Jums jau ir aktīvs sludinājums.",
+        resErrorCode: 23 // New error code for sub-section limit
+      });
+    }
+  } catch (err) {
+      console.error(err);
+      return res.status(500).json({ 
+        resStatus: false, 
+        resMessage: "Internal Server Error",
+        resErrorCode: 23 // New error code for sub-section limit
+      })
   } finally {
     if (client) client.release();
   }
