@@ -1509,7 +1509,7 @@ app.post("/api/kac-milyon/save-reply", async (req, res) => {
 });
 
 /*MASTERS-LATVIA ENDPOINTS */
-app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite, postAdCooldown, 
+app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite, 
   sanitizeInputs, upload.array("images", 5), async (req, res) => {
   const MIN_IMAGE_SIZE = 2 * 1024;           // 2 KB
   const MAX_IMAGE_SIZE = 1.9 * 1024 * 1024;  // 1.8 MB. Normally I should say 1.8 but just give some
