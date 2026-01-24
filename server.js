@@ -166,7 +166,31 @@ function rateLimitRead(req, res, next) {
   }
   next();
 }
-
+//This middleware is specifically for upload and update endpoints of LM.
+//To prevent reentrancy spamming (race condition), we limit each ip to 1 request per 5 seconds for these endpoints.
+const adCooldownStore = new Map();
+function postAdCooldown(req, res, next) {
+  const ip = req.headers["x-forwarded-for"]
+    ? req.headers["x-forwarded-for"].split(",")[0]
+    : req.socket.remoteAddress || req.ip;
+  const now = Date.now();
+  const COOLDOWN_MS = 5000;
+  const lastUsage = adCooldownStore.get(ip);
+  if (lastUsage && now - lastUsage < COOLDOWN_MS) {
+    return res.status(429).json({
+      resStatus: false,
+      resMessage: "Lūdzu, uzgaidiet 5 sekundes.",
+      resErrorCode: 112
+    });
+  }
+  adCooldownStore.set(ip, now);
+  setTimeout(() => {
+    if (adCooldownStore.get(ip) === now) {
+      adCooldownStore.delete(ip);
+    }
+  }, COOLDOWN_MS);
+  next();
+}
 //MIDDLEWARE REQ.BODY AND REQ.QUERY SANITIZER
 //Currently used only by Latvijas meistari
 function sanitizeInputs(req, res, next) {
@@ -1485,7 +1509,7 @@ app.post("/api/kac-milyon/save-reply", async (req, res) => {
 });
 
 /*MASTERS-LATVIA ENDPOINTS */
-app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite, 
+app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite, postAdCooldown, 
   sanitizeInputs, upload.array("images", 5), async (req, res) => {
   const MIN_IMAGE_SIZE = 2 * 1024;           // 2 KB
   const MAX_IMAGE_SIZE = 1.9 * 1024 * 1024;  // 1.8 MB. Normally I should say 1.8 but just give some
@@ -1645,7 +1669,7 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite,
     if (userAdNumberCheck.rows[0]?.number_ads >= 5) {
       return res.status(403).json({
         resStatus: false,
-        resMessage: "Ad limit reached (Max 5 total)",
+        resMessage: "Sludinājumu skaits ir sasniegts (maksimums 5).",
         resErrorCode: 15
       });
     }
@@ -1667,7 +1691,7 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite,
       console.error(err);
       return res.status(500).json({ 
         resStatus: false, 
-        resMessage: "Internal Server Error",
+        resMessage: "Sistēmas kļūda. Lūdzu, mēģiniet vēlreiz vēlāk.",
         resErrorCode: 23 // New error code for sub-section limit
       })
   } finally {
