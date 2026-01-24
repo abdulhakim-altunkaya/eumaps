@@ -171,11 +171,12 @@ function rateLimitRead(req, res, next) {
 const adCooldownStore = new Map();
 function postAdCooldown(req, res, next) {
   const ip = req.headers["x-forwarded-for"]
-    ? req.headers["x-forwarded-for"].split(",")[0]
+    ? req.headers["x-forwarded-for"].split(",")[0].trim()
     : req.socket.remoteAddress || req.ip;
   const now = Date.now();
   const COOLDOWN_MS = 5000;
   const lastUsage = adCooldownStore.get(ip);
+  // Check BEFORE setting to avoid unnecessary updates on blocked requests
   if (lastUsage && now - lastUsage < COOLDOWN_MS) {
     return res.status(429).json({
       resStatus: false,
@@ -183,9 +184,13 @@ function postAdCooldown(req, res, next) {
       resErrorCode: 112
     });
   }
+  // Set timestamp only for requests that pass
   adCooldownStore.set(ip, now);
+  // Improved cleanup: always delete after cooldown period
   setTimeout(() => {
-    if (adCooldownStore.get(ip) === now) {
+    const current = adCooldownStore.get(ip);
+    // Only delete if no newer request has updated it
+    if (current && current <= now) {
       adCooldownStore.delete(ip);
     }
   }, COOLDOWN_MS);
@@ -1509,7 +1514,7 @@ app.post("/api/kac-milyon/save-reply", async (req, res) => {
 });
 
 /*MASTERS-LATVIA ENDPOINTS */
-app.post("/api/post/master-latvia/ads", blockSpamIPs, rateLimitWrite, 
+app.post("/api/post/master-latvia/ads", blockSpamIPs, postAdCooldown, rateLimitWrite, 
   sanitizeInputs, upload.array("images", 5), async (req, res) => {
   const MIN_IMAGE_SIZE = 2 * 1024;           // 2 KB
   const MAX_IMAGE_SIZE = 1.9 * 1024 * 1024;  // 1.8 MB. Normally I should say 1.8 but just give some
