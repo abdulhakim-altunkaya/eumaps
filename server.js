@@ -1825,7 +1825,7 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, postAdCooldown, rateLimitW
     if (client) client.release();
   }
 });
-app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, rateLimitWrite, 
+app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, postAdCooldown, rateLimitWrite, 
   sanitizeInputs,  upload.array("images", 5), async (req, res) => {
   const adId = req.params.id;
   const MIN_IMAGE_SIZE = 2 * 1024;           // 2 KB
@@ -1994,6 +1994,33 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, rateLimitWrite,
       resStatus: false,
       resMessage: "Invalid description length",
       resErrorCode: 18
+    });
+  }
+  /* -------------------------------
+      CHECK SUBSECTION LIMIT (1 AD PER SUB)
+  --------------------------------*/
+  try {
+    // We look for any OTHER ad (id != adId) in this same category
+    const existingAdCheck = await pool.query(
+      `SELECT id FROM masters_latvia_ads 
+        WHERE google_id = $1 AND main_group = $2 AND sub_group = $3 AND id != $4
+        LIMIT 1`,
+      [googleId, mainVal, subVal, adId]
+    );
+
+    if (existingAdCheck.rowCount > 0) {
+      return res.status(403).json({
+        resStatus: false,
+        resMessage: "Šajā apakškategorijā Jums jau ir aktīvs sludinājums.",
+        resErrorCode: 23
+      });
+    }
+  } catch (dbErr) {
+    console.error("SUBSECTION CHECK ERROR:", dbErr);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Sistēmas kļūda, pārbaudot kategoriju ierobežojumus.",
+      resErrorCode: 500
     });
   }
     /* -------------------------------
