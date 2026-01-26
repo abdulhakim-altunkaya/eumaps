@@ -2164,7 +2164,7 @@ app.post("/api/post/master-latvia/auth/google", blockSpamIPs, rateLimitWrite, as
     client = await pool.connect();
     const query = `
       INSERT INTO masters_latvia_users (google_id, email, name, date, ip)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      VALUES ($1, $2, $3, $4, $5)
       ON CONFLICT (google_id)
       DO UPDATE SET email = EXCLUDED.email, name = EXCLUDED.name
       RETURNING google_id;
