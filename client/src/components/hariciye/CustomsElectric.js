@@ -29,8 +29,8 @@ function CustomsElectric() {
   const [currencyName, setCurrencyName] = useState("");
   const [resultArea, setResultArea] = useState("");
 
-  const exchangeDollar = 42.75;
-  const exchangeEuro = 50.18;
+  const exchangeDollar = 43.39;
+  const exchangeEuro = 51.54;
 
   // Handle radio button changes
   const handleRadioChange = (e) => {

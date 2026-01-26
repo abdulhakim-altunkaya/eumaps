@@ -1845,8 +1845,8 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, postAdCooldown, ra
   if (!sessionId) {
     return res.status(401).json({
       resStatus: false,
-      resMessage: "Not logged in",
-      resErrorCode: 13
+      resMessage: "Lūdzu, pieslēdzieties",
+      resErrorCode: 1
     });
   }
   try {
@@ -1860,8 +1860,8 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, postAdCooldown, ra
     if (!userQ.rowCount) {
       return res.status(401).json({
         resStatus: false,
-        resMessage: "Invalid session",
-        resErrorCode: 14
+        resMessage: "Nederīga sesija",
+        resErrorCode: 2
       });
     }
     const googleId = userQ.rows[0].google_id;
@@ -1878,16 +1878,16 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, postAdCooldown, ra
     if (!adQ.rowCount) {
       return res.json({
         resStatus: false,
-        resMessage: "Ad not found",
-        resErrorCode: 20
+        resMessage: "Sludinājums neeksistē",
+        resErrorCode: 3
       });
     }
 
     if (adQ.rows[0].google_id !== googleId) {
       return res.status(403).json({
         resStatus: false,
-        resMessage: "Unauthorized",
-        resErrorCode: 21
+        resMessage: "Nepieciešama pieslēgšanās",
+        resErrorCode: 4
       });
     }
 
@@ -1900,8 +1900,8 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, postAdCooldown, ra
     } catch (err) {
       return res.status(400).json({
         resStatus: false,
-        resMessage: "Invalid form data",
-        resErrorCode: 1
+        resMessage: "Nederīgi formas dati",
+        resErrorCode: 5
       });
     }
 
@@ -1920,50 +1920,50 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, postAdCooldown, ra
      if (!inputService || !inputName || !inputPrice || !inputDescription || !phoneNumber) {
     return res.status(400).json({
       resStatus: false,
-      resMessage: "Missing required fields",
-      resErrorCode: 2
+      resMessage: "Aizpildiet obligātos laukus",
+      resErrorCode: 6
     });
   }
   if (!/^\p{L}+(\s\p{L}+)+$/u.test(inputName)) {
     return res.status(400).json({
       resStatus: false,
-      resMessage: "Invalid name format",
-      resErrorCode: 3
+      resMessage: "Nederīgs vārds",
+      resErrorCode: 7
     });
   }
   if (/<[^>]+>/.test(inputPrice) || /[\p{Cc}]/u.test(inputPrice)) {
     return res.status(400).json({
       resStatus: false,
-      resMessage: "Invalid price value",
-      resErrorCode: 4
+      resMessage: "Nederīga cenas vērtība",
+      resErrorCode: 8
     });
   }
   if (/<[^>]+>/.test(inputDescription) || /[\p{Cc}]/u.test(inputDescription)) {
     return res.status(400).json({
       resStatus: false,
-      resMessage: "Invalid description",
-      resErrorCode: 5
+      resMessage: "Nederīgs apraksts",
+      resErrorCode: 9
     });
   }
   if (phoneNumber.trim().length < 7 || phoneNumber.trim().length > 12) {
     return res.status(400).json({
       resStatus: false,
-      resMessage: "Invalid phone number length",
-      resErrorCode: 6
+      resMessage: "Tālruņa numurs ir pārāk garš vai pārāk īss",
+      resErrorCode: 10
     });
   }
   if (!Array.isArray(inputRegions) || inputRegions.length === 0) {
     return res.status(400).json({
       resStatus: false,
-      resMessage: "No regions selected",
-      resErrorCode: 7
+      resMessage: "Reģioni nav izvēlēti",
+      resErrorCode: 11
     });
   }
   if (inputName.length < 5 || inputName.length > 19) {
     return res.status(400).json({
       resStatus: false,
-      resMessage: "Invalid name length",
-      resErrorCode: 15
+      resMessage: "Vārds ir pārāk garš vai pārāk īss",
+      resErrorCode: 12
     });
   }
   const mainVal = Number(main_group);
@@ -1971,7 +1971,7 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, postAdCooldown, ra
     return res.status(400).json({
       resStatus: false,
       resMessage: "Galvenā kategorija ir ārpus atļautā diapazona.",
-      resErrorCode: 26
+      resErrorCode: 13
     });
   }
   const subVal = Number(sub_group);
@@ -1979,21 +1979,21 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, postAdCooldown, ra
     return res.status(400).json({
       resStatus: false,
       resMessage: "Apakškategorija ir ārpus atļautā diapazona.",
-      resErrorCode: 27
+      resErrorCode: 14
     });
   }
   if (inputPrice.length < 1 || inputPrice.length > 15) {
     return res.status(400).json({
       resStatus: false,
-      resMessage: "Invalid price length",
-      resErrorCode: 16
+      resMessage: "Cena ir pārāk gara vai pārāk īsa",
+      resErrorCode: 15
     });
   }
   if (inputDescription.length < 50 || inputDescription.length > 1000) {
     return res.status(400).json({
       resStatus: false,
-      resMessage: "Invalid description length",
-      resErrorCode: 18
+      resMessage: "Apraksts ir pārāk garš vai pārāk īss",
+      resErrorCode: 16
     });
   }
   /* -------------------------------
@@ -2012,7 +2012,7 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, postAdCooldown, ra
       return res.status(403).json({
         resStatus: false,
         resMessage: "Šajā apakškategorijā Jums jau ir aktīvs sludinājums.",
-        resErrorCode: 23
+        resErrorCode: 17
       });
     }
   } catch (dbErr) {
@@ -2020,7 +2020,7 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, postAdCooldown, ra
     return res.status(500).json({
       resStatus: false,
       resMessage: "Sistēmas kļūda, pārbaudot kategoriju ierobežojumus.",
-      resErrorCode: 500
+      resErrorCode: 18
     });
   }
     /* -------------------------------
@@ -2036,22 +2036,22 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, postAdCooldown, ra
         if (!ALLOWED_IMAGE_TYPES.includes(f.mimetype)) {
           return res.status(400).json({
             resStatus: false,
-            resMessage: "Unsupported file type",
-            resErrorCode: 9
+            resMessage: "Attēla faila tips nav derīgs",
+            resErrorCode: 19
           });
         }
         if (f.size < MIN_IMAGE_SIZE) {
           return res.status(400).json({
             resStatus: false,
-            resMessage: "Image file is corrupted or empty",
-            resErrorCode: 24
+            resMessage: "Attēla fails ir bojāts vai tukšs",
+            resErrorCode: 20
           });
         }
         if (f.size > MAX_IMAGE_SIZE) {
           return res.status(400).json({
             resStatus: false,
-            resMessage: "Image exceeds maximum allowed size (1.8 MB)",
-            resErrorCode: 25
+            resMessage: "Pārāk liels attēls (maks. 1,8 MB)",
+            resErrorCode: 21
           });
         }
       }
@@ -2065,8 +2065,8 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, postAdCooldown, ra
         if (error) {
           return res.status(503).json({
             resStatus: false,
-            resMessage: "Image upload failed",
-            resErrorCode: 10
+            resMessage: "Attēla augšupielāde neizdevās",
+            resErrorCode: 22
           });
         }
         uploadedImages.push(
@@ -2116,14 +2116,14 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, postAdCooldown, ra
     if (!result.rowCount) {
       return res.json({
         resStatus: false,
-        resMessage: "Update failed",
-        resErrorCode: 22
+        resMessage: "Kļūda atjauninot",
+        resErrorCode: 23
       });
     }
 
     return res.json({
       resStatus: true,
-      resMessage: "Ad updated successfully",
+      resMessage: "Izmaiņas saglabātas",
       resOkCode: 1
     });
 
@@ -2131,8 +2131,8 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, postAdCooldown, ra
     console.error("UPDATE ERROR:", err);
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Server error",
-      resErrorCode: 23
+      resMessage: "Servera kļūda",
+      resErrorCode: 24
     });
   }
 });
