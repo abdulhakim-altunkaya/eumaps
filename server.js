@@ -41,7 +41,11 @@ const allowedOrigins = [
   "https://www.latvia-masters.netlify.app/register",
   "https://www.latvia-masters.netlify.app/register.html",
   "https://latvia-masters.netlify.app/register",
-  "https://latvia-masters.netlify.app/register.html"
+  "https://latvia-masters.netlify.app/register.html",
+  "https://meistarilatvija.lv",
+  "http://meistarilatvija.lv",
+  "https://www.meistarilatvija.lv",
+  "http://www.meistarilatvija.lv"
 ];
 app.use(cors({
   origin: function (origin, callback) {
