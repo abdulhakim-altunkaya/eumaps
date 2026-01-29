@@ -34,14 +34,6 @@ const allowedOrigins = [
   'https://kacmilyon.com',
   'https://www.litvanyayatirim.com',
   'https://litvanyayatirim.com',
-  "http://127.0.0.1:8080",
-  "http://192.168.8.103:8080",
-  "https://latvia-masters.netlify.app",
-  "https://www.latvia-masters.netlify.app",
-  "https://www.latvia-masters.netlify.app/register",
-  "https://www.latvia-masters.netlify.app/register.html",
-  "https://latvia-masters.netlify.app/register",
-  "https://latvia-masters.netlify.app/register.html",
   "https://meistarilatvija.lv",
   "http://meistarilatvija.lv",
   "https://www.meistarilatvija.lv",
@@ -58,6 +50,17 @@ app.use(cors({
   },
   credentials: true
 }));
+
+/*
+  "http://127.0.0.1:8080",
+  "http://192.168.8.103:8080",
+  "https://latvia-masters.netlify.app",
+  "https://www.latvia-masters.netlify.app",
+  "https://www.latvia-masters.netlify.app/register",
+  "https://www.latvia-masters.netlify.app/register.html",
+  "https://latvia-masters.netlify.app/register",
+  "https://latvia-masters.netlify.app/register.html",
+   */
 
 /*Google login for masters latvia*/
 const { OAuth2Client } = require("google-auth-library");
