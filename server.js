@@ -66,7 +66,7 @@ app.use(cors({
 const { OAuth2Client } = require("google-auth-library");
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID); // FIXED
 
-app.set('trust proxy', true);
+app.set('trust proxy', 1);
 
 //we need this as we use req.body to send data from frontend to backend
 app.use(express.json());
@@ -2184,7 +2184,7 @@ app.post("/api/post/master-latvia/auth/google", blockSpamIPs, rateLimitWrite, as
     const sessionId = await createSessionForUser(dbGoogleId);
     res.cookie("session_id", sessionId, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: true,
       sameSite: "none",
       maxAge: 1000 * 60 * 60 * 24 * 7
     });
