@@ -1644,7 +1644,9 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, postAdCooldown, rateLimitW
   /* -------------------------------------------
      SESSION VALIDATION
   ------------------------------------------- */
-  const sessionId = req.cookies?.session_id;
+  const auth = req.headers.authorization || "";
+  const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+  const sessionId = req.cookies?.session_id || bearerSid;
   if (!sessionId) {
     return res.status(401).json({
       resStatus: false,
@@ -1848,7 +1850,9 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, postAdCooldown, ra
   /* -------------------------------
      CHECK LOGIN SESSION
   --------------------------------*/
-  const sessionId = req.cookies?.session_id;
+  const auth = req.headers.authorization || "";
+  const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+  const sessionId = req.cookies?.session_id || bearerSid;
   if (!sessionId) {
     return res.status(401).json({
       resStatus: false,
@@ -2143,6 +2147,7 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, postAdCooldown, ra
     });
   }
 });
+
 //this function below is for google auth login of latvia masters
 async function createSessionForUser(dbGoogleId) {
   const sessionId = crypto.randomUUID(); // generate inline
@@ -2214,12 +2219,16 @@ app.post("/api/post/master-latvia/auth/google", blockSpamIPs, rateLimitWrite, as
   }
 });
 app.post("/api/post/master-latvia/logout", blockSpamIPs, rateLimitWrite, async (req, res) => {
-  const sessionId = req.cookies.session_id;
+    // Desktop can use cookies but some mobiles will use headers for login system
+  const auth = req.headers.authorization || "";
+  const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+  const sessionId = req.cookies?.session_id || bearerSid;
+
   await pool.query(`DELETE FROM masters_latvia_sessions WHERE session_id=$1`, [sessionId]);
 
   res.clearCookie("session_id", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: true,
     sameSite: "none"
   });
 
@@ -2275,7 +2284,10 @@ app.post("/api/post/master-latvia/toggle-activation/:id", blockSpamIPs, rateLimi
 });
 app.post("/api/post/master-latvia/delete-ad/:id", blockSpamIPs, rateLimitWrite, async (req, res) => {
   const adId = req.params.id;
-  const sessionId = req.cookies?.session_id;
+      // Desktop can use cookies but some mobiles will use headers for login system
+  const auth = req.headers.authorization || "";
+  const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+  const sessionId = req.cookies?.session_id || bearerSid;
   if (!sessionId) {
     return res.status(401).json({
       resStatus: false,
@@ -2443,7 +2455,10 @@ app.post("/api/post/master-latvia/ad-view", blockSpamIPs, rateLimitWrite, async 
   }
 });
 app.post("/api/post/master-latvia/review", blockSpamIPs, rateLimitWrite, sanitizeInputs, async (req, res) => {
-  const sessionId = req.cookies?.session_id;
+      // Desktop can use cookies but some mobiles will use headers for login system
+  const auth = req.headers.authorization || "";
+  const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+  const sessionId = req.cookies?.session_id || bearerSid;
   const reviewer_name = req.body.reviewer_name.trim();
   const review_text   = req.body.review_text.trim();
   const adId = req.body.adId;
@@ -2598,7 +2613,10 @@ app.post("/api/post/master-latvia/review", blockSpamIPs, rateLimitWrite, sanitiz
   }
 });
 app.post("/api/post/master-latvia/reply", blockSpamIPs, rateLimitWrite, sanitizeInputs, async (req, res) => {
-  const sessionId = req.cookies?.session_id;
+      // Desktop can use cookies but some mobiles will use headers for login system
+  const auth = req.headers.authorization || "";
+  const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+  const sessionId = req.cookies?.session_id || bearerSid;
   const { review_text, adId, parent } = req.body;
 
   if (!sessionId || !review_text || !adId || !parent) {
@@ -2686,7 +2704,10 @@ app.post("/api/post/master-latvia/reply", blockSpamIPs, rateLimitWrite, sanitize
   }
 });
 app.post("/api/post/master-latvia/delete-reply", blockSpamIPs, rateLimitWrite, async (req, res) => {
-  const sessionId = req.cookies?.session_id;
+      // Desktop can use cookies but some mobiles will use headers for login system
+  const auth = req.headers.authorization || "";
+  const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+  const sessionId = req.cookies?.session_id || bearerSid;
   const { replyId, adId } = req.body;
 
   if (!sessionId || !replyId || !adId) {
@@ -2840,7 +2861,10 @@ app.post("/api/post/master-latvia/message", blockSpamIPs, rateLimitWrite, saniti
   }
 });
 app.post("/api/post/master-latvia/like", blockSpamIPs, rateLimitWrite, async (req, res) => {
-  const sessionId = req.cookies?.session_id;
+      // Desktop can use cookies but some mobiles will use headers for login system
+  const auth = req.headers.authorization || "";
+  const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+  const sessionId = req.cookies?.session_id || bearerSid;
   const { ad_id } = req.body;
 
   if (!sessionId || !ad_id) {
@@ -2990,7 +3014,10 @@ app.post("/api/post/master-latvia/like", blockSpamIPs, rateLimitWrite, async (re
   }
 });
 app.get("/api/get/master-latvia/like-status", rateLimitRead, async (req, res) => {
-  const sessionId = req.cookies?.session_id;
+      // Desktop can use cookies but some mobiles will use headers for login system
+  const auth = req.headers.authorization || "";
+  const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+  const sessionId = req.cookies?.session_id || bearerSid;
   const { ad_id } = req.query;
 
   if (!sessionId || !ad_id) {
@@ -3105,7 +3132,10 @@ app.get("/api/get/master-latvia/reviews/:ad_id", rateLimitRead, async (req, res)
 //We are using this endpoint in profile page because it allows better performance
 //otherwise we will have to make two requests to the backend-database instead of one here.
 app.get("/api/get/master-latvia/profile-reviews-ads", rateLimitRead, async (req, res) => {
-  const sessionId = req.cookies?.session_id;
+      // Desktop can use cookies but some mobiles will use headers for login system
+  const auth = req.headers.authorization || "";
+  const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+  const sessionId = req.cookies?.session_id || bearerSid;
 
   if (!sessionId) {
     return res.status(200).json({
@@ -3178,7 +3208,10 @@ app.get("/api/get/master-latvia/profile-reviews-ads", rateLimitRead, async (req,
   }
 });
 app.get("/api/get/master-latvia/profile-replies-ads", rateLimitRead, async (req, res) => {
-  const sessionId = req.cookies?.session_id;
+      // Desktop can use cookies but some mobiles will use headers for login system
+  const auth = req.headers.authorization || "";
+  const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+  const sessionId = req.cookies?.session_id || bearerSid;
 
   if (!sessionId) {
     return res.status(200).json({
@@ -3252,7 +3285,10 @@ app.get("/api/get/master-latvia/profile-replies-ads", rateLimitRead, async (req,
 //deletes both reviews of the user and replies of the user.
 //reviews of user with reply of the owner is not deleted. It is made hidden.
 app.delete("/api/delete/master-latvia/review/:id", blockSpamIPs, rateLimitWrite, async (req, res) => {
-  const sessionId = req.cookies?.session_id;
+      // Desktop can use cookies but some mobiles will use headers for login system
+  const auth = req.headers.authorization || "";
+  const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+  const sessionId = req.cookies?.session_id || bearerSid;
   const reviewId = req.params.id;
 
   if (!sessionId) {
@@ -3392,7 +3428,11 @@ app.delete("/api/delete/master-latvia/review/:id", blockSpamIPs, rateLimitWrite,
   }
 });
 app.get("/api/get/master-latvia/session-user", blockSpamIPs, rateLimitRead, async (req, res) => {
-  const sessionId = req.cookies?.session_id;
+  // Desktop can use cookies but some mobiles will use headers for login system
+  const auth = req.headers.authorization || "";
+  const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+
+  const sessionId = req.cookies?.session_id || bearerSid;
 
   // No cookie -> not logged in, but it's not an "error"
   if (!sessionId) {
@@ -3546,7 +3586,10 @@ app.get("/api/get/master-latvia/ad/:id", rateLimitRead, async (req, res) => {
   }
 });
 app.get("/api/get/master-latvia/user-ads", rateLimitRead, async (req, res) => {
-  const sessionId = req.cookies?.session_id;
+  const auth = req.headers.authorization || "";
+  const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+
+  const sessionId = req.cookies?.session_id || bearerSid;
   if (!sessionId) {
     return res.status(200).json({
       resStatus: false,
