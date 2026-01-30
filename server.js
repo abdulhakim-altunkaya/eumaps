@@ -2191,6 +2191,7 @@ app.post("/api/post/master-latvia/auth/google", blockSpamIPs, rateLimitWrite, as
       httpOnly: true,
       secure: true,
       sameSite: "none",
+      path: "/",
       maxAge: 1000 * 60 * 60 * 24 * 7
     });
     return res.status(200).json({
