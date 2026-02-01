@@ -212,7 +212,8 @@ function sanitizeInputs(req, res, next) {
       .trim()
       .replace(/[\u0000-\u001F\u007F]/g, "") // control chars
       .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+      .replace(/>/g, "&gt;")
+      .replace(/[\u200B-\u200D\uFEFF\u2060\u00AD]/g, "");
   }
   function walk(obj) {
     if (!obj || typeof obj !== "object") return;
@@ -1522,7 +1523,7 @@ app.post("/api/kac-milyon/save-reply", async (req, res) => {
 
 /*MASTERS-LATVIA ENDPOINTS */
 app.post("/api/post/master-latvia/ads", blockSpamIPs, postAdCooldown, rateLimitWrite, 
-  sanitizeInputs, upload.array("images", 5), async (req, res) => {
+  upload.array("images", 5), sanitizeInputs, async (req, res) => {
   const MIN_IMAGE_SIZE = 2 * 1024;           // 2 KB
   const MAX_IMAGE_SIZE = 1.9 * 1024 * 1024;  // 1.8 MB. Normally I should say 1.8 but just give some
   //error room to the frontend here I am saying 1.9
@@ -1585,7 +1586,7 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, postAdCooldown, rateLimitW
       resErrorCode: 4
     });
   }
-  if (!/^\p{L}+(\s\p{L}+)+$/u.test(inputName)) {
+  if (!/^[\p{L}\s]{2,50}$/u.test(inputName.trim())) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Nepareizs vārda formāts",
@@ -1835,7 +1836,7 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, postAdCooldown, rateLimitW
   }
 });
 app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, postAdCooldown, rateLimitWrite, 
-  sanitizeInputs,  upload.array("images", 5), async (req, res) => {
+  upload.array("images", 5), sanitizeInputs,  async (req, res) => {
   const adId = req.params.id;
   const MIN_IMAGE_SIZE = 2 * 1024;           // 2 KB
   const MAX_IMAGE_SIZE = 1.9 * 1024 * 1024;  // 1.8 MB. Normally I should say 1.8 but just give some
@@ -1935,24 +1936,24 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, postAdCooldown, ra
       resErrorCode: 6
     });
   }
-  if (!/^\p{L}+(\s\p{L}+)+$/u.test(inputName)) {
+  if (!/^[\p{L}\s]{2,50}$/u.test(inputName.trim())) {
     return res.status(400).json({
       resStatus: false,
-      resMessage: "Nederīgs vārds",
+      resMessage: "Nepareizs vārda formāts",
       resErrorCode: 7
     });
   }
   if (/<[^>]+>/.test(inputPrice) || /[\p{Cc}]/u.test(inputPrice)) {
     return res.status(400).json({
       resStatus: false,
-      resMessage: "Nederīga cenas vērtība",
+      resMessage: "Nepareiza cenas vērtība",
       resErrorCode: 8
     });
   }
   if (/<[^>]+>/.test(inputDescription) || /[\p{Cc}]/u.test(inputDescription)) {
     return res.status(400).json({
       resStatus: false,
-      resMessage: "Nederīgs apraksts",
+      resMessage: "Nepareizs apraksts",
       resErrorCode: 9
     });
   }
