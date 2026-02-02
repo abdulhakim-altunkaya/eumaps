@@ -235,8 +235,10 @@ const visitorCache = {}; //This object array is for cooldown
 //This array is for ip addresses that we dont want to save in visitors table at all.
 //It is for bot ip addresses. They can visit the website but we will not save them.
 const ignoredLoggingIps = new Set([ 
-  "127.0.0.1xxxx",
-  "::1xxxx"
+  "80.89.79.139",
+  "84.15.219.255",
+  "212.3.194.8",
+  "80.89.79.47"  
 ]);
 function visitLoggingMiddleware(waitingTime) {
   return (req, res, next) => {
@@ -1563,6 +1565,21 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, postAdCooldown, rateLimitW
     main_group,
     sub_group
   } = formData;
+
+  function sanitizeInput(str) {
+    if (typeof str !== 'string') return '';
+    return str
+      // 1. Convert < and > into safe text versions so they don't execute
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      // 2. Remove invisible control characters (keep Newlines and Tabs if you want)
+      // This regex removes Cc (Control) but skips \n (10) and \r (13)
+      .replace(/[^\x20-\x7E\t\n\r\u00A0-\uFFFF]/gu, "");
+  }
+  const cleanInputDescription = sanitizeInput(inputDescription);
+  const cleanInputPrice = sanitizeInput(inputPrice);
+  const cleanInputName = sanitizeInput(inputName);
+
   if (!inputService || !inputName || !inputPrice || !inputDescription || !phoneNumber) {
     return res.status(400).json({
       resStatus: false,
@@ -1584,27 +1601,6 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, postAdCooldown, rateLimitW
       resStatus: false,
       resMessage: "Apakškategorija ir ārpus atļautā diapazona.",
       resErrorCode: 4
-    });
-  }
-  if (!/^[\p{L}\s]{2,50}$/u.test(inputName.trim())) {
-    return res.status(400).json({
-      resStatus: false,
-      resMessage: "Nepareizs vārda formāts",
-      resErrorCode: 5
-    });
-  }
-  if (/<[^>]+>/.test(inputPrice) || /[\p{Cc}]/u.test(inputPrice)) {
-    return res.status(400).json({
-      resStatus: false,
-      resMessage: "Nepareiza cenas vērtība",
-      resErrorCode: 6
-    });
-  }
-  if (/<[^>]+>/.test(inputDescription) || /[\p{Cc}]/u.test(inputDescription)) {
-    return res.status(400).json({
-      resStatus: false,
-      resMessage: "Nepareizs apraksts",
-      resErrorCode: 7
     });
   }
   if (phoneNumber.trim().length < 7 || phoneNumber.trim().length > 12) {
@@ -1787,10 +1783,10 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, postAdCooldown, rateLimitW
     `;
 
     const values = [
-      inputName,
+      cleanInputName,
       inputService,
-      inputDescription,
-      inputPrice,
+      cleanInputDescription,
+      cleanInputPrice,
       JSON.stringify(inputRegions),
       Number(countryCode + phoneNumber),
       JSON.stringify(uploadedImages),
@@ -1929,32 +1925,26 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, postAdCooldown, ra
       sub_group,
       existingImages
     } = formData;
-     if (!inputService || !inputName || !inputPrice || !inputDescription || !phoneNumber) {
+
+    function sanitizeInput(str) {
+      if (typeof str !== 'string') return '';
+      return str
+        // 1. Convert < and > into safe text versions so they don't execute
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        // 2. Remove invisible control characters (keep Newlines and Tabs if you want)
+        // This regex removes Cc (Control) but skips \n (10) and \r (13)
+        .replace(/[^\x20-\x7E\t\n\r\u00A0-\uFFFF]/gu, "");
+    }
+    const cleanInputDescription = sanitizeInput(inputDescription);
+    const cleanInputPrice = sanitizeInput(inputPrice);
+    const cleanInputName = sanitizeInput(inputName);
+
+  if (!inputService || !inputName || !inputPrice || !inputDescription || !phoneNumber) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Aizpildiet obligātos laukus",
       resErrorCode: 6
-    });
-  }
-  if (!/^[\p{L}\s]{2,50}$/u.test(inputName.trim())) {
-    return res.status(400).json({
-      resStatus: false,
-      resMessage: "Nepareizs vārda formāts",
-      resErrorCode: 7
-    });
-  }
-  if (/<[^>]+>/.test(inputPrice) || /[\p{Cc}]/u.test(inputPrice)) {
-    return res.status(400).json({
-      resStatus: false,
-      resMessage: "Nepareiza cenas vērtība",
-      resErrorCode: 8
-    });
-  }
-  if (/<[^>]+>/.test(inputDescription) || /[\p{Cc}]/u.test(inputDescription)) {
-    return res.status(400).json({
-      resStatus: false,
-      resMessage: "Nepareizs apraksts",
-      resErrorCode: 9
     });
   }
   if (phoneNumber.trim().length < 7 || phoneNumber.trim().length > 12) {
@@ -2109,10 +2099,10 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, postAdCooldown, ra
     `;
 
     const values = [
-      inputName,
+      cleanInputName,
       inputService,
-      inputDescription,
-      inputPrice,
+      cleanInputDescription,
+      cleanInputPrice,
       JSON.stringify(inputRegions),
       Number(countryCode + phoneNumber),
       JSON.stringify(finalImages),
