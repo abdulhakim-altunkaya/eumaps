@@ -203,32 +203,6 @@ function postAdCooldown(req, res, next) {
   }, COOLDOWN_MS);
   next();
 }
-//MIDDLEWARE REQ.BODY AND REQ.QUERY SANITIZER
-//Currently used only by Latvijas meistari
-function sanitizeInputs(req, res, next) {
-  function sanitize(value) {
-    if (typeof value !== "string") return value;
-    return value
-      .trim()
-      .replace(/[\u0000-\u001F\u007F]/g, "") // control chars
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/[\u200B-\u200D\uFEFF\u2060\u00AD]/g, "");
-  }
-  function walk(obj) {
-    if (!obj || typeof obj !== "object") return;
-    for (const key in obj) {
-      if (typeof obj[key] === "string") {
-        obj[key] = sanitize(obj[key]);
-      } else if (typeof obj[key] === "object") {
-        walk(obj[key]);
-      }
-    }
-  }
-  walk(req.body);
-  walk(req.query);
-  next();
-}
 
 //MIDDLEWARE - VISITOR LOGGING
 const visitorCache = {}; //This object array is for cooldown
@@ -1525,7 +1499,7 @@ app.post("/api/kac-milyon/save-reply", async (req, res) => {
 
 /*MASTERS-LATVIA ENDPOINTS */
 app.post("/api/post/master-latvia/ads", blockSpamIPs, postAdCooldown, rateLimitWrite, 
-  upload.array("images", 5), sanitizeInputs, async (req, res) => {
+  upload.array("images", 5), async (req, res) => {
   const MIN_IMAGE_SIZE = 2 * 1024;           // 2 KB
   const MAX_IMAGE_SIZE = 1.9 * 1024 * 1024;  // 1.8 MB. Normally I should say 1.8 but just give some
   //error room to the frontend here I am saying 1.9
@@ -1573,8 +1547,6 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, postAdCooldown, rateLimitW
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       // 2. Remove invisible control characters (keep Newlines and Tabs if you want)
-      // This regex removes Cc (Control) but skips \n (10) and \r (13)
-      .replace(/[^\x20-\x7E\t\n\r\u00A0-\uFFFF]/gu, "");
   }
   const cleanInputDescription = sanitizeInput(inputDescription);
   const cleanInputPrice = sanitizeInput(inputPrice);
@@ -1832,7 +1804,7 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, postAdCooldown, rateLimitW
   }
 });
 app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, postAdCooldown, rateLimitWrite, 
-  upload.array("images", 5), sanitizeInputs,  async (req, res) => {
+  upload.array("images", 5), async (req, res) => {
   const adId = req.params.id;
   const MIN_IMAGE_SIZE = 2 * 1024;           // 2 KB
   const MAX_IMAGE_SIZE = 1.9 * 1024 * 1024;  // 1.8 MB. Normally I should say 1.8 but just give some
@@ -1933,8 +1905,6 @@ app.put("/api/put/master-latvia/update-ad/:id", blockSpamIPs, postAdCooldown, ra
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         // 2. Remove invisible control characters (keep Newlines and Tabs if you want)
-        // This regex removes Cc (Control) but skips \n (10) and \r (13)
-        .replace(/[^\x20-\x7E\t\n\r\u00A0-\uFFFF]/gu, "");
     }
     const cleanInputDescription = sanitizeInput(inputDescription);
     const cleanInputPrice = sanitizeInput(inputPrice);
@@ -2446,7 +2416,7 @@ app.post("/api/post/master-latvia/ad-view", blockSpamIPs, rateLimitWrite, async 
     });
   }
 });
-app.post("/api/post/master-latvia/review", blockSpamIPs, rateLimitWrite, sanitizeInputs, async (req, res) => {
+app.post("/api/post/master-latvia/review", blockSpamIPs, rateLimitWrite, async (req, res) => {
       // Desktop can use cookies but some mobiles will use headers for login system
   const auth = req.headers.authorization || "";
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
@@ -2455,6 +2425,18 @@ app.post("/api/post/master-latvia/review", blockSpamIPs, rateLimitWrite, sanitiz
   const review_text   = req.body.review_text.trim();
   const adId = req.body.adId;
   const rating = Number(req.body.rating);
+
+  function sanitizeInput(str) {
+    if (typeof str !== 'string') return '';
+    return str
+      // 1. Convert < and > into safe text versions so they don't execute
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      // 2. Remove invisible control characters (keep Newlines and Tabs if you want)
+  }
+  const cleanReviewText = sanitizeInput(review_text);
+  const cleanReviewName = sanitizeInput(reviewer_name);
+
 
   if (!sessionId || reviewer_name.length < 5 || review_text.length < 5 || !adId ) {
     return res.json({
@@ -2561,8 +2543,8 @@ app.post("/api/post/master-latvia/review", blockSpamIPs, rateLimitWrite, sanitiz
       RETURNING id
       `,
       [
-        reviewer_name,
-        review_text,
+        cleanReviewName,
+        cleanReviewText,
         dateStr,
         reviewer_google_id,
         adId,
@@ -2604,12 +2586,22 @@ app.post("/api/post/master-latvia/review", blockSpamIPs, rateLimitWrite, sanitiz
     });
   }
 });
-app.post("/api/post/master-latvia/reply", blockSpamIPs, rateLimitWrite, sanitizeInputs, async (req, res) => {
+app.post("/api/post/master-latvia/reply", blockSpamIPs, rateLimitWrite, async (req, res) => {
       // Desktop can use cookies but some mobiles will use headers for login system
   const auth = req.headers.authorization || "";
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
   const sessionId = req.cookies?.session_id || bearerSid;
   const { review_text, adId, parent } = req.body;
+
+  function sanitizeInput(str) {
+    if (typeof str !== 'string') return '';
+    return str
+      // 1. Convert < and > into safe text versions so they don't execute
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      // 2. Remove invisible control characters (keep Newlines and Tabs if you want)
+  }
+  const cleanReviewText = sanitizeInput(review_text);
 
   if (!sessionId || !review_text || !adId || !parent) {
     return res.json({
@@ -2672,7 +2664,7 @@ app.post("/api/post/master-latvia/reply", blockSpamIPs, rateLimitWrite, sanitize
     `;
 
     const r = await pool.query(insertQ, [
-      review_text,
+      cleanReviewText,
       dateStr,
       ownerGoogleId, // reviewer_id = owner google_id
       adId,
@@ -2793,7 +2785,7 @@ app.post("/api/post/master-latvia/delete-reply", blockSpamIPs, rateLimitWrite, a
     });
   }
 });
-app.post("/api/post/master-latvia/message", blockSpamIPs, rateLimitWrite, sanitizeInputs, async (req, res) => {
+app.post("/api/post/master-latvia/message", blockSpamIPs, rateLimitWrite, async (req, res) => {
   const clean = (v, max) =>
     String(v || "")
       .trim()
