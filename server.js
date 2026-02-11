@@ -212,7 +212,8 @@ const ignoredLoggingIps = new Set([
   "80.89.79.139",
   "84.15.219.255",
   "212.3.194.8",
-  "80.89.79.47"  
+  "80.89.79.47",
+  "212.3.197.163"
 ]);
 function visitLoggingMiddleware(waitingTime) {
   return (req, res, next) => {
@@ -2998,22 +2999,44 @@ app.post("/api/post/master-latvia/like", blockSpamIPs, rateLimitWrite, async (re
   }
 });
 app.get("/api/get/master-latvia/like-status", rateLimitRead, async (req, res) => {
-      // Desktop can use cookies but some mobiles will use headers for login system
+
   const auth = req.headers.authorization || "";
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
   const sessionId = req.cookies?.session_id || bearerSid;
+
   const { ad_id } = req.query;
 
-  if (!sessionId || !ad_id) {
+  if (!ad_id) {
     return res.json({
       resStatus: false,
-      resErrorCode: 1,
-      resMessage: "Missing fields"
+      resMessage: "Missing ad_id"
     });
   }
 
   try {
-    // get google_id from session
+
+    // Always fetch likes first (PUBLIC)
+    const q = `
+      SELECT likers
+      FROM masters_latvia_likes
+      WHERE ad_id = $1
+      LIMIT 1
+    `;
+    const r = await pool.query(q, [ad_id]);
+
+    const likers = r.rowCount ? (r.rows[0].likers || []) : [];
+    const likersCount = likers.length;
+
+    // Guest user → only return count
+    if (!sessionId) {
+      return res.json({
+        resStatus: true,
+        hasLiked: false,
+        likersCount
+      });
+    }
+
+    // Logged user → check session
     const sessionQ = `
       SELECT google_id
       FROM masters_latvia_sessions
@@ -3024,50 +3047,29 @@ app.get("/api/get/master-latvia/like-status", rateLimitRead, async (req, res) =>
 
     if (!sessionR.rowCount) {
       return res.json({
-        resStatus: false,
-        resErrorCode: 2,
-        resMessage: "Invalid session"
+        resStatus: true,
+        hasLiked: false,
+        likersCount
       });
     }
 
     const google_id = sessionR.rows[0].google_id;
 
-    const q = `
-      SELECT likers
-      FROM masters_latvia_likes
-      WHERE ad_id = $1
-      LIMIT 1
-    `;
-    const r = await pool.query(q, [ad_id]);
-
-    // No row → no likes yet
-    if (!r.rowCount) {
-      return res.json({
-        resStatus: true,
-        resOkCode: 1,
-        hasLiked: false,
-        likersCount: 0
-      });
-    }
-
-    const likers = r.rows[0].likers || [];
-
     return res.json({
       resStatus: true,
-      resOkCode: 2,
       hasLiked: likers.includes(google_id),
-      likersCount: likers.length
+      likersCount
     });
 
   } catch (err) {
     console.error(err);
     return res.status(500).json({
       resStatus: false,
-      resErrorCode: 3,
       resMessage: "Server error"
     });
   }
 });
+
 app.get("/api/get/master-latvia/reviews/:ad_id", rateLimitRead, async (req, res) => {
   const adId = req.params.ad_id;
 
