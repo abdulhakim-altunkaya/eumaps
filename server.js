@@ -43,7 +43,7 @@ app.use(cors({
   origin: function (origin, callback) {
     const normalizedOrigin = origin?.replace(/\/$/, '');  // remove trailing slash if present
 
-    if (!origin || allowedOrigins.includes(normalizedOrigin)) {
+    if (!origin || origin === "null" || allowedOrigins.includes(normalizedOrigin)) {
       return callback(null, true);
     }
     return callback(new Error('Not allowed by CORS'));
