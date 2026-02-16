@@ -1003,9 +1003,9 @@ app.get("/api/kac-milyon/get-provinces", async (req, res) => {
   try {
     client = await pool.connect();
     const result = await client.query(
-      `SELECT "provincename", "2007", "2011", "2015", "2022", "2023", "2024", "provinceid"
+      `SELECT "provincename", "2007", "2011", "2015", "2023", "2024", , "2025", "provinceid"
        FROM kacmilyon_provinces
-       ORDER BY "2024" DESC`
+       ORDER BY "2025" DESC`
     );
     const dbprovinces = result.rows;
     return res.status(200).json({
@@ -1039,10 +1039,10 @@ app.get("/api/kac-milyon/get-districts/:provinceId", async (req, res) => {
   try {
     client = await pool.connect();
     const result = await client.query(
-      `SELECT "provincename", "districtname", "id", "2007", "2011", "2015", "2022", "2023", "2024", "provinceid"
+      `SELECT "provincename", "districtname", "id", "2007", "2011", "2015", "2023", "2024", "2025", "provinceid"
       FROM kacmilyon_districts
       WHERE provinceid = $1
-      ORDER BY "2024" DESC`,
+      ORDER BY "2025" DESC`,
       [provinceId2]
     );
     const provinceDetails = result.rows;
