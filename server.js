@@ -1003,7 +1003,7 @@ app.get("/api/kac-milyon/get-provinces", async (req, res) => {
   try {
     client = await pool.connect();
     const result = await client.query(
-      `SELECT "provincename", "2007", "2011", "2015", "2023", "2024", , "2025", "provinceid"
+      `SELECT "provincename", "2007", "2011", "2015", "2023", "2024", "2025", "provinceid"
        FROM kacmilyon_provinces
        ORDER BY "2025" DESC`
     );
