@@ -11,6 +11,14 @@ const { pool, supabase, upload } = require("./db"); // Import configurations
 const useragent = require("useragent");
 // ADD THIS NEAR TOP
 const axios = require('axios');
+const {
+  extractClientIP,
+  blockMaliciousIPs,
+  applyWriteRateLimit,
+  applyReadRateLimit,
+  enforceAdPostingCooldown,
+  checkLogCooldown
+} = require("./middleware/masters_MW.js");
 
 const cors = require("cors");
 //app.use(cors()); 
