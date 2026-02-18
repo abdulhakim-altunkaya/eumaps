@@ -11,14 +11,10 @@ const { pool, supabase, upload } = require("./db"); // Import configurations
 const useragent = require("useragent");
 // ADD THIS NEAR TOP
 const axios = require('axios');
-const {
-  extractClientIP,
-  blockMaliciousIPs,
-  applyWriteRateLimit,
-  applyReadRateLimit,
-  enforceAdPostingCooldown,
-  checkLogCooldown
-} = require("./middleware/masters_MW.js");
+
+//import and then mount masters LT routes
+const mastersLTRoutes = require("./routes/masters_LT");
+app.use("/api/master-lithuania", mastersLTRoutes);
 
 const cors = require("cors");
 //app.use(cors()); 
@@ -3275,7 +3271,7 @@ app.get("/api/get/master-latvia/profile-replies-ads", rateLimitRead, async (req,
       reviews: []
     });
   }
-});
+}); 
 //deletes both reviews of the user and replies of the user.
 //reviews of user with reply of the owner is not deleted. It is made hidden.
 app.delete("/api/delete/master-latvia/review/:id", blockSpamIPs, rateLimitWrite, async (req, res) => {
