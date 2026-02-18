@@ -11,6 +11,513 @@ const {
   checkLogCooldown
 } = require("../middleware/masters_MW");
 
+
+router.get("/get/reviews/:ad_id", applyReadRateLimit, async (req, res) => {
+  const adId = req.params.ad_id;
+
+  if (!adId) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Trūksta ad_id"
+    });
+  }
+
+  try {
+    const q = `
+      SELECT 
+        id,
+        reviewer_name,
+        review_text,
+        date,
+        reviewer_id,
+        parent,
+        rating
+      FROM masters_LT_reviews
+      WHERE ad_id = $1
+        AND is_deleted = false
+      ORDER BY id ASC
+    `;
+
+    const r = await pool.query(q, [adId]);
+
+    return res.json({
+      resStatus: true,
+      resOkCode: 1,
+      reviews: r.rows
+    });
+
+  } catch (err) {
+    console.error("Get reviews error:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resErrorCode: 2,
+      resMessage: "Serverio klaida"
+    });
+  }
+});
+
+//this gets reviews from reviews table and ad data from ads table (owner name, title, picture)
+//We are using this endpoint in profile page because it allows better performance
+//otherwise we will have to make two requests to the backend-database instead of one here.
+router.get("/get/profile-reviews-ads", applyReadRateLimit, async (req, res) => {
+  // Desktop can use cookies but some mobiles will use headers for login system
+  const auth = req.headers.authorization || "";
+  const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+  const sessionId = req.cookies?.session_id || bearerSid;
+
+  if (!sessionId) {
+    return res.status(200).json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Nėra aktyvios sesijos",
+      reviews: []
+    });
+  }
+
+  try {
+    /* get google id from session */
+    const sessionQuery = `
+      SELECT google_id
+      FROM masters_LT_sessions
+      WHERE session_id = $1
+      LIMIT 1;
+    `;
+
+    const sessionRes = await pool.query(sessionQuery, [sessionId]);
+
+    if (!sessionRes.rowCount) {
+      return res.status(200).json({
+        resStatus: false,
+        resErrorCode: 2,
+        resMessage: "Nėra aktyvios sesijos",
+        reviews: []
+      });
+    }
+
+    const googleId = sessionRes.rows[0].google_id;
+
+    /* reviews + ad data (NO aliases) */
+    const reviewsQuery = `
+      SELECT
+        masters_LT_reviews.id,
+        masters_LT_reviews.review_text,
+        masters_LT_reviews.rating,
+        masters_LT_reviews.date,
+        masters_LT_reviews.ad_id,
+
+        masters_LT_ads.name  AS ad_owner_name,
+        masters_LT_ads.title AS ad_title,
+        masters_LT_ads.image_url AS ad_image_url
+      FROM masters_LT_reviews
+      JOIN masters_LT_ads
+        ON masters_LT_ads.id = masters_LT_reviews.ad_id
+      WHERE masters_LT_reviews.reviewer_id = $1
+        AND masters_LT_reviews.is_deleted = false
+        AND masters_LT_reviews.parent IS NULL
+      ORDER BY masters_LT_reviews.id DESC;
+    `;
+
+    const reviewsRes = await pool.query(reviewsQuery, [googleId]);
+
+    return res.status(200).json({
+      resStatus: true,
+      resOkCode: 1,
+      reviews: reviewsRes.rows
+    });
+
+  } catch (err) {
+    console.error("Profile reviews fetch error:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resErrorCode: 3,
+      resMessage: "Serverio klaida",
+      reviews: []
+    });
+  }
+});
+router.get("/get/profile-replies-ads", applyReadRateLimit, async (req, res) => {
+  // Desktop can use cookies but some mobiles will use headers for login system
+  const auth = req.headers.authorization || "";
+  const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+  const sessionId = req.cookies?.session_id || bearerSid;
+
+  if (!sessionId) {
+    return res.status(200).json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Nėra aktyvios sesijos",
+      reviews: []
+    });
+  }
+
+  try {
+    /* get google id from session */
+    const sessionQuery = `
+      SELECT google_id
+      FROM masters_LT_sessions
+      WHERE session_id = $1
+      LIMIT 1;
+    `;
+
+    const sessionRes = await pool.query(sessionQuery, [sessionId]);
+
+    if (!sessionRes.rowCount) {
+      return res.status(200).json({
+        resStatus: false,
+        resErrorCode: 2,
+        resMessage: "Nėra aktyvios sesijos",
+        reviews: []
+      });
+    }
+
+    const googleId = sessionRes.rows[0].google_id;
+
+    /* replies written BY the user */
+    const repliesQuery = `
+      SELECT
+        masters_LT_reviews.id,
+        masters_LT_reviews.review_text,
+        masters_LT_reviews.date,
+        masters_LT_reviews.ad_id,
+
+        masters_LT_ads.name  AS ad_owner_name,
+        masters_LT_ads.title AS ad_title,
+        masters_LT_ads.image_url AS ad_image_url
+      FROM masters_LT_reviews
+      JOIN masters_LT_ads
+        ON masters_LT_ads.id = masters_LT_reviews.ad_id
+      WHERE masters_LT_reviews.reviewer_id = $1
+        AND masters_LT_reviews.parent IS NOT NULL
+        AND masters_LT_reviews.is_deleted = false
+      ORDER BY masters_LT_reviews.id DESC;
+    `;
+
+    const repliesRes = await pool.query(repliesQuery, [googleId]);
+
+    return res.status(200).json({
+      resStatus: true,
+      resOkCode: 1,
+      reviews: repliesRes.rows
+    });
+
+  } catch (err) {
+    console.error("Profile replies fetch error:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resErrorCode: 3,
+      resMessage: "Serverio klaida",
+      reviews: []
+    });
+  }
+});
+
+//deletes both reviews of the user and replies of the user.
+//reviews of user with reply of the owner is not deleted. It is made hidden.
+router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
+  // Desktop can use cookies but some mobiles will use headers for login system
+  const auth = req.headers.authorization || "";
+  const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+  const sessionId = req.cookies?.session_id || bearerSid;
+  const reviewId = req.params.id;
+
+  if (!sessionId) {
+    return res.status(200).json({
+      resStatus: false,
+      resMessage: "Nėra aktyvios sesijos",
+      resErrorCode: 1
+    });
+  }
+
+  if (!reviewId) {
+    return res.status(200).json({
+      resStatus: false,
+      resMessage: "Trūksta atsiliepimo id",
+      resErrorCode: 2
+    });
+  }
+
+  try {
+    /* GET GOOGLE ID FROM SESSION */
+    const sessionRes = await pool.query(
+      `
+      SELECT google_id
+      FROM masters_LT_sessions
+      WHERE session_id = $1
+      LIMIT 1;
+      `,
+      [sessionId]
+    );
+
+    if (!sessionRes.rowCount) {
+      return res.status(200).json({
+        resStatus: false,
+        resMessage: "Nėra aktyvios sesijos",
+        resErrorCode: 3
+      });
+    }
+
+    const googleId = sessionRes.rows[0].google_id;
+
+    /* VERIFY OWNERSHIP + GET ad_id */
+    const ownershipRes = await pool.query(
+      `
+      SELECT id, parent, ad_id
+      FROM masters_LT_reviews
+      WHERE id = $1
+        AND reviewer_id = $2
+      LIMIT 1;
+      `,
+      [reviewId, googleId]
+    );
+
+    if (!ownershipRes.rowCount) {
+      return res.status(200).json({
+        resStatus: false,
+        resMessage: "Atsiliepimas nerastas arba neleidžiama",
+        resErrorCode: 4
+      });
+    }
+
+    const { parent, ad_id: adId } = ownershipRes.rows[0];
+
+    /* ---------- DELETE LOGIC ---------- */
+
+    // Reply → hard delete
+    if (parent !== null) {
+      await pool.query(
+        `DELETE FROM masters_LT_reviews WHERE id = $1;`,
+        [reviewId]
+      );
+    } else {
+      // Main review → check replies
+      const replyRes = await pool.query(
+        `
+        SELECT 1
+        FROM masters_LT_reviews
+        WHERE parent = $1
+        LIMIT 1;
+        `,
+        [reviewId]
+      );
+
+      if (replyRes.rowCount) {
+        // Soft delete review + replies
+        await pool.query(
+          `
+          UPDATE masters_LT_reviews
+          SET is_deleted = true
+          WHERE id = $1 OR parent = $1;
+          `,
+          [reviewId]
+        );
+      } else {
+        // Hard delete review
+        await pool.query(
+          `DELETE FROM masters_LT_reviews WHERE id = $1;`,
+          [reviewId]
+        );
+      }
+    }
+
+    /* ---------- RECALCULATE STATS ---------- */
+
+    await pool.query(
+      `
+      UPDATE masters_LT_ads
+      SET
+        average_rating = COALESCE(sub.avg, 0),
+        reviews_count  = COALESCE(sub.cnt, 0)
+      FROM (
+        SELECT
+          ROUND(AVG(rating), 1) AS avg,
+          COUNT(*) AS cnt
+        FROM masters_LT_reviews
+        WHERE ad_id = $1
+          AND is_deleted = false
+          AND parent IS NULL
+      ) sub
+      WHERE id = $1;
+      `,
+      [adId]
+    );
+
+    return res.status(200).json({
+      resStatus: true,
+      resOkCode: 1,
+      resMessage: "Atsiliepimas ištrintas"
+    });
+
+  } catch (error) {
+    console.error("Delete review error:", error);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Duomenų bazės ryšio klaida",
+      resErrorCode: 5
+    });
+  }
+});
+
+router.get("/get/session-user", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
+  // Desktop can use cookies but some mobiles will use headers for login system
+  const auth = req.headers.authorization || "";
+  const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+
+  const sessionId = req.cookies?.session_id || bearerSid;
+
+  // No cookie -> not logged in, but it's not an "error"
+  if (!sessionId) {
+    return res.status(200).json({
+      resStatus: false,
+      resMessage: "Nėra aktyvios sesijos",
+      resErrorCode: 1,
+      loggedIn: false
+    });
+  }
+
+  try {
+    const query = `
+      SELECT 
+        masters_LT_users.google_id,
+        masters_LT_users.email,
+        masters_LT_users.name
+      FROM masters_LT_sessions
+      JOIN masters_LT_users
+        ON masters_LT_users.google_id = masters_LT_sessions.google_id
+      WHERE masters_LT_sessions.session_id = $1
+      LIMIT 1;
+    `;
+
+    const result = await pool.query(query, [sessionId]);
+
+    if (result.rowCount === 0) {
+      // Cookie exists but session not found (expired/invalid)
+      return res.status(200).json({
+        resStatus: false,
+        resMessage: "Nėra aktyvios sesijos",
+        resErrorCode: 2,
+        loggedIn: false
+      });
+    }
+
+    const user = result.rows[0];
+
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "Vartotojo sesija aktyvi",
+      resOkCode: 1,
+      loggedIn: true,
+      user: {
+        google_id: user.google_id,
+        email: user.email,
+        name: user.name
+      }
+    });
+
+  } catch (error) {
+    console.error("Session check error:", error);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Duomenų bazės ryšio klaida",
+      resErrorCode: 3,
+      loggedIn: false
+    });
+  }
+});
+
+router.get("/get/ad/:id", applyReadRateLimit, async (req, res) => {
+  const adId = req.params.id;
+
+  try {
+    const q = `
+      SELECT 
+        id, name, title, description, price, city, date, views,
+        telephone, image_url, google_id, main_group, sub_group,
+        average_rating, reviews_count
+      FROM masters_LT_ads
+      WHERE id = $1
+      LIMIT 1
+    `;
+    const r = await pool.query(q, [adId]);
+
+    if (!r.rowCount) {
+      return res.json({
+        resStatus: false,
+        resErrorCode: 1,
+        resMessage: "Skelbimas nerastas"
+      });
+    }
+
+    const ad = r.rows[0];
+    const { main_group, sub_group } = ad;
+
+    let newerId = null;
+    let olderId = null;
+
+    if (sub_group) {
+      const newerQ = `
+        SELECT id FROM masters_LT_ads
+        WHERE main_group = $2
+          AND sub_group = $3
+          AND id > $1
+        ORDER BY id ASC
+        LIMIT 1
+      `;
+      const olderQ = `
+        SELECT id FROM masters_LT_ads
+        WHERE main_group = $2
+          AND sub_group = $3
+          AND id < $1
+        ORDER BY id DESC
+        LIMIT 1
+      `;
+
+      const newerR = await pool.query(newerQ, [adId, main_group, sub_group]);
+      const olderR = await pool.query(olderQ, [adId, main_group, sub_group]);
+
+      newerId = newerR.rows[0]?.id || null;
+      olderId = olderR.rows[0]?.id || null;
+    } else {
+      const newerQ = `
+        SELECT id FROM masters_LT_ads
+        WHERE main_group = $2
+          AND id > $1
+        ORDER BY id ASC
+        LIMIT 1
+      `;
+      const olderQ = `
+        SELECT id FROM masters_LT_ads
+        WHERE main_group = $2
+          AND id < $1
+        ORDER BY id DESC
+        LIMIT 1
+      `;
+
+      const newerR = await pool.query(newerQ, [adId, main_group]);
+      const olderR = await pool.query(olderQ, [adId, main_group]);
+
+      newerId = newerR.rows[0]?.id || null;
+      olderId = olderR.rows[0]?.id || null;
+    }
+
+    return res.json({
+      resStatus: true,
+      resOkCode: 1,
+      ad,
+      newerId,
+      olderId
+    });
+
+  } catch (err) {
+    console.error("GET ad error:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resErrorCode: 2,
+      resMessage: "Serverio klaida"
+    });
+  }
+});
+
 router.get("/get/user-ads", applyReadRateLimit, async (req, res) => {
   const auth = req.headers.authorization || "";
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
