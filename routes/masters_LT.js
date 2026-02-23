@@ -1634,7 +1634,6 @@ router.get("/get/like-status", applyReadRateLimit, async (req, res) => {
     });
   }
 });
-
 router.get("/get/reviews/:ad_id", applyReadRateLimit, async (req, res) => {
   const adId = req.params.ad_id;
 
@@ -1679,7 +1678,6 @@ router.get("/get/reviews/:ad_id", applyReadRateLimit, async (req, res) => {
     });
   }
 });
-
 //this gets reviews from reviews table and ad data from ads table (owner name, title, picture)
 //We are using this endpoint in profile page because it allows better performance
 //otherwise we will have to make two requests to the backend-database instead of one here.
@@ -1834,7 +1832,6 @@ router.get("/get/profile-replies-ads", applyReadRateLimit, async (req, res) => {
     });
   }
 });
-
 //deletes both reviews of the user and replies of the user.
 //reviews of user with reply of the owner is not deleted. It is made hidden.
 router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
@@ -1980,7 +1977,6 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
     });
   }
 });
-
 router.get("/get/session-user", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
   // Desktop can use cookies but some mobiles will use headers for login system
   const auth = req.headers.authorization || "";
@@ -2047,7 +2043,6 @@ router.get("/get/session-user", blockMaliciousIPs, applyReadRateLimit, async (re
     });
   }
 });
-
 router.get("/get/ad/:id", applyReadRateLimit, async (req, res) => {
   const adId = req.params.id;
 
@@ -2140,7 +2135,6 @@ router.get("/get/ad/:id", applyReadRateLimit, async (req, res) => {
     });
   }
 });
-
 router.get("/get/user-ads", applyReadRateLimit, async (req, res) => {
   const auth = req.headers.authorization || "";
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
@@ -2205,7 +2199,6 @@ router.get("/get/user-ads", applyReadRateLimit, async (req, res) => {
     });
   }
 });
-
 router.get("/get/search", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
   const q = (req.query.q || "").trim();
 
@@ -2301,7 +2294,6 @@ router.get("/get/search", blockMaliciousIPs, applyReadRateLimit, async (req, res
     });
   }
 });
-
 router.get("/get/search-filter", applyReadRateLimit, blockMaliciousIPs, async (req, res) => {
   const q = (req.query.q || "").trim();
   if (q.length < 3 || q.length > 60) {
@@ -2434,7 +2426,6 @@ router.get("/get/search-filter", applyReadRateLimit, blockMaliciousIPs, async (r
     });
   }
 });
-
 router.get("/get/browse", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
   const { main, sub, cursor } = req.query;
   const limit = 12;
@@ -2493,7 +2484,6 @@ router.get("/get/browse", blockMaliciousIPs, applyReadRateLimit, async (req, res
     });
   }
 });
-
 router.get("/get/homepage/carousel", async (req, res) => {
   try {
     const q = `
@@ -2528,7 +2518,6 @@ router.get("/get/homepage/carousel", async (req, res) => {
     });
   }
 });
-
 router.get("/get/browse-filter", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
   const {
     main,
