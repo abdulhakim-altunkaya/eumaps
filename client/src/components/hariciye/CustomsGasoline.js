@@ -124,8 +124,8 @@ function CustomsGasoline() {
     `);
 
     let basePriceLira = basePrice * currency;
-
     let percentage;
+    
     if (engineCapacity3 <1401 && basePriceLira<650001) {
       percentage = 70/100;
     } else if (engineCapacity3 < 1401 && basePriceLira<900001) {
@@ -157,7 +157,6 @@ function CustomsGasoline() {
     let otherTaxes = taxYurticiGider + taxDamga + taxBandrol;
 
     let finalBasePrice = basePrice + amountNavlun + otherTaxes;
-
 
     let amountOTV = Math.round(finalBasePrice*percentage);
     let amountKDV = Math.round((amountOTV+finalBasePrice)*20/100);

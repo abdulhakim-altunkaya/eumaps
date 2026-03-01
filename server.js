@@ -12,10 +12,6 @@ const useragent = require("useragent");
 // ADD THIS NEAR TOP
 const axios = require('axios');
 
-//import and then mount masters LT routes
-const mastersLTRoutes = require("./routes/masters_LT");
-app.use("/api/master-lithuania", mastersLTRoutes);
-
 const cors = require("cors");
 //app.use(cors()); 
 
@@ -79,6 +75,11 @@ app.use(express.json());
 //Then go to server.js file and make sure you serve static files from build directory:
 app.use(express.static(path.join(__dirname, 'client/build')));
 //For serving from build directory, you need to install path package and initiate it:
+
+//import and then mount masters LT routes
+//Mounting routes must come after cors and other imports
+const mastersLTRoutes = require("./routes/masters_LT");
+app.use("/api/master-lithuania", mastersLTRoutes);
 
 //This function for now will be used safely convert image file names to alphanumerical values
 //currently used by latvia masters
