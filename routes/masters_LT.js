@@ -39,7 +39,7 @@ router.post("/post/save-visitor", checkLogCooldown(3 * 60 * 1000), async (req, r
     client = await pool.connect();
     await client.query(
       `
-      INSERT INTO visitors_masters_LT (
+      INSERT INTO visitors_masters_lt (
         ip,
         op,
         browser,
@@ -195,7 +195,7 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
     });
   }
   const userRes = await pool.query(
-    `SELECT google_id FROM masters_LT_sessions WHERE session_id = $1 LIMIT 1`,
+    `SELECT google_id FROM masters_lt_sessions WHERE session_id = $1 LIMIT 1`,
     [sessionId]
   );
   if (!userRes.rowCount) {
@@ -217,7 +217,7 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
     client = await pool.connect();
     // 1. Check total ad limit
     const userAdNumberCheck = await client.query(
-      "SELECT number_ads FROM masters_LT_users WHERE google_id = $1",
+      "SELECT number_ads FROM masters_lt_users WHERE google_id = $1",
       [googleId]
     );
     if (userAdNumberCheck.rows[0]?.number_ads >= 5) {
@@ -229,7 +229,7 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
     }
     // 2. NEW: Check if ad already exists in this specific subsection
     const existingAdCheck = await client.query(
-      `SELECT id FROM masters_LT_ads 
+      `SELECT id FROM masters_lt_ads 
       WHERE google_id = $1 AND main_group = $2 AND sub_group = $3 
       LIMIT 1`,
       [googleId, mainVal, subVal]
@@ -314,7 +314,7 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
   try {
     client = await pool.connect();
     const insertQuery = `
-      INSERT INTO masters_LT_ads 
+      INSERT INTO masters_lt_ads 
       (name, title, description, price, city, telephone, image_url, ip, date,
        main_group, sub_group, google_id, update_date,
        created_at, is_active)
@@ -353,7 +353,7 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
     }
 
     await client.query(
-      "UPDATE masters_LT_users SET number_ads = number_ads + 1 WHERE google_id = $1",
+      "UPDATE masters_lt_users SET number_ads = number_ads + 1 WHERE google_id = $1",
       [googleId]
     );
 
@@ -403,7 +403,7 @@ router.put("/put/update-ad/:id", blockMaliciousIPs, enforceAdPostingCooldown, ap
   try {
     const userQ = await pool.query(
       `SELECT google_id 
-       FROM masters_LT_sessions 
+       FROM masters_lt_sessions 
        WHERE session_id = $1 
        LIMIT 1`,
       [sessionId]
@@ -421,7 +421,7 @@ router.put("/put/update-ad/:id", blockMaliciousIPs, enforceAdPostingCooldown, ap
     --------------------------------*/
     const adQ = await pool.query(
       `SELECT image_url, google_id 
-       FROM masters_LT_ads 
+       FROM masters_lt_ads 
        WHERE id = $1 
        LIMIT 1`,
       [adId]
@@ -545,7 +545,7 @@ router.put("/put/update-ad/:id", blockMaliciousIPs, enforceAdPostingCooldown, ap
   try {
     // We look for any OTHER ad (id != adId) in this same category
     const existingAdCheck = await pool.query(
-      `SELECT id FROM masters_LT_ads 
+      `SELECT id FROM masters_lt_ads 
         WHERE google_id = $1 AND main_group = $2 AND sub_group = $3 AND id != $4
         LIMIT 1`,
       [googleId, mainVal, subVal, adId]
@@ -623,7 +623,7 @@ router.put("/put/update-ad/:id", blockMaliciousIPs, enforceAdPostingCooldown, ap
        UPDATE DATABASE
     --------------------------------*/
     const updateQ = `
-      UPDATE masters_LT_ads 
+      UPDATE masters_lt_ads 
       SET 
         name        = $1,
         title       = $2,
@@ -683,7 +683,7 @@ router.put("/put/update-ad/:id", blockMaliciousIPs, enforceAdPostingCooldown, ap
 async function createSessionForUser(dbGoogleId) {
   const sessionId = crypto.randomUUID(); // generate inline
   await pool.query(
-    `INSERT INTO masters_LT_sessions (session_id, google_id) VALUES ($1, $2)`,
+    `INSERT INTO masters_lt_sessions (session_id, google_id) VALUES ($1, $2)`,
     [sessionId, dbGoogleId]
   );
   return sessionId;
@@ -706,7 +706,7 @@ router.post("/post/auth/google", blockMaliciousIPs, applyWriteRateLimit, async (
     const { sub: googleId, email, name } = payload;
     client = await pool.connect();
     const query = `
-      INSERT INTO masters_LT_users (google_id, email, name, date, ip)
+      INSERT INTO masters_lt_users (google_id, email, name, date, ip)
       VALUES ($1, $2, $3, $4, $5)
       ON CONFLICT (google_id)
       DO UPDATE SET email = EXCLUDED.email, name = EXCLUDED.name
@@ -756,7 +756,7 @@ router.post("/post/logout", blockMaliciousIPs, applyWriteRateLimit, async (req, 
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
   const sessionId = req.cookies?.session_id || bearerSid;
 
-  await pool.query(`DELETE FROM masters_LT_sessions WHERE session_id=$1`, [sessionId]);
+  await pool.query(`DELETE FROM masters_lt_sessions WHERE session_id=$1`, [sessionId]);
 
   res.clearCookie("session_id", {
     httpOnly: true,
@@ -775,7 +775,7 @@ router.post("/post/toggle-activation/:id", blockMaliciousIPs, applyWriteRateLimi
   try {
     // Check if ad exists
     const check = await pool.query(
-      "SELECT is_active FROM masters_LT_ads WHERE id = $1 LIMIT 1;",
+      "SELECT is_active FROM masters_lt_ads WHERE id = $1 LIMIT 1;",
       [adId]
     );
     if (!check.rowCount) {
@@ -789,7 +789,7 @@ router.post("/post/toggle-activation/:id", blockMaliciousIPs, applyWriteRateLimi
     const newState = !current; // toggle true → false, false → true
     // Update activation state
     const update = await pool.query(
-      "UPDATE masters_LT_ads SET is_active = $1, created_at = NOW() WHERE id = $2 RETURNING id;",
+      "UPDATE masters_lt_ads SET is_active = $1, created_at = NOW() WHERE id = $2 RETURNING id;",
       [newState, adId]
     );
     if (!update.rowCount) {
@@ -832,7 +832,7 @@ router.post("/post/delete-ad/:id", blockMaliciousIPs, applyWriteRateLimit, async
     const sessionRes = await pool.query(
       `
       SELECT google_id
-      FROM masters_LT_sessions
+      FROM masters_lt_sessions
       WHERE session_id = $1
       LIMIT 1;
       `,
@@ -853,7 +853,7 @@ router.post("/post/delete-ad/:id", blockMaliciousIPs, applyWriteRateLimit, async
     const adRes = await pool.query(
       `
       SELECT image_url
-      FROM masters_LT_ads
+      FROM masters_lt_ads
       WHERE id = $1 AND google_id = $2
       LIMIT 1;
       `,
@@ -887,13 +887,13 @@ router.post("/post/delete-ad/:id", blockMaliciousIPs, applyWriteRateLimit, async
 
     // Hard delete ALL reviews + replies
     await pool.query(
-      `DELETE FROM masters_LT_reviews WHERE ad_id = $1;`,
+      `DELETE FROM masters_lt_reviews WHERE ad_id = $1;`,
       [adId]
     );
 
     // Hard delete ad
     await pool.query(
-      `DELETE FROM masters_LT_ads WHERE id = $1;`,
+      `DELETE FROM masters_lt_ads WHERE id = $1;`,
       [adId]
     );
 
@@ -966,7 +966,7 @@ router.post("/post/ad-view", blockMaliciousIPs, applyWriteRateLimit, async (req,
 
   try {
     await pool.query(
-      "UPDATE masters_LT_ads SET views = views + 1 WHERE id = $1",
+      "UPDATE masters_lt_ads SET views = views + 1 WHERE id = $1",
       [ad_id]
     );
 
@@ -1026,7 +1026,7 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
     const sessionResult = await pool.query(
       `
       SELECT google_id
-      FROM masters_LT_sessions
+      FROM masters_lt_sessions
       WHERE session_id = $1
       LIMIT 1
       `,
@@ -1043,7 +1043,7 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
 
     /* ---------- BLOCK SELF-REVIEW ---------- */
     const adOwnerCheck = await pool.query(
-      `SELECT google_id FROM masters_LT_ads WHERE id = $1 LIMIT 1`,
+      `SELECT google_id FROM masters_lt_ads WHERE id = $1 LIMIT 1`,
       [adId]
     );
     // If the ad exists and the owner is the same as the reviewer
@@ -1059,7 +1059,7 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
     const activeReviewCheck = await pool.query(
       `
       SELECT 1
-      FROM masters_LT_reviews
+      FROM masters_lt_reviews
       WHERE ad_id = $1
         AND reviewer_id = $2
         AND parent IS NULL
@@ -1079,7 +1079,7 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
     const deletedWithReplyCheck = await pool.query(
       `
       SELECT 1
-      FROM masters_LT_reviews
+      FROM masters_lt_reviews
       WHERE ad_id = $1
         AND reviewer_id = $2
         AND parent IS NULL
@@ -1106,7 +1106,7 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
     /* ---------- INSERT REVIEW ---------- */
     const insertReviewResult = await pool.query(
       `
-      INSERT INTO masters_LT_reviews
+      INSERT INTO masters_lt_reviews
       (reviewer_name, review_text, date, reviewer_id, ad_id, parent, rating)
       VALUES ($1, $2, $3, $4, $5, NULL, $6)
       RETURNING id
@@ -1123,7 +1123,7 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
     /* ---------- RECALCULATE AD STATS ---------- */
     await pool.query(
       `
-      UPDATE masters_LT_ads
+      UPDATE masters_lt_ads
       SET
         average_rating = COALESCE(sub.avg, 0),
         reviews_count  = COALESCE(sub.cnt, 0)
@@ -1131,7 +1131,7 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
         SELECT
           ROUND(AVG(rating), 1) AS avg,
           COUNT(*) AS cnt
-        FROM masters_LT_reviews
+        FROM masters_lt_reviews
         WHERE ad_id = $1
           AND is_deleted = false
           AND parent IS NULL
@@ -1184,7 +1184,7 @@ router.post("/post/reply", blockMaliciousIPs, applyWriteRateLimit, async (req, r
     // 1️⃣ get google_id from session
     const sessionQ = `
       SELECT google_id
-      FROM masters_LT_sessions
+      FROM masters_lt_sessions
       WHERE session_id = $1
       LIMIT 1
     `;
@@ -1203,7 +1203,7 @@ router.post("/post/reply", blockMaliciousIPs, applyWriteRateLimit, async (req, r
     // 2️⃣ verify owner owns this ad
     const adQ = `
       SELECT google_id
-      FROM masters_LT_ads
+      FROM masters_lt_ads
       WHERE id = $1
       LIMIT 1
     `;
@@ -1226,7 +1226,7 @@ router.post("/post/reply", blockMaliciousIPs, applyWriteRateLimit, async (req, r
 
     // 4️⃣ insert reply
     const insertQ = `
-      INSERT INTO masters_LT_reviews
+      INSERT INTO masters_lt_reviews
       (reviewer_name, review_text, date, reviewer_id, ad_id, parent, rating)
       VALUES ('Owner', $1, $2, $3, $4, $5, NULL)
       RETURNING id
@@ -1275,7 +1275,7 @@ router.post("/post/delete-reply", blockMaliciousIPs, applyWriteRateLimit, async 
     // 1️⃣ get google_id from session
     const sessionQ = `
       SELECT google_id
-      FROM masters_LT_sessions
+      FROM masters_lt_sessions
       WHERE session_id = $1
       LIMIT 1
     `;
@@ -1294,7 +1294,7 @@ router.post("/post/delete-reply", blockMaliciousIPs, applyWriteRateLimit, async 
     // 2️⃣ verify ad ownership
     const adQ = `
       SELECT google_id
-      FROM masters_LT_ads
+      FROM masters_lt_ads
       WHERE id = $1
       LIMIT 1
     `;
@@ -1311,7 +1311,7 @@ router.post("/post/delete-reply", blockMaliciousIPs, applyWriteRateLimit, async 
     // 3️⃣ verify reply belongs to this ad + owner + is a reply
     const replyQ = `
       SELECT id
-      FROM masters_LT_reviews
+      FROM masters_lt_reviews
       WHERE id = $1
         AND ad_id = $2
         AND parent IS NOT NULL
@@ -1334,7 +1334,7 @@ router.post("/post/delete-reply", blockMaliciousIPs, applyWriteRateLimit, async 
 
     // 4️⃣ delete reply
     const deleteQ = `
-      DELETE FROM masters_LT_reviews
+      DELETE FROM masters_lt_reviews
       WHERE id = $1
     `;
     await pool.query(deleteQ, [replyId]);
@@ -1388,7 +1388,7 @@ router.post("/post/message", blockMaliciousIPs, applyWriteRateLimit, async (req,
     ).padStart(2, "0")}/${d.getFullYear()}`;
 
     const insertQ = `
-      INSERT INTO messages_masters_LT
+      INSERT INTO messages_masters_lt
         (name, email, message, date)
       VALUES ($1, $2, $3, $4)
     `;
@@ -1434,7 +1434,7 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
     // ---------------------------------------
     const sessionQ = `
       SELECT google_id
-      FROM masters_LT_sessions
+      FROM masters_lt_sessions
       WHERE session_id = $1
       LIMIT 1
     `;
@@ -1455,7 +1455,7 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
     // ---------------------------------------
     const adQ = `
       SELECT google_id
-      FROM masters_LT_ads
+      FROM masters_lt_ads
       WHERE id = $1
       LIMIT 1
     `;
@@ -1476,7 +1476,7 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
     // ---------------------------------------
     const selectQ = `
       SELECT id, likers
-      FROM masters_LT_likes
+      FROM masters_lt_likes
       WHERE ad_id = $1
       LIMIT 1
     `;
@@ -1501,7 +1501,7 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
 
         if (!likers.length) {
           await pool.query(
-            `DELETE FROM masters_LT_likes WHERE id = $1`,
+            `DELETE FROM masters_lt_likes WHERE id = $1`,
             [row.id]
           );
           return res.json({
@@ -1512,7 +1512,7 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
         }
 
         await pool.query(
-          `UPDATE masters_LT_likes SET likers = $1 WHERE id = $2`,
+          `UPDATE masters_lt_likes SET likers = $1 WHERE id = $2`,
           [JSON.stringify(likers), row.id]
         );
 
@@ -1527,7 +1527,7 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
       likers.push(liker_google_id);
 
       await pool.query(
-        `UPDATE masters_LT_likes SET likers = $1 WHERE id = $2`,
+        `UPDATE masters_lt_likes SET likers = $1 WHERE id = $2`,
         [JSON.stringify(likers), row.id]
       );
 
@@ -1542,7 +1542,7 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
     // CASE B: NO ROW → CREATE NEW
     // ---------------------------------------
     const insertQ = `
-      INSERT INTO masters_LT_likes (ad_id, master_id, likers)
+      INSERT INTO masters_lt_likes (ad_id, master_id, likers)
       VALUES ($1, $2, $3)
     `;
     await pool.query(insertQ, [
@@ -1585,7 +1585,7 @@ router.get("/get/like-status", applyReadRateLimit, async (req, res) => {
     // Always fetch likes first (PUBLIC)
     const q = `
       SELECT likers
-      FROM masters_LT_likes
+      FROM masters_lt_likes
       WHERE ad_id = $1
       LIMIT 1
     `;
@@ -1604,7 +1604,7 @@ router.get("/get/like-status", applyReadRateLimit, async (req, res) => {
     // Logged user → check session
     const sessionQ = `
       SELECT google_id
-      FROM masters_LT_sessions
+      FROM masters_lt_sessions
       WHERE session_id = $1
       LIMIT 1
     `;
@@ -1655,7 +1655,7 @@ router.get("/get/reviews/:ad_id", applyReadRateLimit, async (req, res) => {
         reviewer_id,
         parent,
         rating
-      FROM masters_LT_reviews
+      FROM masters_lt_reviews
       WHERE ad_id = $1
         AND is_deleted = false
       ORDER BY id ASC
@@ -1700,7 +1700,7 @@ router.get("/get/profile-reviews-ads", applyReadRateLimit, async (req, res) => {
     /* get google id from session */
     const sessionQuery = `
       SELECT google_id
-      FROM masters_LT_sessions
+      FROM masters_lt_sessions
       WHERE session_id = $1
       LIMIT 1;
     `;
@@ -1721,22 +1721,22 @@ router.get("/get/profile-reviews-ads", applyReadRateLimit, async (req, res) => {
     /* reviews + ad data (NO aliases) */
     const reviewsQuery = `
       SELECT
-        masters_LT_reviews.id,
-        masters_LT_reviews.review_text,
-        masters_LT_reviews.rating,
-        masters_LT_reviews.date,
-        masters_LT_reviews.ad_id,
+        masters_lt_reviews.id,
+        masters_lt_reviews.review_text,
+        masters_lt_reviews.rating,
+        masters_lt_reviews.date,
+        masters_lt_reviews.ad_id,
 
-        masters_LT_ads.name  AS ad_owner_name,
-        masters_LT_ads.title AS ad_title,
-        masters_LT_ads.image_url AS ad_image_url
-      FROM masters_LT_reviews
-      JOIN masters_LT_ads
-        ON masters_LT_ads.id = masters_LT_reviews.ad_id
-      WHERE masters_LT_reviews.reviewer_id = $1
-        AND masters_LT_reviews.is_deleted = false
-        AND masters_LT_reviews.parent IS NULL
-      ORDER BY masters_LT_reviews.id DESC;
+        masters_lt_ads.name  AS ad_owner_name,
+        masters_lt_ads.title AS ad_title,
+        masters_lt_ads.image_url AS ad_image_url
+      FROM masters_lt_reviews
+      JOIN masters_lt_ads
+        ON masters_lt_ads.id = masters_lt_reviews.ad_id
+      WHERE masters_lt_reviews.reviewer_id = $1
+        AND masters_lt_reviews.is_deleted = false
+        AND masters_lt_reviews.parent IS NULL
+      ORDER BY masters_lt_reviews.id DESC;
     `;
 
     const reviewsRes = await pool.query(reviewsQuery, [googleId]);
@@ -1776,7 +1776,7 @@ router.get("/get/profile-replies-ads", applyReadRateLimit, async (req, res) => {
     /* get google id from session */
     const sessionQuery = `
       SELECT google_id
-      FROM masters_LT_sessions
+      FROM masters_lt_sessions
       WHERE session_id = $1
       LIMIT 1;
     `;
@@ -1797,21 +1797,21 @@ router.get("/get/profile-replies-ads", applyReadRateLimit, async (req, res) => {
     /* replies written BY the user */
     const repliesQuery = `
       SELECT
-        masters_LT_reviews.id,
-        masters_LT_reviews.review_text,
-        masters_LT_reviews.date,
-        masters_LT_reviews.ad_id,
+        masters_lt_reviews.id,
+        masters_lt_reviews.review_text,
+        masters_lt_reviews.date,
+        masters_lt_reviews.ad_id,
 
-        masters_LT_ads.name  AS ad_owner_name,
-        masters_LT_ads.title AS ad_title,
-        masters_LT_ads.image_url AS ad_image_url
-      FROM masters_LT_reviews
-      JOIN masters_LT_ads
-        ON masters_LT_ads.id = masters_LT_reviews.ad_id
-      WHERE masters_LT_reviews.reviewer_id = $1
-        AND masters_LT_reviews.parent IS NOT NULL
-        AND masters_LT_reviews.is_deleted = false
-      ORDER BY masters_LT_reviews.id DESC;
+        masters_lt_ads.name  AS ad_owner_name,
+        masters_lt_ads.title AS ad_title,
+        masters_lt_ads.image_url AS ad_image_url
+      FROM masters_lt_reviews
+      JOIN masters_lt_ads
+        ON masters_lt_ads.id = masters_lt_reviews.ad_id
+      WHERE masters_lt_reviews.reviewer_id = $1
+        AND masters_lt_reviews.parent IS NOT NULL
+        AND masters_lt_reviews.is_deleted = false
+      ORDER BY masters_lt_reviews.id DESC;
     `;
 
     const repliesRes = await pool.query(repliesQuery, [googleId]);
@@ -1862,7 +1862,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
     const sessionRes = await pool.query(
       `
       SELECT google_id
-      FROM masters_LT_sessions
+      FROM masters_lt_sessions
       WHERE session_id = $1
       LIMIT 1;
       `,
@@ -1883,7 +1883,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
     const ownershipRes = await pool.query(
       `
       SELECT id, parent, ad_id
-      FROM masters_LT_reviews
+      FROM masters_lt_reviews
       WHERE id = $1
         AND reviewer_id = $2
       LIMIT 1;
@@ -1906,7 +1906,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
     // Reply → hard delete
     if (parent !== null) {
       await pool.query(
-        `DELETE FROM masters_LT_reviews WHERE id = $1;`,
+        `DELETE FROM masters_lt_reviews WHERE id = $1;`,
         [reviewId]
       );
     } else {
@@ -1914,7 +1914,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
       const replyRes = await pool.query(
         `
         SELECT 1
-        FROM masters_LT_reviews
+        FROM masters_lt_reviews
         WHERE parent = $1
         LIMIT 1;
         `,
@@ -1925,7 +1925,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
         // Soft delete review + replies
         await pool.query(
           `
-          UPDATE masters_LT_reviews
+          UPDATE masters_lt_reviews
           SET is_deleted = true
           WHERE id = $1 OR parent = $1;
           `,
@@ -1934,7 +1934,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
       } else {
         // Hard delete review
         await pool.query(
-          `DELETE FROM masters_LT_reviews WHERE id = $1;`,
+          `DELETE FROM masters_lt_reviews WHERE id = $1;`,
           [reviewId]
         );
       }
@@ -1944,7 +1944,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
 
     await pool.query(
       `
-      UPDATE masters_LT_ads
+      UPDATE masters_lt_ads
       SET
         average_rating = COALESCE(sub.avg, 0),
         reviews_count  = COALESCE(sub.cnt, 0)
@@ -1952,7 +1952,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
         SELECT
           ROUND(AVG(rating), 1) AS avg,
           COUNT(*) AS cnt
-        FROM masters_LT_reviews
+        FROM masters_lt_reviews
         WHERE ad_id = $1
           AND is_deleted = false
           AND parent IS NULL
@@ -1997,13 +1997,13 @@ router.get("/get/session-user", blockMaliciousIPs, applyReadRateLimit, async (re
   try {
     const query = `
       SELECT 
-        masters_LT_users.google_id,
-        masters_LT_users.email,
-        masters_LT_users.name
-      FROM masters_LT_sessions
-      JOIN masters_LT_users
-        ON masters_LT_users.google_id = masters_LT_sessions.google_id
-      WHERE masters_LT_sessions.session_id = $1
+        masters_lt_users.google_id,
+        masters_lt_users.email,
+        masters_lt_users.name
+      FROM masters_lt_sessions
+      JOIN masters_lt_users
+        ON masters_lt_users.google_id = masters_lt_sessions.google_id
+      WHERE masters_lt_sessions.session_id = $1
       LIMIT 1;
     `;
 
@@ -2052,7 +2052,7 @@ router.get("/get/ad/:id", applyReadRateLimit, async (req, res) => {
         id, name, title, description, price, city, date, views,
         telephone, image_url, google_id, main_group, sub_group,
         average_rating, reviews_count
-      FROM masters_LT_ads
+      FROM masters_lt_ads
       WHERE id = $1
       LIMIT 1
     `;
@@ -2074,7 +2074,7 @@ router.get("/get/ad/:id", applyReadRateLimit, async (req, res) => {
 
     if (sub_group) {
       const newerQ = `
-        SELECT id FROM masters_LT_ads
+        SELECT id FROM masters_lt_ads
         WHERE main_group = $2
           AND sub_group = $3
           AND id > $1
@@ -2082,7 +2082,7 @@ router.get("/get/ad/:id", applyReadRateLimit, async (req, res) => {
         LIMIT 1
       `;
       const olderQ = `
-        SELECT id FROM masters_LT_ads
+        SELECT id FROM masters_lt_ads
         WHERE main_group = $2
           AND sub_group = $3
           AND id < $1
@@ -2097,14 +2097,14 @@ router.get("/get/ad/:id", applyReadRateLimit, async (req, res) => {
       olderId = olderR.rows[0]?.id || null;
     } else {
       const newerQ = `
-        SELECT id FROM masters_LT_ads
+        SELECT id FROM masters_lt_ads
         WHERE main_group = $2
           AND id > $1
         ORDER BY id ASC
         LIMIT 1
       `;
       const olderQ = `
-        SELECT id FROM masters_LT_ads
+        SELECT id FROM masters_lt_ads
         WHERE main_group = $2
           AND id < $1
         ORDER BY id DESC
@@ -2152,7 +2152,7 @@ router.get("/get/user-ads", applyReadRateLimit, async (req, res) => {
     // find google_id from session
     const sessionQuery = `
       SELECT google_id
-      FROM masters_LT_sessions
+      FROM masters_lt_sessions
       WHERE session_id = $1
       LIMIT 1;
     `;
@@ -2178,7 +2178,7 @@ router.get("/get/user-ads", applyReadRateLimit, async (req, res) => {
         date,
         created_at,      
         is_active       
-      FROM masters_LT_ads
+      FROM masters_lt_ads
       WHERE google_id = $1
       ORDER BY date DESC, id DESC;
     `;
@@ -2245,7 +2245,7 @@ router.get("/get/search", blockMaliciousIPs, applyReadRateLimit, async (req, res
     // 1️⃣ capped count
     const countQ = `
       SELECT COUNT(*)
-      FROM masters_LT_ads
+      FROM masters_lt_ads
       WHERE is_active = true
         AND (title ILIKE $1 OR description ILIKE $1)
     `;
@@ -2261,7 +2261,7 @@ router.get("/get/search", blockMaliciousIPs, applyReadRateLimit, async (req, res
         id, name, title, description, price, city, date, views,
         telephone, image_url, google_id, main_group, sub_group,
         average_rating, reviews_count
-      FROM masters_LT_ads
+      FROM masters_lt_ads
       WHERE is_active = true
         AND (title ILIKE $1 OR description ILIKE $1)
       ORDER BY date DESC
@@ -2385,7 +2385,7 @@ router.get("/get/search-filter", applyReadRateLimit, blockMaliciousIPs, async (r
 
     const countQ = `
       SELECT COUNT(*)
-      FROM masters_LT_ads
+      FROM masters_lt_ads
       ${whereClause}
     `;
     const countR = await pool.query(countQ, values);
@@ -2399,7 +2399,7 @@ router.get("/get/search-filter", applyReadRateLimit, blockMaliciousIPs, async (r
         id, name, title, description, price, city, date, views,
         telephone, image_url, google_id, main_group, sub_group,
         average_rating, reviews_count
-      FROM masters_LT_ads
+      FROM masters_lt_ads
       ${whereClause}
       ORDER BY date DESC
       LIMIT $${i} OFFSET $${i + 1}
@@ -2436,7 +2436,7 @@ router.get("/get/browse", blockMaliciousIPs, applyReadRateLimit, async (req, res
         id, name, title, description, price, city, date, views,
         telephone, image_url, google_id, main_group, sub_group,
         average_rating, reviews_count
-      FROM masters_LT_ads
+      FROM masters_lt_ads
       WHERE is_active = true
     `;
     const params = [];
@@ -2497,7 +2497,7 @@ router.get("/get/homepage/carousel", async (req, res) => {
         average_rating,
         reviews_count,
         image_url ->> 0 AS image
-      FROM masters_LT_carousel
+      FROM masters_lt_carousel
       ORDER BY id DESC
     `;
 
@@ -2595,7 +2595,7 @@ router.get("/get/browse-filter", blockMaliciousIPs, applyReadRateLimit, async (r
         id, name, title, description, price, city, date, views,
         telephone, image_url, google_id, main_group, sub_group,
         average_rating, reviews_count
-      FROM masters_LT_ads
+      FROM masters_lt_ads
       WHERE ${conditions.join(" AND ")}
       ORDER BY created_at DESC
       LIMIT $${i}
