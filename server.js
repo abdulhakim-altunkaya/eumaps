@@ -38,6 +38,10 @@ const allowedOrigins = [
   "http://meistarilatvija.lv",
   "https://www.meistarilatvija.lv",
   "http://www.meistarilatvija.lv",
+  "https://www.pagalbapro.lt",
+  "http://www.pagalbapro.lt",
+  "https://pagalbapro.lt",
+  "http://pagalbapro.lt",
   "https://masterslt.netlify.app"
 ];
 app.use(cors({
