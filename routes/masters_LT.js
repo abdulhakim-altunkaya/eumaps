@@ -353,7 +353,7 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
     }
 
     await client.query(
-      "UPDATE masters_lt_users SET number_ads = number_ads + 1 WHERE google_id = $1",
+      "UPDATE masters_lt_users SET number_ads = COALESCE(number_ads, 0) + 1 WHERE google_id = $1",
       [googleId]
     );
 

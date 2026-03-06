@@ -1789,7 +1789,7 @@ app.post("/api/post/master-latvia/ads", blockSpamIPs, postAdCooldown, rateLimitW
     }
 
     await client.query(
-      "UPDATE masters_latvia_users SET number_ads = number_ads + 1 WHERE google_id = $1",
+      "UPDATE masters_latvia_users SET number_ads = COALESCE(number_ads, 0) + 1 WHERE google_id = $1",
       [googleId]
     );
 
