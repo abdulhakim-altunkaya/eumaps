@@ -1977,6 +1977,227 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
     });
   }
 });
+
+
+router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
+  const ipVisitor = req.headers["x-forwarded-for"]
+    ? req.headers["x-forwarded-for"].split(",")[0]
+    : req.socket.remoteAddress || req.ip;
+
+  const clean = (v, max) =>
+    String(v || "")
+      .trim()
+      .slice(0, max)
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;");
+
+  const name = clean(req.body.name, 80);
+  const email = clean(req.body.email, 120).toLowerCase();
+  const password = String(req.body.password || "");
+
+  if (name.length < 2 || email.length < 5 || password.length < 6) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Netinkami duomenys"
+    });
+  }
+
+/*   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 2,
+      resMessage: "Netinkamas el. paštas"
+    });
+  } */
+
+  try {
+
+    const checkQ = `
+      SELECT google_id
+      FROM masters_lt_users
+      WHERE email=$1
+      LIMIT 1
+    `;
+    const checkR = await pool.query(checkQ, [email]);
+
+    if (checkR.rowCount) {
+      return res.json({
+        resStatus: false,
+        resErrorCode: 3,
+        resMessage: "El. paštas jau naudojamas"
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    // generate google_id-like value
+    let googleId;
+    let exists = true;
+
+    while (exists) {
+      googleId = "9" + crypto.randomInt(10 ** 18, 10 ** 19 - 1).toString();
+      const r = await pool.query(
+        `SELECT google_id FROM masters_lt_users WHERE google_id=$1 LIMIT 1`,
+        [googleId]
+      );
+      exists = r.rowCount > 0;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    const insertQ = `
+      INSERT INTO masters_lt_users
+      (google_id,email,name,date,ip,auth_provider,password_hash,email_verified)
+      VALUES ($1,$2,$3,$4,$5,'email',$6,false)
+      RETURNING google_id
+    `;
+
+    const insertR = await pool.query(insertQ, [
+      googleId,
+      email,
+      name,
+      today,
+      ipVisitor,
+      passwordHash
+    ]);
+
+    const dbGoogleId = insertR.rows[0].google_id;
+
+    const sessionId = await createSessionForUser(dbGoogleId);
+
+    res.cookie("session_id", sessionId, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+      path: "/",
+      maxAge: 1000 * 60 * 60 * 24 * 365
+    });
+
+    return res.json({
+      resStatus: true,
+      resOkCode: 1,
+      resMessage: "Registracija sėkminga",
+      user: {
+        google_id: dbGoogleId,
+        email,
+        name,
+        session_id: sessionId
+      }
+    });
+
+  } catch (err) {
+    console.error("Email register error:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resErrorCode: 99,
+      resMessage: "Serverio klaida"
+    });
+  }
+});
+router.post("/post/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
+  const clean = (v, max) =>
+    String(v || "")
+      .trim()
+      .slice(0, max)
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;");
+
+  const email = clean(req.body.email, 120).toLowerCase();
+  const password = String(req.body.password || "");
+
+  if (email.length < 5 || password.length < 6) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Netinkami prisijungimo duomenys"
+    });
+  }
+
+/*   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 2,
+      resMessage: "Netinkamas el. paštas"
+    });
+  } */
+
+  try {
+    const userQ = `
+      SELECT google_id, email, name, password_hash, auth_provider, email_verified
+      FROM masters_lt_users
+      WHERE email = $1
+      LIMIT 1
+    `;
+    const userR = await pool.query(userQ, [email]);
+
+    if (!userR.rowCount) {
+      return res.json({
+        resStatus: false,
+        resErrorCode: 3,
+        resMessage: "Neteisingas el. paštas arba slaptažodis"
+      });
+    }
+
+    const user = userR.rows[0];
+
+    if (user.auth_provider !== "email") {
+      return res.json({
+        resStatus: false,
+        resErrorCode: 4,
+        resMessage: "Šis el. paštas naudojamas su kitu prisijungimo būdu"
+      });
+    }
+
+    if (!user.password_hash) {
+      return res.json({
+        resStatus: false,
+        resErrorCode: 5,
+        resMessage: "Slaptažodis nenustatytas"
+      });
+    }
+
+    const ok = await bcrypt.compare(password, user.password_hash);
+
+    if (!ok) {
+      return res.json({
+        resStatus: false,
+        resErrorCode: 6,
+        resMessage: "Neteisingas el. paštas arba slaptažodis"
+      });
+    }
+
+    const sessionId = await createSessionForUser(user.google_id);
+
+    res.cookie("session_id", sessionId, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+      path: "/",
+      maxAge: 1000 * 60 * 60 * 24 * 365
+    });
+
+    return res.json({
+      resStatus: true,
+      resOkCode: 1,
+      resMessage: "Prisijungimas sėkmingas",
+      user: {
+        google_id: user.google_id,
+        email: user.email,
+        name: user.name,
+        session_id: sessionId
+      }
+    });
+
+  } catch (err) {
+    console.error("Email login error:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resErrorCode: 99,
+      resMessage: "Serverio klaida"
+    });
+  }
+});
 router.get("/get/session-user", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
   // Desktop can use cookies but some mobiles will use headers for login system
   const auth = req.headers.authorization || "";
@@ -2043,6 +2264,9 @@ router.get("/get/session-user", blockMaliciousIPs, applyReadRateLimit, async (re
     });
   }
 });
+
+
+
 router.get("/get/ad/:id", applyReadRateLimit, async (req, res) => {
   const adId = req.params.id;
 

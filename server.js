@@ -2,8 +2,10 @@ const express = require("express");
 const app = express();
 const path = require('path');
 
-//crypto and cookieParser are for latvia masters google login endpoint
+//crypto and cookieParser are for masters email and google login/register endpoints
 const crypto = require("crypto");
+const bcrypt = require("bcrypt");
+
 const cookieParser = require("cookie-parser");
 app.use(cookieParser());
 
