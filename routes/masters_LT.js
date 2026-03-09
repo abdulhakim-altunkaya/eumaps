@@ -1981,6 +1981,8 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
 
 
 router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
+  console.log("[email-register] route reached");
+
   const ipVisitor = req.headers["x-forwarded-for"]
     ? req.headers["x-forwarded-for"].split(",")[0]
     : req.socket.remoteAddress || req.ip;
@@ -1992,11 +1994,27 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;");
 
+  const generateEmailGoogleId = () => {
+    let out = "9";
+    while (out.length < 21) {
+      out += Math.floor(Math.random() * 10);
+    }
+    return out;
+  };
+
   const name = clean(req.body.name, 80);
   const email = clean(req.body.email, 120).toLowerCase();
   const password = String(req.body.password || "");
 
+  console.log("[email-register] incoming:", {
+    nameLength: name.length,
+    email,
+    passwordLength: password.length,
+    ipVisitor
+  });
+
   if (name.length < 2 || email.length < 5 || password.length < 6) {
+    console.log("[email-register] validation failed: bad lengths");
     return res.json({
       resStatus: false,
       resErrorCode: 1,
@@ -2004,25 +2022,21 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
     });
   }
 
-/*   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.json({
-      resStatus: false,
-      resErrorCode: 2,
-      resMessage: "Netinkamas el. paštas"
-    });
-  } */
-
   try {
+    console.log("[email-register] checking existing email");
 
     const checkQ = `
       SELECT google_id
       FROM masters_lt_users
-      WHERE email=$1
+      WHERE email = $1
       LIMIT 1
     `;
     const checkR = await pool.query(checkQ, [email]);
 
+    console.log("[email-register] email check rowCount:", checkR.rowCount);
+
     if (checkR.rowCount) {
+      console.log("[email-register] email already exists:", email);
       return res.json({
         resStatus: false,
         resErrorCode: 3,
@@ -2030,29 +2044,46 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
       });
     }
 
+    console.log("[email-register] hashing password");
     const passwordHash = await bcrypt.hash(password, 12);
+    console.log("[email-register] password hashed");
 
-    // generate google_id-like value
     let googleId;
     let exists = true;
+    let attempts = 0;
+
+    console.log("[email-register] generating google_id-like value");
 
     while (exists) {
-      googleId = "9" + crypto.randomInt(10 ** 18, 10 ** 19 - 1).toString();
+      attempts += 1;
+      googleId = generateEmailGoogleId();
+
+      console.log("[email-register] generated candidate googleId:", googleId, "attempt:", attempts);
+
       const r = await pool.query(
-        `SELECT google_id FROM masters_lt_users WHERE google_id=$1 LIMIT 1`,
+        `SELECT google_id FROM masters_lt_users WHERE google_id = $1 LIMIT 1`,
         [googleId]
       );
+
       exists = r.rowCount > 0;
+      console.log("[email-register] googleId exists?:", exists);
+
+      if (attempts > 20) {
+        throw new Error("Could not generate unique google_id after 20 attempts");
+      }
     }
 
     const today = new Date().toISOString().slice(0, 10);
+    console.log("[email-register] today:", today);
 
     const insertQ = `
       INSERT INTO masters_lt_users
-      (google_id,email,name,date,ip,auth_provider,password_hash,email_verified)
-      VALUES ($1,$2,$3,$4,$5,'email',$6,false)
+      (google_id, email, name, date, ip, auth_provider, password_hash, email_verified)
+      VALUES ($1, $2, $3, $4, $5, 'email', $6, false)
       RETURNING google_id
     `;
+
+    console.log("[email-register] inserting user into masters_lt_users");
 
     const insertR = await pool.query(insertQ, [
       googleId,
@@ -2063,9 +2094,13 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
       passwordHash
     ]);
 
+    console.log("[email-register] insert success:", insertR.rows);
+
     const dbGoogleId = insertR.rows[0].google_id;
 
+    console.log("[email-register] creating session for google_id:", dbGoogleId);
     const sessionId = await createSessionForUser(dbGoogleId);
+    console.log("[email-register] session created:", sessionId);
 
     res.cookie("session_id", sessionId, {
       httpOnly: true,
@@ -2074,6 +2109,8 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
       path: "/",
       maxAge: 1000 * 60 * 60 * 24 * 365
     });
+
+    console.log("[email-register] cookie set, sending success response");
 
     return res.json({
       resStatus: true,
@@ -2088,7 +2125,11 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
     });
 
   } catch (err) {
-    console.error("Email register error:", err);
+    console.error("[email-register] ERROR object:", err);
+    console.error("[email-register] ERROR message:", err?.message);
+    console.error("[email-register] ERROR stack:", err?.stack);
+    console.error("[email-register] ERROR name/email:", { name, email });
+
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 99,
