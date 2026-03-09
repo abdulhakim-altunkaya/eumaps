@@ -70,11 +70,12 @@ router.post("/post/save-visitor", checkLogCooldown(3 * 60 * 1000), async (req, r
     if (client) client.release();
   }
 });
-router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWriteRateLimit, 
+router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWriteRateLimit,
   upload.array("images", 5), async (req, res) => {
-  const MIN_IMAGE_SIZE = 2 * 1024;           // 2 KB
-  const MAX_IMAGE_SIZE = 1.9 * 1024 * 1024;  // 1.8 MB. Normally I should say 1.8 but just give some
-  //error room to the frontend here I am saying 1.9
+  console.log("[post-ads] route reached");
+
+  const MIN_IMAGE_SIZE = 2 * 1024;
+  const MAX_IMAGE_SIZE = 1.9 * 1024 * 1024;
   const ALLOWED_IMAGE_TYPES = [
     "image/jpeg",
     "image/png",
@@ -86,20 +87,29 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
     ? req.headers["x-forwarded-for"].split(",")[0]
     : req.socket.remoteAddress || req.ip;
 
+  console.log("[post-ads] ipVisitor:", ipVisitor);
+
   let client;
   let formData;
+
   /* -------------------------------------------
      PARSE JSON FORM DATA
   ------------------------------------------- */
   try {
+    console.log("[post-ads] req.body keys:", Object.keys(req.body || {}));
+    console.log("[post-ads] req.files length before parse:", req.files?.length || 0);
+
     formData = JSON.parse(req.body.formData);
+    console.log("[post-ads] formData parsed successfully:", formData);
   } catch (err) {
+    console.error("[post-ads] formData parse error:", err);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Netinkami formos duomenys",
       resErrorCode: 1
     });
   }
+
   const {
     inputService,
     inputName,
@@ -113,266 +123,378 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
   } = formData;
 
   function sanitizeInput(str) {
-    if (typeof str !== 'string') return '';
+    if (typeof str !== "string") return "";
     return str
-      // 1. Convert < and > into safe text versions so they don't execute
       .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      // 2. Remove invisible control characters (keep Newlines and Tabs if you want)
+      .replace(/>/g, "&gt;");
   }
+
   const cleanInputDescription = sanitizeInput(inputDescription);
   const cleanInputPrice = sanitizeInput(inputPrice);
   const cleanInputName = sanitizeInput(inputName);
 
+  console.log("[post-ads] validation values:", {
+    inputService,
+    inputNameLength: inputName?.length,
+    inputPriceLength: inputPrice?.length,
+    inputDescriptionLength: inputDescription?.length,
+    countryCode,
+    phoneNumber,
+    inputRegionsLength: Array.isArray(inputRegions) ? inputRegions.length : "not-array",
+    main_group,
+    sub_group
+  });
+
   if (!inputService || !inputName || !inputPrice || !inputDescription || !phoneNumber) {
+    console.log("[post-ads] validation failed: missing required fields");
     return res.status(400).json({
       resStatus: false,
       resMessage: "Neužpildyti privalomi laukai",
       resErrorCode: 2
     });
   }
+
   const mainVal = Number(main_group);
   if (isNaN(mainVal) || mainVal < 1 || mainVal > 10) {
+    console.log("[post-ads] validation failed: invalid main_group", main_group);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Pagrindinė kategorija už leidžiamo diapazono ribų",
       resErrorCode: 3
     });
   }
+
   const subVal = Number(sub_group);
   if (isNaN(subVal) || subVal < 1 || subVal > 10) {
+    console.log("[post-ads] validation failed: invalid sub_group", sub_group);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Pokategoris už leidžiamo diapazono ribų",
       resErrorCode: 4
     });
   }
+
   if (phoneNumber.trim().length < 7 || phoneNumber.trim().length > 12) {
+    console.log("[post-ads] validation failed: invalid phone length", phoneNumber?.trim()?.length);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Neteisingas telefono numerio ilgis",
       resErrorCode: 8
     });
   }
+
   if (!Array.isArray(inputRegions) || inputRegions.length === 0) {
+    console.log("[post-ads] validation failed: no regions");
     return res.status(400).json({
       resStatus: false,
       resMessage: "Nepasirinkta regionų",
       resErrorCode: 9
     });
   }
+
   if (inputName.length < 5 || inputName.length > 19) {
+    console.log("[post-ads] validation failed: inputName length", inputName.length);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Vardas per ilgas arba per trumpas",
       resErrorCode: 10
     });
   }
+
   if (inputPrice.length < 1 || inputPrice.length > 15) {
+    console.log("[post-ads] validation failed: inputPrice length", inputPrice.length);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Kaina per ilga arba per trumpa",
       resErrorCode: 11
     });
   }
+
   if (inputDescription.length < 50 || inputDescription.length > 1000) {
+    console.log("[post-ads] validation failed: inputDescription length", inputDescription.length);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Aprašymas per ilgas arba per trumpas",
       resErrorCode: 12
     });
   }
+
   /* -------------------------------------------
      SESSION VALIDATION
   ------------------------------------------- */
-  const auth = req.headers.authorization || "";
-  const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
-  const sessionId = req.cookies?.session_id || bearerSid;
-  if (!sessionId) {
-    return res.status(401).json({
-      resStatus: false,
-      resMessage: "Prisijunkite, kad tęstumėte",
-      resErrorCode: 13
-    });
-  }
-  const userRes = await pool.query(
-    `SELECT google_id FROM masters_lt_sessions WHERE session_id = $1 LIMIT 1`,
-    [sessionId]
-  );
-  if (!userRes.rowCount) {
-    return res.status(401).json({
-      resStatus: false,
-      resMessage: "Netinkama sesija",
-      resErrorCode: 14
-    });
-  }
-
-  const googleId = userRes.rows[0].google_id;
-
-/* -------------------------------------------
-    1 ad per subsection
-    5 ads total 
-  ------------------------------------------- */
-
   try {
-    client = await pool.connect();
-    // 1. Check total ad limit
-    const userAdNumberCheck = await client.query(
-      "SELECT number_ads FROM masters_lt_users WHERE google_id = $1",
-      [googleId]
-    );
-    if (userAdNumberCheck.rows[0]?.number_ads >= 5) {
-      return res.status(403).json({
+    console.log("[post-ads] session validation start");
+    console.log("[post-ads] cookies:", req.cookies);
+    console.log("[post-ads] auth header:", req.headers.authorization);
+
+    const auth = req.headers.authorization || "";
+    const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+    const sessionId = req.cookies?.session_id || bearerSid;
+
+    console.log("[post-ads] resolved sessionId:", sessionId);
+
+    if (!sessionId) {
+      console.log("[post-ads] no sessionId found");
+      return res.status(401).json({
         resStatus: false,
-        resMessage: "Pasiektas skelbimų skaičius (maksimalus 5)",
-        resErrorCode: 15
+        resMessage: "Prisijunkite, kad tęstumėte",
+        resErrorCode: 13
       });
     }
-    // 2. NEW: Check if ad already exists in this specific subsection
-    const existingAdCheck = await client.query(
-      `SELECT id FROM masters_lt_ads 
-      WHERE google_id = $1 AND main_group = $2 AND sub_group = $3 
-      LIMIT 1`,
-      [googleId, mainVal, subVal]
+
+    const userRes = await pool.query(
+      `SELECT google_id FROM masters_lt_sessions WHERE session_id = $1 LIMIT 1`,
+      [sessionId]
     );
-    if (existingAdCheck.rowCount > 0) {
-      return res.status(403).json({
+
+    console.log("[post-ads] session query rowCount:", userRes.rowCount);
+    console.log("[post-ads] session query rows:", userRes.rows);
+
+    if (!userRes.rowCount) {
+      console.log("[post-ads] invalid session");
+      return res.status(401).json({
         resStatus: false,
-        resMessage: "Šiame pokategoryje jau turite aktyvų skelbimą",
-        resErrorCode: 16 // New error code for sub-section limit
+        resMessage: "Netinkama sesija",
+        resErrorCode: 14
       });
     }
-  } catch (err) {
-      console.error(err);
-      return res.status(500).json({ 
-        resStatus: false, 
+
+    const googleId = userRes.rows[0].google_id;
+    console.log("[post-ads] resolved googleId:", googleId);
+
+    /* -------------------------------------------
+        1 ad per subsection
+        5 ads total 
+    ------------------------------------------- */
+    try {
+      console.log("[post-ads] ad-limit checks start");
+      client = await pool.connect();
+
+      const userAdNumberCheck = await client.query(
+        "SELECT number_ads FROM masters_lt_users WHERE google_id = $1",
+        [googleId]
+      );
+
+      console.log("[post-ads] userAdNumberCheck rows:", userAdNumberCheck.rows);
+
+      if (userAdNumberCheck.rows[0]?.number_ads >= 5) {
+        console.log("[post-ads] total ad limit reached");
+        return res.status(403).json({
+          resStatus: false,
+          resMessage: "Pasiektas skelbimų skaičius (maksimalus 5)",
+          resErrorCode: 15
+        });
+      }
+
+      const existingAdCheck = await client.query(
+        `SELECT id FROM masters_lt_ads 
+        WHERE google_id = $1 AND main_group = $2 AND sub_group = $3 
+        LIMIT 1`,
+        [googleId, mainVal, subVal]
+      );
+
+      console.log("[post-ads] existingAdCheck rowCount:", existingAdCheck.rowCount);
+      console.log("[post-ads] existingAdCheck rows:", existingAdCheck.rows);
+
+      if (existingAdCheck.rowCount > 0) {
+        console.log("[post-ads] subsection ad already exists");
+        return res.status(403).json({
+          resStatus: false,
+          resMessage: "Šiame pokategoryje jau turite aktyvų skelbimą",
+          resErrorCode: 16
+        });
+      }
+    } catch (err) {
+      console.error("[post-ads] ad-limit check ERROR object:", err);
+      console.error("[post-ads] ad-limit check ERROR message:", err?.message);
+      console.error("[post-ads] ad-limit check ERROR stack:", err?.stack);
+      return res.status(500).json({
+        resStatus: false,
         resMessage: "Sistemos klaida. Bandykite dar kartą vėliau",
-        resErrorCode: 23 // New error code for sub-section limit
-      })
-  } finally {
-    if (client) client.release();
-  }
+        resErrorCode: 23
+      });
+    } finally {
+      if (client) {
+        client.release();
+        client = null;
+      }
+    }
 
+    /* -------------------------------------------
+       IMAGE VALIDATION
+    ------------------------------------------- */
+    const files = req.files;
+    console.log("[post-ads] files received:", files?.length || 0);
 
-
-
-  /* -------------------------------------------
-     IMAGE VALIDATION
-  ------------------------------------------- */
-  const files = req.files;
-
-  if (!files || files.length < 1 || files.length > 5) {
-    return res.status(400).json({
-      resStatus: false,
-      resMessage: "Reikalingi 1–5 vaizdai",
-      resErrorCode: 17
-    });
-  }
-  // Upload images
-  let uploadedImages = [];
-  for (const f of files) {
-    if (!ALLOWED_IMAGE_TYPES.includes(f.mimetype)) {
+    if (!files || files.length < 1 || files.length > 5) {
+      console.log("[post-ads] image validation failed: files count invalid");
       return res.status(400).json({
         resStatus: false,
-        resMessage: "Netinkamas failo formatas",
-        resErrorCode: 18
+        resMessage: "Reikalingi 1–5 vaizdai",
+        resErrorCode: 17
       });
     }
-    if (f.size < MIN_IMAGE_SIZE) {
-      return res.status(400).json({
-        resStatus: false,
-        resMessage: "Vaizdo failas sugadintas arba tuščias",
-        resErrorCode: 19
-      });
-    }
-    if (f.size > MAX_IMAGE_SIZE) {
-      return res.status(400).json({
-        resStatus: false,
-        resMessage: "Vaizdas per didelis (maks. 1,8 MB)",
-        resErrorCode: 20
-      });
-    }
-    const fileName = makeSafeName();
-    const { error } = await supabase.storage
-      .from("masters_latvia_storage")
-      .upload(fileName, f.buffer, { contentType: f.mimetype });
 
-    if (error) {
+    let uploadedImages = [];
+    for (const f of files) {
+      console.log("[post-ads] checking file:", {
+        mimetype: f.mimetype,
+        size: f.size,
+        originalname: f.originalname
+      });
+
+      if (!ALLOWED_IMAGE_TYPES.includes(f.mimetype)) {
+        console.log("[post-ads] invalid image type:", f.mimetype);
+        return res.status(400).json({
+          resStatus: false,
+          resMessage: "Netinkamas failo formatas",
+          resErrorCode: 18
+        });
+      }
+
+      if (f.size < MIN_IMAGE_SIZE) {
+        console.log("[post-ads] image too small:", f.size);
+        return res.status(400).json({
+          resStatus: false,
+          resMessage: "Vaizdo failas sugadintas arba tuščias",
+          resErrorCode: 19
+        });
+      }
+
+      if (f.size > MAX_IMAGE_SIZE) {
+        console.log("[post-ads] image too large:", f.size);
+        return res.status(400).json({
+          resStatus: false,
+          resMessage: "Vaizdas per didelis (maks. 1,8 MB)",
+          resErrorCode: 20
+        });
+      }
+
+      const fileName = makeSafeName();
+      console.log("[post-ads] uploading file to supabase:", fileName);
+
+      const { error } = await supabase.storage
+        .from("masters_latvia_storage")
+        .upload(fileName, f.buffer, { contentType: f.mimetype });
+
+      if (error) {
+        console.error("[post-ads] supabase upload error:", error);
+        return res.status(503).json({
+          resStatus: false,
+          resMessage: "Vaizdo įkėlimas nepavyko",
+          resErrorCode: 21
+        });
+      }
+
+      uploadedImages.push(
+        `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_latvia_storage/${fileName}`
+      );
+    }
+
+    console.log("[post-ads] uploadedImages:", uploadedImages);
+
+    /* -------------------------------------------
+       DATABASE INSERT
+    ------------------------------------------- */
+    try {
+      console.log("[post-ads] final DB insert start");
+      client = await pool.connect();
+
+      const insertQuery = `
+        INSERT INTO masters_lt_ads 
+        (name, title, description, price, city, telephone, image_url, ip, date,
+         main_group, sub_group, google_id, update_date,
+         created_at, is_active)
+        VALUES 
+        ($1, $2, $3, $4, $5, $6, $7, $8, $9,
+         $10, $11, $12, $13, $14,
+         $15)
+        RETURNING id
+      `;
+
+      const values = [
+        cleanInputName,
+        inputService,
+        cleanInputDescription,
+        cleanInputPrice,
+        JSON.stringify(inputRegions),
+        Number(countryCode + phoneNumber),
+        JSON.stringify(uploadedImages),
+        ipVisitor,
+        new Date().toISOString().slice(0, 10),
+        main_group,
+        sub_group,
+        googleId,
+        new Date().toISOString().slice(0, 10),
+        new Date(),
+        true
+      ];
+
+      console.log("[post-ads] insert values preview:", {
+        cleanInputName,
+        inputService,
+        cleanInputDescriptionLength: cleanInputDescription?.length,
+        cleanInputPrice,
+        inputRegions,
+        telephone: Number(countryCode + phoneNumber),
+        uploadedImagesLength: uploadedImages.length,
+        ipVisitor,
+        main_group,
+        sub_group,
+        googleId
+      });
+
+      const result = await client.query(insertQuery, values);
+      console.log("[post-ads] insert result rowCount:", result.rowCount);
+      console.log("[post-ads] insert result rows:", result.rows);
+
+      if (!result.rowCount) {
+        console.log("[post-ads] insert returned no rows");
+        return res.status(503).json({
+          resStatus: false,
+          resMessage: "Duomenų išsaugojimas nepavyko",
+          resErrorCode: 22
+        });
+      }
+
+      console.log("[post-ads] updating masters_lt_users.number_ads");
+
+      await client.query(
+        "UPDATE masters_lt_users SET number_ads = COALESCE(number_ads, 0) + 1 WHERE google_id = $1",
+        [googleId]
+      );
+
+      console.log("[post-ads] ad saved successfully");
+
+      return res.status(201).json({
+        resStatus: true,
+        resMessage: "Skelbimas išsaugotas",
+        resOkCode: 1
+      });
+
+    } catch (err) {
+      console.error("[post-ads] final insert ERROR object:", err);
+      console.error("[post-ads] final insert ERROR message:", err?.message);
+      console.error("[post-ads] final insert ERROR stack:", err?.stack);
       return res.status(503).json({
         resStatus: false,
-        resMessage: "Vaizdo įkėlimas nepavyko",
-        resErrorCode: 21
+        resMessage: "Serverio klaida",
+        resErrorCode: 23
       });
+
+    } finally {
+      if (client) client.release();
     }
-    uploadedImages.push(
-      `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_latvia_storage/${fileName}`
-    );
-  }
-
-  /* -------------------------------------------
-     DATABASE INSERT
-  ------------------------------------------- */
-  try {
-    client = await pool.connect();
-    const insertQuery = `
-      INSERT INTO masters_lt_ads 
-      (name, title, description, price, city, telephone, image_url, ip, date,
-       main_group, sub_group, google_id, update_date,
-       created_at, is_active)
-      VALUES 
-      ($1, $2, $3, $4, $5, $6, $7, $8, $9,
-       $10, $11, $12, $13, $14,
-       $15)
-      RETURNING id
-    `;
-
-    const values = [
-      cleanInputName,
-      inputService,
-      cleanInputDescription,
-      cleanInputPrice,
-      JSON.stringify(inputRegions),
-      Number(countryCode + phoneNumber),
-      JSON.stringify(uploadedImages),
-      ipVisitor,
-      new Date().toISOString().slice(0, 10),
-      main_group,
-      sub_group,
-      googleId,
-      new Date().toISOString().slice(0, 10),
-      new Date(),
-      true
-    ];
-
-    const result = await client.query(insertQuery, values);
-    if (!result.rowCount) {
-      return res.status(503).json({
-        resStatus: false,
-        resMessage: "Duomenų išsaugojimas nepavyko",
-        resErrorCode: 22
-      });
-    }
-
-    await client.query(
-      "UPDATE masters_lt_users SET number_ads = COALESCE(number_ads, 0) + 1 WHERE google_id = $1",
-      [googleId]
-    );
-
-    return res.status(201).json({
-      resStatus: true,
-      resMessage: "Skelbimas išsaugotas",
-      resOkCode: 1
-    });
 
   } catch (err) {
-    return res.status(503).json({
+    console.error("[post-ads] outer ERROR object:", err);
+    console.error("[post-ads] outer ERROR message:", err?.message);
+    console.error("[post-ads] outer ERROR stack:", err?.stack);
+    return res.status(500).json({
       resStatus: false,
       resMessage: "Serverio klaida",
-      resErrorCode: 23
+      resErrorCode: 24
     });
-
-  } finally {
-    if (client) client.release();
   }
 });
 router.put("/put/update-ad/:id", blockMaliciousIPs, enforceAdPostingCooldown, applyWriteRateLimit, 
