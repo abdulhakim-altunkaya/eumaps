@@ -24,6 +24,18 @@ const {
 const visitCacheLT = {};
 
 
+//This function for now will be used safely convert image file names to alphanumerical values
+// example value: 30/11/2025_111aaa.jpg
+function makeSafeName() {
+  const d = new Date();
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const rand = Math.random().toString(36).substring(2, 8); // 6 chars
+  return `${dd}${mm}${yyyy}_${rand}`;
+}
+
+
 router.post("/post/save-visitor", checkLogCooldown(3 * 60 * 1000), async (req, res) => {
   // silently skip if throttled
   if (!req.shouldLogVisit) {
