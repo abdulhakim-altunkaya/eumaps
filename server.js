@@ -254,22 +254,21 @@ function visitLoggingMiddleware(waitingTime) {
 
 app.get("/test/brevo-email", async (req, res) => {
   try {
-
-    await sendEmailBrevo({
+    const result = await sendEmailBrevo({
       site: "latvijasmeistari",
       to: "info@meistarilatvija.lv",
       subject: "Brevo test email",
-      html: "<p>If you see this email, Brevo works.</p>"
+      html: "<p>If you see this email, Brevo works.</p>",
+      text: "If you see this email, Brevo works."
     });
 
-    res.json({ success: true });
-
+    console.log("Brevo success:", result);
+    res.json({ success: true, result });
   } catch (err) {
-    console.error("Brevo test error:", err);
-    console.error("Brevo response:", err?.response?.body);
+    console.error("Brevo test error:", err?.response?.data || err.message);
     res.status(500).json({
       error: "Email failed",
-      details: err?.message
+      details: err?.response?.data || err.message,
     });
   }
 });
