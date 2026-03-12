@@ -14,6 +14,8 @@ const useragent = require("useragent");
 // ADD THIS NEAR TOP
 const axios = require('axios');
 
+const sendEmailBrevo = require("./utils/sendEmailBrevo");
+
 const cors = require("cors");
 //app.use(cors()); 
 
@@ -250,6 +252,23 @@ function visitLoggingMiddleware(waitingTime) {
   };
 }
 
+app.get("/test/brevo-email", async (req, res) => {
+  try {
+
+    await sendEmailBrevo({
+      site: "latvijasmeistari",
+      to: "info@meistarilatvija.lv",
+      subject: "Brevo test email",
+      html: "<p>If you see this email, Brevo works.</p>"
+    });
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("Brevo test error:", err);
+    res.status(500).json({ error: "Email failed" });
+  }
+});
 
 //A temporary cache to save ip addresses and it will prevent spam comments and replies for 1 minute.
 //I can do that by checking each ip with database ip addresses but then it will be too many requests to db

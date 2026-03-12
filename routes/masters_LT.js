@@ -5,6 +5,7 @@ const bcrypt = require("bcrypt");
 const { pool, supabase, upload } = require("../db");
 const useragent = require("useragent");
 const axios = require("axios");
+const sendEmailBrevo = require("../utils/sendEmailBrevo");
 
 const { OAuth2Client } = require("google-auth-library");
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
