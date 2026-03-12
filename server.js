@@ -266,7 +266,11 @@ app.get("/test/brevo-email", async (req, res) => {
 
   } catch (err) {
     console.error("Brevo test error:", err);
-    res.status(500).json({ error: "Email failed" });
+    console.error("Brevo response:", err?.response?.body);
+    res.status(500).json({
+      error: "Email failed",
+      details: err?.message
+    });
   }
 });
 
