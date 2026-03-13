@@ -6,6 +6,7 @@ const { pool, supabase, upload } = require("../db");
 const useragent = require("useragent");
 const axios = require("axios");
 const sendEmailBrevo = require("../utils/sendEmailBrevo");
+const jwt = require("jsonwebtoken");
 
 const { OAuth2Client } = require("google-auth-library");
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -2120,6 +2121,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
 });
 
 
+/*Email register only send email verification link */
 router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
   console.log("[email-register] route reached");
 
@@ -2134,14 +2136,6 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;");
 
-  const generateEmailGoogleId = () => {
-    let out = "9";
-    while (out.length < 21) {
-      out += Math.floor(Math.random() * 10);
-    }
-    return out;
-  };
-
   const name = clean(req.body.name, 80);
   const email = clean(req.body.email, 120).toLowerCase();
   const password = String(req.body.password || "");
@@ -2154,7 +2148,6 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
   });
 
   if (name.length < 2 || email.length < 5 || password.length < 6) {
-    console.log("[email-register] validation failed: bad lengths");
     return res.json({
       resStatus: false,
       resErrorCode: 1,
@@ -2176,7 +2169,6 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
     console.log("[email-register] email check rowCount:", checkR.rowCount);
 
     if (checkR.rowCount) {
-      console.log("[email-register] email already exists:", email);
       return res.json({
         resStatus: false,
         resErrorCode: 3,
@@ -2188,87 +2180,58 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
     const passwordHash = await bcrypt.hash(password, 12);
     console.log("[email-register] password hashed");
 
-    let googleId;
-    let exists = true;
-    let attempts = 0;
+    const verifyToken = jwt.sign(
+      {
+        name,
+        email,
+        passwordHash,
+        ipVisitor,
+        auth_provider: "email"
+      },
+      process.env.JWT_EMAIL_VERIFY_SECRET,
+      { expiresIn: "24h" }
+    );
 
-    console.log("[email-register] generating google_id-like value");
+    const verifyLink = `https://pagalbapro.lt/verify-email.html?token=${encodeURIComponent(verifyToken)}`;
 
-    while (exists) {
-      attempts += 1;
-      googleId = generateEmailGoogleId();
+    console.log("[email-register] sending verification email");
 
-      console.log("[email-register] generated candidate googleId:", googleId, "attempt:", attempts);
+    const brevoResult = await sendEmailBrevo({
+      site: "pagalbapro",
+      to: email,
+      subject: "Patvirtinkite savo el. paštą",
+      html: `
+        <p>Sveiki${name ? `, ${name}` : ""},</p>
+        <p>Norėdami užbaigti registraciją, patvirtinkite savo el. paštą paspausdami nuorodą žemiau:</p>
+        <p><a href="${verifyLink}">Patvirtinti el. paštą</a></p>
+        <p>Nuoroda galioja 24 valandas.</p>
+        <p>Jei to neprašėte, ignoruokite šį laišką.</p>
+      `,
+      text:
+`Sveiki${name ? `, ${name}` : ""},
 
-      const r = await pool.query(
-        `SELECT google_id FROM masters_lt_users WHERE google_id = $1 LIMIT 1`,
-        [googleId]
-      );
+Norėdami užbaigti registraciją, atidarykite šią nuorodą:
 
-      exists = r.rowCount > 0;
-      console.log("[email-register] googleId exists?:", exists);
+${verifyLink}
 
-      if (attempts > 20) {
-        throw new Error("Could not generate unique google_id after 20 attempts");
-      }
-    }
+Nuoroda galioja 24 valandas.
 
-    const today = new Date().toISOString().slice(0, 10);
-    console.log("[email-register] today:", today);
-
-    const insertQ = `
-      INSERT INTO masters_lt_users
-      (google_id, email, name, date, ip, auth_provider, password_hash, email_verified)
-      VALUES ($1, $2, $3, $4, $5, 'email', $6, false)
-      RETURNING google_id
-    `;
-
-    console.log("[email-register] inserting user into masters_lt_users");
-
-    const insertR = await pool.query(insertQ, [
-      googleId,
-      email,
-      name,
-      today,
-      ipVisitor,
-      passwordHash
-    ]);
-
-    console.log("[email-register] insert success:", insertR.rows);
-
-    const dbGoogleId = insertR.rows[0].google_id;
-
-    console.log("[email-register] creating session for google_id:", dbGoogleId);
-    const sessionId = await createSessionForUser(dbGoogleId);
-    console.log("[email-register] session created:", sessionId);
-
-    res.cookie("session_id", sessionId, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "none",
-      path: "/",
-      maxAge: 1000 * 60 * 60 * 24 * 365
+Jei to neprašėte, ignoruokite šį laišką.`
     });
 
-    console.log("[email-register] cookie set, sending success response");
+    console.log("[email-register] verification email sent:", brevoResult);
 
     return res.json({
       resStatus: true,
       resOkCode: 1,
-      resMessage: "Registracija sėkminga",
-      user: {
-        google_id: dbGoogleId,
-        email,
-        name,
-        session_id: sessionId
-      }
+      resMessage: "Patvirtinimo laiškas išsiųstas"
     });
 
   } catch (err) {
     console.error("[email-register] ERROR object:", err);
     console.error("[email-register] ERROR message:", err?.message);
     console.error("[email-register] ERROR stack:", err?.stack);
-    console.error("[email-register] ERROR name/email:", { name, email });
+    console.error("[email-register] ERROR response data:", err?.response?.data);
 
     return res.status(500).json({
       resStatus: false,
@@ -2630,6 +2593,156 @@ router.post("/post/auth/email-reset", blockMaliciousIPs, applyWriteRateLimit, as
     });
   } finally {
     if (client) client.release();
+  }
+});
+//email-verify creates the user
+router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
+  console.log("[email-verify] route reached");
+
+  const token = String(req.body.token || "").trim();
+
+  if (!token) {
+    return res.status(400).json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Trūksta patvirtinimo rakto"
+    });
+  }
+
+  try {
+    console.log("[email-verify] verifying token");
+
+    const decoded = jwt.verify(
+      token,
+      process.env.PAGALBAPRO_EMAIL_VERIFY_JWT_SECRET
+    );
+
+    const { name, email, passwordHash, ipVisitor, auth_provider } = decoded;
+
+    console.log("[email-verify] decoded token:", { name, email });
+
+    const checkQ = `
+      SELECT google_id
+      FROM masters_lt_users
+      WHERE email = $1
+      LIMIT 1
+    `;
+    const checkR = await pool.query(checkQ, [email]);
+
+    if (checkR.rowCount) {
+      console.log("[email-verify] user already exists");
+
+      return res.json({
+        resStatus: false,
+        resErrorCode: 2,
+        resMessage: "Paskyra jau egzistuoja"
+      });
+    }
+
+    const generateEmailGoogleId = () => {
+      let out = "9";
+      while (out.length < 21) {
+        out += Math.floor(Math.random() * 10);
+      }
+      return out;
+    };
+
+    let googleId;
+    let exists = true;
+    let attempts = 0;
+
+    console.log("[email-verify] generating google_id");
+
+    while (exists) {
+      attempts += 1;
+      googleId = generateEmailGoogleId();
+
+      const r = await pool.query(
+        `SELECT google_id FROM masters_lt_users WHERE google_id = $1 LIMIT 1`,
+        [googleId]
+      );
+
+      exists = r.rowCount > 0;
+
+      if (attempts > 20) {
+        throw new Error("Could not generate unique google_id");
+      }
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    const insertQ = `
+      INSERT INTO masters_lt_users
+      (google_id, email, name, date, ip, auth_provider, password_hash, email_verified)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,true)
+      RETURNING google_id
+    `;
+
+    console.log("[email-verify] inserting new user");
+
+    const insertR = await pool.query(insertQ, [
+      googleId,
+      email,
+      name,
+      today,
+      ipVisitor,
+      auth_provider || "email",
+      passwordHash
+    ]);
+
+    const dbGoogleId = insertR.rows[0].google_id;
+
+    console.log("[email-verify] creating session");
+
+    const sessionId = await createSessionForUser(dbGoogleId);
+
+    res.cookie("session_id", sessionId, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+      path: "/",
+      maxAge: 1000 * 60 * 60 * 24 * 365
+    });
+
+    console.log("[email-verify] user created + session set");
+
+    return res.json({
+      resStatus: true,
+      resOkCode: 1,
+      resMessage: "El. paštas patvirtintas",
+      user: {
+        google_id: dbGoogleId,
+        email,
+        name,
+        session_id: sessionId
+      }
+    });
+
+  } catch (err) {
+
+    console.error("[email-verify] ERROR:", err);
+
+    if (err.name === "TokenExpiredError") {
+      return res.status(400).json({
+        resStatus: false,
+        resErrorCode: 3,
+        resMessage: "Patvirtinimo nuoroda nebegalioja"
+      });
+    }
+
+    if (err.name === "JsonWebTokenError") {
+      return res.status(400).json({
+        resStatus: false,
+        resErrorCode: 4,
+        resMessage: "Netinkamas patvirtinimo raktas"
+      });
+    }
+
+    return res.status(500).json({
+      resStatus: false,
+      resErrorCode: 99,
+      resMessage: "Serverio klaida"
+    });
   }
 });
 
