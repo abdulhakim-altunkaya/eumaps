@@ -2460,28 +2460,77 @@ router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, a
     });
   }
 
+  let client;
+
   try {
+    client = await pool.connect();
+
+    const userQuery = `
+      SELECT google_id, email, name
+      FROM masters_lt_users
+      WHERE LOWER(email) = $1
+      LIMIT 1;
+    `;
+    const userResult = await client.query(userQuery, [email]);
+
+    if (userResult.rows.length === 0) {
+      return res.status(200).json({
+        resStatus: true,
+        resMessage: "Jei el. paštas egzistuoja, laiškas bus išsiųstas",
+        resOkCode: 1
+      });
+    }
+
+    const user = userResult.rows[0];
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetExpires = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
+
+    const updateQuery = `
+      UPDATE masters_lt_users
+      SET password_reset_token = $1,
+          password_reset_expires = $2
+      WHERE google_id = $3
+    `;
+    await client.query(updateQuery, [resetToken, resetExpires, user.google_id]);
+
+    const resetLink = `https://pagalbapro.lt/reset-password.html?token=${resetToken}`;
+
     const brevoResult = await sendEmailBrevo({
       site: "pagalbapro",
-      to: email,
+      to: user.email,
       subject: "Slaptažodžio atkūrimas",
-      html: "<p>Testas: jei gavote šį laišką, Brevo veikia.</p>",
-      text: "Testas: jei gavote šį laišką, Brevo veikia."
-    });
+      html: `
+        <p>Sveiki${user.name ? `, ${user.name}` : ""},</p>
+        <p>Norėdami pakeisti slaptažodį, spauskite žemiau esančią nuorodą:</p>
+        <p><a href="${resetLink}">${resetLink}</a></p>
+        <p>Nuoroda galioja 1 valandą.</p>
+        <p>Jei to neprašėte, ignoruokite šį laišką.</p>
+      `,
+      text:
+        `Sveiki${user.name ? `, ${user.name}` : ""},
 
+        Norėdami pakeisti slaptažodį, atidarykite šią nuorodą:
+        ${resetLink}
+
+        Nuoroda galioja 1 valandą.
+
+        Jei to neprašėte, ignoruokite šį laišką.`
+      });
+
+    console.log("[email-forget] token saved for:", user.email);
     console.log("[email-forget] brevo success:", brevoResult);
 
     return res.status(200).json({
       resStatus: true,
-      resMessage: "El. laiškas išsiųstas",
-      resOkCode: 1,
-      brevoResult
+      resMessage: "Jei el. paštas egzistuoja, laiškas bus išsiųstas",
+      resOkCode: 2
     });
 
   } catch (error) {
     console.error("[email-forget] full error:", error);
-    console.error("[email-forget] brevo response data:", error?.response?.data);
-    console.error("[email-forget] brevo response status:", error?.response?.status);
+    console.error("[email-forget] response data:", error?.response?.data);
+    console.error("[email-forget] response status:", error?.response?.status);
 
     return res.status(500).json({
       resStatus: false,
@@ -2489,12 +2538,100 @@ router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, a
         error?.response?.data?.message ||
         error?.message ||
         "Nepavyko išsiųsti el. laiško",
-      resErrorCode: 2,
-      errorDetails: error?.response?.data || null
+      resErrorCode: 2
     });
+  } finally {
+    if (client) client.release();
   }
 });
+router.post("/post/auth/email-reset", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
+  console.log("[email-reset] route reached");
+  console.log("[email-reset] body:", {
+    tokenLength: String(req.body.token || "").length,
+    newPasswordLength: String(req.body.newPassword || "").length
+  });
 
+  const token = String(req.body.token || "").trim();
+  const newPassword = String(req.body.newPassword || "");
+
+  if (!token) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Trūksta atkūrimo rakto",
+      resErrorCode: 1
+    });
+  }
+
+  if (!newPassword || newPassword.length < 6 || newPassword.length > 120) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Netinkamas slaptažodis",
+      resErrorCode: 2
+    });
+  }
+
+  let client;
+
+  try {
+    client = await pool.connect();
+
+    const userQuery = `
+      SELECT google_id, email, password_reset_token, password_reset_expires
+      FROM masters_lt_users
+      WHERE password_reset_token = $1
+      LIMIT 1;
+    `;
+    const userResult = await client.query(userQuery, [token]);
+
+    if (userResult.rows.length === 0) {
+      return res.status(400).json({
+        resStatus: false,
+        resMessage: "Netinkama arba negaliojanti atkūrimo nuoroda",
+        resErrorCode: 3
+      });
+    }
+
+    const user = userResult.rows[0];
+
+    if (!user.password_reset_expires || new Date(user.password_reset_expires) < new Date()) {
+      return res.status(400).json({
+        resStatus: false,
+        resMessage: "Atkūrimo nuoroda nebegalioja",
+        resErrorCode: 4
+      });
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPassword, 12);
+
+    const updateQuery = `
+      UPDATE masters_lt_users
+      SET password_hash = $1,
+          password_reset_token = NULL,
+          password_reset_expires = NULL
+      WHERE google_id = $2
+    `;
+    await client.query(updateQuery, [newPasswordHash, user.google_id]);
+
+    console.log("[email-reset] password updated for:", user.email);
+
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "Slaptažodis sėkmingai atnaujintas",
+      resOkCode: 1
+    });
+
+  } catch (error) {
+    console.error("[email-reset] full error:", error);
+
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Nepavyko atnaujinti slaptažodžio",
+      resErrorCode: 5
+    });
+  } finally {
+    if (client) client.release();
+  }
+});
 
 router.get("/get/ad/:id", applyReadRateLimit, async (req, res) => {
   const adId = req.params.id;

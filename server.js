@@ -92,7 +92,7 @@ app.use("/api/master-lithuania", mastersLTRoutes);
 //This function for now will be used safely convert image file names to alphanumerical values
 //currently used by latvia masters
 //can be used by any endpoint in the future
-// example value: 30/11/2025_111aaa.jpg
+// example value: 30/11/2025_111aaa.jpgo
 function makeSafeName() {
   const d = new Date();
   const dd = String(d.getDate()).padStart(2, "0");
