@@ -2188,7 +2188,7 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
         ipVisitor,
         auth_provider: "email"
       },
-      process.env.JWT_EMAIL_VERIFY_SECRET,
+      process.env.PAGALBAPRO_EMAIL_VERIFY_JWT_SECRET,
       { expiresIn: "24h" }
     );
 
