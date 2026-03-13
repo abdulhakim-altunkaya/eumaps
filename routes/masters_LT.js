@@ -950,6 +950,11 @@ router.post("/post/toggle-activation/:id", blockMaliciousIPs, applyWriteRateLimi
     });
   }
 });
+
+
+
+
+
 router.post("/post/delete-ad/:id", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
   const adId = req.params.id;
   // Desktop can use cookies but some mobiles will use headers for login system
@@ -2441,7 +2446,54 @@ router.get("/get/session-user", blockMaliciousIPs, applyReadRateLimit, async (re
     });
   }
 });
+router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
+  console.log("[email-forget] route reached");
+  console.log("[email-forget] body:", req.body);
 
+  const email = String(req.body.email || "").trim().toLowerCase();
+
+  if (!email || email.length > 120) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Netinkamas el. paštas",
+      resErrorCode: 1
+    });
+  }
+
+  try {
+    const brevoResult = await sendEmailBrevo({
+      site: "pagalbapro",
+      to: email,
+      subject: "Slaptažodžio atkūrimas",
+      html: "<p>Testas: jei gavote šį laišką, Brevo veikia.</p>",
+      text: "Testas: jei gavote šį laišką, Brevo veikia."
+    });
+
+    console.log("[email-forget] brevo success:", brevoResult);
+
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "El. laiškas išsiųstas",
+      resOkCode: 1,
+      brevoResult
+    });
+
+  } catch (error) {
+    console.error("[email-forget] full error:", error);
+    console.error("[email-forget] brevo response data:", error?.response?.data);
+    console.error("[email-forget] brevo response status:", error?.response?.status);
+
+    return res.status(500).json({
+      resStatus: false,
+      resMessage:
+        error?.response?.data?.message ||
+        error?.message ||
+        "Nepavyko išsiųsti el. laiško",
+      resErrorCode: 2,
+      errorDetails: error?.response?.data || null
+    });
+  }
+});
 
 
 router.get("/get/ad/:id", applyReadRateLimit, async (req, res) => {
