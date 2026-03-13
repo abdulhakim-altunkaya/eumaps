@@ -252,26 +252,6 @@ function visitLoggingMiddleware(waitingTime) {
   };
 }
 
-app.get("/test/brevo-email", async (req, res) => {
-  try {
-    const result = await sendEmailBrevo({
-      site: "latvijasmeistari",
-      to: "info@meistarilatvija.lv",
-      subject: "Brevo test email",
-      html: "<p>If you see this email, Brevo works.</p>",
-      text: "If you see this email, Brevo works."
-    });
-
-    console.log("Brevo success:", result);
-    res.json({ success: true, result });
-  } catch (err) {
-    console.error("Brevo test error:", err?.response?.data || err.message);
-    res.status(500).json({
-      error: "Email failed",
-      details: err?.response?.data || err.message,
-    });
-  }
-});
 
 //A temporary cache to save ip addresses and it will prevent spam comments and replies for 1 minute.
 //I can do that by checking each ip with database ip addresses but then it will be too many requests to db
