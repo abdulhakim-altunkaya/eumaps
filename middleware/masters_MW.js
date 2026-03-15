@@ -150,7 +150,7 @@ function checkLogCooldown(waitingTime) {
 }
 const emailActionCooldownStore = {};
 //1 ip can trigger reset password and signup only once per 20 minutes.
-function enforceEmailActionCooldown(actionType, cooldownMs = 20 * 60 * 1000) {
+function enforceEmailActionCooldown(actionType, cooldownMs = 2 * 60 * 1000) {
   return (req, res, next) => {
     const ip = extractClientIP(req);
     const now = Date.now();
@@ -206,7 +206,7 @@ function enforceLoginProtection(req, res, next) {
       loginProtectionStore[ip].fails++;
 
       if (loginProtectionStore[ip].fails >= 9) {
-        loginProtectionStore[ip].blockUntil = Date.now() + 20 * 60 * 1000;
+        loginProtectionStore[ip].blockUntil = Date.now() + 2 * 60 * 1000;
         loginProtectionStore[ip].fails = 0;
       }
     },
