@@ -2306,14 +2306,12 @@ router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, v
   enforceEmailActionCooldown("email_reset"), async (req, res) => {
 
   const email = String(req.body.email || "").trim().toLowerCase();
-
   let client;
-
   try {
     client = await pool.connect();
 
     const userQuery = `
-      SELECT google_id, email, name
+      SELECT google_id, email, name, auth_provider
       FROM masters_lt_users
       WHERE LOWER(email) = $1
       LIMIT 1;
@@ -2329,6 +2327,14 @@ router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, v
     }
 
     const user = userResult.rows[0];
+    //if user has google logged in before, then he cannot reset. He should go to google login.
+    if (user.auth_provider !== "email") {
+      return res.status(200).json({
+        resStatus: false,
+        resErrorCode: 6,
+        resMessage: "Šis el. paštas naudojamas su Google prisijungimu. Prisijunkite per Google."
+      });
+    }
 
     const resetToken = crypto.randomBytes(32).toString("hex");
     const resetExpires = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
