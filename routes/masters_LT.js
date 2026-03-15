@@ -19,7 +19,8 @@ const {
   enforceAdPostingCooldown,
   checkLogCooldown,
   enforceLoginProtection,
-  enforceEmailActionCooldown
+  enforceEmailActionCooldown,
+  validateEmail
 } = require("../middleware/masters_MW");
 
 //This object is used to prevent one IP address from increasing/bloating 
@@ -743,6 +744,23 @@ router.post("/post/auth/google", blockMaliciousIPs, applyWriteRateLimit, async (
     const payload = ticket.getPayload();
     const { sub: googleId, email, name } = payload;
     client = await pool.connect();
+    const existingByEmailQ = `
+      SELECT google_id, auth_provider, email
+      FROM masters_lt_users
+      WHERE LOWER(email) = LOWER($1)
+      LIMIT 1
+    `;
+    const existingByEmailR = await client.query(existingByEmailQ, [email]);
+    if (existingByEmailR.rowCount) {
+      const existingUser = existingByEmailR.rows[0];
+      if (existingUser.auth_provider === "email") {
+        return res.status(409).json({
+          resStatus: false,
+          resMessage: "Šis el. paštas jau registruotas su el. paštu. Prisijunkite per el. paštą ir slaptažodį.",
+          resErrorCode: 5
+        });
+      }
+    }
     const query = `
       INSERT INTO masters_lt_users (google_id, email, name, date, ip)
       VALUES ($1, $2, $3, $4, $5)
@@ -2023,8 +2041,8 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
 
 
 /*Email register only send email verification link */
-router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit, enforceEmailActionCooldown("email_register"), 
-  async (req, res) => {
+router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit, validateEmail,
+   enforceEmailActionCooldown("email_register"), async (req, res) => {
 
   const ipVisitor = req.headers["x-forwarded-for"]
     ? req.headers["x-forwarded-for"].split(",")[0]
@@ -2122,7 +2140,8 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
     });
   }
 });
-router.post("/post/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, enforceLoginProtection, async (req, res) => {
+router.post("/post/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, enforceLoginProtection, validateEmail,
+   async (req, res) => {
   const clean = (v, max) =>
     String(v || "")
       .trim()
@@ -2140,14 +2159,6 @@ router.post("/post/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, en
       resMessage: "Netinkami prisijungimo duomenys"
     });
   }
-
-/*   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.json({
-      resStatus: false,
-      resErrorCode: 2,
-      resMessage: "Netinkamas el. paštas"
-    });
-  } */
 
   try {
     const userQ = `
@@ -2172,7 +2183,7 @@ router.post("/post/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, en
       return res.json({
         resStatus: false,
         resErrorCode: 4,
-        resMessage: "Šis el. paštas naudojamas su kitu prisijungimo būdu"
+        resMessage: "Šis el. paštas registruotas su Google. Prisijunkite per Google."
       });
     }
 
@@ -2291,18 +2302,10 @@ router.get("/get/session-user", blockMaliciousIPs, applyReadRateLimit, async (re
     });
   }
 });
-router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, enforceEmailActionCooldown("email_reset"), 
-  async (req, res) => {
+router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, validateEmail, 
+  enforceEmailActionCooldown("email_reset"), async (req, res) => {
 
   const email = String(req.body.email || "").trim().toLowerCase();
-
-  if (!email || email.length > 120) {
-    return res.status(400).json({
-      resStatus: false,
-      resMessage: "Netinkamas el. paštas",
-      resErrorCode: 1
-    });
-  }
 
   let client;
 

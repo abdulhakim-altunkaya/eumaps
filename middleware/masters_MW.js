@@ -219,6 +219,74 @@ function enforceLoginProtection(req, res, next) {
   next();
 }
 
+//garbage email input blocker: used by email login, signup and reset
+function validateEmail(req, res, next) {
+
+  const email = String(req.body.email || "")
+    .trim()
+    .toLowerCase();
+
+  if (!email || email.length > 80) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Netinkamas el. paštas"
+    });
+  }
+
+  const emailRegex =
+    /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+  if (!emailRegex.test(email)) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Netinkamas el. paštas"
+    });
+  }
+
+  const parts = email.split("@");
+  const local = parts[0];
+  const domain = parts[1];
+
+  /* minimum 3 chars before @ */
+  if (local.length < 3) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Netinkamas el. paštas"
+    });
+  }
+
+  /* numeric-only emails */
+  if (/^\d+$/.test(local)) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Netinkamas el. paštas"
+    });
+  }
+
+  const blocked = [
+    "test.com",
+    "example.com",
+    "mailinator.com",
+    "tempmail.com"
+  ];
+
+  if (blocked.includes(domain)) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 1,
+      resMessage: "Netinkamas el. paštas"
+    });
+  }
+
+  /* normalize email */
+  req.body.email = email;
+
+  next();
+};
 
 module.exports = {
   extractClientIP,
@@ -228,5 +296,6 @@ module.exports = {
   enforceAdPostingCooldown,
   checkLogCooldown,
   enforceLoginProtection,
-  enforceEmailActionCooldown
+  enforceEmailActionCooldown,
+  validateEmail
 };
