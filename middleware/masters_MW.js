@@ -148,6 +148,77 @@ function checkLogCooldown(waitingTime) {
     next();
   };
 }
+const emailActionCooldownStore = {};
+//1 ip can trigger reset password and signup only once per 20 minutes.
+function enforceEmailActionCooldown(actionType, cooldownMs = 20 * 60 * 1000) {
+  return (req, res, next) => {
+    const ip = extractClientIP(req);
+    const now = Date.now();
+
+    if (!emailActionCooldownStore[ip]) {
+      emailActionCooldownStore[ip] = {};
+    }
+
+    const blockUntil = emailActionCooldownStore[ip][actionType];
+
+    if (blockUntil && now < blockUntil) {
+      return res.status(429).json({
+        resStatus: false,
+        resMessage: "Per daug bandymų iš šio IP. Bandykite vėliau.",
+        resErrorCode: 115
+      });
+    }
+
+    req.emailActionCooldown = {
+      registerSuccess: () => {
+        if (!emailActionCooldownStore[ip]) {
+          emailActionCooldownStore[ip] = {};
+        }
+
+        emailActionCooldownStore[ip][actionType] = Date.now() + cooldownMs;
+      }
+    };
+
+    next();
+  };
+}
+
+const loginProtectionStore = {};
+function enforceLoginProtection(req, res, next) {
+  const ip = extractClientIP(req);
+  const data = loginProtectionStore[ip];
+
+  if (data && data.blockUntil && Date.now() < data.blockUntil) {
+    return res.status(429).json({
+      resStatus: false,
+      resMessage: "Too many failed login attempts. Try again in 20 minutes.",
+      resErrorCode: 114
+    });
+  }
+
+  req.loginProtection = {
+    registerFail: () => {
+      if (!loginProtectionStore[ip]) {
+        loginProtectionStore[ip] = { fails: 1, blockUntil: null };
+        return;
+      }
+
+      loginProtectionStore[ip].fails++;
+
+      if (loginProtectionStore[ip].fails >= 9) {
+        loginProtectionStore[ip].blockUntil = Date.now() + 20 * 60 * 1000;
+        loginProtectionStore[ip].fails = 0;
+      }
+    },
+
+    registerSuccess: () => {
+      delete loginProtectionStore[ip];
+    }
+  };
+
+  next();
+}
+
 
 module.exports = {
   extractClientIP,
@@ -155,5 +226,7 @@ module.exports = {
   applyWriteRateLimit,
   applyReadRateLimit,
   enforceAdPostingCooldown,
-  checkLogCooldown
+  checkLogCooldown,
+  enforceLoginProtection,
+  enforceEmailActionCooldown
 };

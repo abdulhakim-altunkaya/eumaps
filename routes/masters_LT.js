@@ -17,7 +17,9 @@ const {
   applyReadRateLimit, 
   applyWriteRateLimit,
   enforceAdPostingCooldown,
-  checkLogCooldown
+  checkLogCooldown,
+  enforceLoginProtection,
+  enforceEmailActionCooldown
 } = require("../middleware/masters_MW");
 
 //This object is used to prevent one IP address from increasing/bloating 
@@ -86,8 +88,6 @@ router.post("/post/save-visitor", checkLogCooldown(3 * 60 * 1000), async (req, r
 });
 router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWriteRateLimit,
   upload.array("images", 5), async (req, res) => {
-  console.log("[post-ads] route reached");
-
   const MIN_IMAGE_SIZE = 2 * 1024;
   const MAX_IMAGE_SIZE = 1.9 * 1024 * 1024;
   const ALLOWED_IMAGE_TYPES = [
@@ -101,8 +101,6 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
     ? req.headers["x-forwarded-for"].split(",")[0]
     : req.socket.remoteAddress || req.ip;
 
-  console.log("[post-ads] ipVisitor:", ipVisitor);
-
   let client;
   let formData;
 
@@ -110,13 +108,8 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
      PARSE JSON FORM DATA
   ------------------------------------------- */
   try {
-    console.log("[post-ads] req.body keys:", Object.keys(req.body || {}));
-    console.log("[post-ads] req.files length before parse:", req.files?.length || 0);
-
     formData = JSON.parse(req.body.formData);
-    console.log("[post-ads] formData parsed successfully:", formData);
   } catch (err) {
-    console.error("[post-ads] formData parse error:", err);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Netinkami formos duomenys",
@@ -147,20 +140,7 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
   const cleanInputPrice = sanitizeInput(inputPrice);
   const cleanInputName = sanitizeInput(inputName);
 
-  console.log("[post-ads] validation values:", {
-    inputService,
-    inputNameLength: inputName?.length,
-    inputPriceLength: inputPrice?.length,
-    inputDescriptionLength: inputDescription?.length,
-    countryCode,
-    phoneNumber,
-    inputRegionsLength: Array.isArray(inputRegions) ? inputRegions.length : "not-array",
-    main_group,
-    sub_group
-  });
-
   if (!inputService || !inputName || !inputPrice || !inputDescription || !phoneNumber) {
-    console.log("[post-ads] validation failed: missing required fields");
     return res.status(400).json({
       resStatus: false,
       resMessage: "Neužpildyti privalomi laukai",
@@ -170,7 +150,6 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
 
   const mainVal = Number(main_group);
   if (isNaN(mainVal) || mainVal < 1 || mainVal > 10) {
-    console.log("[post-ads] validation failed: invalid main_group", main_group);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Pagrindinė kategorija už leidžiamo diapazono ribų",
@@ -180,7 +159,6 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
 
   const subVal = Number(sub_group);
   if (isNaN(subVal) || subVal < 1 || subVal > 10) {
-    console.log("[post-ads] validation failed: invalid sub_group", sub_group);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Pokategoris už leidžiamo diapazono ribų",
@@ -189,7 +167,6 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
   }
 
   if (phoneNumber.trim().length < 7 || phoneNumber.trim().length > 12) {
-    console.log("[post-ads] validation failed: invalid phone length", phoneNumber?.trim()?.length);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Neteisingas telefono numerio ilgis",
@@ -198,7 +175,6 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
   }
 
   if (!Array.isArray(inputRegions) || inputRegions.length === 0) {
-    console.log("[post-ads] validation failed: no regions");
     return res.status(400).json({
       resStatus: false,
       resMessage: "Nepasirinkta regionų",
@@ -207,7 +183,6 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
   }
 
   if (inputName.length < 5 || inputName.length > 19) {
-    console.log("[post-ads] validation failed: inputName length", inputName.length);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Vardas per ilgas arba per trumpas",
@@ -216,7 +191,6 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
   }
 
   if (inputPrice.length < 1 || inputPrice.length > 15) {
-    console.log("[post-ads] validation failed: inputPrice length", inputPrice.length);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Kaina per ilga arba per trumpa",
@@ -225,7 +199,6 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
   }
 
   if (inputDescription.length < 50 || inputDescription.length > 1000) {
-    console.log("[post-ads] validation failed: inputDescription length", inputDescription.length);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Aprašymas per ilgas arba per trumpas",
@@ -237,18 +210,12 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
      SESSION VALIDATION
   ------------------------------------------- */
   try {
-    console.log("[post-ads] session validation start");
-    console.log("[post-ads] cookies:", req.cookies);
-    console.log("[post-ads] auth header:", req.headers.authorization);
 
     const auth = req.headers.authorization || "";
     const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
     const sessionId = req.cookies?.session_id || bearerSid;
 
-    console.log("[post-ads] resolved sessionId:", sessionId);
-
     if (!sessionId) {
-      console.log("[post-ads] no sessionId found");
       return res.status(401).json({
         resStatus: false,
         resMessage: "Prisijunkite, kad tęstumėte",
@@ -261,11 +228,7 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
       [sessionId]
     );
 
-    console.log("[post-ads] session query rowCount:", userRes.rowCount);
-    console.log("[post-ads] session query rows:", userRes.rows);
-
     if (!userRes.rowCount) {
-      console.log("[post-ads] invalid session");
       return res.status(401).json({
         resStatus: false,
         resMessage: "Netinkama sesija",
@@ -274,14 +237,11 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
     }
 
     const googleId = userRes.rows[0].google_id;
-    console.log("[post-ads] resolved googleId:", googleId);
-
     /* -------------------------------------------
         1 ad per subsection
         5 ads total 
     ------------------------------------------- */
     try {
-      console.log("[post-ads] ad-limit checks start");
       client = await pool.connect();
 
       const userAdNumberCheck = await client.query(
@@ -289,10 +249,7 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
         [googleId]
       );
 
-      console.log("[post-ads] userAdNumberCheck rows:", userAdNumberCheck.rows);
-
       if (userAdNumberCheck.rows[0]?.number_ads >= 5) {
-        console.log("[post-ads] total ad limit reached");
         return res.status(403).json({
           resStatus: false,
           resMessage: "Pasiektas skelbimų skaičius (maksimalus 5)",
@@ -307,11 +264,7 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
         [googleId, mainVal, subVal]
       );
 
-      console.log("[post-ads] existingAdCheck rowCount:", existingAdCheck.rowCount);
-      console.log("[post-ads] existingAdCheck rows:", existingAdCheck.rows);
-
       if (existingAdCheck.rowCount > 0) {
-        console.log("[post-ads] subsection ad already exists");
         return res.status(403).json({
           resStatus: false,
           resMessage: "Šiame pokategoryje jau turite aktyvų skelbimą",
@@ -319,9 +272,6 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
         });
       }
     } catch (err) {
-      console.error("[post-ads] ad-limit check ERROR object:", err);
-      console.error("[post-ads] ad-limit check ERROR message:", err?.message);
-      console.error("[post-ads] ad-limit check ERROR stack:", err?.stack);
       return res.status(500).json({
         resStatus: false,
         resMessage: "Sistemos klaida. Bandykite dar kartą vėliau",
@@ -338,10 +288,8 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
        IMAGE VALIDATION
     ------------------------------------------- */
     const files = req.files;
-    console.log("[post-ads] files received:", files?.length || 0);
 
     if (!files || files.length < 1 || files.length > 5) {
-      console.log("[post-ads] image validation failed: files count invalid");
       return res.status(400).json({
         resStatus: false,
         resMessage: "Reikalingi 1–5 vaizdai",
@@ -351,14 +299,7 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
 
     let uploadedImages = [];
     for (const f of files) {
-      console.log("[post-ads] checking file:", {
-        mimetype: f.mimetype,
-        size: f.size,
-        originalname: f.originalname
-      });
-
       if (!ALLOWED_IMAGE_TYPES.includes(f.mimetype)) {
-        console.log("[post-ads] invalid image type:", f.mimetype);
         return res.status(400).json({
           resStatus: false,
           resMessage: "Netinkamas failo formatas",
@@ -367,7 +308,6 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
       }
 
       if (f.size < MIN_IMAGE_SIZE) {
-        console.log("[post-ads] image too small:", f.size);
         return res.status(400).json({
           resStatus: false,
           resMessage: "Vaizdo failas sugadintas arba tuščias",
@@ -376,7 +316,6 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
       }
 
       if (f.size > MAX_IMAGE_SIZE) {
-        console.log("[post-ads] image too large:", f.size);
         return res.status(400).json({
           resStatus: false,
           resMessage: "Vaizdas per didelis (maks. 1,8 MB)",
@@ -385,14 +324,11 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
       }
 
       const fileName = makeSafeName();
-      console.log("[post-ads] uploading file to supabase:", fileName);
-
       const { error } = await supabase.storage
         .from("masters_latvia_storage")
         .upload(fileName, f.buffer, { contentType: f.mimetype });
 
       if (error) {
-        console.error("[post-ads] supabase upload error:", error);
         return res.status(503).json({
           resStatus: false,
           resMessage: "Vaizdo įkėlimas nepavyko",
@@ -404,14 +340,10 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
         `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_latvia_storage/${fileName}`
       );
     }
-
-    console.log("[post-ads] uploadedImages:", uploadedImages);
-
     /* -------------------------------------------
        DATABASE INSERT
     ------------------------------------------- */
     try {
-      console.log("[post-ads] final DB insert start");
       client = await pool.connect();
 
       const insertQuery = `
@@ -444,41 +376,18 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
         true
       ];
 
-      console.log("[post-ads] insert values preview:", {
-        cleanInputName,
-        inputService,
-        cleanInputDescriptionLength: cleanInputDescription?.length,
-        cleanInputPrice,
-        inputRegions,
-        telephone: Number(countryCode + phoneNumber),
-        uploadedImagesLength: uploadedImages.length,
-        ipVisitor,
-        main_group,
-        sub_group,
-        googleId
-      });
-
       const result = await client.query(insertQuery, values);
-      console.log("[post-ads] insert result rowCount:", result.rowCount);
-      console.log("[post-ads] insert result rows:", result.rows);
-
       if (!result.rowCount) {
-        console.log("[post-ads] insert returned no rows");
         return res.status(503).json({
           resStatus: false,
           resMessage: "Duomenų išsaugojimas nepavyko",
           resErrorCode: 22
         });
       }
-
-      console.log("[post-ads] updating masters_lt_users.number_ads");
-
       await client.query(
         "UPDATE masters_lt_users SET number_ads = COALESCE(number_ads, 0) + 1 WHERE google_id = $1",
         [googleId]
       );
-
-      console.log("[post-ads] ad saved successfully");
 
       return res.status(201).json({
         resStatus: true,
@@ -487,9 +396,6 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
       });
 
     } catch (err) {
-      console.error("[post-ads] final insert ERROR object:", err);
-      console.error("[post-ads] final insert ERROR message:", err?.message);
-      console.error("[post-ads] final insert ERROR stack:", err?.stack);
       return res.status(503).json({
         resStatus: false,
         resMessage: "Serverio klaida",
@@ -501,9 +407,6 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
     }
 
   } catch (err) {
-    console.error("[post-ads] outer ERROR object:", err);
-    console.error("[post-ads] outer ERROR message:", err?.message);
-    console.error("[post-ads] outer ERROR stack:", err?.stack);
     return res.status(500).json({
       resStatus: false,
       resMessage: "Serverio klaida",
@@ -696,7 +599,6 @@ router.put("/put/update-ad/:id", blockMaliciousIPs, enforceAdPostingCooldown, ap
       });
     }
   } catch (dbErr) {
-    console.error("SUBSECTION CHECK ERROR:", dbErr);
     return res.status(500).json({
       resStatus: false,
       resMessage: "Sistemos klaida tikrinant kategorijų apribojimus",
@@ -808,7 +710,6 @@ router.put("/put/update-ad/:id", blockMaliciousIPs, enforceAdPostingCooldown, ap
     });
 
   } catch (err) {
-    console.error("UPDATE ERROR:", err);
     return res.status(500).json({
       resStatus: false,
       resMessage: "Serverio klaida",
@@ -817,11 +718,11 @@ router.put("/put/update-ad/:id", blockMaliciousIPs, enforceAdPostingCooldown, ap
   }
 });
 //this function below is for google auth login of latvia masters
-async function createSessionForUser(dbGoogleId) {
+async function createSessionForUser(dbGoogleId, isEmail) {
   const sessionId = crypto.randomUUID(); // generate inline
   await pool.query(
-    `INSERT INTO masters_lt_sessions (session_id, google_id) VALUES ($1, $2)`,
-    [sessionId, dbGoogleId]
+    `INSERT INTO masters_lt_sessions (session_id, google_id, is_email) VALUES ($1, $2, $3)`,
+    [sessionId, dbGoogleId, isEmail]
   );
   return sessionId;
 }
@@ -854,13 +755,13 @@ router.post("/post/auth/google", blockMaliciousIPs, applyWriteRateLimit, async (
 
     const dbGoogleId = result.rows[0].google_id;
 
-    const sessionId = await createSessionForUser(dbGoogleId);
+    const sessionId = await createSessionForUser(dbGoogleId, false);
     res.cookie("session_id", sessionId, {
       httpOnly: true,
       secure: true,
       sameSite: "none",
       path: "/",
-      maxAge: 1000 * 60 * 60 * 24 * 7
+      maxAge: 1000 * 60 * 60 * 24 * 365
     });
     return res.status(200).json({
       resStatus: true,
@@ -2122,8 +2023,8 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
 
 
 /*Email register only send email verification link */
-router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
-  console.log("[email-register] route reached");
+router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit, enforceEmailActionCooldown("email_register"), 
+  async (req, res) => {
 
   const ipVisitor = req.headers["x-forwarded-for"]
     ? req.headers["x-forwarded-for"].split(",")[0]
@@ -2140,12 +2041,6 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
   const email = clean(req.body.email, 120).toLowerCase();
   const password = String(req.body.password || "");
 
-  console.log("[email-register] incoming:", {
-    nameLength: name.length,
-    email,
-    passwordLength: password.length,
-    ipVisitor
-  });
 
   if (name.length < 2 || email.length < 5 || password.length < 6) {
     return res.json({
@@ -2156,7 +2051,6 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
   }
 
   try {
-    console.log("[email-register] checking existing email");
 
     const checkQ = `
       SELECT google_id
@@ -2166,8 +2060,6 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
     `;
     const checkR = await pool.query(checkQ, [email]);
 
-    console.log("[email-register] email check rowCount:", checkR.rowCount);
-
     if (checkR.rowCount) {
       return res.json({
         resStatus: false,
@@ -2176,9 +2068,7 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
       });
     }
 
-    console.log("[email-register] hashing password");
     const passwordHash = await bcrypt.hash(password, 12);
-    console.log("[email-register] password hashed");
 
     const verifyToken = jwt.sign(
       {
@@ -2194,8 +2084,6 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
 
     const verifyLink = `https://pagalbapro.lt/verify-email.html?token=${encodeURIComponent(verifyToken)}`;
 
-    console.log("[email-register] sending verification email");
-
     const brevoResult = await sendEmailBrevo({
       site: "pagalbapro",
       to: email,
@@ -2208,19 +2096,17 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
         <p>Jei to neprašėte, ignoruokite šį laišką.</p>
       `,
       text:
-`Sveiki${name ? `, ${name}` : ""},
+        `Sveiki${name ? `, ${name}` : ""},
 
-Norėdami užbaigti registraciją, atidarykite šią nuorodą:
+        Norėdami užbaigti registraciją, atidarykite šią nuorodą:
 
-${verifyLink}
+        ${verifyLink}
 
-Nuoroda galioja 24 valandas.
+        Nuoroda galioja 24 valandas.
 
-Jei to neprašėte, ignoruokite šį laišką.`
+        Jei to neprašėte, ignoruokite šį laišką.`
     });
-
-    console.log("[email-register] verification email sent:", brevoResult);
-
+    req.emailActionCooldown.registerSuccess();
     return res.json({
       resStatus: true,
       resOkCode: 1,
@@ -2228,10 +2114,6 @@ Jei to neprašėte, ignoruokite šį laišką.`
     });
 
   } catch (err) {
-    console.error("[email-register] ERROR object:", err);
-    console.error("[email-register] ERROR message:", err?.message);
-    console.error("[email-register] ERROR stack:", err?.stack);
-    console.error("[email-register] ERROR response data:", err?.response?.data);
 
     return res.status(500).json({
       resStatus: false,
@@ -2240,7 +2122,7 @@ Jei to neprašėte, ignoruokite šį laišką.`
     });
   }
 });
-router.post("/post/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
+router.post("/post/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, enforceLoginProtection, async (req, res) => {
   const clean = (v, max) =>
     String(v || "")
       .trim()
@@ -2312,7 +2194,7 @@ router.post("/post/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, as
       });
     }
 
-    const sessionId = await createSessionForUser(user.google_id);
+    const sessionId = await createSessionForUser(user.google_id, true);
 
     res.cookie("session_id", sessionId, {
       httpOnly: true,
@@ -2409,9 +2291,8 @@ router.get("/get/session-user", blockMaliciousIPs, applyReadRateLimit, async (re
     });
   }
 });
-router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
-  console.log("[email-forget] route reached");
-  console.log("[email-forget] body:", req.body);
+router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, enforceEmailActionCooldown("email_reset"), 
+  async (req, res) => {
 
   const email = String(req.body.email || "").trim().toLowerCase();
 
@@ -2481,8 +2362,7 @@ router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, a
         Jei to neprašėte, ignoruokite šį laišką.`
       });
 
-    console.log("[email-forget] token saved for:", user.email);
-    console.log("[email-forget] brevo success:", brevoResult);
+      req.emailActionCooldown.registerSuccess();
 
     return res.status(200).json({
       resStatus: true,
@@ -2491,9 +2371,6 @@ router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, a
     });
 
   } catch (error) {
-    console.error("[email-forget] full error:", error);
-    console.error("[email-forget] response data:", error?.response?.data);
-    console.error("[email-forget] response status:", error?.response?.status);
 
     return res.status(500).json({
       resStatus: false,
@@ -2508,11 +2385,6 @@ router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, a
   }
 });
 router.post("/post/auth/email-reset", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
-  console.log("[email-reset] route reached");
-  console.log("[email-reset] body:", {
-    tokenLength: String(req.body.token || "").length,
-    newPasswordLength: String(req.body.newPassword || "").length
-  });
 
   const token = String(req.body.token || "").trim();
   const newPassword = String(req.body.newPassword || "");
@@ -2575,8 +2447,6 @@ router.post("/post/auth/email-reset", blockMaliciousIPs, applyWriteRateLimit, as
     `;
     await client.query(updateQuery, [newPasswordHash, user.google_id]);
 
-    console.log("[email-reset] password updated for:", user.email);
-
     return res.status(200).json({
       resStatus: true,
       resMessage: "Slaptažodis sėkmingai atnaujintas",
@@ -2597,7 +2467,6 @@ router.post("/post/auth/email-reset", blockMaliciousIPs, applyWriteRateLimit, as
 });
 //email-verify creates the user
 router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
-  console.log("[email-verify] route reached");
 
   const token = String(req.body.token || "").trim();
 
@@ -2610,16 +2479,12 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
   }
 
   try {
-    console.log("[email-verify] verifying token");
-
     const decoded = jwt.verify(
       token,
       process.env.PAGALBAPRO_EMAIL_VERIFY_JWT_SECRET
     );
 
     const { name, email, passwordHash, ipVisitor, auth_provider } = decoded;
-
-    console.log("[email-verify] decoded token:", { name, email });
 
     const checkQ = `
       SELECT google_id
@@ -2630,7 +2495,6 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
     const checkR = await pool.query(checkQ, [email]);
 
     if (checkR.rowCount) {
-      console.log("[email-verify] user already exists");
 
       return res.json({
         resStatus: false,
@@ -2650,8 +2514,6 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
     let googleId;
     let exists = true;
     let attempts = 0;
-
-    console.log("[email-verify] generating google_id");
 
     while (exists) {
       attempts += 1;
@@ -2678,8 +2540,6 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
       RETURNING google_id
     `;
 
-    console.log("[email-verify] inserting new user");
-
     const insertR = await pool.query(insertQ, [
       googleId,
       email,
@@ -2692,9 +2552,7 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
 
     const dbGoogleId = insertR.rows[0].google_id;
 
-    console.log("[email-verify] creating session");
-
-    const sessionId = await createSessionForUser(dbGoogleId);
+    const sessionId = await createSessionForUser(dbGoogleId, true);
 
     res.cookie("session_id", sessionId, {
       httpOnly: true,
@@ -2703,8 +2561,6 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
       path: "/",
       maxAge: 1000 * 60 * 60 * 24 * 365
     });
-
-    console.log("[email-verify] user created + session set");
 
     return res.json({
       resStatus: true,
@@ -2719,8 +2575,6 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
     });
 
   } catch (err) {
-
-    console.error("[email-verify] ERROR:", err);
 
     if (err.name === "TokenExpiredError") {
       return res.status(400).json({
