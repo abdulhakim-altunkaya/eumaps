@@ -164,7 +164,7 @@ function enforceEmailActionCooldown(actionType, cooldownMs = 2 * 60 * 1000) {
     if (blockUntil && now < blockUntil) {
       return res.status(429).json({
         resStatus: false,
-        resMessage: "Per daug bandymų iš šio IP. Bandykite vėliau.",
+        resMessage: "Too many attempts from this IP. Please try again later.",
         resErrorCode: 115
       });
     }
@@ -230,7 +230,7 @@ function validateEmail(req, res, next) {
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Netinkamas el. paštas"
+      resMessage: "Invalid email."
     });
   }
 
@@ -241,7 +241,7 @@ function validateEmail(req, res, next) {
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Netinkamas el. paštas"
+      resMessage: "Invalid email."
     });
   }
 
@@ -254,7 +254,7 @@ function validateEmail(req, res, next) {
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Netinkamas el. paštas"
+      resMessage: "Invalid email."
     });
   }
 
@@ -263,7 +263,7 @@ function validateEmail(req, res, next) {
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Netinkamas el. paštas"
+      resMessage: "Invalid email."
     });
   }
 
@@ -278,7 +278,7 @@ function validateEmail(req, res, next) {
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Netinkamas el. paštas"
+      resMessage: "Invalid email."
     });
   }
 
