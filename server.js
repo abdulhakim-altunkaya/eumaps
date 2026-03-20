@@ -84,12 +84,14 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'client/build')));
 //For serving from build directory, you need to install path package and initiate it:
 
-//import and then mount masters LT routes
+//import and then mount masters master routes
 //Mounting routes must come after cors and other imports
 const mastersLTRoutes = require("./routes/masters_LT");
 app.use("/api/master-lithuania", mastersLTRoutes);
 const mastersLVRoutes = require("./routes/masters_LV");
 app.use("/", mastersLVRoutes);
+
+
 //This function for now will be used safely convert image file names to alphanumerical values
 //currently used by latvia masters
 //can be used by any endpoint in the future

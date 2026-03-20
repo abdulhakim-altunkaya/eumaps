@@ -2370,7 +2370,7 @@ router.post("/api/post/master-latvia/auth/email-reset", blockMaliciousIPs, apply
   }
 });
 //email-verify creates the user
-router.post("api/post/master-latvia/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
+router.post("/api/post/master-latvia/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
 
   const token = String(req.body.token || "").trim();
 
