@@ -747,9 +747,6 @@ async function createSessionForUser(dbGoogleId, isEmail) {
   );
   return sessionId;
 }
-
-
-
 router.post("/post/auth/google", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
   const ipVisitor = req.headers["x-forwarded-for"] ? req.headers["x-forwarded-for"].split(",")[0]
     : req.socket.remoteAddress || req.ip;
@@ -894,10 +891,6 @@ router.post("/post/toggle-activation/:id", blockMaliciousIPs, applyWriteRateLimi
   }
 });
 
-
-
-
-
 router.post("/post/delete-ad/:id", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
   const adId = req.params.id;
   // Desktop can use cookies but some mobiles will use headers for login system
@@ -907,7 +900,7 @@ router.post("/post/delete-ad/:id", blockMaliciousIPs, applyWriteRateLimit, async
   if (!sessionId) {
     return res.status(401).json({
       resStatus: false,
-      resMessage: "Nėra aktyvios sesijos",
+      resMessage: "Aktif oturum bulunamadı",
       resErrorCode: 1
     });
   }
@@ -916,7 +909,7 @@ router.post("/post/delete-ad/:id", blockMaliciousIPs, applyWriteRateLimit, async
     const sessionRes = await pool.query(
       `
       SELECT google_id
-      FROM masters_lt_sessions
+      FROM masters_tr_sessions
       WHERE session_id = $1
       LIMIT 1;
       `,
@@ -926,7 +919,7 @@ router.post("/post/delete-ad/:id", blockMaliciousIPs, applyWriteRateLimit, async
     if (!sessionRes.rowCount) {
       return res.status(401).json({
         resStatus: false,
-        resMessage: "Netinkama sesija",
+        resMessage: "Geçersiz oturum",
         resErrorCode: 2
       });
     }
@@ -937,7 +930,7 @@ router.post("/post/delete-ad/:id", blockMaliciousIPs, applyWriteRateLimit, async
     const adRes = await pool.query(
       `
       SELECT image_url
-      FROM masters_lt_ads
+      FROM masters_tr_ads
       WHERE id = $1 AND google_id = $2
       LIMIT 1;
       `,
@@ -947,7 +940,7 @@ router.post("/post/delete-ad/:id", blockMaliciousIPs, applyWriteRateLimit, async
     if (!adRes.rowCount) {
       return res.status(403).json({
         resStatus: false,
-        resMessage: "Neleidžiama ištrinti šio skelbimo",
+        resMessage: "İlan silinemedi",
         resErrorCode: 3
       });
     }
@@ -971,13 +964,13 @@ router.post("/post/delete-ad/:id", blockMaliciousIPs, applyWriteRateLimit, async
 
     // Hard delete ALL reviews + replies
     await pool.query(
-      `DELETE FROM masters_lt_reviews WHERE ad_id = $1;`,
+      `DELETE FROM masters_tr_reviews WHERE ad_id = $1;`,
       [adId]
     );
 
     // Hard delete ad
     await pool.query(
-      `DELETE FROM masters_lt_ads WHERE id = $1;`,
+      `DELETE FROM masters_tr_ads WHERE id = $1;`,
       [adId]
     );
 
@@ -996,7 +989,7 @@ router.post("/post/delete-ad/:id", blockMaliciousIPs, applyWriteRateLimit, async
 
     return res.json({
       resStatus: true,
-      resMessage: "Skelbimas ir susiję atsiliepimai ištrinti",
+      resMessage: "İlan ve ilgili yorumlar silindi.",
       resOkCode: 1
     });
 
@@ -1006,7 +999,7 @@ router.post("/post/delete-ad/:id", blockMaliciousIPs, applyWriteRateLimit, async
     console.error("Delete ad error:", err);
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Serverio klaida",
+      resMessage: "Sunucu hatası",
       resErrorCode: 4
     });
   }
@@ -1018,7 +1011,7 @@ router.post("/post/ad-view", blockMaliciousIPs, applyWriteRateLimit, async (req,
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Trūksta ad_id"
+      resMessage: "İlan no eksik"
     });
   }
 
@@ -1042,7 +1035,7 @@ router.post("/post/ad-view", blockMaliciousIPs, applyWriteRateLimit, async (req,
     return res.json({
       resStatus: true,
       resOkCode: 2,
-      resMessage: "Peržiūra ignoruota (laukimo laikas)"
+      resMessage: "Görüntüleme atlandı (bekleme süresi)."
     });
   }
 
@@ -1050,14 +1043,14 @@ router.post("/post/ad-view", blockMaliciousIPs, applyWriteRateLimit, async (req,
 
   try {
     await pool.query(
-      "UPDATE masters_lt_ads SET views = views + 1 WHERE id = $1",
+      "UPDATE masters_tr_ads SET views = views + 1 WHERE id = $1",
       [ad_id]
     );
 
     return res.json({
       resStatus: true,
       resOkCode: 1,
-      resMessage: "Peržiūra įrašyta"
+      resMessage: "Görünteleme sayısı güncellendi"
     });
 
   } catch (err) {
@@ -1065,7 +1058,7 @@ router.post("/post/ad-view", blockMaliciousIPs, applyWriteRateLimit, async (req,
     return res.json({
       resStatus: false,
       resErrorCode: 3,
-      resMessage: "Duomenų bazės klaida"
+      resMessage: "Database hatası"
     });
   }
 });
@@ -1095,14 +1088,14 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Netinkami arba trūkstami laukai"
+      resMessage: "Geçersiz veya eksik alan"
     });
   }
   if (rating < 0 || rating > 10) {
     return res.json({
       resStatus: false,
       resErrorCode: 6,
-      resMessage: "Netinkama įvertinimo vertė"
+      resMessage: "Geçersiz değer"
     });
   }
   try {
@@ -1110,7 +1103,7 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
     const sessionResult = await pool.query(
       `
       SELECT google_id
-      FROM masters_lt_sessions
+      FROM masters_tr_sessions
       WHERE session_id = $1
       LIMIT 1
       `,
@@ -1120,14 +1113,14 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
       return res.json({
         resStatus: false,
         resErrorCode: 2,
-        resMessage: "Neautentifikuotas"
+        resMessage: "Kimlik doğrulanmadı."
       });
     }
     const reviewer_google_id = sessionResult.rows[0].google_id;
 
     /* ---------- BLOCK SELF-REVIEW ---------- */
     const adOwnerCheck = await pool.query(
-      `SELECT google_id FROM masters_lt_ads WHERE id = $1 LIMIT 1`,
+      `SELECT google_id FROM masters_tr_ads WHERE id = $1 LIMIT 1`,
       [adId]
     );
     // If the ad exists and the owner is the same as the reviewer
@@ -1135,7 +1128,7 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
       return res.json({
         resStatus: false,
         resErrorCode: 7, // New error code for self-review
-        resMessage: "Negalite vertinti savo skelbimo"
+        resMessage: "Kendi ilanınızı değerlendiremezsiniz."
       });
     }
 
@@ -1143,7 +1136,7 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
     const activeReviewCheck = await pool.query(
       `
       SELECT 1
-      FROM masters_lt_reviews
+      FROM masters_tr_reviews
       WHERE ad_id = $1
         AND reviewer_id = $2
         AND parent IS NULL
@@ -1156,14 +1149,14 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
       return res.json({
         resStatus: false,
         resErrorCode: 3,
-        resMessage: "Jau paskelbėte atsiliepimą šiam skelbimui"
+        resMessage: "Bu ilanı daha önce değerlendirdiniz."
       });
     }
     /* ---------- BLOCK RE-POST AFTER SOFT DELETE ---------- */
     const deletedWithReplyCheck = await pool.query(
       `
       SELECT 1
-      FROM masters_lt_reviews
+      FROM masters_tr_reviews
       WHERE ad_id = $1
         AND reviewer_id = $2
         AND parent IS NULL
@@ -1177,7 +1170,7 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
         resStatus: false,
         resErrorCode: 4,
         resMessage:
-          "Negalite skelbti kito atsiliepimo šiam skelbimui po to, kai savininkas atsakė į jūsų ankstesnį"
+          "İlan sahibi değerlendirmenize cevap verdiği için tekrardan değerlendirme yapamazsınız."
       });
     }
     /* ---------- DATE ---------- */
@@ -1190,7 +1183,7 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
     /* ---------- INSERT REVIEW ---------- */
     const insertReviewResult = await pool.query(
       `
-      INSERT INTO masters_lt_reviews
+      INSERT INTO masters_tr_reviews
       (reviewer_name, review_text, date, reviewer_id, ad_id, parent, rating)
       VALUES ($1, $2, $3, $4, $5, NULL, $6)
       RETURNING id
@@ -1207,7 +1200,7 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
     /* ---------- RECALCULATE AD STATS ---------- */
     await pool.query(
       `
-      UPDATE masters_lt_ads
+      UPDATE masters_tr_ads
       SET
         average_rating = COALESCE(sub.avg, 0),
         reviews_count  = COALESCE(sub.cnt, 0)
@@ -1215,7 +1208,7 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
         SELECT
           ROUND(AVG(rating), 1) AS avg,
           COUNT(*) AS cnt
-        FROM masters_lt_reviews
+        FROM masters_tr_reviews
         WHERE ad_id = $1
           AND is_deleted = false
           AND parent IS NULL
@@ -1227,7 +1220,7 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
     return res.json({
       resStatus: true,
       resOkCode: 1,
-      resMessage: "Atsiliepimas išsaugotas",
+      resMessage: "Yorum kaydedildi.",
       review_id: insertReviewResult.rows[0].id
     });
   } catch (error) {
@@ -1235,7 +1228,7 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 99,
-      resMessage: "Serverio klaida"
+      resMessage: "Sunucu hatası"
     });
   }
 });
@@ -1260,7 +1253,7 @@ router.post("/post/reply", blockMaliciousIPs, applyWriteRateLimit, async (req, r
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Trūksta laukų"
+      resMessage: "Alanlar eksik."
     });
   }
 
@@ -1268,7 +1261,7 @@ router.post("/post/reply", blockMaliciousIPs, applyWriteRateLimit, async (req, r
     // 1️⃣ get google_id from session
     const sessionQ = `
       SELECT google_id
-      FROM masters_lt_sessions
+      FROM masters_tr_sessions
       WHERE session_id = $1
       LIMIT 1
     `;
@@ -1278,7 +1271,7 @@ router.post("/post/reply", blockMaliciousIPs, applyWriteRateLimit, async (req, r
       return res.json({
         resStatus: false,
         resErrorCode: 2,
-        resMessage: "Netinkama sesija"
+        resMessage: "Geçersiz oturum"
       });
     }
 
@@ -1287,7 +1280,7 @@ router.post("/post/reply", blockMaliciousIPs, applyWriteRateLimit, async (req, r
     // 2️⃣ verify owner owns this ad
     const adQ = `
       SELECT google_id
-      FROM masters_lt_ads
+      FROM masters_tr_ads
       WHERE id = $1
       LIMIT 1
     `;
@@ -1297,7 +1290,7 @@ router.post("/post/reply", blockMaliciousIPs, applyWriteRateLimit, async (req, r
       return res.json({
         resStatus: false,
         resErrorCode: 3,
-        resMessage: "Ne skelbimo savininkas"
+        resMessage: "İlan sahibi değilsiniz"
       });
     }
 
@@ -1310,7 +1303,7 @@ router.post("/post/reply", blockMaliciousIPs, applyWriteRateLimit, async (req, r
 
     // 4️⃣ insert reply
     const insertQ = `
-      INSERT INTO masters_lt_reviews
+      INSERT INTO masters_tr_reviews
       (reviewer_name, review_text, date, reviewer_id, ad_id, parent, rating)
       VALUES ('Owner', $1, $2, $3, $4, $5, NULL)
       RETURNING id
@@ -1327,7 +1320,7 @@ router.post("/post/reply", blockMaliciousIPs, applyWriteRateLimit, async (req, r
     return res.json({
       resStatus: true,
       resOkCode: 1,
-      resMessage: "Atsakymas išsaugotas",
+      resMessage: "Cevap kaydedildi",
       reply_id: r.rows[0].id
     });
 
@@ -1336,7 +1329,7 @@ router.post("/post/reply", blockMaliciousIPs, applyWriteRateLimit, async (req, r
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 4,
-      resMessage: "Serverio klaida"
+      resMessage: "Sunucu hatası"
     });
   }
 });
@@ -1351,7 +1344,7 @@ router.post("/post/delete-reply", blockMaliciousIPs, applyWriteRateLimit, async 
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Trūksta laukų"
+      resMessage: "Eksik alan"
     });
   }
 
@@ -1359,7 +1352,7 @@ router.post("/post/delete-reply", blockMaliciousIPs, applyWriteRateLimit, async 
     // 1️⃣ get google_id from session
     const sessionQ = `
       SELECT google_id
-      FROM masters_lt_sessions
+      FROM masters_tr_sessions
       WHERE session_id = $1
       LIMIT 1
     `;
@@ -1369,7 +1362,7 @@ router.post("/post/delete-reply", blockMaliciousIPs, applyWriteRateLimit, async 
       return res.json({
         resStatus: false,
         resErrorCode: 2,
-        resMessage: "Netinkama sesija"
+        resMessage: "Geçersiz oturum"
       });
     }
 
@@ -1378,7 +1371,7 @@ router.post("/post/delete-reply", blockMaliciousIPs, applyWriteRateLimit, async 
     // 2️⃣ verify ad ownership
     const adQ = `
       SELECT google_id
-      FROM masters_lt_ads
+      FROM masters_tr_ads
       WHERE id = $1
       LIMIT 1
     `;
@@ -1388,14 +1381,14 @@ router.post("/post/delete-reply", blockMaliciousIPs, applyWriteRateLimit, async 
       return res.json({
         resStatus: false,
         resErrorCode: 3,
-        resMessage: "Ne skelbimo savininkas"
+        resMessage: "İlan sahibi değilsiniz"
       });
     }
 
     // 3️⃣ verify reply belongs to this ad + owner + is a reply
     const replyQ = `
       SELECT id
-      FROM masters_lt_reviews
+      FROM masters_tr_reviews
       WHERE id = $1
         AND ad_id = $2
         AND parent IS NOT NULL
@@ -1412,13 +1405,13 @@ router.post("/post/delete-reply", blockMaliciousIPs, applyWriteRateLimit, async 
       return res.json({
         resStatus: false,
         resErrorCode: 4,
-        resMessage: "Atsakymas nerastas arba neleidžiama"
+        resMessage: "Cevap bulunamadı"
       });
     }
 
     // 4️⃣ delete reply
     const deleteQ = `
-      DELETE FROM masters_lt_reviews
+      DELETE FROM masters_tr_reviews
       WHERE id = $1
     `;
     await pool.query(deleteQ, [replyId]);
@@ -1426,7 +1419,7 @@ router.post("/post/delete-reply", blockMaliciousIPs, applyWriteRateLimit, async 
     return res.json({
       resStatus: true,
       resOkCode: 1,
-      resMessage: "Atsakymas ištrintas"
+      resMessage: "Cevap silindi"
     });
 
   } catch (err) {
@@ -1434,7 +1427,7 @@ router.post("/post/delete-reply", blockMaliciousIPs, applyWriteRateLimit, async 
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 5,
-      resMessage: "Serverio klaida"
+      resMessage: "Sunucu hatası"
     });
   }
 });
@@ -1454,7 +1447,7 @@ router.post("/post/message", blockMaliciousIPs, applyWriteRateLimit, async (req,
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Netinkami duomenys"
+      resMessage: "Geçersiz mesaj alanları"
     });
   }
   // basic email sanity check
@@ -1462,7 +1455,7 @@ router.post("/post/message", blockMaliciousIPs, applyWriteRateLimit, async (req,
     return res.json({
       resStatus: false,
       resErrorCode: 2,
-      resMessage: "Netinkamas el. paštas"
+      resMessage: "Geçersiz e-mail adresi"
     });
   }
   try {
@@ -1472,7 +1465,7 @@ router.post("/post/message", blockMaliciousIPs, applyWriteRateLimit, async (req,
     ).padStart(2, "0")}/${d.getFullYear()}`;
 
     const insertQ = `
-      INSERT INTO messages_masters_lt
+      INSERT INTO messages_masters_tr
         (name, email, message, date)
       VALUES ($1, $2, $3, $4)
     `;
@@ -1493,10 +1486,11 @@ router.post("/post/message", blockMaliciousIPs, applyWriteRateLimit, async (req,
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 2,
-      resMessage: "Serverio klaida"
+      resMessage: "Sunucu hatası"
     });
   }
 });
+
 router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
   // Desktop can use cookies but some mobiles will use headers for login system
   const auth = req.headers.authorization || "";
@@ -1775,7 +1769,7 @@ router.get("/get/profile-reviews-ads", applyReadRateLimit, async (req, res) => {
     return res.status(200).json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Nėra aktyvios sesijos",
+      resMessage: "Aktif oturum bulunamadı",
       reviews: []
     });
   }
@@ -1784,7 +1778,7 @@ router.get("/get/profile-reviews-ads", applyReadRateLimit, async (req, res) => {
     /* get google id from session */
     const sessionQuery = `
       SELECT google_id
-      FROM masters_lt_sessions
+      FROM masters_tr_sessions
       WHERE session_id = $1
       LIMIT 1;
     `;
@@ -1795,7 +1789,7 @@ router.get("/get/profile-reviews-ads", applyReadRateLimit, async (req, res) => {
       return res.status(200).json({
         resStatus: false,
         resErrorCode: 2,
-        resMessage: "Nėra aktyvios sesijos",
+        resMessage: "Aktif oturum bulunamadı",
         reviews: []
       });
     }
@@ -1805,22 +1799,22 @@ router.get("/get/profile-reviews-ads", applyReadRateLimit, async (req, res) => {
     /* reviews + ad data (NO aliases) */
     const reviewsQuery = `
       SELECT
-        masters_lt_reviews.id,
-        masters_lt_reviews.review_text,
-        masters_lt_reviews.rating,
-        masters_lt_reviews.date,
-        masters_lt_reviews.ad_id,
+        masters_tr_reviews.id,
+        masters_tr_reviews.review_text,
+        masters_tr_reviews.rating,
+        masters_tr_reviews.date,
+        masters_tr_reviews.ad_id,
 
-        masters_lt_ads.name  AS ad_owner_name,
-        masters_lt_ads.title AS ad_title,
-        masters_lt_ads.image_url AS ad_image_url
-      FROM masters_lt_reviews
-      JOIN masters_lt_ads
-        ON masters_lt_ads.id = masters_lt_reviews.ad_id
-      WHERE masters_lt_reviews.reviewer_id = $1
-        AND masters_lt_reviews.is_deleted = false
-        AND masters_lt_reviews.parent IS NULL
-      ORDER BY masters_lt_reviews.id DESC;
+        masters_tr_ads.name  AS ad_owner_name,
+        masters_tr_ads.title AS ad_title,
+        masters_tr_ads.image_url AS ad_image_url
+        FROM masters_tr_reviews
+        JOIN masters_tr_ads
+          ON masters_tr_ads.id = masters_tr_reviews.ad_id
+        WHERE masters_tr_reviews.reviewer_id = $1
+          AND masters_tr_reviews.is_deleted = false
+          AND masters_tr_reviews.parent IS NULL
+        ORDER BY masters_tr_reviews.id DESC;
     `;
 
     const reviewsRes = await pool.query(reviewsQuery, [googleId]);
@@ -1836,7 +1830,7 @@ router.get("/get/profile-reviews-ads", applyReadRateLimit, async (req, res) => {
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 3,
-      resMessage: "Serverio klaida",
+      resMessage: "Kullanıcı hatası",
       reviews: []
     });
   }
@@ -1851,7 +1845,7 @@ router.get("/get/profile-replies-ads", applyReadRateLimit, async (req, res) => {
     return res.status(200).json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Nėra aktyvios sesijos",
+      resMessage: "Aktif oturum bulunamadı",
       reviews: []
     });
   }
@@ -1860,7 +1854,7 @@ router.get("/get/profile-replies-ads", applyReadRateLimit, async (req, res) => {
     /* get google id from session */
     const sessionQuery = `
       SELECT google_id
-      FROM masters_lt_sessions
+      FROM masters_tr_sessions
       WHERE session_id = $1
       LIMIT 1;
     `;
@@ -1871,7 +1865,7 @@ router.get("/get/profile-replies-ads", applyReadRateLimit, async (req, res) => {
       return res.status(200).json({
         resStatus: false,
         resErrorCode: 2,
-        resMessage: "Nėra aktyvios sesijos",
+        resMessage: "Aktif oturum bulunamadı",
         reviews: []
       });
     }
@@ -1881,21 +1875,21 @@ router.get("/get/profile-replies-ads", applyReadRateLimit, async (req, res) => {
     /* replies written BY the user */
     const repliesQuery = `
       SELECT
-        masters_lt_reviews.id,
-        masters_lt_reviews.review_text,
-        masters_lt_reviews.date,
-        masters_lt_reviews.ad_id,
+        masters_tr_reviews.id,
+        masters_tr_reviews.review_text,
+        masters_tr_reviews.date,
+        masters_tr_reviews.ad_id,
 
-        masters_lt_ads.name  AS ad_owner_name,
-        masters_lt_ads.title AS ad_title,
-        masters_lt_ads.image_url AS ad_image_url
-      FROM masters_lt_reviews
-      JOIN masters_lt_ads
-        ON masters_lt_ads.id = masters_lt_reviews.ad_id
-      WHERE masters_lt_reviews.reviewer_id = $1
-        AND masters_lt_reviews.parent IS NOT NULL
-        AND masters_lt_reviews.is_deleted = false
-      ORDER BY masters_lt_reviews.id DESC;
+        masters_tr_ads.name  AS ad_owner_name,
+        masters_tr_ads.title AS ad_title,
+        masters_tr_ads.image_url AS ad_image_url
+        FROM masters_tr_reviews
+        JOIN masters_tr_ads
+          ON masters_tr_ads.id = masters_tr_reviews.ad_id
+        WHERE masters_tr_reviews.reviewer_id = $1
+          AND masters_tr_reviews.parent IS NOT NULL
+          AND masters_tr_reviews.is_deleted = false
+        ORDER BY masters_tr_reviews.id DESC;
     `;
 
     const repliesRes = await pool.query(repliesQuery, [googleId]);
@@ -1911,7 +1905,7 @@ router.get("/get/profile-replies-ads", applyReadRateLimit, async (req, res) => {
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 3,
-      resMessage: "Serverio klaida",
+      resMessage: "Sunucu hatası",
       reviews: []
     });
   }
@@ -1928,7 +1922,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
   if (!sessionId) {
     return res.status(200).json({
       resStatus: false,
-      resMessage: "Nėra aktyvios sesijos",
+      resMessage: "Aktif oturum bulunamadı",
       resErrorCode: 1
     });
   }
@@ -1936,7 +1930,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
   if (!reviewId) {
     return res.status(200).json({
       resStatus: false,
-      resMessage: "Trūksta atsiliepimo id",
+      resMessage: "Geçersiz değerlendirme numarası",
       resErrorCode: 2
     });
   }
@@ -1946,7 +1940,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
     const sessionRes = await pool.query(
       `
       SELECT google_id
-      FROM masters_lt_sessions
+      FROM masters_tr_sessions
       WHERE session_id = $1
       LIMIT 1;
       `,
@@ -1956,7 +1950,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
     if (!sessionRes.rowCount) {
       return res.status(200).json({
         resStatus: false,
-        resMessage: "Nėra aktyvios sesijos",
+        resMessage: "Geçersiz oturum",
         resErrorCode: 3
       });
     }
@@ -1967,7 +1961,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
     const ownershipRes = await pool.query(
       `
       SELECT id, parent, ad_id
-      FROM masters_lt_reviews
+      FROM masters_tr_reviews
       WHERE id = $1
         AND reviewer_id = $2
       LIMIT 1;
@@ -1978,7 +1972,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
     if (!ownershipRes.rowCount) {
       return res.status(200).json({
         resStatus: false,
-        resMessage: "Atsiliepimas nerastas arba neleidžiama",
+        resMessage: "Geçersiz",
         resErrorCode: 4
       });
     }
@@ -1986,11 +1980,10 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
     const { parent, ad_id: adId } = ownershipRes.rows[0];
 
     /* ---------- DELETE LOGIC ---------- */
-
     // Reply → hard delete
     if (parent !== null) {
       await pool.query(
-        `DELETE FROM masters_lt_reviews WHERE id = $1;`,
+        `DELETE FROM masters_tr_reviews WHERE id = $1;`,
         [reviewId]
       );
     } else {
@@ -1998,7 +1991,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
       const replyRes = await pool.query(
         `
         SELECT 1
-        FROM masters_lt_reviews
+        FROM masters_tr_reviews
         WHERE parent = $1
         LIMIT 1;
         `,
@@ -2009,7 +2002,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
         // Soft delete review + replies
         await pool.query(
           `
-          UPDATE masters_lt_reviews
+          UPDATE masters_tr_reviews
           SET is_deleted = true
           WHERE id = $1 OR parent = $1;
           `,
@@ -2018,7 +2011,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
       } else {
         // Hard delete review
         await pool.query(
-          `DELETE FROM masters_lt_reviews WHERE id = $1;`,
+          `DELETE FROM masters_tr_reviews WHERE id = $1;`,
           [reviewId]
         );
       }
@@ -2028,7 +2021,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
 
     await pool.query(
       `
-      UPDATE masters_lt_ads
+      UPDATE masters_tr_ads
       SET
         average_rating = COALESCE(sub.avg, 0),
         reviews_count  = COALESCE(sub.cnt, 0)
@@ -2036,7 +2029,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
         SELECT
           ROUND(AVG(rating), 1) AS avg,
           COUNT(*) AS cnt
-        FROM masters_lt_reviews
+        FROM masters_tr_reviews
         WHERE ad_id = $1
           AND is_deleted = false
           AND parent IS NULL
@@ -2049,20 +2042,18 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
     return res.status(200).json({
       resStatus: true,
       resOkCode: 1,
-      resMessage: "Atsiliepimas ištrintas"
+      resMessage: "Değerlendirme silindi"
     });
 
   } catch (error) {
     console.error("Delete review error:", error);
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Duomenų bazės ryšio klaida",
+      resMessage: "Database hatası",
       resErrorCode: 5
     });
   }
 });
-
-
 /*Email register only send email verification link */
 router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit, validateEmail,
    enforceEmailActionCooldown("email_register"), async (req, res) => {
@@ -2087,7 +2078,7 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Netinkami duomenys"
+      resMessage: "Geçersiz veriler"
     });
   }
 
@@ -2095,7 +2086,7 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
 
     const checkQ = `
       SELECT google_id
-      FROM masters_lt_users
+      FROM masters_tr_users
       WHERE email = $1
       LIMIT 1
     `;
@@ -2105,7 +2096,7 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
       return res.json({
         resStatus: false,
         resErrorCode: 3,
-        resMessage: "El. paštas jau naudojamas"
+        resMessage: "Email adresi zaten kayıtlı"
       });
     }
 
@@ -2123,35 +2114,35 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
       { expiresIn: "24h" }
     );
 
-    const verifyLink = `https://pagalbapro.lt/verify-email.html?token=${encodeURIComponent(verifyToken)}`;
+    const verifyLink = `https://eniyiusta.com.tr/verify-email.html?token=${encodeURIComponent(verifyToken)}`;
 
     const brevoResult = await sendEmailBrevo({
-      site: "pagalbapro",
+      site: "eniyiusta",
       to: email,
-      subject: "Patvirtinkite savo el. paštą",
+      subject: "E-posta adresinizi doğrulayın",
       html: `
-        <p>Sveiki${name ? `, ${name}` : ""},</p>
-        <p>Norėdami užbaigti registraciją, patvirtinkite savo el. paštą paspausdami nuorodą žemiau:</p>
-        <p><a href="${verifyLink}">Patvirtinti el. paštą</a></p>
-        <p>Nuoroda galioja 24 valandas.</p>
-        <p>Jei to neprašėte, ignoruokite šį laišką.</p>
+        <p>Merhaba${name ? `, ${name}` : ""},</p>
+        <p>Kaydınızı tamamlamak için aşağıdaki bağlantıya tıklayarak e-posta adresinizi doğrulayın:</p>
+        <p><a href="${verifyLink}">E-postayı doğrula</a></p>
+        <p>Bu bağlantı 24 saat geçerlidir.</p>
+        <p>Eğer bu işlemi siz yapmadıysanız, bu e-postayı yok sayabilirsiniz.</p>
       `,
       text:
-        `Sveiki${name ? `, ${name}` : ""},
+        `Merhaba${name ? `, ${name}` : ""},
 
-        Norėdami užbaigti registraciją, atidarykite šią nuorodą:
+    Kaydınızı tamamlamak için aşağıdaki bağlantıyı açın:
 
-        ${verifyLink}
+    ${verifyLink}
 
-        Nuoroda galioja 24 valandas.
+    Bu bağlantı 24 saat geçerlidir.
 
-        Jei to neprašėte, ignoruokite šį laišką.`
+    Eğer bu işlemi siz yapmadıysanız, bu e-postayı yok sayabilirsiniz.`
     });
     req.emailActionCooldown.registerSuccess();
     return res.json({
       resStatus: true,
       resOkCode: 1,
-      resMessage: "Patvirtinimo laiškas išsiųstas"
+      resMessage: "Doğrulama e-postası gönderildi"
     });
 
   } catch (err) {
@@ -2159,7 +2150,7 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 99,
-      resMessage: "Serverio klaida"
+      resMessage: "Sunucu hatası"
     });
   }
 });
@@ -2179,14 +2170,14 @@ router.post("/post/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, en
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Netinkami prisijungimo duomenys"
+      resMessage: "Şifre veya e-mail çok kısa"
     });
   }
 
   try {
     const userQ = `
       SELECT google_id, email, name, password_hash, auth_provider, email_verified
-      FROM masters_lt_users
+      FROM masters_tr_users
       WHERE email = $1
       LIMIT 1
     `;
@@ -2196,7 +2187,7 @@ router.post("/post/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, en
       return res.json({
         resStatus: false,
         resErrorCode: 3,
-        resMessage: "Neteisingas el. paštas arba slaptažodis"
+        resMessage: "Geçersiz e-posta veya şifre"
       });
     }
 
@@ -2206,7 +2197,7 @@ router.post("/post/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, en
       return res.json({
         resStatus: false,
         resErrorCode: 4,
-        resMessage: "Šis el. paštas registruotas su Google. Prisijunkite per Google."
+        resMessage: "Bu e-posta ile Google üzerinden giriş yapılmış. Lütfen Google girişi kullanın."
       });
     }
 
@@ -2214,7 +2205,7 @@ router.post("/post/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, en
       return res.json({
         resStatus: false,
         resErrorCode: 5,
-        resMessage: "Slaptažodis nenustatytas"
+        resMessage: "Bu e-posta ile Google üzerinden giriş yapılmış. Lütfen Google girişi kullanın."
       });
     }
 
@@ -2224,7 +2215,7 @@ router.post("/post/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, en
       return res.json({
         resStatus: false,
         resErrorCode: 6,
-        resMessage: "Neteisingas el. paštas arba slaptažodis"
+        resMessage: "Hatalı e-mail veya şifre"
       });
     }
 
@@ -2241,7 +2232,7 @@ router.post("/post/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, en
     return res.json({
       resStatus: true,
       resOkCode: 1,
-      resMessage: "Prisijungimas sėkmingas",
+      resMessage: "Giriş başarılı",
       user: {
         google_id: user.google_id,
         email: user.email,
@@ -2255,7 +2246,7 @@ router.post("/post/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, en
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 99,
-      resMessage: "Serverio klaida"
+      resMessage: "Sunucu hatası"
     });
   }
 });
@@ -2270,7 +2261,7 @@ router.get("/get/session-user", blockMaliciousIPs, applyReadRateLimit, async (re
   if (!sessionId) {
     return res.status(200).json({
       resStatus: false,
-      resMessage: "Nėra aktyvios sesijos",
+      resMessage: "Aktif oturum bulunmadı",
       resErrorCode: 1,
       loggedIn: false
     });
@@ -2279,13 +2270,13 @@ router.get("/get/session-user", blockMaliciousIPs, applyReadRateLimit, async (re
   try {
     const query = `
       SELECT 
-        masters_lt_users.google_id,
-        masters_lt_users.email,
-        masters_lt_users.name
-      FROM masters_lt_sessions
-      JOIN masters_lt_users
-        ON masters_lt_users.google_id = masters_lt_sessions.google_id
-      WHERE masters_lt_sessions.session_id = $1
+        masters_tr_users.google_id,
+        masters_tr_users.email,
+        masters_tr_users.name
+      FROM masters_tr_sessions
+      JOIN masters_tr_users
+        ON masters_tr_users.google_id = masters_tr_sessions.google_id
+      WHERE masters_tr_sessions.session_id = $1
       LIMIT 1;
     `;
 
@@ -2295,7 +2286,7 @@ router.get("/get/session-user", blockMaliciousIPs, applyReadRateLimit, async (re
       // Cookie exists but session not found (expired/invalid)
       return res.status(200).json({
         resStatus: false,
-        resMessage: "Nėra aktyvios sesijos",
+        resMessage: "Aktif oturum bulunamadı",
         resErrorCode: 2,
         loggedIn: false
       });
@@ -2305,7 +2296,7 @@ router.get("/get/session-user", blockMaliciousIPs, applyReadRateLimit, async (re
 
     return res.status(200).json({
       resStatus: true,
-      resMessage: "Vartotojo sesija aktyvi",
+      resMessage: "Kullanıcı oturumu aktif",
       resOkCode: 1,
       loggedIn: true,
       user: {
@@ -2319,7 +2310,7 @@ router.get("/get/session-user", blockMaliciousIPs, applyReadRateLimit, async (re
     console.error("Session check error:", error);
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Duomenų bazės ryšio klaida",
+      resMessage: "Database/Sunucu hatası",
       resErrorCode: 3,
       loggedIn: false
     });
@@ -2335,7 +2326,7 @@ router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, v
 
     const userQuery = `
       SELECT google_id, email, name, auth_provider
-      FROM masters_lt_users
+      FROM masters_tr_users
       WHERE LOWER(email) = $1
       LIMIT 1;
     `;
@@ -2344,7 +2335,7 @@ router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, v
     if (userResult.rows.length === 0) {
       return res.status(200).json({
         resStatus: true,
-        resMessage: "Jei el. paštas egzistuoja, laiškas bus išsiųstas",
+        resMessage: "Eğer e-posta adresi kayıtlıysa, bir e-posta gönderilecektir",
         resOkCode: 1
       });
     }
@@ -2355,7 +2346,7 @@ router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, v
       return res.status(200).json({
         resStatus: false,
         resErrorCode: 6,
-        resMessage: "Šis el. paštas naudojamas su Google prisijungimu. Prisijunkite per Google."
+        resMessage: "Bu e-posta ile Google üzerinden giriş yapılmış. Lütfen Google girişi kullanın."
       });
     }
 
@@ -2363,42 +2354,42 @@ router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, v
     const resetExpires = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
 
     const updateQuery = `
-      UPDATE masters_lt_users
+      UPDATE masters_tr_users
       SET password_reset_token = $1,
           password_reset_expires = $2
       WHERE google_id = $3
     `;
     await client.query(updateQuery, [resetToken, resetExpires, user.google_id]);
 
-    const resetLink = `https://pagalbapro.lt/reset-password.html?token=${resetToken}`;
+    const resetLink = `https://eniyiusta.com.tr/reset-password.html?token=${resetToken}`;
 
     const brevoResult = await sendEmailBrevo({
-      site: "pagalbapro",
+      site: "eniyiusta",
       to: user.email,
-      subject: "Slaptažodžio atkūrimas",
+      subject: "Şifre sıfırlama",
       html: `
-        <p>Sveiki${user.name ? `, ${user.name}` : ""},</p>
-        <p>Norėdami pakeisti slaptažodį, spauskite žemiau esančią nuorodą:</p>
+        <p>Merhaba${user.name ? `, ${user.name}` : ""},</p>
+        <p>Şifrenizi sıfırlamak için aşağıdaki bağlantıya tıklayın:</p>
         <p><a href="${resetLink}">${resetLink}</a></p>
-        <p>Nuoroda galioja 1 valandą.</p>
-        <p>Jei to neprašėte, ignoruokite šį laišką.</p>
+        <p>Bu bağlantı 1 saat geçerlidir.</p>
+        <p>Eğer bu işlemi siz yapmadıysanız, bu e-postayı yok sayabilirsiniz.</p>
       `,
       text:
-        `Sveiki${user.name ? `, ${user.name}` : ""},
+        `Merhaba${user.name ? `, ${user.name}` : ""},
 
-        Norėdami pakeisti slaptažodį, atidarykite šią nuorodą:
-        ${resetLink}
+    Şifrenizi sıfırlamak için aşağıdaki bağlantıyı açın:
+    ${resetLink}
 
-        Nuoroda galioja 1 valandą.
+    Bu bağlantı 1 saat geçerlidir.
 
-        Jei to neprašėte, ignoruokite šį laišką.`
-      });
+    Eğer bu işlemi siz yapmadıysanız, bu e-postayı yok sayabilirsiniz.`
+    });
 
-      req.emailActionCooldown.registerSuccess();
+    req.emailActionCooldown.registerSuccess();
 
     return res.status(200).json({
       resStatus: true,
-      resMessage: "Jei el. paštas egzistuoja, laiškas bus išsiųstas",
+      resMessage: "Eğer e-posta adresi kayıtlıysa, bir e-posta gönderilecektir",
       resOkCode: 2
     });
 
@@ -2409,7 +2400,7 @@ router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, v
       resMessage:
         error?.response?.data?.message ||
         error?.message ||
-        "Nepavyko išsiųsti el. laiško",
+        "E-posta gönderilemedi",
       resErrorCode: 2
     });
   } finally {
@@ -2424,7 +2415,7 @@ router.post("/post/auth/email-reset", blockMaliciousIPs, applyWriteRateLimit, as
   if (!token) {
     return res.status(400).json({
       resStatus: false,
-      resMessage: "Trūksta atkūrimo rakto",
+      resMessage: "Token yok",
       resErrorCode: 1
     });
   }
@@ -2432,7 +2423,7 @@ router.post("/post/auth/email-reset", blockMaliciousIPs, applyWriteRateLimit, as
   if (!newPassword || newPassword.length < 6 || newPassword.length > 120) {
     return res.status(400).json({
       resStatus: false,
-      resMessage: "Netinkamas slaptažodis",
+      resMessage: "Geçersiz şifre, şifrenizi değiştirin",
       resErrorCode: 2
     });
   }
@@ -2444,7 +2435,7 @@ router.post("/post/auth/email-reset", blockMaliciousIPs, applyWriteRateLimit, as
 
     const userQuery = `
       SELECT google_id, email, password_reset_token, password_reset_expires
-      FROM masters_lt_users
+      FROM masters_tr_users
       WHERE password_reset_token = $1
       LIMIT 1;
     `;
@@ -2453,7 +2444,7 @@ router.post("/post/auth/email-reset", blockMaliciousIPs, applyWriteRateLimit, as
     if (userResult.rows.length === 0) {
       return res.status(400).json({
         resStatus: false,
-        resMessage: "Netinkama arba negaliojanti atkūrimo nuoroda",
+        resMessage: "Geçersiz veya süresi dolmuş sıfırlama bağlantısı",
         resErrorCode: 3
       });
     }
@@ -2463,34 +2454,30 @@ router.post("/post/auth/email-reset", blockMaliciousIPs, applyWriteRateLimit, as
     if (!user.password_reset_expires || new Date(user.password_reset_expires) < new Date()) {
       return res.status(400).json({
         resStatus: false,
-        resMessage: "Atkūrimo nuoroda nebegalioja",
+        resMessage: "Sıfırlama bağlantısı süresi doldu, yeni sıfırlama maili alın",
         resErrorCode: 4
       });
     }
-
     const newPasswordHash = await bcrypt.hash(newPassword, 12);
-
     const updateQuery = `
-      UPDATE masters_lt_users
+      UPDATE masters_tr_users
       SET password_hash = $1,
           password_reset_token = NULL,
           password_reset_expires = NULL
       WHERE google_id = $2
     `;
     await client.query(updateQuery, [newPasswordHash, user.google_id]);
-
     return res.status(200).json({
       resStatus: true,
-      resMessage: "Slaptažodis sėkmingai atnaujintas",
+      resMessage: "Şifre güncellendi",
       resOkCode: 1
     });
-
   } catch (error) {
     console.error("[email-reset] full error:", error);
 
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Nepavyko atnaujinti slaptažodžio",
+      resMessage: "Şifre güncellenemedi",
       resErrorCode: 5
     });
   } finally {
@@ -2506,7 +2493,7 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
     return res.status(400).json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Trūksta patvirtinimo rakto"
+      resMessage: "Token eksik"
     });
   }
 
@@ -2520,7 +2507,7 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
 
     const checkQ = `
       SELECT google_id
-      FROM masters_lt_users
+      FROM masters_tr_users
       WHERE email = $1
       LIMIT 1
     `;
@@ -2531,7 +2518,7 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
       return res.json({
         resStatus: false,
         resErrorCode: 2,
-        resMessage: "Paskyra jau egzistuoja"
+        resMessage: "Hesap zaten mevcut"
       });
     }
 
@@ -2552,7 +2539,7 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
       googleId = generateEmailGoogleId();
 
       const r = await pool.query(
-        `SELECT google_id FROM masters_lt_users WHERE google_id = $1 LIMIT 1`,
+        `SELECT google_id FROM masters_tr_users WHERE google_id = $1 LIMIT 1`,
         [googleId]
       );
 
@@ -2566,7 +2553,7 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
     const today = new Date().toISOString().slice(0, 10);
 
     const insertQ = `
-      INSERT INTO masters_lt_users
+      INSERT INTO masters_tr_users
       (google_id, email, name, date, ip, auth_provider, password_hash, email_verified)
       VALUES ($1,$2,$3,$4,$5,$6,$7,true)
       RETURNING google_id
@@ -2597,7 +2584,7 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
     return res.json({
       resStatus: true,
       resOkCode: 1,
-      resMessage: "El. paštas patvirtintas",
+      resMessage: "E-posta adresi doğrulandı",
       user: {
         google_id: dbGoogleId,
         email,
@@ -2612,7 +2599,7 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
       return res.status(400).json({
         resStatus: false,
         resErrorCode: 3,
-        resMessage: "Patvirtinimo nuoroda nebegalioja"
+        resMessage: "Doğrulama bağlantısı geçerli değil"
       });
     }
 
@@ -2620,28 +2607,27 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
       return res.status(400).json({
         resStatus: false,
         resErrorCode: 4,
-        resMessage: "Netinkamas patvirtinimo raktas"
+        resMessage: "Geçersiz doğrulama işlemi"
       });
     }
 
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 99,
-      resMessage: "Serverio klaida"
+      resMessage: "Sunucu hatası"
     });
   }
 });
-
 router.get("/get/ad/:id", applyReadRateLimit, async (req, res) => {
   const adId = req.params.id;
 
   try {
     const q = `
       SELECT 
-        id, name, title, description, price, city, date, views,
+        id, name, title, description, price, city, district, date, views,
         telephone, image_url, google_id, main_group, sub_group,
         average_rating, reviews_count
-      FROM masters_lt_ads
+      FROM masters_tr_ads
       WHERE id = $1
       LIMIT 1
     `;
@@ -2651,7 +2637,7 @@ router.get("/get/ad/:id", applyReadRateLimit, async (req, res) => {
       return res.json({
         resStatus: false,
         resErrorCode: 1,
-        resMessage: "Skelbimas nerastas"
+        resMessage: "İlan bulunamadı"
       });
     }
 
@@ -2663,7 +2649,7 @@ router.get("/get/ad/:id", applyReadRateLimit, async (req, res) => {
 
     if (sub_group) {
       const newerQ = `
-        SELECT id FROM masters_lt_ads
+        SELECT id FROM masters_tr_ads
         WHERE main_group = $2
           AND sub_group = $3
           AND id > $1
@@ -2671,7 +2657,7 @@ router.get("/get/ad/:id", applyReadRateLimit, async (req, res) => {
         LIMIT 1
       `;
       const olderQ = `
-        SELECT id FROM masters_lt_ads
+        SELECT id FROM masters_tr_ads
         WHERE main_group = $2
           AND sub_group = $3
           AND id < $1
@@ -2686,14 +2672,14 @@ router.get("/get/ad/:id", applyReadRateLimit, async (req, res) => {
       olderId = olderR.rows[0]?.id || null;
     } else {
       const newerQ = `
-        SELECT id FROM masters_lt_ads
+        SELECT id FROM masters_tr_ads
         WHERE main_group = $2
           AND id > $1
         ORDER BY id ASC
         LIMIT 1
       `;
       const olderQ = `
-        SELECT id FROM masters_lt_ads
+        SELECT id FROM masters_tr_ads
         WHERE main_group = $2
           AND id < $1
         ORDER BY id DESC
@@ -2720,7 +2706,7 @@ router.get("/get/ad/:id", applyReadRateLimit, async (req, res) => {
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 2,
-      resMessage: "Serverio klaida"
+      resMessage: "Sunucu hatası"
     });
   }
 });
@@ -2732,7 +2718,7 @@ router.get("/get/user-ads", applyReadRateLimit, async (req, res) => {
   if (!sessionId) {
     return res.status(200).json({
       resStatus: false,
-      resMessage: "Nėra aktyvios sesijos",
+      resMessage: "Aktif oturum bulunamadı",
       resErrorCode: 1,
       ads: []
     });
@@ -2741,7 +2727,7 @@ router.get("/get/user-ads", applyReadRateLimit, async (req, res) => {
     // find google_id from session
     const sessionQuery = `
       SELECT google_id
-      FROM masters_lt_sessions
+      FROM masters_tr_sessions
       WHERE session_id = $1
       LIMIT 1;
     `;
@@ -2749,7 +2735,7 @@ router.get("/get/user-ads", applyReadRateLimit, async (req, res) => {
     if (!sessionRes.rowCount) {
       return res.status(200).json({
         resStatus: false,
-        resMessage: "Nėra aktyvios sesijos",
+        resMessage: "Aktif oturum bulunamadı",
         resErrorCode: 2,
         ads: []
       });
@@ -2762,19 +2748,20 @@ router.get("/get/user-ads", applyReadRateLimit, async (req, res) => {
         title, 
         description, 
         price, 
-        city, 
+        city,
+        district, 
         image_url, 
         date,
         created_at,      
         is_active       
-      FROM masters_lt_ads
+      FROM masters_tr_ads
       WHERE google_id = $1
       ORDER BY date DESC, id DESC;
     `;
     const adsRes = await pool.query(adsQuery, [googleId]);
     return res.status(200).json({
       resStatus: true,
-      resMessage: "Vartotojo skelbimai užkrauti",
+      resMessage: "Kullanıcı ilanları başarıyla yüklendi",
       resOkCode: 1,
       ads: adsRes.rows
     });
@@ -2782,12 +2769,15 @@ router.get("/get/user-ads", applyReadRateLimit, async (req, res) => {
     console.error("User ads fetch error:", error);
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Duomenų bazės ryšio klaida",
+      resMessage: "Sunucu hatası",
       resErrorCode: 3,
       ads: []
     });
   }
 });
+
+
+
 router.get("/get/search", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
   const q = (req.query.q || "").trim();
 
@@ -2804,14 +2794,14 @@ router.get("/get/search", blockMaliciousIPs, applyReadRateLimit, async (req, res
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Paieškos užklausa per trumpa arba per ilga"
+      resMessage: "Aranan kelime çok kısa veya çok uzun"
     });
   }
   if (!/^[^<>]{3,60}$/.test(q)) {
     return res.json({
       resStatus: false,
       resErrorCode: 3,
-      resMessage: "Netinkama paieškos užklausa"
+      resMessage: "Aranan kelime geçersiz"
     });
   }
 
@@ -2834,7 +2824,7 @@ router.get("/get/search", blockMaliciousIPs, applyReadRateLimit, async (req, res
     // 1️⃣ capped count
     const countQ = `
       SELECT COUNT(*)
-      FROM masters_lt_ads
+      FROM masters_tr_ads
       WHERE is_active = true
         AND (title ILIKE $1 OR description ILIKE $1)
     `;
@@ -2847,10 +2837,10 @@ router.get("/get/search", blockMaliciousIPs, applyReadRateLimit, async (req, res
     // 2️⃣ paged data
     const dataQ = `
       SELECT 
-        id, name, title, description, price, city, date, views,
+        id, name, title, description, price, city, district, date, views,
         telephone, image_url, google_id, main_group, sub_group,
         average_rating, reviews_count
-      FROM masters_lt_ads
+      FROM masters_tr_ads
       WHERE is_active = true
         AND (title ILIKE $1 OR description ILIKE $1)
       ORDER BY date DESC
@@ -2879,7 +2869,7 @@ router.get("/get/search", blockMaliciousIPs, applyReadRateLimit, async (req, res
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 2,
-      resMessage: "Serverio klaida"
+      resMessage: "Sunucu hatası"
     });
   }
 });
@@ -2889,14 +2879,14 @@ router.get("/get/search-filter", applyReadRateLimit, blockMaliciousIPs, async (r
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Paieškos užklausa per trumpa arba per ilga"
+      resMessage: "Aranan kelime çok uzun veya çok kısa"
     });
   }
   if (!/^[^<>]{3,60}$/.test(q)) {
     return res.json({
       resStatus: false,
       resErrorCode: 3,
-      resMessage: "Netinkama paieškos užklausa"
+      resMessage: "Aranan kelime geçersiz"
     });
   }
   const { title, city, minRating, minReviews } = req.query;
@@ -2985,10 +2975,10 @@ router.get("/get/search-filter", applyReadRateLimit, blockMaliciousIPs, async (r
 
     const dataQ = `
       SELECT 
-        id, name, title, description, price, city, date, views,
+        id, name, title, description, price, city, district, date, views,
         telephone, image_url, google_id, main_group, sub_group,
         average_rating, reviews_count
-      FROM masters_lt_ads
+      FROM masters_tr_ads
       ${whereClause}
       ORDER BY date DESC
       LIMIT $${i} OFFSET $${i + 1}
@@ -3011,7 +3001,7 @@ router.get("/get/search-filter", applyReadRateLimit, blockMaliciousIPs, async (r
     console.error("Search filter error:", err);
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Serverio klaida"
+      resMessage: "Sunucu hatası"
     });
   }
 });
@@ -3022,7 +3012,7 @@ router.get("/get/browse", blockMaliciousIPs, applyReadRateLimit, async (req, res
   try {
     let query = `
       SELECT 
-        id, name, title, description, price, city, date, views,
+        id, name, title, description, price, city, district, date, views,
         telephone, image_url, google_id, main_group, sub_group,
         average_rating, reviews_count
       FROM masters_lt_ads
@@ -3069,7 +3059,7 @@ router.get("/get/browse", blockMaliciousIPs, applyReadRateLimit, async (req, res
     console.error("Browse error:", err);
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Serverio klaida"
+      resMessage: "Sunucu hatası"
     });
   }
 });
@@ -3082,11 +3072,12 @@ router.get("/get/homepage/carousel", async (req, res) => {
         name,
         price,
         city,
+        district,
         description,
         average_rating,
         reviews_count,
         image_url ->> 0 AS image
-      FROM masters_lt_carousel
+      FROM masters_tr_carousel
       ORDER BY id DESC
     `;
 
@@ -3102,7 +3093,7 @@ router.get("/get/homepage/carousel", async (req, res) => {
     console.error("CAROUSEL FETCH ERROR:", err);
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Nepavyko gauti karuselės skelbimų",
+      resMessage: "Sunucu hatası",
       resErrorCode: 2
     });
   }
@@ -3113,6 +3104,7 @@ router.get("/get/browse-filter", blockMaliciousIPs, applyReadRateLimit, async (r
     sub,
     title,
     city,
+    district,
     minRating,
     minReviews,
     cursor
@@ -3181,10 +3173,10 @@ router.get("/get/browse-filter", blockMaliciousIPs, applyReadRateLimit, async (r
 
     const query = `
       SELECT 
-        id, name, title, description, price, city, date, views,
+        id, name, title, description, price, city, district, date, views,
         telephone, image_url, google_id, main_group, sub_group,
         average_rating, reviews_count
-      FROM masters_lt_ads
+      FROM masters_tr_ads
       WHERE ${conditions.join(" AND ")}
       ORDER BY created_at DESC
       LIMIT $${i}
@@ -3206,7 +3198,7 @@ router.get("/get/browse-filter", blockMaliciousIPs, applyReadRateLimit, async (r
     console.error("Browse filter error:", err);
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Serverio klaida"
+      resMessage: "Sunucu hatası"
     });
   }
 });

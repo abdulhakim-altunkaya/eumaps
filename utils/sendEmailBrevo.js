@@ -11,6 +11,11 @@ const MAIL_SITES = {
     fromEmail: "info@meistarilatvija.lv",
     fromName: "Latvijas Meistari",
   },
+  eniyiusta: {
+    apiKey: process.env.BREVO_API_KEY_ENIYIUSTA,
+    fromEmail: "info@eniyiusta.com.tr",
+    fromName: "Eniyiusta",
+  },
 };
 
 async function sendEmailBrevo({ site, to, subject, html, text }) {
