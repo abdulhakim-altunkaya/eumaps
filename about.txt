@@ -1,2 +1,0 @@
-migrate from react.js to vanilla
-provide a link to schengen calculator from eumaps

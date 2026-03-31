@@ -46,7 +46,10 @@ const allowedOrigins = [
   "http://www.pagalbapro.lt",
   "https://pagalbapro.lt",
   "http://pagalbapro.lt",
-  "https://masterslt.netlify.app"
+  "https://eniyiusta.com.tr",
+  "https://www.eniyiusta.com.tr",
+  "http://eniyiusta.com.tr",
+  "http://www.eniyiusta.com.tr"
 ];
 app.use(cors({
   origin: function (origin, callback) {
@@ -90,7 +93,8 @@ const mastersLTRoutes = require("./routes/masters_LT");
 app.use("/api/master-lithuania", mastersLTRoutes);
 const mastersLVRoutes = require("./routes/masters_LV");
 app.use("/", mastersLVRoutes);
-
+const mastersTRRoutes = require("./routes/masters_TR");
+app.use("/api/master-turkey", mastersTRRoutes);
 
 //This function for now will be used safely convert image file names to alphanumerical values
 //currently used by latvia masters

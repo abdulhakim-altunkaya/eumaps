@@ -671,13 +671,22 @@ router.put("/put/update-ad/:id", blockMaliciousIPs, enforceAdPostingCooldown, ap
             resErrorCode: 24
           });
         }
-
         uploadedImages.push(
           `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_turkey_storage/${fileName}`
         );
       }
 
-      finalImages = [...finalImages, ...uploadedImages];
+      const combinedImages = [...finalImages, ...uploadedImages];
+      if (combinedImages.length > 5) {
+        return res.status(400).json({
+          resStatus: false,
+          resMessage: "En fazla 5 fotoğraf olabilir",
+          resErrorCode: 27
+        });
+      }
+      finalImages = combinedImages;
+
+
     }
 
     const updateQ = `
@@ -1502,7 +1511,7 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Trūksta laukų"
+      resMessage: "İlan no yanlış veya aktif oturum yok"
     });
   }
 
@@ -1512,7 +1521,7 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
     // ---------------------------------------
     const sessionQ = `
       SELECT google_id
-      FROM masters_lt_sessions
+      FROM masters_tr_sessions
       WHERE session_id = $1
       LIMIT 1
     `;
@@ -1522,7 +1531,7 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
       return res.json({
         resStatus: false,
         resErrorCode: 2,
-        resMessage: "Netinkama sesija"
+        resMessage: "Geçersiz oturum"
       });
     }
 
@@ -1533,7 +1542,7 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
     // ---------------------------------------
     const adQ = `
       SELECT google_id
-      FROM masters_lt_ads
+      FROM masters_tr_ads
       WHERE id = $1
       LIMIT 1
     `;
@@ -1543,7 +1552,7 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
       return res.json({
         resStatus: false,
         resErrorCode: 3,
-        resMessage: "Skelbimas nerastas"
+        resMessage: "İlan bulunamadı"
       });
     }
 
@@ -1554,7 +1563,7 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
     // ---------------------------------------
     const selectQ = `
       SELECT id, likers
-      FROM masters_lt_likes
+      FROM masters_tr_likes
       WHERE ad_id = $1
       LIMIT 1
     `;
@@ -1579,25 +1588,25 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
 
         if (!likers.length) {
           await pool.query(
-            `DELETE FROM masters_lt_likes WHERE id = $1`,
+            `DELETE FROM masters_tr_likes WHERE id = $1`,
             [row.id]
           );
           return res.json({
             resStatus: true,
             resOkCode: 3,
-            resMessage: "Patinka pašalintas (eilutė ištrinta)"
+            resMessage: "Beğeni silindi"
           });
         }
 
         await pool.query(
-          `UPDATE masters_lt_likes SET likers = $1 WHERE id = $2`,
+          `UPDATE masters_tr_likes SET likers = $1 WHERE id = $2`,
           [JSON.stringify(likers), row.id]
         );
 
         return res.json({
           resStatus: true,
           resOkCode: 4,
-          resMessage: "Patinka pašalintas"
+          resMessage: "Beğeni silindi"
         });
       }
 
@@ -1605,14 +1614,14 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
       likers.push(liker_google_id);
 
       await pool.query(
-        `UPDATE masters_lt_likes SET likers = $1 WHERE id = $2`,
+        `UPDATE masters_tr_likes SET likers = $1 WHERE id = $2`,
         [JSON.stringify(likers), row.id]
       );
 
       return res.json({
         resStatus: true,
         resOkCode: 1,
-        resMessage: "Patinka išsaugotas"
+        resMessage: "Beğeni kaydedildi"
       });
     }
 
@@ -1620,7 +1629,7 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
     // CASE B: NO ROW → CREATE NEW
     // ---------------------------------------
     const insertQ = `
-      INSERT INTO masters_lt_likes (ad_id, master_id, likers)
+      INSERT INTO masters_tr_likes (ad_id, master_id, likers)
       VALUES ($1, $2, $3)
     `;
     await pool.query(insertQ, [
@@ -1632,7 +1641,7 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
     return res.json({
       resStatus: true,
       resOkCode: 2,
-      resMessage: "Patinka išsaugotas (nauja eilutė sukurta)"
+      resMessage: "Beğeni kaydedildi"
     });
 
   } catch (err) {
@@ -1640,7 +1649,7 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 99,
-      resMessage: "Serverio klaida"
+      resMessage: "Sunucu hatası"
     });
   }
 });
@@ -1655,7 +1664,7 @@ router.get("/get/like-status", applyReadRateLimit, async (req, res) => {
   if (!ad_id) {
     return res.json({
       resStatus: false,
-      resMessage: "Trūksta ad_id"
+      resMessage: "İlan no eksik"
     });
   }
 
@@ -1663,7 +1672,7 @@ router.get("/get/like-status", applyReadRateLimit, async (req, res) => {
     // Always fetch likes first (PUBLIC)
     const q = `
       SELECT likers
-      FROM masters_lt_likes
+      FROM masters_tr_likes
       WHERE ad_id = $1
       LIMIT 1
     `;
@@ -1682,7 +1691,7 @@ router.get("/get/like-status", applyReadRateLimit, async (req, res) => {
     // Logged user → check session
     const sessionQ = `
       SELECT google_id
-      FROM masters_lt_sessions
+      FROM masters_tr_sessions
       WHERE session_id = $1
       LIMIT 1
     `;
@@ -1708,7 +1717,7 @@ router.get("/get/like-status", applyReadRateLimit, async (req, res) => {
     console.error(err);
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Serverio klaida"
+      resMessage: "Sunucu hatası"
     });
   }
 });
@@ -1719,7 +1728,7 @@ router.get("/get/reviews/:ad_id", applyReadRateLimit, async (req, res) => {
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Trūksta ad_id"
+      resMessage: "İlan no eksik"
     });
   }
 
@@ -1733,7 +1742,7 @@ router.get("/get/reviews/:ad_id", applyReadRateLimit, async (req, res) => {
         reviewer_id,
         parent,
         rating
-      FROM masters_lt_reviews
+      FROM masters_tr_reviews
       WHERE ad_id = $1
         AND is_deleted = false
       ORDER BY id ASC
@@ -1752,7 +1761,7 @@ router.get("/get/reviews/:ad_id", applyReadRateLimit, async (req, res) => {
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 2,
-      resMessage: "Serverio klaida"
+      resMessage: "Sunucu hatası"
     });
   }
 });
@@ -2155,109 +2164,121 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
   }
 });
 router.post("/post/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, enforceLoginProtection, validateEmail,
-   async (req, res) => {
-  const clean = (v, max) =>
-    String(v || "")
-      .trim()
-      .slice(0, max)
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;");
+  async (req, res) => {
+    const clean = (v, max) =>
+      String(v || "")
+        .trim()
+        .slice(0, max)
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
 
-  const email = clean(req.body.email, 120).toLowerCase();
-  const password = String(req.body.password || "");
+    const email = clean(req.body.email, 120).toLowerCase();
+    const password = String(req.body.password || "");
 
-  if (email.length < 5 || password.length < 6) {
-    return res.json({
-      resStatus: false,
-      resErrorCode: 1,
-      resMessage: "Şifre veya e-mail çok kısa"
-    });
-  }
-
-  try {
-    const userQ = `
-      SELECT google_id, email, name, password_hash, auth_provider, email_verified
-      FROM masters_tr_users
-      WHERE email = $1
-      LIMIT 1
-    `;
-    const userR = await pool.query(userQ, [email]);
-
-    if (!userR.rowCount) {
+    if (email.length < 5 || password.length < 6) {
       return res.json({
         resStatus: false,
-        resErrorCode: 3,
-        resMessage: "Geçersiz e-posta veya şifre"
+        resErrorCode: 1,
+        resMessage: "Şifre veya e-mail çok kısa"
       });
     }
 
-    const user = userR.rows[0];
+    try {
+      const userQ = `
+        SELECT
+          masters_tr_users.google_id,
+          masters_tr_users.email,
+          masters_tr_users.name,
+          masters_tr_users.password_hash,
+          masters_tr_users.auth_provider,
+          masters_tr_users.email_verified
+        FROM masters_tr_users
+        WHERE masters_tr_users.email = $1
+        LIMIT 1
+      `;
+      const userR = await pool.query(userQ, [email]);
 
-    if (user.auth_provider !== "email") {
-      return res.json({
-        resStatus: false,
-        resErrorCode: 4,
-        resMessage: "Bu e-posta ile Google üzerinden giriş yapılmış. Lütfen Google girişi kullanın."
-      });
-    }
-
-    if (!user.password_hash) {
-      return res.json({
-        resStatus: false,
-        resErrorCode: 5,
-        resMessage: "Bu e-posta ile Google üzerinden giriş yapılmış. Lütfen Google girişi kullanın."
-      });
-    }
-
-    const ok = await bcrypt.compare(password, user.password_hash);
-
-    if (!ok) {
-      return res.json({
-        resStatus: false,
-        resErrorCode: 6,
-        resMessage: "Hatalı e-mail veya şifre"
-      });
-    }
-
-    const sessionId = await createSessionForUser(user.google_id, true);
-
-    res.cookie("session_id", sessionId, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "none",
-      path: "/",
-      maxAge: 1000 * 60 * 60 * 24 * 365
-    });
-
-    return res.json({
-      resStatus: true,
-      resOkCode: 1,
-      resMessage: "Giriş başarılı",
-      user: {
-        google_id: user.google_id,
-        email: user.email,
-        name: user.name,
-        session_id: sessionId
+      if (!userR.rowCount) {
+        return res.json({
+          resStatus: false,
+          resErrorCode: 3,
+          resMessage: "Geçersiz e-posta veya şifre"
+        });
       }
-    });
 
-  } catch (err) {
-    console.error("Email login error:", err);
-    return res.status(500).json({
-      resStatus: false,
-      resErrorCode: 99,
-      resMessage: "Sunucu hatası"
-    });
-  }
-});
+      const user = userR.rows[0];
+
+      if (user.auth_provider !== "email") {
+        return res.json({
+          resStatus: false,
+          resErrorCode: 4,
+          resMessage: "Bu e-posta ile Google üzerinden giriş yapılmış. Lütfen Google girişi kullanın."
+        });
+      }
+
+      if (!user.password_hash) {
+        return res.json({
+          resStatus: false,
+          resErrorCode: 5,
+          resMessage: "Bu e-posta ile Google üzerinden giriş yapılmış. Lütfen Google girişi kullanın."
+        });
+      }
+
+      if (!user.email_verified) {
+        return res.json({
+          resStatus: false,
+          resErrorCode: 7,
+          resMessage: "E-posta adresinizi doğrulayın"
+        });
+      }
+
+      const ok = await bcrypt.compare(password, user.password_hash);
+
+      if (!ok) {
+        return res.json({
+          resStatus: false,
+          resErrorCode: 6,
+          resMessage: "Hatalı e-mail veya şifre"
+        });
+      }
+
+      const sessionId = await createSessionForUser(user.google_id, true);
+
+      res.cookie("session_id", sessionId, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "none",
+        path: "/",
+        maxAge: 1000 * 60 * 60 * 24 * 365
+      });
+
+      return res.json({
+        resStatus: true,
+        resOkCode: 1,
+        resMessage: "Giriş başarılı",
+        user: {
+          google_id: user.google_id,
+          email: user.email,
+          name: user.name
+        }
+      });
+
+    } catch (err) {
+      console.error("Email login error:", err);
+      return res.status(500).json({
+        resStatus: false,
+        resErrorCode: 99,
+        resMessage: "Sunucu hatası"
+      });
+    }
+  });
 router.get("/get/session-user", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
   // Desktop can use cookies but some mobiles will use headers for login system
   const auth = req.headers.authorization || "";
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
 
-  const sessionId = req.cookies?.session_id || bearerSid;
+  const sessionId = bearerSid || req.cookies?.session_id;
 
-  // No cookie -> not logged in, but it's not an "error"
   if (!sessionId) {
     return res.status(200).json({
       resStatus: false,
@@ -2283,7 +2304,6 @@ router.get("/get/session-user", blockMaliciousIPs, applyReadRateLimit, async (re
     const result = await pool.query(query, [sessionId]);
 
     if (result.rowCount === 0) {
-      // Cookie exists but session not found (expired/invalid)
       return res.status(200).json({
         resStatus: false,
         resMessage: "Aktif oturum bulunamadı",
@@ -2316,23 +2336,26 @@ router.get("/get/session-user", blockMaliciousIPs, applyReadRateLimit, async (re
     });
   }
 });
-router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, validateEmail, 
+router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, validateEmail,
   enforceEmailActionCooldown("email_reset"), async (req, res) => {
 
   const email = String(req.body.email || "").trim().toLowerCase();
   let client;
+
   try {
     client = await pool.connect();
+    await client.query("BEGIN");
 
     const userQuery = `
-      SELECT google_id, email, name, auth_provider
+      SELECT masters_tr_users.google_id, masters_tr_users.email, masters_tr_users.name, masters_tr_users.auth_provider
       FROM masters_tr_users
-      WHERE LOWER(email) = $1
+      WHERE LOWER(masters_tr_users.email) = $1
       LIMIT 1;
     `;
     const userResult = await client.query(userQuery, [email]);
 
     if (userResult.rows.length === 0) {
+      await client.query("ROLLBACK");
       return res.status(200).json({
         resStatus: true,
         resMessage: "Eğer e-posta adresi kayıtlıysa, bir e-posta gönderilecektir",
@@ -2341,8 +2364,9 @@ router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, v
     }
 
     const user = userResult.rows[0];
-    //if user has google logged in before, then he cannot reset. He should go to google login.
+
     if (user.auth_provider !== "email") {
+      await client.query("ROLLBACK");
       return res.status(200).json({
         resStatus: false,
         resErrorCode: 6,
@@ -2351,19 +2375,19 @@ router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, v
     }
 
     const resetToken = crypto.randomBytes(32).toString("hex");
-    const resetExpires = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
+    const resetExpires = new Date(Date.now() + 1000 * 60 * 60);
 
     const updateQuery = `
       UPDATE masters_tr_users
       SET password_reset_token = $1,
           password_reset_expires = $2
-      WHERE google_id = $3
+      WHERE masters_tr_users.google_id = $3
     `;
     await client.query(updateQuery, [resetToken, resetExpires, user.google_id]);
 
     const resetLink = `https://eniyiusta.com.tr/reset-password.html?token=${resetToken}`;
 
-    const brevoResult = await sendEmailBrevo({
+    await sendEmailBrevo({
       site: "eniyiusta",
       to: user.email,
       subject: "Şifre sıfırlama",
@@ -2377,13 +2401,15 @@ router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, v
       text:
         `Merhaba${user.name ? `, ${user.name}` : ""},
 
-    Şifrenizi sıfırlamak için aşağıdaki bağlantıyı açın:
-    ${resetLink}
+Şifrenizi sıfırlamak için aşağıdaki bağlantıyı açın:
+${resetLink}
 
-    Bu bağlantı 1 saat geçerlidir.
+Bu bağlantı 1 saat geçerlidir.
 
-    Eğer bu işlemi siz yapmadıysanız, bu e-postayı yok sayabilirsiniz.`
+Eğer bu işlemi siz yapmadıysanız, bu e-postayı yok sayabilirsiniz.`
     });
+
+    await client.query("COMMIT");
 
     req.emailActionCooldown.registerSuccess();
 
@@ -2394,6 +2420,11 @@ router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, v
     });
 
   } catch (error) {
+    if (client) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {}
+    }
 
     return res.status(500).json({
       resStatus: false,
@@ -2486,7 +2517,6 @@ router.post("/post/auth/email-reset", blockMaliciousIPs, applyWriteRateLimit, as
 });
 //email-verify creates the user
 router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
-
   const token = String(req.body.token || "").trim();
 
   if (!token) {
@@ -2503,18 +2533,20 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
       process.env.ENIYIUSTA_EMAIL_VERIFY_JWT_SECRET
     );
 
-    const { name, email, passwordHash, ipVisitor, auth_provider } = decoded;
+    const name = String(decoded.name || "").trim().slice(0, 80);
+    const email = String(decoded.email || "").trim().toLowerCase().slice(0, 120);
+    const passwordHash = String(decoded.passwordHash || "");
+    const ipVisitor = String(decoded.ipVisitor || "").trim().slice(0, 100);
 
     const checkQ = `
-      SELECT google_id
+      SELECT masters_tr_users.google_id
       FROM masters_tr_users
-      WHERE email = $1
+      WHERE masters_tr_users.email = $1
       LIMIT 1
     `;
     const checkR = await pool.query(checkQ, [email]);
 
     if (checkR.rowCount) {
-
       return res.json({
         resStatus: false,
         resErrorCode: 2,
@@ -2539,7 +2571,10 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
       googleId = generateEmailGoogleId();
 
       const r = await pool.query(
-        `SELECT google_id FROM masters_tr_users WHERE google_id = $1 LIMIT 1`,
+        `SELECT masters_tr_users.google_id
+         FROM masters_tr_users
+         WHERE masters_tr_users.google_id = $1
+         LIMIT 1`,
         [googleId]
       );
 
@@ -2556,7 +2591,7 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
       INSERT INTO masters_tr_users
       (google_id, email, name, date, ip, auth_provider, password_hash, email_verified)
       VALUES ($1,$2,$3,$4,$5,$6,$7,true)
-      RETURNING google_id
+      RETURNING masters_tr_users.google_id
     `;
 
     const insertR = await pool.query(insertQ, [
@@ -2565,7 +2600,7 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
       name,
       today,
       ipVisitor,
-      auth_provider || "email",
+      "email",
       passwordHash
     ]);
 
@@ -2588,13 +2623,11 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
       user: {
         google_id: dbGoogleId,
         email,
-        name,
-        session_id: sessionId
+        name
       }
     });
 
   } catch (err) {
-
     if (err.name === "TokenExpiredError") {
       return res.status(400).json({
         resStatus: false,
@@ -2610,6 +2643,16 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
         resMessage: "Geçersiz doğrulama işlemi"
       });
     }
+
+    if (err.code === "23505") {
+      return res.status(400).json({
+        resStatus: false,
+        resErrorCode: 2,
+        resMessage: "Hesap zaten mevcut"
+      });
+    }
+
+    console.error("Email verify error:", err);
 
     return res.status(500).json({
       resStatus: false,
@@ -2628,7 +2671,8 @@ router.get("/get/ad/:id", applyReadRateLimit, async (req, res) => {
         telephone, image_url, google_id, main_group, sub_group,
         average_rating, reviews_count
       FROM masters_tr_ads
-      WHERE id = $1
+      WHERE masters_tr_ads.id = $1
+        AND masters_tr_ads.is_active = true
       LIMIT 1
     `;
     const r = await pool.query(q, [adId]);
@@ -2755,8 +2799,8 @@ router.get("/get/user-ads", applyReadRateLimit, async (req, res) => {
         created_at,      
         is_active       
       FROM masters_tr_ads
-      WHERE google_id = $1
-      ORDER BY date DESC, id DESC;
+      WHERE masters_tr_ads.google_id = $1
+      ORDER BY masters_tr_ads.created_at DESC, masters_tr_ads.id DESC;
     `;
     const adsRes = await pool.query(adsQuery, [googleId]);
     return res.status(200).json({
@@ -2779,7 +2823,7 @@ router.get("/get/user-ads", applyReadRateLimit, async (req, res) => {
 
 
 router.get("/get/search", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
-  const q = (req.query.q || "").trim();
+  const q = String(req.query.q || "").trim();
 
   const PAGE_SIZE = 12;
   const HARD_CAP = 1000;
@@ -2790,6 +2834,7 @@ router.get("/get/search", blockMaliciousIPs, applyReadRateLimit, async (req, res
   const limit = PAGE_SIZE;
   const offset = (page - 1) * limit;
 
+  // validation
   if (q.length < 3 || q.length > 60) {
     return res.json({
       resStatus: false,
@@ -2797,7 +2842,8 @@ router.get("/get/search", blockMaliciousIPs, applyReadRateLimit, async (req, res
       resMessage: "Aranan kelime çok kısa veya çok uzun"
     });
   }
-  if (!/^[^<>]{3,60}$/.test(q)) {
+
+  if (!/^[^<>]{3,60}$/.test(q) || /[\p{Cc}\p{Cf}]/gu.test(q)) {
     return res.json({
       resStatus: false,
       resErrorCode: 3,
@@ -2805,47 +2851,64 @@ router.get("/get/search", blockMaliciousIPs, applyReadRateLimit, async (req, res
     });
   }
 
-  // 🚫 block deep offsets
+  // hard cap protection
   if (offset >= HARD_CAP) {
     return res.json({
       resStatus: true,
       resOkCode: 1,
       ads: [],
       pagination: {
-        page,
+        currentPage: page,
         pageSize: PAGE_SIZE,
         totalResults: HARD_CAP,
-        totalPages: Math.ceil(HARD_CAP / PAGE_SIZE)
+        totalPages: Math.ceil(HARD_CAP / PAGE_SIZE),
+        hardCap: HARD_CAP
       }
     });
   }
 
   try {
-    // 1️⃣ capped count
+    // count query
     const countQ = `
       SELECT COUNT(*)
       FROM masters_tr_ads
       WHERE is_active = true
         AND (title ILIKE $1 OR description ILIKE $1)
     `;
+
     const countR = await pool.query(countQ, [`%${q}%`]);
 
-    const realTotal = parseInt(countR.rows[0].count, 10);
+    const realTotal = parseInt(countR.rows[0].count, 10) || 0;
     const totalResults = Math.min(realTotal, HARD_CAP);
-    const totalPages = Math.ceil(totalResults / PAGE_SIZE);
+    const totalPages = Math.max(1, Math.ceil(totalResults / PAGE_SIZE));
 
-    // 2️⃣ paged data
+    // data query
     const dataQ = `
       SELECT 
-        id, name, title, description, price, city, district, date, views,
-        telephone, image_url, google_id, main_group, sub_group,
-        average_rating, reviews_count
+        id,
+        name,
+        title,
+        description,
+        price,
+        city,
+        district,
+        date,
+        created_at,
+        views,
+        telephone,
+        image_url,
+        google_id,
+        main_group,
+        sub_group,
+        average_rating,
+        reviews_count
       FROM masters_tr_ads
       WHERE is_active = true
         AND (title ILIKE $1 OR description ILIKE $1)
-      ORDER BY date DESC
+      ORDER BY created_at DESC
       LIMIT $2 OFFSET $3
     `;
+
     const dataR = await pool.query(dataQ, [
       `%${q}%`,
       limit,
@@ -2857,13 +2920,14 @@ router.get("/get/search", blockMaliciousIPs, applyReadRateLimit, async (req, res
       resOkCode: 1,
       ads: dataR.rows,
       pagination: {
-        page,
+        currentPage: page,
         pageSize: PAGE_SIZE,
         totalResults,
         totalPages,
         hardCap: HARD_CAP
       }
     });
+
   } catch (err) {
     console.error("Search error:", err);
     return res.status(500).json({
@@ -2874,7 +2938,8 @@ router.get("/get/search", blockMaliciousIPs, applyReadRateLimit, async (req, res
   }
 });
 router.get("/get/search-filter", applyReadRateLimit, blockMaliciousIPs, async (req, res) => {
-  const q = (req.query.q || "").trim();
+  const q = String(req.query.q || "").trim();
+
   if (q.length < 3 || q.length > 60) {
     return res.json({
       resStatus: false,
@@ -2882,6 +2947,7 @@ router.get("/get/search-filter", applyReadRateLimit, blockMaliciousIPs, async (r
       resMessage: "Aranan kelime çok uzun veya çok kısa"
     });
   }
+
   if (!/^[^<>]{3,60}$/.test(q)) {
     return res.json({
       resStatus: false,
@@ -2889,7 +2955,15 @@ router.get("/get/search-filter", applyReadRateLimit, blockMaliciousIPs, async (r
       resMessage: "Aranan kelime geçersiz"
     });
   }
-  const { title, city, minRating, minReviews } = req.query;
+
+  const {
+    title,      // actually sub_group id from dropdown
+    city,       // province id
+    town,       // district id
+    minRating,
+    minReviews
+  } = req.query;
+
   const PAGE_SIZE = 12;
   const HARD_CAP = 1000;
 
@@ -2904,7 +2978,7 @@ router.get("/get/search-filter", applyReadRateLimit, blockMaliciousIPs, async (r
       resStatus: true,
       ads: [],
       pagination: {
-        page,
+        currentPage: page,
         pageSize: PAGE_SIZE,
         totalResults: HARD_CAP,
         totalPages: Math.ceil(HARD_CAP / PAGE_SIZE)
@@ -2923,14 +2997,17 @@ router.get("/get/search-filter", applyReadRateLimit, blockMaliciousIPs, async (r
     values.push(`%${q}%`);
     i++;
 
-    // profession filter
+    // profession dropdown = sub_group id
     if (title) {
-      conditions.push(`title = $${i}`);
-      values.push(title);
-      i++;
+      const subGroupId = Number(title);
+      if (!Number.isNaN(subGroupId)) {
+        conditions.push(`sub_group = $${i}`);
+        values.push(subGroupId);
+        i++;
+      }
     }
 
-    // city filter
+    // province filter
     if (city) {
       const cityId = Number(city);
       if (!Number.isNaN(cityId)) {
@@ -2940,8 +3017,18 @@ router.get("/get/search-filter", applyReadRateLimit, blockMaliciousIPs, async (r
       }
     }
 
+    // district filter
+    if (town) {
+      const townId = Number(town);
+      if (!Number.isNaN(townId)) {
+        conditions.push(`district::jsonb @> $${i}::jsonb`);
+        values.push(JSON.stringify([townId]));
+        i++;
+      }
+    }
+
     // rating filter
-    if (minRating) {
+    if (minRating !== undefined && minRating !== "") {
       const r = Number(minRating);
       if (!Number.isNaN(r)) {
         conditions.push(`average_rating >= $${i}`);
@@ -2951,7 +3038,7 @@ router.get("/get/search-filter", applyReadRateLimit, blockMaliciousIPs, async (r
     }
 
     // reviews filter
-    if (minReviews) {
+    if (minReviews !== undefined && minReviews !== "") {
       const rc = Number(minReviews);
       if (!Number.isNaN(rc)) {
         conditions.push(`reviews_count >= $${i}`);
@@ -2964,23 +3051,38 @@ router.get("/get/search-filter", applyReadRateLimit, blockMaliciousIPs, async (r
 
     const countQ = `
       SELECT COUNT(*)
-      FROM masters_lt_ads
-      ${whereClause}
-    `;
-    const countR = await pool.query(countQ, values);
-
-    const realTotal = parseInt(countR.rows[0].count, 10);
-    const totalResults = Math.min(realTotal, HARD_CAP);
-    const totalPages = Math.ceil(totalResults / PAGE_SIZE);
-
-    const dataQ = `
-      SELECT 
-        id, name, title, description, price, city, district, date, views,
-        telephone, image_url, google_id, main_group, sub_group,
-        average_rating, reviews_count
       FROM masters_tr_ads
       ${whereClause}
-      ORDER BY date DESC
+    `;
+
+    const countR = await pool.query(countQ, values);
+
+    const realTotal = parseInt(countR.rows[0].count, 10) || 0;
+    const totalResults = Math.min(realTotal, HARD_CAP);
+    const totalPages = Math.max(1, Math.ceil(totalResults / PAGE_SIZE));
+
+    const dataQ = `
+      SELECT
+        id,
+        name,
+        title,
+        description,
+        price,
+        city,
+        district,
+        date,
+        created_at,
+        views,
+        telephone,
+        image_url,
+        google_id,
+        main_group,
+        sub_group,
+        average_rating,
+        reviews_count
+      FROM masters_tr_ads
+      ${whereClause}
+      ORDER BY created_at DESC
       LIMIT $${i} OFFSET $${i + 1}
     `;
 
@@ -2990,7 +3092,7 @@ router.get("/get/search-filter", applyReadRateLimit, blockMaliciousIPs, async (r
       resStatus: true,
       ads: dataR.rows,
       pagination: {
-        page,
+        currentPage: page,
         pageSize: PAGE_SIZE,
         totalResults,
         totalPages
@@ -3014,8 +3116,8 @@ router.get("/get/browse", blockMaliciousIPs, applyReadRateLimit, async (req, res
       SELECT 
         id, name, title, description, price, city, district, date, views,
         telephone, image_url, google_id, main_group, sub_group,
-        average_rating, reviews_count
-      FROM masters_lt_ads
+        average_rating, created_at, reviews_count
+      FROM masters_tr_ads
       WHERE is_active = true
     `;
     const params = [];
@@ -3102,9 +3204,9 @@ router.get("/get/browse-filter", blockMaliciousIPs, applyReadRateLimit, async (r
   const {
     main,
     sub,
-    title,
+    title,       
     city,
-    district,
+    town,        
     minRating,
     minReviews,
     cursor
@@ -3117,26 +3219,37 @@ router.get("/get/browse-filter", blockMaliciousIPs, applyReadRateLimit, async (r
     const values = [];
     let i = 1;
 
-    // BROWSE SCOPE
+    // browse page scope from URL
     if (main) {
-      conditions.push(`main_group = $${i}`);
-      values.push(main);
-      i++;
+      const mainNum = Number(main);
+      if (!Number.isNaN(mainNum)) {
+        conditions.push(`main_group = $${i}`);
+        values.push(mainNum);
+        i++;
+      }
     }
 
     if (sub) {
-      conditions.push(`sub_group = $${i}`);
-      values.push(sub);
-      i++;
+      const subNum = Number(sub);
+      if (!Number.isNaN(subNum)) {
+        conditions.push(`sub_group = $${i}`);
+        values.push(subNum);
+        i++;
+      }
     }
 
-    // FILTERS
-    if (title) {
-      conditions.push(`title ILIKE $${i}`);
-      values.push(`%${title.trim()}%`);
-      i++;
+    // filter dropdown "title" is actually sub_group id
+    // only apply if browse scope sub is not already set
+    if (title && !sub) {
+      const titleNum = Number(title);
+      if (!Number.isNaN(titleNum)) {
+        conditions.push(`sub_group = $${i}`);
+        values.push(titleNum);
+        i++;
+      }
     }
 
+    // province filter
     if (city) {
       const cityId = Number(city);
       if (!Number.isNaN(cityId)) {
@@ -3146,25 +3259,34 @@ router.get("/get/browse-filter", blockMaliciousIPs, applyReadRateLimit, async (r
       }
     }
 
-    if (minRating) {
-      const r = Number(minRating);
-      if (!Number.isNaN(r)) {
+    // district filter (frontend sends "town")
+    if (town) {
+      const townId = Number(town);
+      if (!Number.isNaN(townId)) {
+        conditions.push(`district::jsonb @> $${i}::jsonb`);
+        values.push(JSON.stringify([townId]));
+        i++;
+      }
+    }
+
+    if (minRating !== undefined && minRating !== "") {
+      const ratingNum = Number(minRating);
+      if (!Number.isNaN(ratingNum)) {
         conditions.push(`average_rating >= $${i}`);
-        values.push(r);
+        values.push(ratingNum);
         i++;
       }
     }
 
-    if (minReviews) {
-      const rc = Number(minReviews);
-      if (!Number.isNaN(rc)) {
+    if (minReviews !== undefined && minReviews !== "") {
+      const reviewsNum = Number(minReviews);
+      if (!Number.isNaN(reviewsNum)) {
         conditions.push(`reviews_count >= $${i}`);
-        values.push(rc);
+        values.push(reviewsNum);
         i++;
       }
     }
 
-    // CURSOR (show more)
     if (cursor) {
       conditions.push(`created_at < $${i}`);
       values.push(cursor);
@@ -3172,10 +3294,10 @@ router.get("/get/browse-filter", blockMaliciousIPs, applyReadRateLimit, async (r
     }
 
     const query = `
-      SELECT 
-        id, name, title, description, price, city, district, date, views,
-        telephone, image_url, google_id, main_group, sub_group,
-        average_rating, reviews_count
+      SELECT
+        id, name, title, description, price, city, district,
+        date, created_at, views, telephone, image_url, google_id,
+        main_group, sub_group, average_rating, reviews_count
       FROM masters_tr_ads
       WHERE ${conditions.join(" AND ")}
       ORDER BY created_at DESC
@@ -3189,9 +3311,7 @@ router.get("/get/browse-filter", blockMaliciousIPs, applyReadRateLimit, async (r
     return res.json({
       resStatus: true,
       ads: rows,
-      nextCursor: rows.length
-        ? rows[rows.length - 1].created_at
-        : null
+      nextCursor: rows.length ? rows[rows.length - 1].created_at : null
     });
 
   } catch (err) {
