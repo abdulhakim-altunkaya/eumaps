@@ -331,7 +331,7 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
 
       const fileName = makeSafeName();
       const { error } = await supabase.storage
-        .from("masters_turkey_storage")
+        .from("masters_latvia_storage")
         .upload(fileName, f.buffer, { contentType: f.mimetype });
 
       if (error) {
@@ -343,7 +343,7 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
       }
 
       uploadedImages.push(
-        `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_turkey_storage/${fileName}`
+        `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_latvia_storage/${fileName}`
       );
     }
 
@@ -661,7 +661,7 @@ router.put("/put/update-ad/:id", blockMaliciousIPs, enforceAdPostingCooldown, ap
       for (const f of files) {
         const fileName = makeSafeName();
         const { error } = await supabase.storage
-          .from("masters_turkey_storage")
+          .from("masters_latvia_storage")
           .upload(fileName, f.buffer, { contentType: f.mimetype });
 
         if (error) {
@@ -672,7 +672,7 @@ router.put("/put/update-ad/:id", blockMaliciousIPs, enforceAdPostingCooldown, ap
           });
         }
         uploadedImages.push(
-          `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_turkey_storage/${fileName}`
+          `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_latvia_storage/${fileName}`
         );
       }
 
