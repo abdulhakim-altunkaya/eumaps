@@ -2064,20 +2064,12 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
   }
 });
 /*Email register only send email verification link */
-router.post("/post/auth/email-register",
-  blockMaliciousIPs,
-  applyWriteRateLimit,
-  validateEmail,
-  enforceEmailActionCooldown("email_register"),
-  async (req, res) => {
-
-  console.log("[EMAIL_REGISTER] START");
+router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit, validateEmail,
+   enforceEmailActionCooldown("email_register"), async (req, res) => {
 
   const ipVisitor = req.headers["x-forwarded-for"]
     ? req.headers["x-forwarded-for"].split(",")[0]
     : req.socket.remoteAddress || req.ip;
-
-  console.log("[EMAIL_REGISTER] IP:", ipVisitor);
 
   const clean = (v, max) =>
     String(v || "")
@@ -2090,10 +2082,8 @@ router.post("/post/auth/email-register",
   const email = clean(req.body.email, 120).toLowerCase();
   const password = String(req.body.password || "");
 
-  console.log("[EMAIL_REGISTER] INPUT:", { name, email, passwordLength: password.length });
 
   if (name.length < 2 || email.length < 5 || password.length < 6) {
-    console.log("[EMAIL_REGISTER] INVALID INPUT");
     return res.json({
       resStatus: false,
       resErrorCode: 1,
@@ -2102,7 +2092,6 @@ router.post("/post/auth/email-register",
   }
 
   try {
-    console.log("[EMAIL_REGISTER] CHECK USER");
 
     const checkQ = `
       SELECT google_id
@@ -2112,10 +2101,7 @@ router.post("/post/auth/email-register",
     `;
     const checkR = await pool.query(checkQ, [email]);
 
-    console.log("[EMAIL_REGISTER] CHECK RESULT:", checkR.rowCount);
-
     if (checkR.rowCount) {
-      console.log("[EMAIL_REGISTER] EMAIL EXISTS");
       return res.json({
         resStatus: false,
         resErrorCode: 3,
@@ -2123,10 +2109,8 @@ router.post("/post/auth/email-register",
       });
     }
 
-    console.log("[EMAIL_REGISTER] HASH PASSWORD");
     const passwordHash = await bcrypt.hash(password, 12);
 
-    console.log("[EMAIL_REGISTER] CREATE TOKEN");
     const verifyToken = jwt.sign(
       {
         name,
@@ -2141,21 +2125,29 @@ router.post("/post/auth/email-register",
 
     const verifyLink = `https://eniyiusta.com.tr/verify-email.html?token=${encodeURIComponent(verifyToken)}`;
 
-    console.log("[EMAIL_REGISTER] SEND EMAIL ->", email);
-
     const brevoResult = await sendEmailBrevo({
       site: "eniyiusta",
       to: email,
       subject: "E-posta adresinizi doğrulayın",
-      html: `...`,
-      text: `...`
+      html: `
+        <p>Merhaba${name ? `, ${name}` : ""},</p>
+        <p>Kaydınızı tamamlamak için aşağıdaki bağlantıya tıklayarak e-posta adresinizi doğrulayın:</p>
+        <p><a href="${verifyLink}">E-postayı doğrula</a></p>
+        <p>Bu bağlantı 24 saat geçerlidir.</p>
+        <p>Eğer bu işlemi siz yapmadıysanız, bu e-postayı yok sayabilirsiniz.</p>
+      `,
+      text:
+        `Merhaba${name ? `, ${name}` : ""},
+
+    Kaydınızı tamamlamak için aşağıdaki bağlantıyı açın:
+
+    ${verifyLink}
+
+    Bu bağlantı 24 saat geçerlidir.
+
+    Eğer bu işlemi siz yapmadıysanız, bu e-postayı yok sayabilirsiniz.`
     });
-
-    console.log("[EMAIL_REGISTER] BREVO RESULT:", brevoResult);
-
     req.emailActionCooldown.registerSuccess();
-    console.log("[EMAIL_REGISTER] SUCCESS");
-
     return res.json({
       resStatus: true,
       resOkCode: 1,
@@ -2163,9 +2155,6 @@ router.post("/post/auth/email-register",
     });
 
   } catch (err) {
-    console.error("[EMAIL_REGISTER] ERROR:", err);
-    console.error("[EMAIL_REGISTER] STACK:", err?.stack);
-    console.error("[EMAIL_REGISTER] MESSAGE:", err?.message);
 
     return res.status(500).json({
       resStatus: false,
