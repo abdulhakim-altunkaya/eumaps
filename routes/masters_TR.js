@@ -90,7 +90,7 @@ router.post("/post/save-visitor", checkLogCooldown(3 * 60 * 1000), async (req, r
 router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWriteRateLimit,
   upload.array("images", 5), async (req, res) => {
   const MIN_IMAGE_SIZE = 2 * 1024;
-  const MAX_IMAGE_SIZE = 1.9 * 1024 * 1024;
+  const MAX_IMAGE_SIZE = 3 * 1024 * 1024;
   const ALLOWED_IMAGE_TYPES = [
     "image/jpeg",
     "image/png",
@@ -324,7 +324,7 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
       if (f.size > MAX_IMAGE_SIZE) {
         return res.status(400).json({
           resStatus: false,
-          resMessage: "Fotoğraf çok büyük (maks. 1,8 MB)",
+          resMessage: "Fotoğraf çok büyük",
           resErrorCode: 23
         });
       }
@@ -422,7 +422,7 @@ router.put("/put/update-ad/:id", blockMaliciousIPs, enforceAdPostingCooldown, ap
   upload.array("images", 5), async (req, res) => {
   const adId = req.params.id;
   const MIN_IMAGE_SIZE = 2 * 1024;
-  const MAX_IMAGE_SIZE = 1.9 * 1024 * 1024;
+  const MAX_IMAGE_SIZE = 3 * 1024 * 1024;
   const ALLOWED_IMAGE_TYPES = [
     "image/jpeg",
     "image/png",
@@ -650,7 +650,7 @@ router.put("/put/update-ad/:id", blockMaliciousIPs, enforceAdPostingCooldown, ap
         if (f.size > MAX_IMAGE_SIZE) {
           return res.status(400).json({
             resStatus: false,
-            resMessage: "Fotoğraf çok büyük (maks. 1,8 MB)",
+            resMessage: "Fotoğraf çok büyük",
             resErrorCode: 23
           });
         }
