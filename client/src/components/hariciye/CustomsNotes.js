@@ -81,8 +81,10 @@ function CustomsNotes() {
             <strong>Not:</strong> Tercümeleri aracı aldığınız ülkedeki Konsolosluktan yapmanız tavsiye olunur.
 
             <h4>SÜREÇ</h4>
-            <strong>1.</strong> Randevu almaya gerek yok. Gümrükçülere gerek yok. İşinizi kendiniz halledebilirsiniz. Gümrükler sabah 8'de 
-            açılıyor (2021 Şubat itibariyle).<br /><span className="customsNotesAreaExtraMargin"></span>
+            <strong>1.</strong> Randevu almaya gerek yok. Önceden gümrükçü aracılar olmadan arabayı kaydedebiliyorduk. 
+            Ama malesef şimdi bir gümrükçü ile anlaşmak gerekiyor. Sabah gümrük müdürlüğüne gidin, orda dolanan gümrükçüler oluyor. 
+            Herhangi biriyle anlaşabiliyorsunuz, size gümrük beyannamesi dolduruyor. Ortalama 300-350 Euro civarı ücret alıyor.
+             Gümrükler sabah 8'de açılıyor (2021 Şubat itibariyle).<br /><span className="customsNotesAreaExtraMargin"></span>
             <strong>2.</strong> Gümrük işini 6 ay içinde yapmalısınız. Türkiye'ye girerken pasaportunuza iki yıl süre vurulmuş olsa bile 6 ay 
             içinde gümrük işini yapmalısınız.<br /><span className="customsNotesAreaExtraMargin"></span>
             <strong>3.</strong> Gümrük işleri bittikten sonra TSE'den araç projenizi hazırlatmanız gerekiyor. Bunun için bir araç proje 

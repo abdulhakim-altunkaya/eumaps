@@ -30,7 +30,7 @@ function CustomsHybridPlugin() {
   const [currencyName, setCurrencyName] = useState("");
   const [resultArea, setResultArea] = useState("");
 
-  const exchangeDollar = 43.84;
+  const exchangeDollar = 44.52;
   const exchangeEuro = 51.72;
 
   // Handle radio button changes
