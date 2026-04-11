@@ -167,7 +167,7 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
     });
   }
 
-  if (phoneNumber.trim().length < 7 || phoneNumber.trim().length > 12) {
+  if (phoneNumber.trim().length < 7 || phoneNumber.trim().length > 15) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Neteisingas telefono numerio ilgis",
@@ -183,7 +183,7 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
     });
   }
 
-  if (inputName.length < 5 || inputName.length > 19) {
+  if (inputName.length < 5 || inputName.length > 25) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Vardas per ilgas arba per trumpas",
@@ -191,7 +191,7 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
     });
   }
 
-  if (inputPrice.length < 1 || inputPrice.length > 15) {
+  if (inputPrice.length < 1 || inputPrice.length > 25) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Kaina per ilga arba per trumpa",
@@ -529,7 +529,7 @@ router.put("/put/update-ad/:id", blockMaliciousIPs, enforceAdPostingCooldown, ap
       resErrorCode: 6
     });
   }
-  if (phoneNumber.trim().length < 7 || phoneNumber.trim().length > 12) {
+  if (phoneNumber.trim().length < 7 || phoneNumber.trim().length > 15) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Telefono numeris per ilgas arba per trumpas",
@@ -543,7 +543,7 @@ router.put("/put/update-ad/:id", blockMaliciousIPs, enforceAdPostingCooldown, ap
       resErrorCode: 11
     });
   }
-  if (inputName.length < 5 || inputName.length > 19) {
+  if (inputName.length < 5 || inputName.length > 25) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Vardas per ilgas arba per trumpas",

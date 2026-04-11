@@ -165,7 +165,7 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
     });
   }
 
-  if (phoneNumber.trim().length < 7 || phoneNumber.trim().length > 12) {
+  if (phoneNumber.trim().length < 7 || phoneNumber.trim().length > 15) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Telefon numarası uzunluğu geçersiz",
@@ -197,7 +197,7 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
     });
   }
 
-  if (inputName.length < 5 || inputName.length > 19) {
+  if (inputName.length < 5 || inputName.length > 25) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Ad soyad çok kısa veya çok uzun",
@@ -205,7 +205,7 @@ router.post("/post/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWrite
     });
   }
 
-  if (inputPrice.length < 1 || inputPrice.length > 15) {
+  if (inputPrice.length < 1 || inputPrice.length > 25) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Fiyat çok kısa veya çok uzun",
@@ -529,7 +529,7 @@ router.put("/put/update-ad/:id", blockMaliciousIPs, enforceAdPostingCooldown, ap
       });
     }
 
-    if (phoneNumber.trim().length < 7 || phoneNumber.trim().length > 12) {
+    if (phoneNumber.trim().length < 7 || phoneNumber.trim().length > 15) {
       return res.status(400).json({
         resStatus: false,
         resMessage: "Telefon numarası çok kısa veya çok uzun",
@@ -561,7 +561,7 @@ router.put("/put/update-ad/:id", blockMaliciousIPs, enforceAdPostingCooldown, ap
       });
     }
 
-    if (inputName.length < 5 || inputName.length > 19) {
+    if (inputName.length < 5 || inputName.length > 25) {
       return res.status(400).json({
         resStatus: false,
         resMessage: "Ad soyad çok kısa veya çok uzun",

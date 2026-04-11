@@ -167,7 +167,7 @@ router.post("/api/post/master-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
     });
   }
 
-  if (phoneNumber.trim().length < 7 || phoneNumber.trim().length > 12) {
+  if (phoneNumber.trim().length < 7 || phoneNumber.trim().length > 15) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Nepareizs tālruņa numura garums",
@@ -183,7 +183,7 @@ router.post("/api/post/master-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
     });
   }
 
-  if (inputName.length < 5 || inputName.length > 19) {
+  if (inputName.length < 5 || inputName.length > 25) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Vārds ir pārāk garš vai pārāk īss",
@@ -191,7 +191,7 @@ router.post("/api/post/master-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
     });
   }
 
-  if (inputPrice.length < 1 || inputPrice.length > 15) {
+  if (inputPrice.length < 1 || inputPrice.length > 25) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Cena ir pārāk gara vai pārāk īsa",
@@ -526,7 +526,7 @@ router.put("/api/put/master-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       resErrorCode: 6
     });
   }
-  if (phoneNumber.trim().length < 7 || phoneNumber.trim().length > 12) {
+  if (phoneNumber.trim().length < 7 || phoneNumber.trim().length > 15) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Tālruņa numurs ir pārāk garš vai pārāk īss",
@@ -540,7 +540,7 @@ router.put("/api/put/master-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       resErrorCode: 11
     });
   }
-  if (inputName.length < 5 || inputName.length > 19) {
+  if (inputName.length < 5 || inputName.length > 25) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Vārds ir pārāk garš vai pārāk īss",
@@ -563,7 +563,7 @@ router.put("/api/put/master-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       resErrorCode: 14
     });
   }
-  if (inputPrice.length < 1 || inputPrice.length > 15) {
+  if (inputPrice.length < 1 || inputPrice.length > 25) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Cena ir pārāk gara vai pārāk īsa",
