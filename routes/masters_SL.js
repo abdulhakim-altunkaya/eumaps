@@ -1634,7 +1634,7 @@ router.get("/get/like-status", applyReadRateLimit, async (req, res) => {
   if (!ad_id) {
     return res.json({
       resStatus: false,
-      resMessage: "Trūksta ad_id"
+      resMessage: "Missing ad id"
     });
   }
 
@@ -1698,7 +1698,7 @@ router.get("/get/reviews/:ad_id", applyReadRateLimit, async (req, res) => {
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Trūksta ad_id"
+      resMessage: "Missing ad number"
     });
   }
 
@@ -1748,7 +1748,7 @@ router.get("/get/profile-reviews-ads", applyReadRateLimit, async (req, res) => {
     return res.status(200).json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Nėra aktyvios sesijos",
+      resMessage: "No active session",
       reviews: []
     });
   }
@@ -1768,7 +1768,7 @@ router.get("/get/profile-reviews-ads", applyReadRateLimit, async (req, res) => {
       return res.status(200).json({
         resStatus: false,
         resErrorCode: 2,
-        resMessage: "Nėra aktyvios sesijos",
+        resMessage: "No active session",
         reviews: []
       });
     }
@@ -1824,7 +1824,7 @@ router.get("/get/profile-replies-ads", applyReadRateLimit, async (req, res) => {
     return res.status(200).json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Nėra aktyvios sesijos",
+      resMessage: "No active session",
       reviews: []
     });
   }
@@ -1844,7 +1844,7 @@ router.get("/get/profile-replies-ads", applyReadRateLimit, async (req, res) => {
       return res.status(200).json({
         resStatus: false,
         resErrorCode: 2,
-        resMessage: "Nėra aktyvios sesijos",
+        resMessage: "No active session",
         reviews: []
       });
     }
@@ -1901,7 +1901,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
   if (!sessionId) {
     return res.status(200).json({
       resStatus: false,
-      resMessage: "Nėra aktyvios sesijos",
+      resMessage: "No active session",
       resErrorCode: 1
     });
   }
@@ -1909,7 +1909,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
   if (!reviewId) {
     return res.status(200).json({
       resStatus: false,
-      resMessage: "Trūksta atsiliepimo id",
+      resMessage: "Missing review number",
       resErrorCode: 2
     });
   }
@@ -1929,7 +1929,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
     if (!sessionRes.rowCount) {
       return res.status(200).json({
         resStatus: false,
-        resMessage: "Nėra aktyvios sesijos",
+        resMessage: "No active session",
         resErrorCode: 3
       });
     }
@@ -1951,7 +1951,7 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
     if (!ownershipRes.rowCount) {
       return res.status(200).json({
         resStatus: false,
-        resMessage: "Atsiliepimas nerastas arba neleidžiama",
+        resMessage: "Review not found",
         resErrorCode: 4
       });
     }
@@ -2022,14 +2022,14 @@ router.delete("/delete/review/:id", blockMaliciousIPs, applyWriteRateLimit, asyn
     return res.status(200).json({
       resStatus: true,
       resOkCode: 1,
-      resMessage: "Atsiliepimas ištrintas"
+      resMessage: "Review deleted"
     });
 
   } catch (error) {
     console.error("Delete review error:", error);
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Duomenų bazės ryšio klaida",
+      resMessage: "Database or server error",
       resErrorCode: 5
     });
   }
@@ -2078,7 +2078,7 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
       return res.json({
         resStatus: false,
         resErrorCode: 3,
-        resMessage: "El. paštas jau naudojamas"
+        resMessage: "E-mail already used"
       });
     }
 
@@ -2101,30 +2101,26 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
     const brevoResult = await sendEmailBrevo({
       site: "salone",
       to: email,
-      subject: "Patvirtinkite savo el. paštą",
+      subject: "Confirm your email address",
       html: `
-        <p>Sveiki${name ? `, ${name}` : ""},</p>
-        <p>Norėdami užbaigti registraciją, patvirtinkite savo el. paštą paspausdami nuorodą žemiau:</p>
-        <p><a href="${verifyLink}">Patvirtinti el. paštą</a></p>
-        <p>Nuoroda galioja 24 valandas.</p>
-        <p>Jei to neprašėte, ignoruokite šį laišką.</p>
+        <p>Hello${name ? `, ${name}` : ""},</p>
+        <p>To complete your registration on SaloneMasters, please confirm your email by clicking the link below:</p>
+        <p><a href="${verifyLink}">Confirm email address</a></p>
+        <p>This link is valid for 24 hours.</p>
+        <p>If you did not request this, please ignore this email.</p>
       `,
       text:
-        `Sveiki${name ? `, ${name}` : ""},
-
-        Norėdami užbaigti registraciją, atidarykite šią nuorodą:
-
+        `Hello${name ? `, ${name}` : ""},
+        To complete your registration on SaloneMasters, open the link below:
         ${verifyLink}
-
-        Nuoroda galioja 24 valandas.
-
-        Jei to neprašėte, ignoruokite šį laišką.`
+        This link is valid for 24 hours.
+        If you did not request this, please ignore this email.`
     });
     req.emailActionCooldown.registerSuccess();
     return res.json({
       resStatus: true,
       resOkCode: 1,
-      resMessage: "Patvirtinimo laiškas išsiųstas"
+      resMessage: "Confirmation email sent"
     });
 
   } catch (err) {
@@ -2152,7 +2148,7 @@ router.post("/post/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, en
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Netinkami prisijungimo duomenys"
+      resMessage: "Invalid login credentials"
     });
   }
 
@@ -2169,7 +2165,7 @@ router.post("/post/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, en
       return res.json({
         resStatus: false,
         resErrorCode: 3,
-        resMessage: "Neteisingas el. paštas arba slaptažodis"
+        resMessage: "Incorrect email or password"
       });
     }
 
@@ -2179,7 +2175,7 @@ router.post("/post/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, en
       return res.json({
         resStatus: false,
         resErrorCode: 4,
-        resMessage: "Šis el. paštas registruotas su Google. Prisijunkite per Google."
+        resMessage: "This email is registered with Google. Please sign in using Google."
       });
     }
 
@@ -2187,7 +2183,7 @@ router.post("/post/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, en
       return res.json({
         resStatus: false,
         resErrorCode: 5,
-        resMessage: "Slaptažodis nenustatytas"
+        resMessage: "Password not set"
       });
     }
 
@@ -2197,7 +2193,7 @@ router.post("/post/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, en
       return res.json({
         resStatus: false,
         resErrorCode: 6,
-        resMessage: "Neteisingas el. paštas arba slaptažodis"
+        resMessage: "Incorrect email or password"
       });
     }
 
@@ -2214,7 +2210,7 @@ router.post("/post/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, en
     return res.json({
       resStatus: true,
       resOkCode: 1,
-      resMessage: "Prisijungimas sėkmingas",
+      resMessage: "Login successful",
       user: {
         google_id: user.google_id,
         email: user.email,
@@ -2243,7 +2239,7 @@ router.get("/get/session-user", blockMaliciousIPs, applyReadRateLimit, async (re
   if (!sessionId) {
     return res.status(200).json({
       resStatus: false,
-      resMessage: "Nėra aktyvios sesijos",
+      resMessage: "No active session",
       resErrorCode: 1,
       loggedIn: false
     });
@@ -2268,7 +2264,7 @@ router.get("/get/session-user", blockMaliciousIPs, applyReadRateLimit, async (re
       // Cookie exists but session not found (expired/invalid)
       return res.status(200).json({
         resStatus: false,
-        resMessage: "Nėra aktyvios sesijos",
+        resMessage: "No active session",
         resErrorCode: 2,
         loggedIn: false
       });
@@ -2278,7 +2274,7 @@ router.get("/get/session-user", blockMaliciousIPs, applyReadRateLimit, async (re
 
     return res.status(200).json({
       resStatus: true,
-      resMessage: "Vartotojo sesija aktyvi",
+      resMessage: "User session active",
       resOkCode: 1,
       loggedIn: true,
       user: {
@@ -2292,7 +2288,7 @@ router.get("/get/session-user", blockMaliciousIPs, applyReadRateLimit, async (re
     console.error("Session check error:", error);
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Duomenų bazės ryšio klaida",
+      resMessage: "Database or server error",
       resErrorCode: 3,
       loggedIn: false
     });
@@ -2317,7 +2313,7 @@ router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, v
     if (userResult.rows.length === 0) {
       return res.status(200).json({
         resStatus: true,
-        resMessage: "Jei el. paštas egzistuoja, laiškas bus išsiųstas",
+        resMessage: "If the email exists, an e-mail will be sent.",
         resOkCode: 1
       });
     }
@@ -2328,7 +2324,7 @@ router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, v
       return res.status(200).json({
         resStatus: false,
         resErrorCode: 6,
-        resMessage: "Šis el. paštas naudojamas su Google prisijungimu. Prisijunkite per Google."
+        resMessage: "This email is used with Google login. Sign in with Google."
       });
     }
 
@@ -2348,30 +2344,30 @@ router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, v
     const brevoResult = await sendEmailBrevo({
       site: "salone",
       to: user.email,
-      subject: "Slaptažodžio atkūrimas",
+      subject: "Password reset",
       html: `
-        <p>Sveiki${user.name ? `, ${user.name}` : ""},</p>
-        <p>Norėdami pakeisti slaptažodį, spauskite žemiau esančią nuorodą:</p>
+        <p>Hello${user.name ? `, ${user.name}` : ""},</p>
+        <p>To reset your password on SaloneMasters, click the link below:</p>
         <p><a href="${resetLink}">${resetLink}</a></p>
-        <p>Nuoroda galioja 1 valandą.</p>
-        <p>Jei to neprašėte, ignoruokite šį laišką.</p>
+        <p>This link is valid for 1 hour.</p>
+        <p>If you did not request this, please ignore this email.</p>
       `,
       text:
-        `Sveiki${user.name ? `, ${user.name}` : ""},
+        `Hello${user.name ? `, ${user.name}` : ""},
 
-        Norėdami pakeisti slaptažodį, atidarykite šią nuorodą:
+        To reset your password on SaloneMasters, open the link below:
         ${resetLink}
 
-        Nuoroda galioja 1 valandą.
+        This link is valid for 1 hour.
 
-        Jei to neprašėte, ignoruokite šį laišką.`
+        If you did not request this, please ignore this email.`
       });
 
       req.emailActionCooldown.registerSuccess();
 
     return res.status(200).json({
       resStatus: true,
-      resMessage: "Jei el. paštas egzistuoja, laiškas bus išsiųstas",
+      resMessage: "If the email exists, an e-mail will be sent.",
       resOkCode: 2
     });
 
@@ -2382,7 +2378,7 @@ router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, v
       resMessage:
         error?.response?.data?.message ||
         error?.message ||
-        "Nepavyko išsiųsti el. laiško",
+        "Failed to send email.",
       resErrorCode: 2
     });
   } finally {
@@ -2397,7 +2393,7 @@ router.post("/post/auth/email-reset", blockMaliciousIPs, applyWriteRateLimit, as
   if (!token) {
     return res.status(400).json({
       resStatus: false,
-      resMessage: "Trūksta atkūrimo rakto",
+      resMessage: "Missing recovery token",
       resErrorCode: 1
     });
   }
@@ -2405,7 +2401,7 @@ router.post("/post/auth/email-reset", blockMaliciousIPs, applyWriteRateLimit, as
   if (!newPassword || newPassword.length < 6 || newPassword.length > 120) {
     return res.status(400).json({
       resStatus: false,
-      resMessage: "Netinkamas slaptažodis",
+      resMessage: "Incorrect password",
       resErrorCode: 2
     });
   }
@@ -2426,7 +2422,7 @@ router.post("/post/auth/email-reset", blockMaliciousIPs, applyWriteRateLimit, as
     if (userResult.rows.length === 0) {
       return res.status(400).json({
         resStatus: false,
-        resMessage: "Netinkama arba negaliojanti atkūrimo nuoroda",
+        resMessage: "invalid recovery link",
         resErrorCode: 3
       });
     }
@@ -2436,7 +2432,7 @@ router.post("/post/auth/email-reset", blockMaliciousIPs, applyWriteRateLimit, as
     if (!user.password_reset_expires || new Date(user.password_reset_expires) < new Date()) {
       return res.status(400).json({
         resStatus: false,
-        resMessage: "Atkūrimo nuoroda nebegalioja",
+        resMessage: "The recovery link is no longer valid.",
         resErrorCode: 4
       });
     }
@@ -2454,7 +2450,7 @@ router.post("/post/auth/email-reset", blockMaliciousIPs, applyWriteRateLimit, as
 
     return res.status(200).json({
       resStatus: true,
-      resMessage: "Slaptažodis sėkmingai atnaujintas",
+      resMessage: "Password reset successfully",
       resOkCode: 1
     });
 
@@ -2463,7 +2459,7 @@ router.post("/post/auth/email-reset", blockMaliciousIPs, applyWriteRateLimit, as
 
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Nepavyko atnaujinti slaptažodžio",
+      resMessage: "Password reset failed",
       resErrorCode: 5
     });
   } finally {
@@ -2479,7 +2475,7 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
     return res.status(400).json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Trūksta patvirtinimo rakto"
+      resMessage: "Missing verification token"
     });
   }
 
@@ -2504,7 +2500,7 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
       return res.json({
         resStatus: false,
         resErrorCode: 2,
-        resMessage: "Paskyra jau egzistuoja"
+        resMessage: "Account already exists"
       });
     }
 
@@ -2570,7 +2566,7 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
     return res.json({
       resStatus: true,
       resOkCode: 1,
-      resMessage: "El. paštas patvirtintas",
+      resMessage: "E-mail verified",
       user: {
         google_id: dbGoogleId,
         email,
@@ -2585,7 +2581,7 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
       return res.status(400).json({
         resStatus: false,
         resErrorCode: 3,
-        resMessage: "Patvirtinimo nuoroda nebegalioja"
+        resMessage: "The verification link is no longer valid."
       });
     }
 
@@ -2593,7 +2589,7 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
       return res.status(400).json({
         resStatus: false,
         resErrorCode: 4,
-        resMessage: "Netinkamas patvirtinimo raktas"
+        resMessage: "Invalid verification token"
       });
     }
 
@@ -2705,7 +2701,7 @@ router.get("/get/user-ads", applyReadRateLimit, async (req, res) => {
   if (!sessionId) {
     return res.status(200).json({
       resStatus: false,
-      resMessage: "Nėra aktyvios sesijos",
+      resMessage: "No active session",
       resErrorCode: 1,
       ads: []
     });
@@ -2722,7 +2718,7 @@ router.get("/get/user-ads", applyReadRateLimit, async (req, res) => {
     if (!sessionRes.rowCount) {
       return res.status(200).json({
         resStatus: false,
-        resMessage: "Nėra aktyvios sesijos",
+        resMessage: "No active session",
         resErrorCode: 2,
         ads: []
       });
@@ -2747,7 +2743,7 @@ router.get("/get/user-ads", applyReadRateLimit, async (req, res) => {
     const adsRes = await pool.query(adsQuery, [googleId]);
     return res.status(200).json({
       resStatus: true,
-      resMessage: "Vartotojo skelbimai užkrauti",
+      resMessage: "User ads loaded",
       resOkCode: 1,
       ads: adsRes.rows
     });
@@ -2755,7 +2751,7 @@ router.get("/get/user-ads", applyReadRateLimit, async (req, res) => {
     console.error("User ads fetch error:", error);
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Duomenų bazės ryšio klaida",
+      resMessage: "Database or server error",
       resErrorCode: 3,
       ads: []
     });
@@ -2777,14 +2773,14 @@ router.get("/get/search", blockMaliciousIPs, applyReadRateLimit, async (req, res
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Paieškos užklausa per trumpa arba per ilga"
+      resMessage: "Search query too short or too long"
     });
   }
   if (!/^[^<>]{3,60}$/.test(q)) {
     return res.json({
       resStatus: false,
       resErrorCode: 3,
-      resMessage: "Netinkama paieškos užklausa"
+      resMessage: "Invalid search query"
     });
   }
 
@@ -2862,14 +2858,14 @@ router.get("/get/search-filter", applyReadRateLimit, blockMaliciousIPs, async (r
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Paieškos užklausa per trumpa arba per ilga"
+      resMessage: "Search query too short or too long"
     });
   }
   if (!/^[^<>]{3,60}$/.test(q)) {
     return res.json({
       resStatus: false,
       resErrorCode: 3,
-      resMessage: "Netinkama paieškos užklausa"
+      resMessage: "Invalid search query"
     });
   }
   const { title, city, minRating, minReviews } = req.query;
@@ -3075,7 +3071,7 @@ router.get("/get/homepage/carousel", async (req, res) => {
     console.error("CAROUSEL FETCH ERROR:", err);
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Nepavyko gauti karuselės skelbimų",
+      resMessage: "Unable to retrieve carousel ads",
       resErrorCode: 2
     });
   }
