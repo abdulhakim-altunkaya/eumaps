@@ -734,7 +734,7 @@ router.post("/post/auth/google", blockMaliciousIPs, applyWriteRateLimit, async (
   if (!idToken) {
     return res.status(400).json({
       resStatus: false,
-      resMessage: "Trūksta Google žetono",
+      resMessage: "Missing Google token",
       resErrorCode: 4
     });
   }
@@ -756,7 +756,7 @@ router.post("/post/auth/google", blockMaliciousIPs, applyWriteRateLimit, async (
       if (existingUser.auth_provider === "email") {
         return res.status(409).json({
           resStatus: false,
-          resMessage: "Šis el. paštas jau registruotas su el. paštu. Prisijunkite per el. paštą ir slaptažodį.",
+          resMessage: "This email is already registered with an email address. Please log in with your email address and password.",
           resErrorCode: 5
         });
       }
@@ -783,7 +783,7 @@ router.post("/post/auth/google", blockMaliciousIPs, applyWriteRateLimit, async (
     });
     return res.status(200).json({
       resStatus: true,
-      resMessage: "Vartotojas autentifikuotas",
+      resMessage: "User authenticated",
       resOkCode: 1,
       user: { google_id: dbGoogleId, email, name, session_id: sessionId }
     });
@@ -793,13 +793,13 @@ router.post("/post/auth/google", blockMaliciousIPs, applyWriteRateLimit, async (
     if (error.message?.includes("Invalid") || error.message?.includes("JWT")) {
       return res.status(401).json({
         resStatus: false,
-        resMessage: "Netinkamas Google žetonas",
+        resMessage: "Invalid Google token",
         resErrorCode: 2
       });
     }
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Duomenų bazės ryšio klaida",
+      resMessage: "Server or Database error",
       resErrorCode: 3
     });
   } finally {
@@ -822,7 +822,7 @@ router.post("/post/logout", blockMaliciousIPs, applyWriteRateLimit, async (req, 
 
   return res.status(200).json({
     resStatus: true,
-    resMessage: "Atsijungta",
+    resMessage: "Logged out",
     resOkCode: 1
   });
 });
@@ -837,7 +837,7 @@ router.post("/post/toggle-activation/:id", blockMaliciousIPs, applyWriteRateLimi
     if (!check.rowCount) {
       return res.status(200).json({
         resStatus: false,
-        resMessage: "Skelbimas nerastas",
+        resMessage: "Ad not found",
         resErrorCode: 1
       });
     }
@@ -851,13 +851,13 @@ router.post("/post/toggle-activation/:id", blockMaliciousIPs, applyWriteRateLimi
     if (!update.rowCount) {
       return res.status(200).json({
         resStatus: false,
-        resMessage: "Nepavyko atnaujinti skelbimo aktyvavimo būsenos",
+        resMessage: "Failed to change activation status",
         resErrorCode: 2
       });
     }
     return res.status(200).json({
       resStatus: true,
-      resMessage: newState ? "Skelbimas aktyvuotas" : "Skelbimas deaktyvuotas",
+      resMessage: newState ? "Ad activated" : "Ad deactivated",
       resOkCode: 1,
       is_active: newState
     });
@@ -871,10 +871,6 @@ router.post("/post/toggle-activation/:id", blockMaliciousIPs, applyWriteRateLimi
   }
 });
 
-
-
-
-
 router.post("/post/delete-ad/:id", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
   const adId = req.params.id;
   // Desktop can use cookies but some mobiles will use headers for login system
@@ -884,7 +880,7 @@ router.post("/post/delete-ad/:id", blockMaliciousIPs, applyWriteRateLimit, async
   if (!sessionId) {
     return res.status(401).json({
       resStatus: false,
-      resMessage: "Nėra aktyvios sesijos",
+      resMessage: "No active session",
       resErrorCode: 1
     });
   }
@@ -903,7 +899,7 @@ router.post("/post/delete-ad/:id", blockMaliciousIPs, applyWriteRateLimit, async
     if (!sessionRes.rowCount) {
       return res.status(401).json({
         resStatus: false,
-        resMessage: "Netinkama sesija",
+        resMessage: "No valid session",
         resErrorCode: 2
       });
     }
@@ -924,7 +920,7 @@ router.post("/post/delete-ad/:id", blockMaliciousIPs, applyWriteRateLimit, async
     if (!adRes.rowCount) {
       return res.status(403).json({
         resStatus: false,
-        resMessage: "Neleidžiama ištrinti šio skelbimo",
+        resMessage: "You are not allowed to delete this ad.",
         resErrorCode: 3
       });
     }
@@ -973,7 +969,7 @@ router.post("/post/delete-ad/:id", blockMaliciousIPs, applyWriteRateLimit, async
 
     return res.json({
       resStatus: true,
-      resMessage: "Skelbimas ir susiję atsiliepimai ištrinti",
+      resMessage: "Ad and related reviews deleted",
       resOkCode: 1
     });
 
@@ -995,7 +991,7 @@ router.post("/post/ad-view", blockMaliciousIPs, applyWriteRateLimit, async (req,
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Trūksta ad_id"
+      resMessage: "Missing ad id"
     });
   }
 
@@ -1019,7 +1015,7 @@ router.post("/post/ad-view", blockMaliciousIPs, applyWriteRateLimit, async (req,
     return res.json({
       resStatus: true,
       resOkCode: 2,
-      resMessage: "Peržiūra ignoruota (laukimo laikas)"
+      resMessage: "View ignored (waiting time)"
     });
   }
 
@@ -1034,7 +1030,7 @@ router.post("/post/ad-view", blockMaliciousIPs, applyWriteRateLimit, async (req,
     return res.json({
       resStatus: true,
       resOkCode: 1,
-      resMessage: "Peržiūra įrašyta"
+      resMessage: "Preview recorded"
     });
 
   } catch (err) {
@@ -1042,7 +1038,7 @@ router.post("/post/ad-view", blockMaliciousIPs, applyWriteRateLimit, async (req,
     return res.json({
       resStatus: false,
       resErrorCode: 3,
-      resMessage: "Duomenų bazės klaida"
+      resMessage: "Database/Server error"
     });
   }
 });
@@ -1072,14 +1068,14 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Netinkami arba trūkstami laukai"
+      resMessage: "No session, no ad or missing fields"
     });
   }
   if (rating < 0 || rating > 10) {
     return res.json({
       resStatus: false,
       resErrorCode: 6,
-      resMessage: "Netinkama įvertinimo vertė"
+      resMessage: "Invalid rating value"
     });
   }
   try {
@@ -1097,7 +1093,7 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
       return res.json({
         resStatus: false,
         resErrorCode: 2,
-        resMessage: "Neautentifikuotas"
+        resMessage: "Not authenticated"
       });
     }
     const reviewer_google_id = sessionResult.rows[0].google_id;
@@ -1112,7 +1108,7 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
       return res.json({
         resStatus: false,
         resErrorCode: 7, // New error code for self-review
-        resMessage: "Negalite vertinti savo skelbimo"
+        resMessage: "You cannot rate your own ad"
       });
     }
 
@@ -1133,7 +1129,7 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
       return res.json({
         resStatus: false,
         resErrorCode: 3,
-        resMessage: "Jau paskelbėte atsiliepimą šiam skelbimui"
+        resMessage: "You already reviewed this ad"
       });
     }
     /* ---------- BLOCK RE-POST AFTER SOFT DELETE ---------- */
@@ -1154,7 +1150,7 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
         resStatus: false,
         resErrorCode: 4,
         resMessage:
-          "Negalite skelbti kito atsiliepimo šiam skelbimui po to, kai savininkas atsakė į jūsų ankstesnį"
+          "You cannot post another review after the owner has responded to your previous one."
       });
     }
     /* ---------- DATE ---------- */
@@ -1204,7 +1200,7 @@ router.post("/post/review", blockMaliciousIPs, applyWriteRateLimit, async (req, 
     return res.json({
       resStatus: true,
       resOkCode: 1,
-      resMessage: "Atsiliepimas išsaugotas",
+      resMessage: "Review saved",
       review_id: insertReviewResult.rows[0].id
     });
   } catch (error) {
@@ -1237,7 +1233,7 @@ router.post("/post/reply", blockMaliciousIPs, applyWriteRateLimit, async (req, r
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Trūksta laukų"
+      resMessage: "No session, no ad or missing fields"
     });
   }
 
@@ -1255,7 +1251,7 @@ router.post("/post/reply", blockMaliciousIPs, applyWriteRateLimit, async (req, r
       return res.json({
         resStatus: false,
         resErrorCode: 2,
-        resMessage: "Netinkama sesija"
+        resMessage: "No valid session"
       });
     }
 
@@ -1274,7 +1270,7 @@ router.post("/post/reply", blockMaliciousIPs, applyWriteRateLimit, async (req, r
       return res.json({
         resStatus: false,
         resErrorCode: 3,
-        resMessage: "Ne skelbimo savininkas"
+        resMessage: "You are not ad owner"
       });
     }
 
@@ -1304,7 +1300,7 @@ router.post("/post/reply", blockMaliciousIPs, applyWriteRateLimit, async (req, r
     return res.json({
       resStatus: true,
       resOkCode: 1,
-      resMessage: "Atsakymas išsaugotas",
+      resMessage: "Reply saved",
       reply_id: r.rows[0].id
     });
 
@@ -1328,7 +1324,7 @@ router.post("/post/delete-reply", blockMaliciousIPs, applyWriteRateLimit, async 
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Trūksta laukų"
+      resMessage: "Missing fields"
     });
   }
 
@@ -1346,7 +1342,7 @@ router.post("/post/delete-reply", blockMaliciousIPs, applyWriteRateLimit, async 
       return res.json({
         resStatus: false,
         resErrorCode: 2,
-        resMessage: "Netinkama sesija"
+        resMessage: "No valid session"
       });
     }
 
@@ -1365,7 +1361,7 @@ router.post("/post/delete-reply", blockMaliciousIPs, applyWriteRateLimit, async 
       return res.json({
         resStatus: false,
         resErrorCode: 3,
-        resMessage: "Ne skelbimo savininkas"
+        resMessage: "You are not ad owner"
       });
     }
 
@@ -1389,7 +1385,7 @@ router.post("/post/delete-reply", blockMaliciousIPs, applyWriteRateLimit, async 
       return res.json({
         resStatus: false,
         resErrorCode: 4,
-        resMessage: "Atsakymas nerastas arba neleidžiama"
+        resMessage: "Reply not found"
       });
     }
 
@@ -1403,7 +1399,7 @@ router.post("/post/delete-reply", blockMaliciousIPs, applyWriteRateLimit, async 
     return res.json({
       resStatus: true,
       resOkCode: 1,
-      resMessage: "Atsakymas ištrintas"
+      resMessage: "Reply deleted"
     });
 
   } catch (err) {
@@ -1431,7 +1427,7 @@ router.post("/post/message", blockMaliciousIPs, applyWriteRateLimit, async (req,
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Netinkami duomenys"
+      resMessage: "Invalid user inputs"
     });
   }
   // basic email sanity check
@@ -1439,7 +1435,7 @@ router.post("/post/message", blockMaliciousIPs, applyWriteRateLimit, async (req,
     return res.json({
       resStatus: false,
       resErrorCode: 2,
-      resMessage: "Netinkamas el. paštas"
+      resMessage: "Invalid email"
     });
   }
   try {
@@ -1485,7 +1481,7 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Trūksta laukų"
+      resMessage: "Missing fields"
     });
   }
 
@@ -1505,7 +1501,7 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
       return res.json({
         resStatus: false,
         resErrorCode: 2,
-        resMessage: "Netinkama sesija"
+        resMessage: "No valid session"
       });
     }
 
@@ -1526,7 +1522,7 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
       return res.json({
         resStatus: false,
         resErrorCode: 3,
-        resMessage: "Skelbimas nerastas"
+        resMessage: "Ad not found"
       });
     }
 
@@ -1568,7 +1564,7 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
           return res.json({
             resStatus: true,
             resOkCode: 3,
-            resMessage: "Patinka pašalintas (eilutė ištrinta)"
+            resMessage: "Unliked"
           });
         }
 
@@ -1580,7 +1576,7 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
         return res.json({
           resStatus: true,
           resOkCode: 4,
-          resMessage: "Patinka pašalintas"
+          resMessage: "Unliked"
         });
       }
 
@@ -1595,7 +1591,7 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
       return res.json({
         resStatus: true,
         resOkCode: 1,
-        resMessage: "Patinka išsaugotas"
+        resMessage: "Liked"
       });
     }
 
@@ -1615,7 +1611,7 @@ router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, re
     return res.json({
       resStatus: true,
       resOkCode: 2,
-      resMessage: "Patinka išsaugotas (nauja eilutė sukurta)"
+      resMessage: "Liked"//new line added
     });
 
   } catch (err) {
@@ -2064,7 +2060,7 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Netinkami duomenys"
+      resMessage: "Invalid user inputs"
     });
   }
 
@@ -2628,7 +2624,7 @@ router.get("/get/ad/:id", applyReadRateLimit, async (req, res) => {
       return res.json({
         resStatus: false,
         resErrorCode: 1,
-        resMessage: "Skelbimas nerastas"
+        resMessage: "Ad not found"
       });
     }
 
