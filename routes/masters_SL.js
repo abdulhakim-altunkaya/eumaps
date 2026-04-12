@@ -2099,7 +2099,7 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
     const verifyLink = `https://salonemasters.com/verify-email.html?token=${encodeURIComponent(verifyToken)}`;
 
     const brevoResult = await sendEmailBrevo({
-      site: "salone",
+      site: "salonemasters",
       to: email,
       subject: "Confirm your email address",
       html: `
@@ -2342,7 +2342,7 @@ router.post("/post/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, v
     const resetLink = `https://salonemasters.com/reset-password.html?token=${resetToken}`;
 
     const brevoResult = await sendEmailBrevo({
-      site: "salone",
+      site: "salonemasters",
       to: user.email,
       subject: "Password reset",
       html: `

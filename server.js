@@ -49,7 +49,11 @@ const allowedOrigins = [
   "https://eniyiusta.com.tr",
   "https://www.eniyiusta.com.tr",
   "http://eniyiusta.com.tr",
-  "http://www.eniyiusta.com.tr"
+  "http://www.eniyiusta.com.tr",
+  "https://salonemasters.com",
+  "https://www.salonemasters.com",
+  "http://salonemasters.com",
+  "http://www.salonemasters.com"
 ];
 app.use(cors({
   origin: function (origin, callback) {
@@ -95,6 +99,8 @@ const mastersLVRoutes = require("./routes/masters_LV");
 app.use("/", mastersLVRoutes);
 const mastersTRRoutes = require("./routes/masters_TR");
 app.use("/api/master-turkey", mastersTRRoutes);
+const mastersSLRoutes = require("./routes/masters_SL");
+app.use("/api/master-sierraleone", mastersSLRoutes);
 
 //This function for now will be used safely convert image file names to alphanumerical values
 //currently used by latvia masters

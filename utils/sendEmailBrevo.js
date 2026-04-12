@@ -16,6 +16,11 @@ const MAIL_SITES = {
     fromEmail: "info@eniyiusta.com.tr",
     fromName: "Eniyiusta",
   },
+  salonemasters: {
+    apiKey: process.env.BREVO_API_KEY_SALONEMASTERS,
+    fromEmail: "info@salonemasters.com",
+    fromName: "Salone Masters",
+  },
 };
 
 async function sendEmailBrevo({ site, to, subject, html, text }) {
