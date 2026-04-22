@@ -21,6 +21,11 @@ const MAIL_SITES = {
     fromEmail: "info@salonemasters.com",
     fromName: "Salone Masters",
   },
+  grilslatvija: {
+    apiKey: process.env.BREVO_API_KEY_GRILSLATVIJA,
+    fromEmail: "info@grilslatvija.com",
+    fromName: "Grils Latvija",
+  },
 };
 
 async function sendEmailBrevo({ site, to, subject, html, text }) {
