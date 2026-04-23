@@ -41,7 +41,7 @@ function makeSafeName() {
 }
 
 
-router.post("/api/post/master-latvia/save-visitor", checkLogCooldown(3 * 60 * 1000), async (req, res) => {
+router.post("/api/post/grills-latvia/save-visitor", checkLogCooldown(3 * 60 * 1000), async (req, res) => {
   // silently skip if throttled
   if (!req.shouldLogVisit) {
     return res.status(200).json({
@@ -57,7 +57,7 @@ router.post("/api/post/master-latvia/save-visitor", checkLogCooldown(3 * 60 * 10
     client = await pool.connect();
     await client.query(
       `
-      INSERT INTO visitors_masters_latvia (
+      INSERT INTO visitors_grills_latvia (
         ip,
         op,
         browser,
@@ -87,7 +87,7 @@ router.post("/api/post/master-latvia/save-visitor", checkLogCooldown(3 * 60 * 10
     if (client) client.release();
   }
 });
-router.post("/api/post/master-latvia/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWriteRateLimit,
+router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWriteRateLimit,
   upload.array("images", 5), async (req, res) => {
   const MIN_IMAGE_SIZE = 2 * 1024;
   const MAX_IMAGE_SIZE = 3 * 1024 * 1024;
@@ -225,7 +225,7 @@ router.post("/api/post/master-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
     }
 
     const userRes = await pool.query(
-      `SELECT google_id FROM masters_latvia_sessions WHERE session_id = $1 LIMIT 1`,
+      `SELECT google_id FROM grills_latvia_sessions WHERE session_id = $1 LIMIT 1`,
       [sessionId]
     );
 
@@ -246,7 +246,7 @@ router.post("/api/post/master-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
       client = await pool.connect();
 
       const userAdNumberCheck = await client.query(
-        "SELECT number_ads FROM masters_latvia_users WHERE google_id = $1",
+        "SELECT number_ads FROM grills_latvia_users WHERE google_id = $1",
         [googleId]
       );
 
@@ -348,7 +348,7 @@ router.post("/api/post/master-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
       client = await pool.connect();
 
       const insertQuery = `
-        INSERT INTO masters_latvia_ads
+        INSERT INTO grills_latvia_ads
         (name, title, description, price, city, telephone, image_url, ip, date,
          main_group, sub_group, google_id, update_date,
          created_at, is_active)
@@ -386,7 +386,7 @@ router.post("/api/post/master-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
         });
       }
       await client.query(
-        "UPDATE masters_latvia_users SET number_ads = COALESCE(number_ads, 0) + 1 WHERE google_id = $1",
+        "UPDATE grills_latvia_users SET number_ads = COALESCE(number_ads, 0) + 1 WHERE google_id = $1",
         [googleId]
       );
       return res.status(201).json({
@@ -414,7 +414,7 @@ router.post("/api/post/master-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
     });
   }
 });
-router.put("/api/put/master-latvia/update-ad/:id", blockMaliciousIPs, enforceAdPostingCooldown, applyWriteRateLimit, 
+router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdPostingCooldown, applyWriteRateLimit, 
   upload.array("images", 5), async (req, res) => {
   const adId = req.params.id;
   const MIN_IMAGE_SIZE = 2 * 1024;           // 2 KB
@@ -443,7 +443,7 @@ router.put("/api/put/master-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
   try {
     const userQ = await pool.query(
       `SELECT google_id 
-       FROM masters_latvia_sessions 
+       FROM grills_latvia_sessions 
        WHERE session_id = $1 
        LIMIT 1`,
       [sessionId]
@@ -461,7 +461,7 @@ router.put("/api/put/master-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
     --------------------------------*/
     const adQ = await pool.query(
       `SELECT image_url, google_id 
-       FROM masters_latvia_ads 
+       FROM grills_latvia_ads 
        WHERE id = $1 
        LIMIT 1`,
       [adId]
@@ -583,7 +583,7 @@ router.put("/api/put/master-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
   try {
     // We look for any OTHER ad (id != adId) in this same category
     const existingAdCheck = await pool.query(
-      `SELECT id FROM masters_latvia_ads 
+      `SELECT id FROM grills_latvia_ads 
         WHERE google_id = $1 AND main_group = $2 AND sub_group = $3 AND id != $4
         LIMIT 1`,
       [googleId, mainVal, subVal, adId]
@@ -659,7 +659,7 @@ router.put("/api/put/master-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
        UPDATE DATABASE
     --------------------------------*/
     const updateQ = `
-      UPDATE masters_latvia_ads 
+      UPDATE grills_latvia_ads 
       SET 
         name        = $1,
         title       = $2,
@@ -723,7 +723,7 @@ async function createSessionForUser(dbGoogleId, isEmail) {
   );
   return sessionId;
 }
-router.post("/api/post/master-latvia/auth/google", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
+router.post("/api/post/grills-latvia/auth/google", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
   const ipVisitor = req.headers["x-forwarded-for"] ? req.headers["x-forwarded-for"].split(",")[0]
     : req.socket.remoteAddress || req.ip;
   const { idToken } = req.body;
@@ -758,7 +758,7 @@ router.post("/api/post/master-latvia/auth/google", blockMaliciousIPs, applyWrite
       }
     }
     const query = `
-      INSERT INTO masters_latvia_users (google_id, email, name, date, ip)
+      INSERT INTO grills_latvia_users (google_id, email, name, date, ip)
       VALUES ($1, $2, $3, $4, $5)
       ON CONFLICT (google_id)
       DO UPDATE SET email = EXCLUDED.email, name = EXCLUDED.name
@@ -802,13 +802,13 @@ router.post("/api/post/master-latvia/auth/google", blockMaliciousIPs, applyWrite
     if (client) client.release();
   }
 });
-router.post("/api/post/master-latvia/logout", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
+router.post("/api/post/grills-latvia/logout", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
   // Desktop can use cookies but some mobiles will use headers for login system
   const auth = req.headers.authorization || "";
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
   const sessionId = req.cookies?.session_id || bearerSid;
 
-  await pool.query(`DELETE FROM masters_latvia_sessions WHERE session_id=$1`, [sessionId]);
+  await pool.query(`DELETE FROM grills_latvia_sessions WHERE session_id=$1`, [sessionId]);
 
   res.clearCookie("session_id", {
     httpOnly: true,
@@ -822,12 +822,12 @@ router.post("/api/post/master-latvia/logout", blockMaliciousIPs, applyWriteRateL
     resOkCode: 1
   });
 });
-router.post("/api/post/master-latvia/toggle-activation/:id", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
+router.post("/api/post/grills-latvia/toggle-activation/:id", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
   const adId = req.params.id;
   try {
     // Check if ad exists
     const check = await pool.query(
-      "SELECT is_active FROM masters_latvia_ads WHERE id = $1 LIMIT 1;",
+      "SELECT is_active FROM grills_latvia_ads WHERE id = $1 LIMIT 1;",
       [adId]
     );
     if (!check.rowCount) {
@@ -841,7 +841,7 @@ router.post("/api/post/master-latvia/toggle-activation/:id", blockMaliciousIPs, 
     const newState = !current; // toggle true → false, false → true
     // Update activation state
     const update = await pool.query(
-      "UPDATE masters_latvia_ads SET is_active = $1, created_at = NOW() WHERE id = $2 RETURNING id;",
+      "UPDATE grills_latvia_ads SET is_active = $1, created_at = NOW() WHERE id = $2 RETURNING id;",
       [newState, adId]
     );
     if (!update.rowCount) {
@@ -866,7 +866,7 @@ router.post("/api/post/master-latvia/toggle-activation/:id", blockMaliciousIPs, 
     });
   }
 });
-router.post("/api/post/master-latvia/delete-ad/:id", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
+router.post("/api/post/grills-latvia/delete-ad/:id", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
   const adId = req.params.id;
   // Desktop can use cookies but some mobiles will use headers for login system
   const auth = req.headers.authorization || "";
@@ -884,7 +884,7 @@ router.post("/api/post/master-latvia/delete-ad/:id", blockMaliciousIPs, applyWri
     const sessionRes = await pool.query(
       `
       SELECT google_id
-      FROM masters_latvia_sessions
+      FROM grills_latvia_sessions
       WHERE session_id = $1
       LIMIT 1;
       `,
@@ -905,7 +905,7 @@ router.post("/api/post/master-latvia/delete-ad/:id", blockMaliciousIPs, applyWri
     const adRes = await pool.query(
       `
       SELECT image_url
-      FROM masters_latvia_ads
+      FROM grills_latvia_ads
       WHERE id = $1 AND google_id = $2
       LIMIT 1;
       `,
@@ -937,13 +937,13 @@ router.post("/api/post/master-latvia/delete-ad/:id", blockMaliciousIPs, applyWri
 
     // Hard delete ALL reviews + replies
     await pool.query(
-      `DELETE FROM masters_latvia_reviews WHERE ad_id = $1;`,
+      `DELETE FROM grills_latvia_reviews WHERE ad_id = $1;`,
       [adId]
     );
 
     // Hard delete ad
     await pool.query(
-      `DELETE FROM masters_latvia_ads WHERE id = $1;`,
+      `DELETE FROM grills_latvia_ads WHERE id = $1;`,
       [adId]
     );
 
@@ -977,7 +977,7 @@ router.post("/api/post/master-latvia/delete-ad/:id", blockMaliciousIPs, applyWri
     });
   }
 });
-router.post("/api/post/master-latvia/ad-view", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
+router.post("/api/post/grills-latvia/ad-view", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
   const { ad_id } = req.body;
 
   if (!ad_id) {
@@ -1016,7 +1016,7 @@ router.post("/api/post/master-latvia/ad-view", blockMaliciousIPs, applyWriteRate
 
   try {
     await pool.query(
-      "UPDATE masters_latvia_ads SET views = views + 1 WHERE id = $1",
+      "UPDATE grills_latvia_ads SET views = views + 1 WHERE id = $1",
       [ad_id]
     );
 
@@ -1035,7 +1035,7 @@ router.post("/api/post/master-latvia/ad-view", blockMaliciousIPs, applyWriteRate
     });
   }
 });
-router.post("/api/post/master-latvia/review", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
+router.post("/api/post/grills-latvia/review", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
   // Desktop can use cookies but some mobiles will use headers for login system
   const auth = req.headers.authorization || "";
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
@@ -1076,7 +1076,7 @@ router.post("/api/post/master-latvia/review", blockMaliciousIPs, applyWriteRateL
     const sessionResult = await pool.query(
       `
       SELECT google_id
-      FROM masters_latvia_sessions
+      FROM grills_latvia_sessions
       WHERE session_id = $1
       LIMIT 1
       `,
@@ -1093,7 +1093,7 @@ router.post("/api/post/master-latvia/review", blockMaliciousIPs, applyWriteRateL
 
     /* ---------- BLOCK SELF-REVIEW ---------- */
     const adOwnerCheck = await pool.query(
-      `SELECT google_id FROM masters_latvia_ads WHERE id = $1 LIMIT 1`,
+      `SELECT google_id FROM grills_latvia_ads WHERE id = $1 LIMIT 1`,
       [adId]
     );
     // If the ad exists and the owner is the same as the reviewer
@@ -1109,7 +1109,7 @@ router.post("/api/post/master-latvia/review", blockMaliciousIPs, applyWriteRateL
     const activeReviewCheck = await pool.query(
       `
       SELECT 1
-      FROM masters_latvia_reviews
+      FROM grills_latvia_reviews
       WHERE ad_id = $1
         AND reviewer_id = $2
         AND parent IS NULL
@@ -1129,7 +1129,7 @@ router.post("/api/post/master-latvia/review", blockMaliciousIPs, applyWriteRateL
     const deletedWithReplyCheck = await pool.query(
       `
       SELECT 1
-      FROM masters_latvia_reviews
+      FROM grills_latvia_reviews
       WHERE ad_id = $1
         AND reviewer_id = $2
         AND parent IS NULL
@@ -1156,7 +1156,7 @@ router.post("/api/post/master-latvia/review", blockMaliciousIPs, applyWriteRateL
     /* ---------- INSERT REVIEW ---------- */
     const insertReviewResult = await pool.query(
       `
-      INSERT INTO masters_latvia_reviews
+      INSERT INTO grills_latvia_reviews
       (reviewer_name, review_text, date, reviewer_id, ad_id, parent, rating)
       VALUES ($1, $2, $3, $4, $5, NULL, $6)
       RETURNING id
@@ -1173,7 +1173,7 @@ router.post("/api/post/master-latvia/review", blockMaliciousIPs, applyWriteRateL
     /* ---------- RECALCULATE AD STATS ---------- */
     await pool.query(
       `
-      UPDATE masters_latvia_ads
+      UPDATE grills_latvia_ads
       SET
         average_rating = COALESCE(sub.avg, 0),
         reviews_count  = COALESCE(sub.cnt, 0)
@@ -1181,7 +1181,7 @@ router.post("/api/post/master-latvia/review", blockMaliciousIPs, applyWriteRateL
         SELECT
           ROUND(AVG(rating), 1) AS avg,
           COUNT(*) AS cnt
-        FROM masters_latvia_reviews
+        FROM grills_latvia_reviews
         WHERE ad_id = $1
           AND is_deleted = false
           AND parent IS NULL
@@ -1205,7 +1205,7 @@ router.post("/api/post/master-latvia/review", blockMaliciousIPs, applyWriteRateL
     });
   }
 });
-router.post("/api/post/master-latvia/reply", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
+router.post("/api/post/grills-latvia/reply", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
   // Desktop can use cookies but some mobiles will use headers for login system
   const auth = req.headers.authorization || "";
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
@@ -1231,7 +1231,7 @@ router.post("/api/post/master-latvia/reply", blockMaliciousIPs, applyWriteRateLi
     // 1️⃣ get google_id from session
     const sessionQ = `
       SELECT google_id
-      FROM masters_latvia_sessions
+      FROM grills_latvia_sessions
       WHERE session_id = $1
       LIMIT 1
     `;
@@ -1267,7 +1267,7 @@ router.post("/api/post/master-latvia/reply", blockMaliciousIPs, applyWriteRateLi
       now.getFullYear();
     // 4️⃣ insert reply
     const insertQ = `
-      INSERT INTO masters_latvia_reviews
+      INSERT INTO grills_latvia_reviews
       (reviewer_name, review_text, date, reviewer_id, ad_id, parent, rating)
       VALUES ('Owner', $1, $2, $3, $4, $5, NULL)
       RETURNING id
@@ -1294,7 +1294,7 @@ router.post("/api/post/master-latvia/reply", blockMaliciousIPs, applyWriteRateLi
     });
   }
 });
-router.post("/api/post/master-latvia/delete-reply", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
+router.post("/api/post/grills-latvia/delete-reply", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
   // Desktop can use cookies but some mobiles will use headers for login system
   const auth = req.headers.authorization || "";
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
@@ -1313,7 +1313,7 @@ router.post("/api/post/master-latvia/delete-reply", blockMaliciousIPs, applyWrit
     // 1️⃣ get google_id from session
     const sessionQ = `
       SELECT google_id
-      FROM masters_latvia_sessions
+      FROM grills_latvia_sessions
       WHERE session_id = $1
       LIMIT 1
     `;
@@ -1331,7 +1331,7 @@ router.post("/api/post/master-latvia/delete-reply", blockMaliciousIPs, applyWrit
     // 2️⃣ verify ad ownership
     const adQ = `
       SELECT google_id
-      FROM masters_latvia_ads
+      FROM grills_latvia_ads
       WHERE id = $1
       LIMIT 1
     `;
@@ -1348,7 +1348,7 @@ router.post("/api/post/master-latvia/delete-reply", blockMaliciousIPs, applyWrit
     // 3️⃣ verify reply belongs to this ad + owner + is a reply
     const replyQ = `
       SELECT id
-      FROM masters_latvia_reviews
+      FROM grills_latvia_reviews
       WHERE id = $1
         AND ad_id = $2
         AND parent IS NOT NULL
@@ -1371,7 +1371,7 @@ router.post("/api/post/master-latvia/delete-reply", blockMaliciousIPs, applyWrit
 
     // 4️⃣ delete reply
     const deleteQ = `
-      DELETE FROM masters_latvia_reviews
+      DELETE FROM grills_latvia_reviews
       WHERE id = $1
     `;
     await pool.query(deleteQ, [replyId]);
@@ -1391,7 +1391,7 @@ router.post("/api/post/master-latvia/delete-reply", blockMaliciousIPs, applyWrit
     });
   }
 });
-router.post("/api/post/master-latvia/message", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
+router.post("/api/post/grills-latvia/message", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
   const clean = (v, max) =>
     String(v || "")
       .trim()
@@ -1423,7 +1423,7 @@ router.post("/api/post/master-latvia/message", blockMaliciousIPs, applyWriteRate
       d.getMonth() + 1
     ).padStart(2, "0")}/${d.getFullYear()}`;
     const insertQ = `
-      INSERT INTO messages_masters_latvia
+      INSERT INTO messages_grills_latvia
         (name, email, message, date)
       VALUES ($1, $2, $3, $4)
     `;
@@ -1446,7 +1446,7 @@ router.post("/api/post/master-latvia/message", blockMaliciousIPs, applyWriteRate
     });
   }
 });
-router.post("/api/post/master-latvia/like", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
+router.post("/api/post/grills-latvia/like", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
   // Desktop can use cookies but some mobiles will use headers for login system
   const auth = req.headers.authorization || "";
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
@@ -1467,7 +1467,7 @@ router.post("/api/post/master-latvia/like", blockMaliciousIPs, applyWriteRateLim
     // ---------------------------------------
     const sessionQ = `
       SELECT google_id
-      FROM masters_latvia_sessions
+      FROM grills_latvia_sessions
       WHERE session_id = $1
       LIMIT 1
     `;
@@ -1486,7 +1486,7 @@ router.post("/api/post/master-latvia/like", blockMaliciousIPs, applyWriteRateLim
     // ---------------------------------------
     const adQ = `
       SELECT google_id
-      FROM masters_latvia_ads
+      FROM grills_latvia_ads
       WHERE id = $1
       LIMIT 1
     `;
@@ -1505,7 +1505,7 @@ router.post("/api/post/master-latvia/like", blockMaliciousIPs, applyWriteRateLim
     // ---------------------------------------
     const selectQ = `
       SELECT id, likers
-      FROM masters_latvia_likes
+      FROM grills_latvia_likes
       WHERE ad_id = $1
       LIMIT 1
     `;
@@ -1526,7 +1526,7 @@ router.post("/api/post/master-latvia/like", blockMaliciousIPs, applyWriteRateLim
 
         if (!likers.length) {
           await pool.query(
-            `DELETE FROM masters_latvia_likes WHERE id = $1`,
+            `DELETE FROM grills_latvia_likes WHERE id = $1`,
             [row.id]
           );
           return res.json({
@@ -1536,7 +1536,7 @@ router.post("/api/post/master-latvia/like", blockMaliciousIPs, applyWriteRateLim
           });
         }
         await pool.query(
-          `UPDATE masters_latvia_likes SET likers = $1 WHERE id = $2`,
+          `UPDATE grills_latvia_likes SET likers = $1 WHERE id = $2`,
           [JSON.stringify(likers), row.id]
         );
         return res.json({
@@ -1548,7 +1548,7 @@ router.post("/api/post/master-latvia/like", blockMaliciousIPs, applyWriteRateLim
       // ADD LIKE
       likers.push(liker_google_id);
       await pool.query(
-        `UPDATE masters_latvia_likes SET likers = $1 WHERE id = $2`,
+        `UPDATE grills_latvia_likes SET likers = $1 WHERE id = $2`,
         [JSON.stringify(likers), row.id]
       );
 
@@ -1562,7 +1562,7 @@ router.post("/api/post/master-latvia/like", blockMaliciousIPs, applyWriteRateLim
     // CASE B: NO ROW → CREATE NEW
     // ---------------------------------------
     const insertQ = `
-      INSERT INTO masters_latvia_likes (ad_id, master_id, likers)
+      INSERT INTO grills_latvia_likes (ad_id, master_id, likers)
       VALUES ($1, $2, $3)
     `;
     await pool.query(insertQ, [
@@ -1586,7 +1586,7 @@ router.post("/api/post/master-latvia/like", blockMaliciousIPs, applyWriteRateLim
     });
   }
 });
-router.get("/api/get/master-latvia/like-status", applyReadRateLimit, async (req, res) => {
+router.get("/api/get/grills-latvia/like-status", applyReadRateLimit, async (req, res) => {
   const auth = req.headers.authorization || "";
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
   const sessionId = req.cookies?.session_id || bearerSid;
@@ -1601,7 +1601,7 @@ router.get("/api/get/master-latvia/like-status", applyReadRateLimit, async (req,
     // Always fetch likes first (PUBLIC)
     const q = `
       SELECT likers
-      FROM masters_latvia_likes
+      FROM grills_latvia_likes
       WHERE ad_id = $1
       LIMIT 1
     `;
@@ -1619,7 +1619,7 @@ router.get("/api/get/master-latvia/like-status", applyReadRateLimit, async (req,
     // Logged user → check session
     const sessionQ = `
       SELECT google_id
-      FROM masters_latvia_sessions
+      FROM grills_latvia_sessions
       WHERE session_id = $1
       LIMIT 1
     `;
@@ -1646,7 +1646,7 @@ router.get("/api/get/master-latvia/like-status", applyReadRateLimit, async (req,
     });
   }
 });
-router.get("/api/get/master-latvia/reviews/:ad_id", applyReadRateLimit, async (req, res) => {
+router.get("/api/get/grills-latvia/reviews/:ad_id", applyReadRateLimit, async (req, res) => {
   const adId = req.params.ad_id;
 
   if (!adId) {
@@ -1667,7 +1667,7 @@ router.get("/api/get/master-latvia/reviews/:ad_id", applyReadRateLimit, async (r
         reviewer_id,
         parent,
         rating
-      FROM masters_latvia_reviews
+      FROM grills_latvia_reviews
       WHERE ad_id = $1
         AND is_deleted = false
       ORDER BY id ASC
@@ -1693,7 +1693,7 @@ router.get("/api/get/master-latvia/reviews/:ad_id", applyReadRateLimit, async (r
 //this gets reviews from reviews table and ad data from ads table (owner name, title, picture)
 //We are using this endpoint in profile page because it allows better performance
 //otherwise we will have to make two requests to the backend-database instead of one here.
-router.get("/api/get/master-latvia/profile-reviews-ads", applyReadRateLimit, async (req, res) => {
+router.get("/api/get/grills-latvia/profile-reviews-ads", applyReadRateLimit, async (req, res) => {
   // Desktop can use cookies but some mobiles will use headers for login system
   const auth = req.headers.authorization || "";
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
@@ -1712,7 +1712,7 @@ router.get("/api/get/master-latvia/profile-reviews-ads", applyReadRateLimit, asy
     /* get google id from session */
     const sessionQuery = `
       SELECT google_id
-      FROM masters_latvia_sessions
+      FROM grills_latvia_sessions
       WHERE session_id = $1
       LIMIT 1;
     `;
@@ -1733,22 +1733,22 @@ router.get("/api/get/master-latvia/profile-reviews-ads", applyReadRateLimit, asy
     /* reviews + ad data (NO aliases) */
     const reviewsQuery = `
       SELECT
-        masters_latvia_reviews.id,
-        masters_latvia_reviews.review_text,
-        masters_latvia_reviews.rating,
-        masters_latvia_reviews.date,
-        masters_latvia_reviews.ad_id,
+        grills_latvia_reviews.id,
+        grills_latvia_reviews.review_text,
+        grills_latvia_reviews.rating,
+        grills_latvia_reviews.date,
+        grills_latvia_reviews.ad_id,
 
-        masters_latvia_ads.name  AS ad_owner_name,
-        masters_latvia_ads.title AS ad_title,
-        masters_latvia_ads.image_url AS ad_image_url
-      FROM masters_latvia_reviews
-      JOIN masters_latvia_ads
-        ON masters_latvia_ads.id = masters_latvia_reviews.ad_id
-      WHERE masters_latvia_reviews.reviewer_id = $1
-        AND masters_latvia_reviews.is_deleted = false
-        AND masters_latvia_reviews.parent IS NULL
-      ORDER BY masters_latvia_reviews.id DESC;
+        grills_latvia_ads.name  AS ad_owner_name,
+        grills_latvia_ads.title AS ad_title,
+        grills_latvia_ads.image_url AS ad_image_url
+      FROM grills_latvia_reviews
+      JOIN grills_latvia_ads
+        ON grills_latvia_ads.id = grills_latvia_reviews.ad_id
+      WHERE grills_latvia_reviews.reviewer_id = $1
+        AND grills_latvia_reviews.is_deleted = false
+        AND grills_latvia_reviews.parent IS NULL
+      ORDER BY grills_latvia_reviews.id DESC;
     `;
 
     const reviewsRes = await pool.query(reviewsQuery, [googleId]);
@@ -1769,7 +1769,7 @@ router.get("/api/get/master-latvia/profile-reviews-ads", applyReadRateLimit, asy
     });
   }
 });
-router.get("/api/get/master-latvia/profile-replies-ads", applyReadRateLimit, async (req, res) => {
+router.get("/api/get/grills-latvia/profile-replies-ads", applyReadRateLimit, async (req, res) => {
   // Desktop can use cookies but some mobiles will use headers for login system
   const auth = req.headers.authorization || "";
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
@@ -1786,7 +1786,7 @@ router.get("/api/get/master-latvia/profile-replies-ads", applyReadRateLimit, asy
     /* get google id from session */
     const sessionQuery = `
       SELECT google_id
-      FROM masters_latvia_sessions
+      FROM grills_latvia_sessions
       WHERE session_id = $1
       LIMIT 1;
     `;
@@ -1807,21 +1807,21 @@ router.get("/api/get/master-latvia/profile-replies-ads", applyReadRateLimit, asy
     // replies written BY the user 
     const repliesQuery = `
       SELECT
-        masters_latvia_reviews.id,
-        masters_latvia_reviews.review_text,
-        masters_latvia_reviews.date,
-        masters_latvia_reviews.ad_id,
+        grills_latvia_reviews.id,
+        grills_latvia_reviews.review_text,
+        grills_latvia_reviews.date,
+        grills_latvia_reviews.ad_id,
 
-        masters_latvia_ads.name  AS ad_owner_name,
-        masters_latvia_ads.title AS ad_title,
-        masters_latvia_ads.image_url AS ad_image_url
-      FROM masters_latvia_reviews
-      JOIN masters_latvia_ads
-        ON masters_latvia_ads.id = masters_latvia_reviews.ad_id
-      WHERE masters_latvia_reviews.reviewer_id = $1
-        AND masters_latvia_reviews.parent IS NOT NULL
-        AND masters_latvia_reviews.is_deleted = false
-      ORDER BY masters_latvia_reviews.id DESC;
+        grills_latvia_ads.name  AS ad_owner_name,
+        grills_latvia_ads.title AS ad_title,
+        grills_latvia_ads.image_url AS ad_image_url
+      FROM grills_latvia_reviews
+      JOIN grills_latvia_ads
+        ON grills_latvia_ads.id = grills_latvia_reviews.ad_id
+      WHERE grills_latvia_reviews.reviewer_id = $1
+        AND grills_latvia_reviews.parent IS NOT NULL
+        AND grills_latvia_reviews.is_deleted = false
+      ORDER BY grills_latvia_reviews.id DESC;
     `;
 
     const repliesRes = await pool.query(repliesQuery, [googleId]);
@@ -1844,7 +1844,7 @@ router.get("/api/get/master-latvia/profile-replies-ads", applyReadRateLimit, asy
 });
 //deletes both reviews of the user and replies of the user.
 //reviews of user with reply of the owner is not deleted. It is made hidden.
-router.delete("/api/delete/master-latvia/review/:id", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
+router.delete("/api/delete/grills-latvia/review/:id", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
  // Desktop can use cookies but some mobiles will use headers for login system
   const auth = req.headers.authorization || "";
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
@@ -1870,7 +1870,7 @@ router.delete("/api/delete/master-latvia/review/:id", blockMaliciousIPs, applyWr
     const sessionRes = await pool.query(
       `
       SELECT google_id
-      FROM masters_latvia_sessions
+      FROM grills_latvia_sessions
       WHERE session_id = $1
       LIMIT 1;
       `,
@@ -1889,7 +1889,7 @@ router.delete("/api/delete/master-latvia/review/:id", blockMaliciousIPs, applyWr
     const ownershipRes = await pool.query(
       `
       SELECT id, parent, ad_id
-      FROM masters_latvia_reviews
+      FROM grills_latvia_reviews
       WHERE id = $1
         AND reviewer_id = $2
       LIMIT 1;
@@ -1909,7 +1909,7 @@ router.delete("/api/delete/master-latvia/review/:id", blockMaliciousIPs, applyWr
     // Reply → hard delete
     if (parent !== null) {
       await pool.query(
-        `DELETE FROM masters_latvia_reviews WHERE id = $1;`,
+        `DELETE FROM grills_latvia_reviews WHERE id = $1;`,
         [reviewId]
       );
     } else {
@@ -1917,7 +1917,7 @@ router.delete("/api/delete/master-latvia/review/:id", blockMaliciousIPs, applyWr
       const replyRes = await pool.query(
         `
         SELECT 1
-        FROM masters_latvia_reviews
+        FROM grills_latvia_reviews
         WHERE parent = $1
         LIMIT 1;
         `,
@@ -1928,7 +1928,7 @@ router.delete("/api/delete/master-latvia/review/:id", blockMaliciousIPs, applyWr
         // Soft delete review + replies
         await pool.query(
           `
-          UPDATE masters_latvia_reviews
+          UPDATE grills_latvia_reviews
           SET is_deleted = true
           WHERE id = $1 OR parent = $1;
           `,
@@ -1937,7 +1937,7 @@ router.delete("/api/delete/master-latvia/review/:id", blockMaliciousIPs, applyWr
       } else {
         // Hard delete review
         await pool.query(
-          `DELETE FROM masters_latvia_reviews WHERE id = $1;`,
+          `DELETE FROM grills_latvia_reviews WHERE id = $1;`,
           [reviewId]
         );
       }
@@ -1945,7 +1945,7 @@ router.delete("/api/delete/master-latvia/review/:id", blockMaliciousIPs, applyWr
     /* ---------- RECALCULATE STATS ---------- */
     await pool.query(
       `
-      UPDATE masters_latvia_ads
+      UPDATE grills_latvia_ads
       SET
         average_rating = COALESCE(sub.avg, 0),
         reviews_count  = COALESCE(sub.cnt, 0)
@@ -1953,7 +1953,7 @@ router.delete("/api/delete/master-latvia/review/:id", blockMaliciousIPs, applyWr
         SELECT
           ROUND(AVG(rating), 1) AS avg,
           COUNT(*) AS cnt
-        FROM masters_latvia_reviews
+        FROM grills_latvia_reviews
         WHERE ad_id = $1
           AND is_deleted = false
           AND parent IS NULL
@@ -1976,7 +1976,7 @@ router.delete("/api/delete/master-latvia/review/:id", blockMaliciousIPs, applyWr
     });
   }
 });
-router.get("/api/get/master-latvia/session-user", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
+router.get("/api/get/grills-latvia/session-user", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
    // Desktop can use cookies but some mobiles will use headers for login system
   const auth = req.headers.authorization || "";
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
@@ -1996,13 +1996,13 @@ router.get("/api/get/master-latvia/session-user", blockMaliciousIPs, applyReadRa
   try {
     const query = `
       SELECT 
-        masters_latvia_users.google_id,
-        masters_latvia_users.email,
-        masters_latvia_users.name
-      FROM masters_latvia_sessions
-      JOIN masters_latvia_users
-        ON masters_latvia_users.google_id = masters_latvia_sessions.google_id
-      WHERE masters_latvia_sessions.session_id = $1
+        grills_latvia_users.google_id,
+        grills_latvia_users.email,
+        grills_latvia_users.name
+      FROM grills_latvia_sessions
+      JOIN grills_latvia_users
+        ON grills_latvia_users.google_id = grills_latvia_sessions.google_id
+      WHERE grills_latvia_sessions.session_id = $1
       LIMIT 1;
     `;
 
@@ -2043,7 +2043,7 @@ router.get("/api/get/master-latvia/session-user", blockMaliciousIPs, applyReadRa
   }
 });
 /*Email register only send email verification link */
-router.post("/api/post/master-latvia/auth/email-register", blockMaliciousIPs, applyWriteRateLimit, validateEmail,
+router.post("/api/post/grills-latvia/auth/email-register", blockMaliciousIPs, applyWriteRateLimit, validateEmail,
    enforceEmailActionCooldown("email_register"), async (req, res) => {
 
   const ipVisitor = req.headers["x-forwarded-for"]
@@ -2069,7 +2069,7 @@ router.post("/api/post/master-latvia/auth/email-register", blockMaliciousIPs, ap
   try {
     const checkQ = `
       SELECT google_id
-      FROM masters_latvia_users
+      FROM grills_latvia_users
       WHERE email = $1
       LIMIT 1
     `;
@@ -2129,7 +2129,7 @@ router.post("/api/post/master-latvia/auth/email-register", blockMaliciousIPs, ap
     });
   }
 });
-router.post("/api/post/master-latvia/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, enforceLoginProtection, validateEmail,
+router.post("/api/post/grills-latvia/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, enforceLoginProtection, validateEmail,
   async (req, res) => {
   const clean = (v, max) =>
     String(v || "")
@@ -2149,7 +2149,7 @@ router.post("/api/post/master-latvia/auth/email-login", blockMaliciousIPs, apply
   try {
     const userQ = `
       SELECT google_id, email, name, password_hash, auth_provider, email_verified
-      FROM masters_latvia_users
+      FROM grills_latvia_users
       WHERE email = $1
       LIMIT 1
     `;
@@ -2212,7 +2212,7 @@ router.post("/api/post/master-latvia/auth/email-login", blockMaliciousIPs, apply
     });
   }
 });
-router.post("/api/post/master-latvia/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, validateEmail, 
+router.post("/api/post/grills-latvia/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, validateEmail, 
   enforceEmailActionCooldown("email_reset"), async (req, res) => {
   const email = String(req.body.email || "").trim().toLowerCase();
   let client;
@@ -2244,7 +2244,7 @@ router.post("/api/post/master-latvia/auth/email-forget", blockMaliciousIPs, appl
     const resetToken = crypto.randomBytes(32).toString("hex");
     const resetExpires = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
     const updateQuery = `
-      UPDATE masters_latvia_users
+      UPDATE grills_latvia_users
       SET password_reset_token = $1,
           password_reset_expires = $2
       WHERE google_id = $3
@@ -2288,7 +2288,7 @@ router.post("/api/post/master-latvia/auth/email-forget", blockMaliciousIPs, appl
     if (client) client.release();
   }
 });
-router.post("/api/post/master-latvia/auth/email-reset", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
+router.post("/api/post/grills-latvia/auth/email-reset", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
 
   const token = String(req.body.token || "").trim();
   const newPassword = String(req.body.newPassword || "");
@@ -2316,7 +2316,7 @@ router.post("/api/post/master-latvia/auth/email-reset", blockMaliciousIPs, apply
 
     const userQuery = `
       SELECT google_id, email, password_reset_token, password_reset_expires
-      FROM masters_latvia_users
+      FROM grills_latvia_users
       WHERE password_reset_token = $1
       LIMIT 1;
     `;
@@ -2343,7 +2343,7 @@ router.post("/api/post/master-latvia/auth/email-reset", blockMaliciousIPs, apply
     const newPasswordHash = await bcrypt.hash(newPassword, 12);
 
     const updateQuery = `
-      UPDATE masters_latvia_users
+      UPDATE grills_latvia_users
       SET password_hash = $1,
           password_reset_token = NULL,
           password_reset_expires = NULL
@@ -2370,7 +2370,7 @@ router.post("/api/post/master-latvia/auth/email-reset", blockMaliciousIPs, apply
   }
 });
 //email-verify creates the user
-router.post("/api/post/master-latvia/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
+router.post("/api/post/grills-latvia/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
 
   const token = String(req.body.token || "").trim();
 
@@ -2424,7 +2424,7 @@ router.post("/api/post/master-latvia/auth/email-verify", blockMaliciousIPs, appl
       googleId = generateEmailGoogleId();
 
       const r = await pool.query(
-        `SELECT google_id FROM masters_latvia_users WHERE google_id = $1 LIMIT 1`,
+        `SELECT google_id FROM grills_latvia_users WHERE google_id = $1 LIMIT 1`,
         [googleId]
       );
 
@@ -2438,7 +2438,7 @@ router.post("/api/post/master-latvia/auth/email-verify", blockMaliciousIPs, appl
     const today = new Date().toISOString().slice(0, 10);
 
     const insertQ = `
-      INSERT INTO masters_latvia_users
+      INSERT INTO grills_latvia_users
       (google_id, email, name, date, ip, auth_provider, password_hash, email_verified)
       VALUES ($1,$2,$3,$4,$5,$6,$7,true)
       RETURNING google_id
@@ -2504,7 +2504,7 @@ router.post("/api/post/master-latvia/auth/email-verify", blockMaliciousIPs, appl
   }
 });
 
-router.get("/api/get/master-latvia/ad/:id", applyReadRateLimit, async (req, res) => {
+router.get("/api/get/grills-latvia/ad/:id", applyReadRateLimit, async (req, res) => {
   const adId = req.params.id;
 
   try {
@@ -2513,7 +2513,7 @@ router.get("/api/get/master-latvia/ad/:id", applyReadRateLimit, async (req, res)
         id, name, title, description, price, city, date, views,
         telephone, image_url, google_id, main_group, sub_group,
         average_rating, reviews_count
-      FROM masters_latvia_ads
+      FROM grills_latvia_ads
       WHERE id = $1
       LIMIT 1
     `;
@@ -2535,7 +2535,7 @@ router.get("/api/get/master-latvia/ad/:id", applyReadRateLimit, async (req, res)
 
     if (sub_group) {
       const newerQ = `
-        SELECT id FROM masters_latvia_ads
+        SELECT id FROM grills_latvia_ads
         WHERE main_group = $2
           AND sub_group = $3
           AND id > $1
@@ -2543,7 +2543,7 @@ router.get("/api/get/master-latvia/ad/:id", applyReadRateLimit, async (req, res)
         LIMIT 1
       `;
       const olderQ = `
-        SELECT id FROM masters_latvia_ads
+        SELECT id FROM grills_latvia_ads
         WHERE main_group = $2
           AND sub_group = $3
           AND id < $1
@@ -2558,14 +2558,14 @@ router.get("/api/get/master-latvia/ad/:id", applyReadRateLimit, async (req, res)
       olderId = olderR.rows[0]?.id || null;
     } else {
       const newerQ = `
-        SELECT id FROM masters_latvia_ads
+        SELECT id FROM grills_latvia_ads
         WHERE main_group = $2
           AND id > $1
         ORDER BY id ASC
         LIMIT 1
       `;
       const olderQ = `
-        SELECT id FROM masters_latvia_ads
+        SELECT id FROM grills_latvia_ads
         WHERE main_group = $2
           AND id < $1
         ORDER BY id DESC
@@ -2596,7 +2596,7 @@ router.get("/api/get/master-latvia/ad/:id", applyReadRateLimit, async (req, res)
     });
   }
 });
-router.get("/api/get/master-latvia/user-ads", applyReadRateLimit, async (req, res) => {
+router.get("/api/get/grills-latvia/user-ads", applyReadRateLimit, async (req, res) => {
   const auth = req.headers.authorization || "";
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
 
@@ -2613,7 +2613,7 @@ router.get("/api/get/master-latvia/user-ads", applyReadRateLimit, async (req, re
     // find google_id from session
     const sessionQuery = `
       SELECT google_id
-      FROM masters_latvia_sessions
+      FROM grills_latvia_sessions
       WHERE session_id = $1
       LIMIT 1;
     `;
@@ -2639,7 +2639,7 @@ router.get("/api/get/master-latvia/user-ads", applyReadRateLimit, async (req, re
         date,
         created_at,      
         is_active       
-      FROM masters_latvia_ads
+      FROM grills_latvia_ads
       WHERE google_id = $1
       ORDER BY date DESC, id DESC;
     `;
@@ -2660,7 +2660,7 @@ router.get("/api/get/master-latvia/user-ads", applyReadRateLimit, async (req, re
     });
   }
 });
-router.get("/api/get/master-latvia/search", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
+router.get("/api/get/grills-latvia/search", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
   const q = (req.query.q || "").trim();
 
   const PAGE_SIZE = 12;
@@ -2707,7 +2707,7 @@ router.get("/api/get/master-latvia/search", blockMaliciousIPs, applyReadRateLimi
     // 1️⃣ capped count
     const countQ = `
       SELECT COUNT(*)
-      FROM masters_latvia_ads
+      FROM grills_latvia_ads
       WHERE is_active = true
         AND (title ILIKE $1 OR description ILIKE $1)
     `;
@@ -2723,7 +2723,7 @@ router.get("/api/get/master-latvia/search", blockMaliciousIPs, applyReadRateLimi
         id, name, title, description, price, city, date, views,
         telephone, image_url, google_id, main_group, sub_group,
         average_rating, reviews_count
-      FROM masters_latvia_ads
+      FROM grills_latvia_ads
       WHERE is_active = true
         AND (title ILIKE $1 OR description ILIKE $1)
       ORDER BY date DESC
@@ -2756,7 +2756,7 @@ router.get("/api/get/master-latvia/search", blockMaliciousIPs, applyReadRateLimi
     });
   }
 });
-router.get("/api/get/master-latvia/search-filter", applyReadRateLimit, blockMaliciousIPs, async (req, res) => {
+router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMaliciousIPs, async (req, res) => {
   const q = (req.query.q || "").trim();
   if (q.length < 3 || q.length > 60) {
     return res.json({
@@ -2847,7 +2847,7 @@ router.get("/api/get/master-latvia/search-filter", applyReadRateLimit, blockMali
 
     const countQ = `
       SELECT COUNT(*)
-      FROM masters_latvia_ads
+      FROM grills_latvia_ads
       ${whereClause}
     `;
     const countR = await pool.query(countQ, values);
@@ -2861,7 +2861,7 @@ router.get("/api/get/master-latvia/search-filter", applyReadRateLimit, blockMali
         id, name, title, description, price, city, date, views,
         telephone, image_url, google_id, main_group, sub_group,
         average_rating, reviews_count
-      FROM masters_latvia_ads
+      FROM grills_latvia_ads
       ${whereClause}
       ORDER BY date DESC
       LIMIT $${i} OFFSET $${i + 1}
@@ -2888,7 +2888,7 @@ router.get("/api/get/master-latvia/search-filter", applyReadRateLimit, blockMali
     });
   }
 });
-router.get("/api/get/master-latvia/browse", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
+router.get("/api/get/grills-latvia/browse", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
   const { main, sub, cursor } = req.query;
   const limit = 12;
 
@@ -2898,7 +2898,7 @@ router.get("/api/get/master-latvia/browse", blockMaliciousIPs, applyReadRateLimi
         id, name, title, description, price, city, date, views,
         telephone, image_url, google_id, main_group, sub_group,
         average_rating, reviews_count
-      FROM masters_latvia_ads
+      FROM grills_latvia_ads
       WHERE is_active = true
     `;
     const params = [];
@@ -2946,7 +2946,7 @@ router.get("/api/get/master-latvia/browse", blockMaliciousIPs, applyReadRateLimi
     });
   }
 });
-router.get("/api/get/master-latvia/homepage/carousel", async (req, res) => {
+router.get("/api/get/grills-latvia/homepage/carousel", async (req, res) => {
   try {
     const q = `
       SELECT
@@ -2959,7 +2959,7 @@ router.get("/api/get/master-latvia/homepage/carousel", async (req, res) => {
         average_rating,
         reviews_count,
         image_url ->> 0 AS image
-      FROM masters_latvia_carousel
+      FROM grills_latvia_carousel
       ORDER BY id DESC
     `;
 
@@ -2980,7 +2980,7 @@ router.get("/api/get/master-latvia/homepage/carousel", async (req, res) => {
     });
   }
 });
-router.get("/api/get/master-latvia/browse-filter", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
+router.get("/api/get/grills-latvia/browse-filter", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
   const {
     main,
     sub,
@@ -3057,7 +3057,7 @@ router.get("/api/get/master-latvia/browse-filter", blockMaliciousIPs, applyReadR
         id, name, title, description, price, city, date, views,
         telephone, image_url, google_id, main_group, sub_group,
         average_rating, reviews_count
-      FROM masters_latvia_ads
+      FROM grills_latvia_ads
       WHERE ${conditions.join(" AND ")}
       ORDER BY created_at DESC
       LIMIT $${i}
