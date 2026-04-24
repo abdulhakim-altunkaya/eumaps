@@ -57,7 +57,7 @@ router.post("/api/post/grills-latvia/save-visitor", checkLogCooldown(3 * 60 * 10
     client = await pool.connect();
     await client.query(
       `
-      INSERT INTO visitors_grills_latvia (
+      INSERT INTO visitors_grills_lv (
         ip,
         op,
         browser,
@@ -259,7 +259,7 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
       }
 
       const existingAdCheck = await client.query(
-        `SELECT id FROM masters_latvia_ads 
+        `SELECT id FROM grills_latvia_ads 
         WHERE google_id = $1 AND main_group = $2 AND sub_group = $3 
         LIMIT 1`,
         [googleId, mainVal, subVal]
@@ -714,11 +714,11 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
     });
   }
 });
-//this function below is for google auth login of latvia masters
+//this function below is for google auth login
 async function createSessionForUser(dbGoogleId, isEmail) {
   const sessionId = crypto.randomUUID(); // generate inline
   await pool.query(
-    `INSERT INTO masters_latvia_sessions (session_id, google_id, is_email) VALUES ($1, $2, $3)`,
+    `INSERT INTO grills_latvia_sessions (session_id, google_id, is_email) VALUES ($1, $2, $3)`,
     [sessionId, dbGoogleId, isEmail]
   );
   return sessionId;
@@ -742,7 +742,7 @@ router.post("/api/post/grills-latvia/auth/google", blockMaliciousIPs, applyWrite
     client = await pool.connect();
     const existingByEmailQ = `
       SELECT google_id, auth_provider, email
-      FROM masters_latvia_users
+      FROM grills_latvia_users
       WHERE LOWER(email) = LOWER($1)
       LIMIT 1
     `;
@@ -1247,7 +1247,7 @@ router.post("/api/post/grills-latvia/reply", blockMaliciousIPs, applyWriteRateLi
     // 2️⃣ verify owner owns this ad
     const adQ = `
       SELECT google_id
-      FROM masters_latvia_ads
+      FROM grills_latvia_ads
       WHERE id = $1
       LIMIT 1
     `;
@@ -1482,7 +1482,7 @@ router.post("/api/post/grills-latvia/like", blockMaliciousIPs, applyWriteRateLim
     }
     const liker_google_id = sessionR.rows[0].google_id;
     // ---------------------------------------
-    // 2) GET AD OWNER GOOGLE ID (MASTER)
+    // 2) GET AD OWNER GOOGLE ID
     // ---------------------------------------
     const adQ = `
       SELECT google_id
@@ -1499,7 +1499,7 @@ router.post("/api/post/grills-latvia/like", blockMaliciousIPs, applyWriteRateLim
         resMessage: "Sludinājums nav atrasts"
       });
     }
-    const master_google_id = adR.rows[0].google_id;
+    const user_google_id = adR.rows[0].google_id;
     // ---------------------------------------
     // 3) CHECK EXISTING LIKE ROW
     // ---------------------------------------
@@ -1567,7 +1567,7 @@ router.post("/api/post/grills-latvia/like", blockMaliciousIPs, applyWriteRateLim
     `;
     await pool.query(insertQ, [
       ad_id,
-      master_google_id,
+      user_google_id,
       JSON.stringify([liker_google_id])
     ]);
 
@@ -2220,7 +2220,7 @@ router.post("/api/post/grills-latvia/auth/email-forget", blockMaliciousIPs, appl
     client = await pool.connect();
     const userQuery = `
       SELECT google_id, email, name, auth_provider
-      FROM masters_latvia_users
+      FROM grills_latvia_users
       WHERE LOWER(email) = $1
       LIMIT 1;
     `;
@@ -2392,7 +2392,7 @@ router.post("/api/post/grills-latvia/auth/email-verify", blockMaliciousIPs, appl
 
     const checkQ = `
       SELECT google_id
-      FROM masters_latvia_users
+      FROM grills_latvia_users
       WHERE email = $1
       LIMIT 1
     `;
