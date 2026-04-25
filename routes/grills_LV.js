@@ -101,10 +101,8 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
   const ipVisitor = req.headers["x-forwarded-for"]
     ? req.headers["x-forwarded-for"].split(",")[0]
     : req.socket.remoteAddress || req.ip;
-
   let client;
   let formData;
-
   /* -------------------------------------------
      PARSE JSON FORM DATA
   ------------------------------------------- */
@@ -117,17 +115,11 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
       resErrorCode: 1
     });
   }
-
   const {
-    inputService,
     inputName,
     inputPrice,
     inputDescription,
-    countryCode,
-    phoneNumber,
-    inputRegions,
-    main_group,
-    sub_group
+    inputRegions
   } = formData;
 
   function sanitizeInput(str) {
@@ -2090,13 +2082,13 @@ router.post("/api/post/grills-latvia/auth/email-register", blockMaliciousIPs, ap
         ipVisitor,
         auth_provider: "email"
       },
-      process.env.LATVIJASMEISTARI_EMAIL_VERIFY_JWT_SECRET,
+      process.env.GRILSLATVIJA_EMAIL_VERIFY_JWT_SECRET,
       { expiresIn: "24h" }
     );
 
-    const verifyLink = `https://meistarilatvija.lv/verify-email.html?token=${encodeURIComponent(verifyToken)}`;
+    const verifyLink = `https://grilslatvija.lv/verify-email.html?token=${encodeURIComponent(verifyToken)}`;
     const brevoResult = await sendEmailBrevo({
-      site: "latvijasmeistari",
+      site: "grilslatvija",
       to: email,
       subject: "Apstipriniet savu e-pastu",
       html: `
@@ -2250,9 +2242,9 @@ router.post("/api/post/grills-latvia/auth/email-forget", blockMaliciousIPs, appl
       WHERE google_id = $3
     `;
     await client.query(updateQuery, [resetToken, resetExpires, user.google_id]);
-    const resetLink = `https://meistarilatvija.lv/reset-password.html?token=${resetToken}`;
+    const resetLink = `https://grilslatvija.lv/reset-password.html?token=${resetToken}`;
     const brevoResult = await sendEmailBrevo({
-      site: "latvijasmeistari",
+      site: "grilslatvija",
       to: user.email,
       subject: "Paroles atjaunošana",
       html: `
@@ -2385,7 +2377,7 @@ router.post("/api/post/grills-latvia/auth/email-verify", blockMaliciousIPs, appl
   try {
     const decoded = jwt.verify(
       token,
-      process.env.LATVIJASMEISTARI_EMAIL_VERIFY_JWT_SECRET
+      process.env.GRILSLATVIJA_EMAIL_VERIFY_JWT_SECRET
     );
 
     const { name, email, passwordHash, ipVisitor, auth_provider } = decoded;
