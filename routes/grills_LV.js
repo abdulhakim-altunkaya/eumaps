@@ -120,8 +120,8 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
     inputPrice,
     inputDescription,
     inputRegions,
-    inputLatitude,
-    inputLongitude
+    latitude,
+    longitude
   } = formData;
 
   function sanitizeInput(str) {
@@ -135,7 +135,7 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
   const cleanInputPrice = sanitizeInput(inputPrice);
   const cleanInputName = sanitizeInput(inputName);
 
-  if (!inputName || !inputPrice || !inputDescription || !phoneNumber) {
+  if (!inputName || !inputPrice || !inputDescription) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Nav aizpildīti obligātie lauki",
@@ -144,8 +144,8 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
   }
 
   // ✅ LAT/LNG VALIDATION
-  const lat = Number(inputLatitude);
-  const lng = Number(inputLongitude);
+  const lat = Number(latitude);
+  const lng = Number(longitude);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
     return res.status(400).json({
       resStatus: false,
@@ -173,7 +173,7 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
   const latRounded = Number(lat.toFixed(6));
   const lngRounded = Number(lng.toFixed(6));
   // ✅ JSONB ARRAY
-  const location = [latRounded, lngRounded];
+  const locationArray = [latRounded, lngRounded];
 
 
   if (!Array.isArray(inputRegions) || inputRegions.length === 0) {
@@ -231,8 +231,7 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
     }
     const googleId = userRes.rows[0].google_id;
     /* -------------------------------------------
-        1 ad per subsection
-        5 ads total 
+        max 50 ads per user
     ------------------------------------------- */
     try {
       client = await pool.connect();
@@ -340,7 +339,7 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
         cleanInputDescription,                   // $2
         cleanInputPrice,                         // $3
         JSON.stringify(inputRegions),            // $4 (city)
-        location,                                // $5 ✅ location (jsonb)
+        locationArray,                                // $5 ✅ location (jsonb)
         JSON.stringify(uploadedImages),          // $6
         ipVisitor,                                // $7
         googleId,                                 // $8
@@ -472,7 +471,9 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       inputPrice,
       inputDescription,
       inputRegions,
-      existingImages
+      existingImages,
+      latitude,
+      longitude
     } = formData;
 
     function sanitizeInput(str) {
@@ -487,13 +488,46 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
     const cleanInputPrice = sanitizeInput(inputPrice);
     const cleanInputName = sanitizeInput(inputName);
 
-  if ( !inputName || !inputPrice || !inputDescription || !phoneNumber) {
+  if ( !inputName || !inputPrice || !inputDescription ) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Lūdzu, aizpildiet obligātos laukus",
       resErrorCode: 6
     });
   }
+  // ✅ LAT/LNG VALIDATION
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Nederīgas koordinātas",
+      resErrorCode: 10
+    });
+  }
+  // latitude: -90 to 90
+  if (lat < -90 || lat > 90) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Latitude ārpus diapazona",
+      resErrorCode: 11
+    });
+  }
+  // longitude: -180 to 180
+  if (lng < -180 || lng > 180) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Longitude ārpus diapazona",
+      resErrorCode: 12
+    });
+  }
+  // optional: round (clean DB) 6 decimals is 0.11 cm precision
+  const latRounded = Number(lat.toFixed(6));
+  const lngRounded = Number(lng.toFixed(6));
+  const locationArray = [latRounded, lngRounded];//JSONB ARRAY
+
+
+  //OTHER VALIDATIONS
   if (!Array.isArray(inputRegions) || inputRegions.length === 0) {
     return res.status(400).json({
       resStatus: false,
@@ -501,14 +535,14 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       resErrorCode: 11
     });
   }
-  if (inputName.length < 5 || inputName.length > 25) {
+  if (inputName.length < 5 || inputName.length > 40) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Vārds ir pārāk garš vai pārāk īss",
       resErrorCode: 12
     });
   }
-  if (inputPrice.length < 1 || inputPrice.length > 25) {
+  if (inputPrice.length < 1 || inputPrice.length > 40) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Cena ir pārāk gara vai pārāk īsa",
@@ -522,31 +556,7 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       resErrorCode: 16
     });
   }
-  /* -------------------------------
-      CHECK SUBSECTION LIMIT (1 AD PER SUB)
-  --------------------------------*/
-  try {
-    // We look for any OTHER ad (id != adId) in this same category
-    const existingAdCheck = await pool.query(
-      `SELECT id FROM grills_latvia_ads 
-        WHERE google_id = $1 AND main_group = $2 AND sub_group = $3 AND id != $4
-        LIMIT 1`,
-      [googleId, mainVal, subVal, adId]
-    );
-    if (existingAdCheck.rowCount > 0) {
-      return res.status(403).json({
-        resStatus: false,
-        resMessage: "Šajā apakškategorijā jums jau ir aktīvs sludinājums",
-        resErrorCode: 17
-      });
-    }
-  } catch (dbErr) {
-    return res.status(500).json({
-      resStatus: false,
-      resMessage: "Sistēmas kļūda, pārbaudot kategoriju ierobežojumus",
-      resErrorCode: 18
-    });
-  }
+
     /* -------------------------------
        HANDLE NEW IMAGE UPLOADS
     --------------------------------*/
@@ -607,32 +617,26 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       UPDATE grills_latvia_ads 
       SET 
         name        = $1,
-        title       = $2,
-        description = $3,
-        price       = $4,
-        city        = $5,
-        telephone   = $6,
-        image_url   = $7,
-        main_group  = $8,
-        sub_group   = $9,
-        update_date = $10
-      WHERE id = $11 AND google_id = $12
+        description = $2,
+        price       = $3,
+        city        = $4,
+        location    = $5,
+        image_url   = $6,
+        update_date = $7
+      WHERE id = $8 AND google_id = $9
       RETURNING id
     `;
 
     const values = [
-      cleanInputName,
-      inputService,
-      cleanInputDescription,
-      cleanInputPrice,
-      JSON.stringify(inputRegions),
-      Number(countryCode + phoneNumber),
-      JSON.stringify(finalImages),
-      main_group,
-      sub_group,
-      new Date().toISOString().slice(0, 10),
-      adId,
-      googleId
+      cleanInputName,                          // $1
+      cleanInputDescription,                   // $2
+      cleanInputPrice,                         // $3
+      JSON.stringify(inputRegions),            // $4
+      locationArray,                           // $5 (jsonb)
+      finalImages,                             // $6 (jsonb, no stringify)
+      new Date(),                               // $7
+      adId,                                    // $8
+      googleId                                 // $9
     ];
 
     const result = await pool.query(updateQ, values);
@@ -1635,7 +1639,7 @@ router.get("/api/get/grills-latvia/reviews/:ad_id", applyReadRateLimit, async (r
     });
   }
 });
-//this gets reviews from reviews table and ad data from ads table (owner name, title, picture)
+//this gets reviews from reviews table and ad data from ads table (owner name, picture)
 //We are using this endpoint in profile page because it allows better performance
 //otherwise we will have to make two requests to the backend-database instead of one here.
 router.get("/api/get/grills-latvia/profile-reviews-ads", applyReadRateLimit, async (req, res) => {
@@ -1685,7 +1689,6 @@ router.get("/api/get/grills-latvia/profile-reviews-ads", applyReadRateLimit, asy
         grills_latvia_reviews.ad_id,
 
         grills_latvia_ads.name  AS ad_owner_name,
-        grills_latvia_ads.title AS ad_title,
         grills_latvia_ads.image_url AS ad_image_url
       FROM grills_latvia_reviews
       JOIN grills_latvia_ads
@@ -1758,7 +1761,6 @@ router.get("/api/get/grills-latvia/profile-replies-ads", applyReadRateLimit, asy
         grills_latvia_reviews.ad_id,
 
         grills_latvia_ads.name  AS ad_owner_name,
-        grills_latvia_ads.title AS ad_title,
         grills_latvia_ads.image_url AS ad_image_url
       FROM grills_latvia_reviews
       JOIN grills_latvia_ads
@@ -2004,7 +2006,7 @@ router.post("/api/post/grills-latvia/auth/email-register", blockMaliciousIPs, ap
   const name = clean(req.body.name, 80);
   const email = clean(req.body.email, 120).toLowerCase();
   const password = String(req.body.password || "");
-  if (name.length < 2 || email.length < 5 || password.length < 6) {
+  if (name.length < 2 || email.length < 5 || password.length < 6 || password.length > 40 || email.length > 40) {
     return res.json({
       resStatus: false,
       resErrorCode: 1,
@@ -2455,8 +2457,8 @@ router.get("/api/get/grills-latvia/ad/:id", applyReadRateLimit, async (req, res)
   try {
     const q = `
       SELECT 
-        id, name, title, description, price, city, date, views,
-        telephone, image_url, google_id, main_group, sub_group,
+        id, name, description, price, city, date, views,
+        image_url, google_id,
         average_rating, reviews_count
       FROM grills_latvia_ads
       WHERE id = $1
@@ -2473,55 +2475,51 @@ router.get("/api/get/grills-latvia/ad/:id", applyReadRateLimit, async (req, res)
     }
 
     const ad = r.rows[0];
-    const { main_group, sub_group } = ad;
-
+    // extract single region (since it's only 1 element in the city array.)
+    const region = ad.city?.[0];
     let newerId = null;
     let olderId = null;
-
-    if (sub_group) {
+    // --- REGION BASED ---
+    if (region !== undefined) {
       const newerQ = `
         SELECT id FROM grills_latvia_ads
-        WHERE main_group = $2
-          AND sub_group = $3
-          AND id > $1
+        WHERE id > $1
+          AND city @> $2
         ORDER BY id ASC
         LIMIT 1
       `;
       const olderQ = `
         SELECT id FROM grills_latvia_ads
-        WHERE main_group = $2
-          AND sub_group = $3
-          AND id < $1
+        WHERE id < $1
+          AND city @> $2
         ORDER BY id DESC
         LIMIT 1
       `;
-
-      const newerR = await pool.query(newerQ, [adId, main_group, sub_group]);
-      const olderR = await pool.query(olderQ, [adId, main_group, sub_group]);
-
+      const newerR = await pool.query(newerQ, [adId, [region]]);
+      const olderR = await pool.query(olderQ, [adId, [region]]);
       newerId = newerR.rows[0]?.id || null;
       olderId = olderR.rows[0]?.id || null;
-    } else {
-      const newerQ = `
-        SELECT id FROM grills_latvia_ads
-        WHERE main_group = $2
-          AND id > $1
+    }
+    // --- FALLBACK (global) ---
+    if (!newerId) {
+      const r = await pool.query(
+        `SELECT id FROM grills_latvia_ads
+        WHERE id > $1
         ORDER BY id ASC
-        LIMIT 1
-      `;
-      const olderQ = `
-        SELECT id FROM grills_latvia_ads
-        WHERE main_group = $2
-          AND id < $1
+        LIMIT 1`,
+        [adId]
+      );
+      newerId = r.rows[0]?.id || null;
+    }
+    if (!olderId) {
+      const r = await pool.query(
+        `SELECT id FROM grills_latvia_ads
+        WHERE id < $1
         ORDER BY id DESC
-        LIMIT 1
-      `;
-
-      const newerR = await pool.query(newerQ, [adId, main_group]);
-      const olderR = await pool.query(olderQ, [adId, main_group]);
-
-      newerId = newerR.rows[0]?.id || null;
-      olderId = olderR.rows[0]?.id || null;
+        LIMIT 1`,
+        [adId]
+      );
+      olderId = r.rows[0]?.id || null;
     }
 
     return res.json({
@@ -2576,7 +2574,6 @@ router.get("/api/get/grills-latvia/user-ads", applyReadRateLimit, async (req, re
     const adsQuery = `
       SELECT 
         id, 
-        title, 
         description, 
         price, 
         city, 
@@ -2654,7 +2651,7 @@ router.get("/api/get/grills-latvia/search", blockMaliciousIPs, applyReadRateLimi
       SELECT COUNT(*)
       FROM grills_latvia_ads
       WHERE is_active = true
-        AND (title ILIKE $1 OR description ILIKE $1)
+        AND (description ILIKE $1)
     `;
     const countR = await pool.query(countQ, [`%${q}%`]);
 
@@ -2665,12 +2662,12 @@ router.get("/api/get/grills-latvia/search", blockMaliciousIPs, applyReadRateLimi
     // 2️⃣ paged data
     const dataQ = `
       SELECT 
-        id, name, title, description, price, city, date, views,
-        telephone, image_url, google_id, main_group, sub_group,
+        id, name, description, price, city, date, views,
+        image_url, google_id,
         average_rating, reviews_count
       FROM grills_latvia_ads
       WHERE is_active = true
-        AND (title ILIKE $1 OR description ILIKE $1)
+        AND (description ILIKE $1)
       ORDER BY date DESC
       LIMIT $2 OFFSET $3
     `;
@@ -2717,7 +2714,7 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
       resMessage: "Invalid search query"
     });
   }
-  const { title, city, minRating, minReviews } = req.query;
+  const { city, minRating, minReviews } = req.query;
   const PAGE_SIZE = 12;
   const HARD_CAP = 1000;
 
@@ -2747,16 +2744,9 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
 
     // base search
     conditions.push(`is_active = true`);
-    conditions.push(`(title ILIKE $${i} OR description ILIKE $${i})`);
+    conditions.push(`(description ILIKE $${i})`);
     values.push(`%${q}%`);
     i++;
-
-    // profession filter
-    if (title) {
-      conditions.push(`title = $${i}`);
-      values.push(title);
-      i++;
-    }
 
     // city filter
     if (city) {
@@ -2803,8 +2793,8 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
 
     const dataQ = `
       SELECT 
-        id, name, title, description, price, city, date, views,
-        telephone, image_url, google_id, main_group, sub_group,
+        id, name, description, price, city, date, views,
+        image_url, google_id,
         average_rating, reviews_count
       FROM grills_latvia_ads
       ${whereClause}
@@ -2833,70 +2823,12 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
     });
   }
 });
-router.get("/api/get/grills-latvia/browse", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
-  const { main, sub, cursor } = req.query;
-  const limit = 12;
 
-  try {
-    let query = `
-      SELECT 
-        id, name, title, description, price, city, date, views,
-        telephone, image_url, google_id, main_group, sub_group,
-        average_rating, reviews_count
-      FROM grills_latvia_ads
-      WHERE is_active = true
-    `;
-    const params = [];
-
-    if (main) {
-      params.push(main);
-      query += ` AND main_group = $${params.length}`;
-    }
-
-    if (sub) {
-      params.push(sub);
-      query += ` AND sub_group = $${params.length}`;
-    }
-
-    if (cursor) {
-      params.push(cursor);
-      query += ` AND created_at < $${params.length}`;
-    }
-
-    query += ` ORDER BY created_at DESC`;
-    params.push(limit);
-    query += ` LIMIT $${params.length}`;
-
-    const adsRes = await pool.query(query, params);
-
-    if (!adsRes.rowCount) {
-      return res.status(200).json({
-        resStatus: true,
-        ads: [],
-        nextCursor: null
-      });
-    }
-
-    return res.status(200).json({
-      resStatus: true,
-      ads: adsRes.rows,
-      nextCursor: adsRes.rows[adsRes.rows.length - 1].created_at
-    });
-
-  } catch (err) {
-    console.error("Browse error:", err);
-    return res.status(500).json({
-      resStatus: false,
-      resMessage: "Server error"
-    });
-  }
-});
 router.get("/api/get/grills-latvia/homepage/carousel", async (req, res) => {
   try {
     const q = `
       SELECT
         id,
-        title,
         name,
         price,
         city,
@@ -2922,109 +2854,6 @@ router.get("/api/get/grills-latvia/homepage/carousel", async (req, res) => {
       resStatus: false,
       resMessage: "Failed to fetch carousel ads",
       resErrorCode: 2
-    });
-  }
-});
-router.get("/api/get/grills-latvia/browse-filter", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
-  const {
-    main,
-    sub,
-    title,
-    city,
-    minRating,
-    minReviews,
-    cursor
-  } = req.query;
-
-  const limit = 12;
-
-  try {
-    const conditions = [`is_active = true`];
-    const values = [];
-    let i = 1;
-
-    // BROWSE SCOPE
-    if (main) {
-      conditions.push(`main_group = $${i}`);
-      values.push(main);
-      i++;
-    }
-
-    if (sub) {
-      conditions.push(`sub_group = $${i}`);
-      values.push(sub);
-      i++;
-    }
-
-    // FILTERS
-    if (title) {
-      conditions.push(`title ILIKE $${i}`);
-      values.push(`%${title.trim()}%`);
-      i++;
-    }
-
-    if (city) {
-      const cityId = Number(city);
-      if (!Number.isNaN(cityId)) {
-        conditions.push(`city::jsonb @> $${i}::jsonb`);
-        values.push(JSON.stringify([cityId]));
-        i++;
-      }
-    }
-
-    if (minRating) {
-      const r = Number(minRating);
-      if (!Number.isNaN(r)) {
-        conditions.push(`average_rating >= $${i}`);
-        values.push(r);
-        i++;
-      }
-    }
-
-    if (minReviews) {
-      const rc = Number(minReviews);
-      if (!Number.isNaN(rc)) {
-        conditions.push(`reviews_count >= $${i}`);
-        values.push(rc);
-        i++;
-      }
-    }
-
-    // CURSOR (show more)
-    if (cursor) {
-      conditions.push(`created_at < $${i}`);
-      values.push(cursor);
-      i++;
-    }
-
-    const query = `
-      SELECT 
-        id, name, title, description, price, city, date, views,
-        telephone, image_url, google_id, main_group, sub_group,
-        average_rating, reviews_count
-      FROM grills_latvia_ads
-      WHERE ${conditions.join(" AND ")}
-      ORDER BY created_at DESC
-      LIMIT $${i}
-    `;
-
-    values.push(limit);
-
-    const { rows } = await pool.query(query, values);
-
-    return res.json({
-      resStatus: true,
-      ads: rows,
-      nextCursor: rows.length
-        ? rows[rows.length - 1].created_at
-        : null
-    });
-
-  } catch (err) {
-    console.error("Browse filter error:", err);
-    return res.status(500).json({
-      resStatus: false,
-      resMessage: "Server error"
     });
   }
 });
