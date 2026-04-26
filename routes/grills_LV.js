@@ -119,7 +119,9 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
     inputName,
     inputPrice,
     inputDescription,
-    inputRegions
+    inputRegions,
+    inputLatitude,
+    inputLongitude
   } = formData;
 
   function sanitizeInput(str) {
@@ -133,7 +135,7 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
   const cleanInputPrice = sanitizeInput(inputPrice);
   const cleanInputName = sanitizeInput(inputName);
 
-  if (!inputService || !inputName || !inputPrice || !inputDescription || !phoneNumber) {
+  if (!inputName || !inputPrice || !inputDescription || !phoneNumber) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Nav aizpildīti obligātie lauki",
@@ -141,31 +143,38 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
     });
   }
 
-  const mainVal = Number(main_group);
-  if (isNaN(mainVal) || mainVal < 1 || mainVal > 10) {
+  // ✅ LAT/LNG VALIDATION
+  const lat = Number(inputLatitude);
+  const lng = Number(inputLongitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
     return res.status(400).json({
       resStatus: false,
-      resMessage: "Galvenā kategorija ir ārpus atļautā diapazona",
-      resErrorCode: 3
+      resMessage: "Nederīgas koordinātas",
+      resErrorCode: 10
     });
   }
+  // latitude: -90 to 90
+  if (lat < -90 || lat > 90) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Latitude ārpus diapazona",
+      resErrorCode: 11
+    });
+  }
+  // longitude: -180 to 180
+  if (lng < -180 || lng > 180) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Longitude ārpus diapazona",
+      resErrorCode: 12
+    });
+  }
+  // optional: round (clean DB) 6 decimals is 0.11 cm precision
+  const latRounded = Number(lat.toFixed(6));
+  const lngRounded = Number(lng.toFixed(6));
+  // ✅ JSONB ARRAY
+  const location = [latRounded, lngRounded];
 
-  const subVal = Number(sub_group);
-  if (isNaN(subVal) || subVal < 1 || subVal > 10) {
-    return res.status(400).json({
-      resStatus: false,
-      resMessage: "Apakškategorija ir ārpus atļautā diapazona",
-      resErrorCode: 4
-    });
-  }
-
-  if (phoneNumber.trim().length < 7 || phoneNumber.trim().length > 15) {
-    return res.status(400).json({
-      resStatus: false,
-      resMessage: "Nepareizs tālruņa numura garums",
-      resErrorCode: 8
-    });
-  }
 
   if (!Array.isArray(inputRegions) || inputRegions.length === 0) {
     return res.status(400).json({
@@ -174,23 +183,20 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
       resErrorCode: 9
     });
   }
-
-  if (inputName.length < 5 || inputName.length > 25) {
+  if (inputName.length < 5 || inputName.length > 40) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Vārds ir pārāk garš vai pārāk īss",
       resErrorCode: 10
     });
   }
-
-  if (inputPrice.length < 1 || inputPrice.length > 25) {
+  if (inputPrice.length < 1 || inputPrice.length > 40) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Cena ir pārāk gara vai pārāk īsa",
       resErrorCode: 11
     });
   }
-
   if (inputDescription.length < 50 || inputDescription.length > 1000) {
     return res.status(400).json({
       resStatus: false,
@@ -198,16 +204,13 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
       resErrorCode: 12
     });
   }
-
   /* -------------------------------------------
      SESSION VALIDATION
   ------------------------------------------- */
   try {
-
     const auth = req.headers.authorization || "";
     const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
     const sessionId = req.cookies?.session_id || bearerSid;
-
     if (!sessionId) {
       return res.status(401).json({
         resStatus: false,
@@ -215,12 +218,10 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
         resErrorCode: 13
       });
     }
-
     const userRes = await pool.query(
       `SELECT google_id FROM grills_latvia_sessions WHERE session_id = $1 LIMIT 1`,
       [sessionId]
     );
-
     if (!userRes.rowCount) {
       return res.status(401).json({
         resStatus: false,
@@ -228,7 +229,6 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
         resErrorCode: 14
       });
     }
-
     const googleId = userRes.rows[0].google_id;
     /* -------------------------------------------
         1 ad per subsection
@@ -236,32 +236,16 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
     ------------------------------------------- */
     try {
       client = await pool.connect();
-
       const userAdNumberCheck = await client.query(
         "SELECT number_ads FROM grills_latvia_users WHERE google_id = $1",
         [googleId]
       );
 
-      if (userAdNumberCheck.rows[0]?.number_ads >= 5) {
+      if (userAdNumberCheck.rows[0]?.number_ads >= 50) {
         return res.status(403).json({
           resStatus: false,
-          resMessage: "Sasniegts sludinājumu limits (maksimums 5)",
+          resMessage: "Sasniegts sludinājumu limits (maksimums 50)",
           resErrorCode: 15
-        });
-      }
-
-      const existingAdCheck = await client.query(
-        `SELECT id FROM grills_latvia_ads 
-        WHERE google_id = $1 AND main_group = $2 AND sub_group = $3 
-        LIMIT 1`,
-        [googleId, mainVal, subVal]
-      );
-
-      if (existingAdCheck.rowCount > 0) {
-        return res.status(403).json({
-          resStatus: false,
-          resMessage: "Šajā apakškategorijā jums jau ir aktīvs sludinājums",
-          resErrorCode: 16
         });
       }
     } catch (err) {
@@ -341,32 +325,29 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
 
       const insertQuery = `
         INSERT INTO grills_latvia_ads
-        (name, title, description, price, city, telephone, image_url, ip, date,
-         main_group, sub_group, google_id, update_date,
-         created_at, is_active)
+        (name, description, price, city, 
+        location, image_url, ip, google_id,
+        date, update_date, created_at, 
+        is_active)
         VALUES 
         ($1, $2, $3, $4, $5, $6, $7, $8, $9,
-         $10, $11, $12, $13, $14,
-         $15)
+        $10, $11, $12)
         RETURNING id
       `;
 
       const values = [
-        cleanInputName,
-        inputService,
-        cleanInputDescription,
-        cleanInputPrice,
-        JSON.stringify(inputRegions),
-        Number(countryCode + phoneNumber),
-        JSON.stringify(uploadedImages),
-        ipVisitor,
-        new Date().toISOString().slice(0, 10),
-        main_group,
-        sub_group,
-        googleId,
-        new Date().toISOString().slice(0, 10),
-        new Date(),
-        true
+        cleanInputName,                          // $1
+        cleanInputDescription,                   // $2
+        cleanInputPrice,                         // $3
+        JSON.stringify(inputRegions),            // $4 (city)
+        location,                                // $5 ✅ location (jsonb)
+        JSON.stringify(uploadedImages),          // $6
+        ipVisitor,                                // $7
+        googleId,                                 // $8
+        new Date().toISOString().slice(0, 10),    // $9
+        new Date(),                               // $10
+        new Date(),                               // $11
+        true                                      // $12
       ];
 
       const result = await client.query(insertQuery, values);
@@ -487,15 +468,10 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       });
     }
     const {
-      inputService,
       inputName,
       inputPrice,
       inputDescription,
-      countryCode,
-      phoneNumber,
       inputRegions,
-      main_group,
-      sub_group,
       existingImages
     } = formData;
 
@@ -511,18 +487,11 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
     const cleanInputPrice = sanitizeInput(inputPrice);
     const cleanInputName = sanitizeInput(inputName);
 
-  if (!inputService || !inputName || !inputPrice || !inputDescription || !phoneNumber) {
+  if ( !inputName || !inputPrice || !inputDescription || !phoneNumber) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Lūdzu, aizpildiet obligātos laukus",
       resErrorCode: 6
-    });
-  }
-  if (phoneNumber.trim().length < 7 || phoneNumber.trim().length > 15) {
-    return res.status(400).json({
-      resStatus: false,
-      resMessage: "Tālruņa numurs ir pārāk garš vai pārāk īss",
-      resErrorCode: 10
     });
   }
   if (!Array.isArray(inputRegions) || inputRegions.length === 0) {
@@ -537,22 +506,6 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       resStatus: false,
       resMessage: "Vārds ir pārāk garš vai pārāk īss",
       resErrorCode: 12
-    });
-  }
-  const mainVal = Number(main_group);
-  if (isNaN(mainVal) || mainVal < 1 || mainVal > 10) {
-    return res.status(400).json({
-      resStatus: false,
-      resMessage: "Galvenā kategorija ir ārpus atļautā diapazona",
-      resErrorCode: 13
-    });
-  }
-  const subVal = Number(sub_group);
-  if (isNaN(subVal) || subVal < 1 || subVal > 10) {
-    return res.status(400).json({
-      resStatus: false,
-      resMessage: "Apakškategorija ir ārpus atļautā diapazona",
-      resErrorCode: 14
     });
   }
   if (inputPrice.length < 1 || inputPrice.length > 25) {
