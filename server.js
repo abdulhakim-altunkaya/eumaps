@@ -95,6 +95,8 @@ const mastersTRRoutes = require("./routes/masters_TR");
 app.use("/api/master-turkey", mastersTRRoutes);
 const mastersSLRoutes = require("./routes/masters_SL");
 app.use("/api/master-sierraleone", mastersSLRoutes);
+const grillsLVRoutes = require("./routes/grills_LV");
+app.use("/", grillsLVRoutes);
 
 //This function for now will be used safely convert image file names to alphanumerical values
 //currently used by latvia masters

@@ -46,7 +46,7 @@ router.post("/api/post/grills-latvia/save-visitor", checkLogCooldown(3 * 60 * 10
   if (!req.shouldLogVisit) {
     return res.status(200).json({
       resStatus: false,
-      resMessage: "Gaidīšanas laiks aktivizēts vai reģistrācija izlaista",
+      resMessage: "Pagaidiet vai izlaists",
       resErrorCode: 1
     });
   }
@@ -172,7 +172,6 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
   // optional: round (clean DB) 6 decimals is 0.11 cm precision
   const latRounded = Number(lat.toFixed(6));
   const lngRounded = Number(lng.toFixed(6));
-  // ✅ JSONB ARRAY
   const locationArray = [latRounded, lngRounded];
 
 
@@ -243,7 +242,7 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
       if (userAdNumberCheck.rows[0]?.number_ads >= 50) {
         return res.status(403).json({
           resStatus: false,
-          resMessage: "Sasniegts sludinājumu limits (maksimums 50)",
+          resMessage: "Sasniegts limits (maksimums 50)",
           resErrorCode: 15
         });
       }
@@ -363,7 +362,7 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
       );
       return res.status(201).json({
         resStatus: true,
-        resMessage: "Sludinājums saglabāts",
+        resMessage: "Vieta saglabāta",
         resOkCode: 1
       });
 
@@ -441,7 +440,7 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
     if (!adQ.rowCount) {
       return res.json({
         resStatus: false,
-        resMessage: "Sludinājums neeksistē",
+        resMessage: "Vieta neeksistē",
         resErrorCode: 3
       });
     }
@@ -609,7 +608,6 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       }
       finalImages = [...finalImages, ...uploadedImages];
     }
-
     /* -------------------------------
        UPDATE DATABASE
     --------------------------------*/
@@ -626,7 +624,6 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       WHERE id = $8 AND google_id = $9
       RETURNING id
     `;
-
     const values = [
       cleanInputName,                          // $1
       cleanInputDescription,                   // $2
@@ -638,9 +635,7 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       adId,                                    // $8
       googleId                                 // $9
     ];
-
     const result = await pool.query(updateQ, values);
-
     if (!result.rowCount) {
       return res.json({
         resStatus: false,
@@ -648,13 +643,11 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
         resErrorCode: 23
       });
     }
-
     return res.json({
       resStatus: true,
       resMessage: "Izmaiņas saglabātas",
       resOkCode: 1
     });
-
   } catch (err) {
     return res.status(500).json({
       resStatus: false,
@@ -782,7 +775,7 @@ router.post("/api/post/grills-latvia/toggle-activation/:id", blockMaliciousIPs, 
     if (!check.rowCount) {
       return res.status(200).json({
         resStatus: false,
-        resMessage: "Sludinājums nav atrasts",
+        resMessage: "Vieta nav atrasta",
         resErrorCode: 1
       });
     }
@@ -796,13 +789,13 @@ router.post("/api/post/grills-latvia/toggle-activation/:id", blockMaliciousIPs, 
     if (!update.rowCount) {
       return res.status(200).json({
         resStatus: false,
-        resMessage: "Neizdevās atjaunināt sludinājuma aktivizācijas statusu",
+        resMessage: "Neizdevās atjaunināt vietas statusu",
         resErrorCode: 2
       });
     }
     return res.status(200).json({
       resStatus: true,
-      resMessage: newState ? "Sludinājums aktivizēts" : "Sludinājums deaktivizēts",
+      resMessage: newState ? "Aktivizēts" : "Deaktivizēts",
       resOkCode: 1,
       is_active: newState
     });
@@ -864,7 +857,7 @@ router.post("/api/post/grills-latvia/delete-ad/:id", blockMaliciousIPs, applyWri
     if (!adRes.rowCount) {
       return res.status(403).json({
         resStatus: false,
-        resMessage: "Nav atļauts dzēst šo sludinājumu",
+        resMessage: "Nav atļauts dzēst šo vietu",
         resErrorCode: 3
       });
     }
@@ -880,30 +873,24 @@ router.post("/api/post/grills-latvia/delete-ad/:id", blockMaliciousIPs, applyWri
     const filesToDelete = images
       .map(url => url.split("/").pop())
       .filter(Boolean);
-
     /* ---------- DB TRANSACTION ---------- */
     await pool.query("BEGIN");
-
     // Hard delete ALL reviews + replies
     await pool.query(
       `DELETE FROM grills_latvia_reviews WHERE ad_id = $1;`,
       [adId]
     );
-
     // Hard delete ad
     await pool.query(
       `DELETE FROM grills_latvia_ads WHERE id = $1;`,
       [adId]
     );
-
     await pool.query("COMMIT");
-
     /* ---------- DELETE IMAGES (NON-BLOCKING) ---------- */
     if (filesToDelete.length > 0) {
       const { error } = await supabase.storage
         .from("masters_latvia_storage")
         .remove(filesToDelete);
-
       if (error) {
         console.error("Supabase delete error:", error);
       }
@@ -911,7 +898,7 @@ router.post("/api/post/grills-latvia/delete-ad/:id", blockMaliciousIPs, applyWri
 
     return res.json({
       resStatus: true,
-      resMessage: "Sludinājums un saistītās atsauksmes dzēstas",
+      resMessage: "Vieta un atsauksmes dzēstas",
       resOkCode: 1
     });
 
@@ -933,7 +920,7 @@ router.post("/api/post/grills-latvia/ad-view", blockMaliciousIPs, applyWriteRate
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Trūkst ad_id"
+      resMessage: "Trūkst vietas ID"
     });
   }
 
@@ -1050,7 +1037,7 @@ router.post("/api/post/grills-latvia/review", blockMaliciousIPs, applyWriteRateL
       return res.json({
         resStatus: false,
         resErrorCode: 7, // New error code for self-review
-        resMessage: "Jūs nevarat vērtēt savu sludinājumu"
+        resMessage: "Jūs nevarat vērtēt savu vietu"
       });
     }
 
@@ -1071,7 +1058,7 @@ router.post("/api/post/grills-latvia/review", blockMaliciousIPs, applyWriteRateL
       return res.json({
         resStatus: false,
         resErrorCode: 3,
-        resMessage: "Jūs jau esat atstājis atsauksmi par šo sludinājumu"
+        resMessage: "Jūs jau esat atstājis atsauksmi par šo vietu"
       });
     }
     /* ---------- BLOCK RE-POST AFTER SOFT DELETE ---------- */
@@ -1092,7 +1079,7 @@ router.post("/api/post/grills-latvia/review", blockMaliciousIPs, applyWriteRateL
         resStatus: false,
         resErrorCode: 4,
         resMessage:
-          "Jūs nevarat pievienot citu atsauksmi šim sludinājumam pēc tam, kad īpašnieks ir atbildējis uz jūsu iepriekšējo"
+          "Jūs nevarat pievienot citu atsauksmi šai vietai pēc īpašnieka atbildes"
       });
     }
     /* ---------- DATE ---------- */
@@ -1205,7 +1192,7 @@ router.post("/api/post/grills-latvia/reply", blockMaliciousIPs, applyWriteRateLi
       return res.json({
         resStatus: false,
         resErrorCode: 3,
-        resMessage: "Nav sludinājuma īpašnieks"
+        resMessage: "Nav jūsu ieraksts"
       });
     }
     // 3️⃣ format date
@@ -1290,7 +1277,7 @@ router.post("/api/post/grills-latvia/delete-reply", blockMaliciousIPs, applyWrit
       return res.json({
         resStatus: false,
         resErrorCode: 3,
-        resMessage: "Nav sludinājuma īpašnieks"
+        resMessage: "Nav jūsu ieraksts"
       });
     }
 
@@ -1445,7 +1432,7 @@ router.post("/api/post/grills-latvia/like", blockMaliciousIPs, applyWriteRateLim
       return res.json({
         resStatus: false,
         resErrorCode: 3,
-        resMessage: "Sludinājums nav atrasts"
+        resMessage: "Vieta nav atrasta"
       });
     }
     const user_google_id = adR.rows[0].google_id;
@@ -1543,7 +1530,7 @@ router.get("/api/get/grills-latvia/like-status", applyReadRateLimit, async (req,
   if (!ad_id) {
     return res.json({
       resStatus: false,
-      resMessage: "Trūkst ad_id"
+      resMessage: "Trūkst vietas ID"
     });
   }
   try {
@@ -1597,15 +1584,13 @@ router.get("/api/get/grills-latvia/like-status", applyReadRateLimit, async (req,
 });
 router.get("/api/get/grills-latvia/reviews/:ad_id", applyReadRateLimit, async (req, res) => {
   const adId = req.params.ad_id;
-
   if (!adId) {
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Trūkst ad_id"
+      resMessage: "Trūkst vietas ID"
     });
   }
-
   try {
     const q = `
       SELECT 
@@ -1621,15 +1606,12 @@ router.get("/api/get/grills-latvia/reviews/:ad_id", applyReadRateLimit, async (r
         AND is_deleted = false
       ORDER BY id ASC
     `;
-
     const r = await pool.query(q, [adId]);
-
     return res.json({
       resStatus: true,
       resOkCode: 1,
       reviews: r.rows
     });
-
   } catch (err) {
     console.error("Get reviews error:", err);
     return res.status(500).json({
@@ -1647,7 +1629,6 @@ router.get("/api/get/grills-latvia/profile-reviews-ads", applyReadRateLimit, asy
   const auth = req.headers.authorization || "";
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
   const sessionId = req.cookies?.session_id || bearerSid;
-
   if (!sessionId) {
     return res.status(200).json({
       resStatus: false,
@@ -1656,7 +1637,6 @@ router.get("/api/get/grills-latvia/profile-reviews-ads", applyReadRateLimit, asy
       reviews: []
     });
   }
-
   try {
     /* get google id from session */
     const sessionQuery = `
@@ -1665,9 +1645,7 @@ router.get("/api/get/grills-latvia/profile-reviews-ads", applyReadRateLimit, asy
       WHERE session_id = $1
       LIMIT 1;
     `;
-
     const sessionRes = await pool.query(sessionQuery, [sessionId]);
-
     if (!sessionRes.rowCount) {
       return res.status(200).json({
         resStatus: false,
@@ -1797,7 +1775,6 @@ router.delete("/api/delete/grills-latvia/review/:id", blockMaliciousIPs, applyWr
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
   const sessionId = req.cookies?.session_id || bearerSid;
   const reviewId = req.params.id;
-
   if (!sessionId) {
     return res.status(200).json({
       resStatus: false,
@@ -1918,7 +1895,7 @@ router.delete("/api/delete/grills-latvia/review/:id", blockMaliciousIPs, applyWr
     console.error("Delete review error:", error);
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Datu bāzes savienojuma kļūda",
+      resMessage: "Datu bāzes kļūda",
       resErrorCode: 5
     });
   }
@@ -1927,14 +1904,12 @@ router.get("/api/get/grills-latvia/session-user", blockMaliciousIPs, applyReadRa
    // Desktop can use cookies but some mobiles will use headers for login system
   const auth = req.headers.authorization || "";
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
-
   const sessionId = req.cookies?.session_id || bearerSid;
-
   // No cookie -> not logged in, but it's not an "error"
   if (!sessionId) {
     return res.status(200).json({
       resStatus: false,
-      resMessage: "No active session",
+      resMessage: "Nav aktīvas sesijas",
       resErrorCode: 1,
       loggedIn: false
     });
@@ -1959,7 +1934,7 @@ router.get("/api/get/grills-latvia/session-user", blockMaliciousIPs, applyReadRa
       // Cookie exists but session not found (expired/invalid)
       return res.status(200).json({
         resStatus: false,
-        resMessage: "No active session",
+        resMessage: "Nav aktīvas sesijas",
         resErrorCode: 2,
         loggedIn: false
       });
@@ -1969,7 +1944,7 @@ router.get("/api/get/grills-latvia/session-user", blockMaliciousIPs, applyReadRa
 
     return res.status(200).json({
       resStatus: true,
-      resMessage: "User session active",
+      resMessage: "Sesija aktīva",
       resOkCode: 1,
       loggedIn: true,
       user: {
@@ -1983,7 +1958,7 @@ router.get("/api/get/grills-latvia/session-user", blockMaliciousIPs, applyReadRa
     console.error("Session check error:", error);
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Database connection error",
+      resMessage: "Servera kļūda",
       resErrorCode: 3,
       loggedIn: false
     });
@@ -2006,10 +1981,17 @@ router.post("/api/post/grills-latvia/auth/email-register", blockMaliciousIPs, ap
   const name = clean(req.body.name, 80);
   const email = clean(req.body.email, 120).toLowerCase();
   const password = String(req.body.password || "");
-  if (name.length < 2 || email.length < 5 || password.length < 6 || password.length > 40 || email.length > 40) {
+  if (name.length < 2 || email.length < 5 || password.length < 5) {
     return res.json({
       resStatus: false,
       resErrorCode: 1,
+      resMessage: "Nederīgi dati"
+    });
+  }
+  if (name.length > 40 || password.length > 40 || email.length > 40) {
+    return res.json({
+      resStatus: false,
+      resErrorCode: 10,
       resMessage: "Nederīgi dati"
     });
   }
@@ -2076,15 +2058,16 @@ router.post("/api/post/grills-latvia/auth/email-register", blockMaliciousIPs, ap
     });
   }
 });
-router.post("/api/post/grills-latvia/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, enforceLoginProtection, validateEmail,
-  async (req, res) => {
+router.post("/api/post/grills-latvia/auth/email-login", blockMaliciousIPs, applyWriteRateLimit, enforceLoginProtection, 
+  validateEmail, async (req, res) => {
+  
   const clean = (v, max) =>
     String(v || "")
       .trim()
       .slice(0, max)
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;");
-  const email = clean(req.body.email, 120).toLowerCase();
+  const email = clean(req.body.email, 40).toLowerCase();
   const password = String(req.body.password || "");
   if (email.length < 5 || password.length < 6) {
     return res.json({
@@ -2400,9 +2383,7 @@ router.post("/api/post/grills-latvia/auth/email-verify", blockMaliciousIPs, appl
       auth_provider || "email",
       passwordHash
     ]);
-
     const dbGoogleId = insertR.rows[0].google_id;
-
     const sessionId = await createSessionForUser(dbGoogleId, true);
 
     res.cookie("session_id", sessionId, {
@@ -2434,7 +2415,6 @@ router.post("/api/post/grills-latvia/auth/email-verify", blockMaliciousIPs, appl
         resMessage: "Apstiprinājuma saite vairs nav derīga."
       });
     }
-
     if (err.name === "JsonWebTokenError") {
       return res.status(400).json({
         resStatus: false,
@@ -2442,7 +2422,6 @@ router.post("/api/post/grills-latvia/auth/email-verify", blockMaliciousIPs, appl
         resMessage: "Nederīga apstiprinājuma atslēga."
       });
     }
-
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 99,
@@ -2453,7 +2432,6 @@ router.post("/api/post/grills-latvia/auth/email-verify", blockMaliciousIPs, appl
 
 router.get("/api/get/grills-latvia/ad/:id", applyReadRateLimit, async (req, res) => {
   const adId = req.params.id;
-
   try {
     const q = `
       SELECT 
@@ -2465,12 +2443,11 @@ router.get("/api/get/grills-latvia/ad/:id", applyReadRateLimit, async (req, res)
       LIMIT 1
     `;
     const r = await pool.query(q, [adId]);
-
     if (!r.rowCount) {
       return res.json({
         resStatus: false,
         resErrorCode: 1,
-        resMessage: "Ad not found"
+        resMessage:"Vieta nav atrasta"
       });
     }
 
@@ -2535,7 +2512,7 @@ router.get("/api/get/grills-latvia/ad/:id", applyReadRateLimit, async (req, res)
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 2,
-      resMessage: "Server error"
+      resMessage: "Servera kļūda"
     });
   }
 });
@@ -2547,7 +2524,7 @@ router.get("/api/get/grills-latvia/user-ads", applyReadRateLimit, async (req, re
   if (!sessionId) {
     return res.status(200).json({
       resStatus: false,
-      resMessage: "No active session",
+      resMessage: "Nav aktīvas sesijas",
       resErrorCode: 1,
       ads: []
     });
@@ -2564,7 +2541,7 @@ router.get("/api/get/grills-latvia/user-ads", applyReadRateLimit, async (req, re
     if (!sessionRes.rowCount) {
       return res.status(200).json({
         resStatus: false,
-        resMessage: "No active session",
+        resMessage: "Nav aktīvas sesijas",
         resErrorCode: 2,
         ads: []
       });
@@ -2588,7 +2565,7 @@ router.get("/api/get/grills-latvia/user-ads", applyReadRateLimit, async (req, re
     const adsRes = await pool.query(adsQuery, [googleId]);
     return res.status(200).json({
       resStatus: true,
-      resMessage: "User ads loaded",
+      resMessage: "Ielādētas vietas",
       resOkCode: 1,
       ads: adsRes.rows
     });
@@ -2596,7 +2573,7 @@ router.get("/api/get/grills-latvia/user-ads", applyReadRateLimit, async (req, re
     console.error("User ads fetch error:", error);
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Database connection error",
+      resMessage: "Servera kļūda",
       resErrorCode: 3,
       ads: []
     });
@@ -2618,14 +2595,14 @@ router.get("/api/get/grills-latvia/search", blockMaliciousIPs, applyReadRateLimi
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Search query too short or long"
+      resMessage: "Meklējums par īsu vai garu"
     });
   }
   if (!/^[^<>]{3,60}$/.test(q)) {
     return res.json({
       resStatus: false,
       resErrorCode: 3,
-      resMessage: "Invalid search query"
+      resMessage: "Nederīgs meklējums"
     });
   }
 
@@ -2694,7 +2671,7 @@ router.get("/api/get/grills-latvia/search", blockMaliciousIPs, applyReadRateLimi
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 2,
-      resMessage: "Server error"
+      resMessage: "Servera kļūda"
     });
   }
 });
@@ -2704,14 +2681,14 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
     return res.json({
       resStatus: false,
       resErrorCode: 1,
-      resMessage: "Search query too short or long"
+      resMessage: "Meklējums par īsu vai garu"
     });
   }
   if (!/^[^<>]{3,60}$/.test(q)) {
     return res.json({
       resStatus: false,
       resErrorCode: 3,
-      resMessage: "Invalid search query"
+      resMessage: "Nederīgs meklējums"
     });
   }
   const { city, minRating, minReviews } = req.query;
@@ -2819,7 +2796,7 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
     console.error("Search filter error:", err);
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Server error"
+      resMessage: "Servera kļūda"
     });
   }
 });
@@ -2839,20 +2816,17 @@ router.get("/api/get/grills-latvia/homepage/carousel", async (req, res) => {
       FROM grills_latvia_carousel
       ORDER BY id DESC
     `;
-
     const result = await pool.query(q);
-
     return res.json({
       resStatus: true,
       resOkCode: 1,
       resData: result.rows
     });
-
   } catch (err) {
     console.error("CAROUSEL FETCH ERROR:", err);
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Failed to fetch carousel ads",
+      resMessage: "Neizdevās ielādēt karuseli",
       resErrorCode: 2
     });
   }
