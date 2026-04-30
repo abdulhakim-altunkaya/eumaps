@@ -53,7 +53,11 @@ const allowedOrigins = [
   "https://salonemasters.com",
   "https://www.salonemasters.com",
   "http://salonemasters.com",
-  "http://www.salonemasters.com"
+  "http://www.salonemasters.com",
+  "https://grilslatvija.lv",
+  "https://www.grilslatvija.lv",
+  "http://grilslatvija.lv",
+  "http://www.grilslatvija.lv"
 ];
 app.use(cors({
   origin: function (origin, callback) {
