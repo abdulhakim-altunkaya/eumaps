@@ -87,44 +87,36 @@ router.post("/api/post/grills-latvia/save-visitor", checkLogCooldown(3 * 60 * 10
     if (client) client.release();
   }
 });
-router.post(
-"/api/post/grills-latvia/ads",
-blockMaliciousIPs,
-enforceAdPostingCooldown,
-applyWriteRateLimit,
-upload.array("images", 5),
-async (req, res) => {
+router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCooldown, applyWriteRateLimit,
+  upload.array("images", 5), async (req, res) => {
+  const MIN_IMAGE_SIZE = 2 * 1024;
+  const MAX_IMAGE_SIZE = 3 * 1024 * 1024;
+  const ALLOWED_IMAGE_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp"
+  ];
 
-console.log("=== NEW PLACE REQUEST ===");
-console.log("Time:", new Date().toISOString());
-
-const MIN_IMAGE_SIZE = 2 * 1024;
-const MAX_IMAGE_SIZE = 3 * 1024 * 1024;
-
-const ipVisitor = req.headers["x-forwarded-for"]
-  ? req.headers["x-forwarded-for"].split(",")[0]
-  : req.socket.remoteAddress || req.ip;
-
-console.log("IP:", ipVisitor);
-
-let client;
-let formData;
-
-try {
-  console.log("BODY KEYS:", Object.keys(req.body || {}));
-  console.log("FILES COUNT:", req.files?.length || 0);
-
+  const ipVisitor = req.headers["x-forwarded-for"]
+    ? req.headers["x-forwarded-for"].split(",")[0]
+    : req.socket.remoteAddress || req.ip;
+  console.log("[grills-latvia/ads] POST request from IP:", ipVisitor);
+  let client;
+  let formData;
+  /* -------------------------------------------
+     PARSE JSON FORM DATA
+  ------------------------------------------- */
   try {
     formData = JSON.parse(req.body.formData);
-    console.log("FORM DATA:", formData);
   } catch (err) {
-    console.log("JSON PARSE ERROR:", err.message);
+    console.log("[grills-latvia/ads] Failed to parse formData:", err.message);
     return res.status(400).json({
       resStatus: false,
-      resMessage: "Nederīgi formas dati"
+      resMessage: "Nederīgi formas dati",
+      resErrorCode: 1
     });
   }
-
   const {
     inputName,
     inputPrice,
@@ -134,140 +126,291 @@ try {
     longitude
   } = formData;
 
-  console.log("NAME:", inputName);
-  console.log("PRICE:", inputPrice);
-  console.log("REGIONS:", inputRegions);
-  console.log("LAT:", latitude, "LNG:", longitude);
+  function sanitizeInput(str) {
+    if (typeof str !== "string") return "";
+    return str
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
 
-  const lat = Number(latitude);
-  const lng = Number(longitude);
+  const cleanInputDescription = sanitizeInput(inputDescription);
+  const cleanInputPrice = sanitizeInput(inputPrice);
+  const cleanInputName = sanitizeInput(inputName);
 
-  console.log("PARSED LAT/LNG:", lat, lng);
-
-  const locationArray = [
-    Number(lat.toFixed(6)),
-    Number(lng.toFixed(6))
-  ];
-
-  console.log("LOCATION ARRAY:", locationArray);
-
-  const auth = req.headers.authorization || "";
-  const bearerSid = auth.startsWith("Bearer ")
-    ? auth.slice(7).trim()
-    : null;
-
-  const sessionId = req.cookies?.session_id || bearerSid;
-
-  console.log("SESSION EXISTS:", !!sessionId);
-
-  const userRes = await pool.query(
-    `SELECT google_id FROM grills_lv_sessions WHERE session_id = $1 LIMIT 1`,
-    [sessionId]
-  );
-
-  console.log("SESSION ROWS:", userRes.rowCount);
-
-  const googleId = userRes.rows[0]?.google_id;
-
-  console.log("GOOGLE ID:", googleId);
-
-  client = await pool.connect();
-
-  const userAdNumberCheck = await client.query(
-    "SELECT number_ads FROM grills_lv_users WHERE google_id = $1",
-    [googleId]
-  );
-
-  console.log(
-    "USER ADS COUNT:",
-    userAdNumberCheck.rows[0]?.number_ads
-  );
-
-  client.release();
-  client = null;
-
-  const files = req.files || [];
-
-  console.log("FILES:", files.length);
-
-  for (const f of files) {
-    console.log("FILE:", {
-      name: f.originalname,
-      type: f.mimetype,
-      size: f.size
+  if (!inputName || !inputPrice || !inputDescription) {
+    console.log("[grills-latvia/ads] Missing required fields");
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Nav aizpildīti obligātie lauki",
+      resErrorCode: 2
     });
   }
 
-  let uploadedImages = [];
+  // ✅ LAT/LNG VALIDATION
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    console.log("[grills-latvia/ads] Invalid coordinates:", latitude, longitude);
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Nederīgas koordinātas",
+      resErrorCode: 10
+    });
+  }
+  // latitude: -90 to 90
+  if (lat < -90 || lat > 90) {
+    console.log("[grills-latvia/ads] Latitude out of range:", lat);
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Latitude ārpus diapazona",
+      resErrorCode: 11
+    });
+  }
+  // longitude: -180 to 180
+  if (lng < -180 || lng > 180) {
+    console.log("[grills-latvia/ads] Longitude out of range:", lng);
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Longitude ārpus diapazona",
+      resErrorCode: 12
+    });
+  }
+  // optional: round (clean DB) 6 decimals is 0.11 cm precision
+  const latRounded = Number(lat.toFixed(6));
+  const lngRounded = Number(lng.toFixed(6));
+  const locationArray = [latRounded, lngRounded];
+  console.log("[grills-latvia/ads] Location:", locationArray);
 
-  for (const f of files) {
-    const fileName = makeSafeName();
 
-    console.log("UPLOADING:", fileName);
-
-    const { error } = await supabase.storage
-      .from("masters_latvia_storage")
-      .upload(fileName, f.buffer, {
-        contentType: f.mimetype
-      });
-
-    if (error) {
-      console.log("SUPABASE ERROR:", error);
-      return res.status(503).json({
+  if (!Array.isArray(inputRegions) || inputRegions.length === 0) {
+    console.log("[grills-latvia/ads] No regions selected");
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Nav izvēlēti reģioni",
+      resErrorCode: 9
+    });
+  }
+  if (inputName.length < 5 || inputName.length > 40) {
+    console.log("[grills-latvia/ads] inputName length invalid:", inputName.length);
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Vārds ir pārāk garš vai pārāk īss",
+      resErrorCode: 10
+    });
+  }
+  if (inputPrice.length < 1 || inputPrice.length > 40) {
+    console.log("[grills-latvia/ads] inputPrice length invalid:", inputPrice.length);
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Cena ir pārāk gara vai pārāk īsa",
+      resErrorCode: 11
+    });
+  }
+  if (inputDescription.length < 50 || inputDescription.length > 1000) {
+    console.log("[grills-latvia/ads] inputDescription length invalid:", inputDescription.length);
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Apraksts ir pārāk garš vai pārāk īss",
+      resErrorCode: 12
+    });
+  }
+  /* -------------------------------------------
+     SESSION VALIDATION
+  ------------------------------------------- */
+  try {
+    const auth = req.headers.authorization || "";
+    const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+    const sessionId = req.cookies?.session_id || bearerSid;
+    if (!sessionId) {
+      console.log("[grills-latvia/ads] No session ID provided");
+      return res.status(401).json({
         resStatus: false,
-        resMessage: "Attēla augšupielāde neizdevās"
+        resMessage: "Piesakieties, lai turpinātu",
+        resErrorCode: 13
+      });
+    }
+    const userRes = await pool.query(
+      `SELECT google_id FROM grills_lv_sessions WHERE session_id = $1 LIMIT 1`,
+      [sessionId]
+    );
+    if (!userRes.rowCount) {
+      console.log("[grills-latvia/ads] Invalid session ID");
+      return res.status(401).json({
+        resStatus: false,
+        resMessage: "Nederīga sesija",
+        resErrorCode: 14
+      });
+    }
+    const googleId = userRes.rows[0].google_id;
+    console.log("[grills-latvia/ads] Authenticated google_id:", googleId);
+    /* -------------------------------------------
+        max 50 ads per user
+    ------------------------------------------- */
+    try {
+      client = await pool.connect();
+      const userAdNumberCheck = await client.query(
+        "SELECT number_ads FROM grills_lv_users WHERE google_id = $1",
+        [googleId]
+      );
+
+      if (userAdNumberCheck.rows[0]?.number_ads >= 50) {
+        console.log("[grills-latvia/ads] Ad limit reached for google_id:", googleId);
+        return res.status(403).json({
+          resStatus: false,
+          resMessage: "Sasniegts limits (maksimums 50)",
+          resErrorCode: 15
+        });
+      }
+    } catch (err) {
+      console.log("[grills-latvia/ads] Error checking ad count:", err.message);
+      return res.status(500).json({
+        resStatus: false,
+        resMessage: "Sistēmas kļūda. Mēģiniet vēlreiz vēlāk",
+        resErrorCode: 23
+      });
+    } finally {
+      if (client) {
+        client.release();
+        client = null;
+      }
+    }
+
+    /* -------------------------------------------
+       IMAGE VALIDATION
+    ------------------------------------------- */
+    const files = req.files;
+
+    if (!files || files.length < 1 || files.length > 5) {
+      console.log("[grills-latvia/ads] Invalid file count:", files?.length);
+      return res.status(400).json({
+        resStatus: false,
+        resMessage: "Nepieciešami 1–5 attēli",
+        resErrorCode: 17
       });
     }
 
-    uploadedImages.push(
-      `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_latvia_storage/${fileName}`
-    );
+    let uploadedImages = [];
+    for (const f of files) {
+      if (!ALLOWED_IMAGE_TYPES.includes(f.mimetype)) {
+        console.log("[grills-latvia/ads] Invalid file type:", f.mimetype);
+        return res.status(400).json({
+          resStatus: false,
+          resMessage: "Nederīgs faila formāts",
+          resErrorCode: 18
+        });
+      }
+
+      if (f.size < MIN_IMAGE_SIZE) {
+        console.log("[grills-latvia/ads] File too small:", f.size);
+        return res.status(400).json({
+          resStatus: false,
+          resMessage: "Attēla fails ir bojāts vai tukšs",
+          resErrorCode: 19
+        });
+      }
+
+      if (f.size > MAX_IMAGE_SIZE) {
+        console.log("[grills-latvia/ads] File too large:", f.size);
+        return res.status(400).json({
+          resStatus: false,
+          resMessage: "Attēls ir pārāk liels (maks. 1,8 MB)",
+          resErrorCode: 20
+        });
+      }
+
+      const fileName = makeSafeName();
+      console.log("[grills-latvia/ads] Uploading image:", fileName);
+      const { error } = await supabase.storage
+        .from("masters_latvia_storage")
+        .upload(fileName, f.buffer, { contentType: f.mimetype });
+
+      if (error) {
+        console.log("[grills-latvia/ads] Supabase upload error:", error.message);
+        return res.status(503).json({
+          resStatus: false,
+          resMessage: "Attēla augšupielāde neizdevās",
+          resErrorCode: 21
+        });
+      }
+
+      uploadedImages.push(
+        `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_latvia_storage/${fileName}`
+      );
+    }
+    console.log("[grills-latvia/ads] Images uploaded:", uploadedImages.length);
+    /* -------------------------------------------
+       DATABASE INSERT
+    ------------------------------------------- */
+    try {
+      client = await pool.connect();
+
+      const insertQuery = `
+        INSERT INTO grills_lv_ads
+        (name, description, price, city, 
+        location, image_url, ip, google_id,
+        date, update_date, created_at, 
+        is_active)
+        VALUES 
+        ($1, $2, $3, $4, $5, $6, $7, $8, $9,
+        $10, $11, $12)
+        RETURNING id
+      `;
+
+      const values = [
+        cleanInputName,                          // $1
+        cleanInputDescription,                   // $2
+        cleanInputPrice,                         // $3
+        JSON.stringify(inputRegions),            // $4 (city)
+        locationArray,                                // $5 ✅ location (jsonb)
+        JSON.stringify(uploadedImages),          // $6
+        ipVisitor,                                // $7
+        googleId,                                 // $8
+        new Date().toISOString().slice(0, 10),    // $9
+        new Date(),                               // $10
+        new Date(),                               // $11
+        true                                      // $12
+      ];
+      
+      const result = await client.query(insertQuery, values);
+      if (!result.rowCount) {
+        console.log("[grills-latvia/ads] DB insert returned no rows");
+        return res.status(503).json({
+          resStatus: false,
+          resMessage: "Datu saglabāšana neizdevās",
+          resErrorCode: 22
+        });
+      }
+      await client.query(
+        "UPDATE grills_lv_users SET number_ads = COALESCE(number_ads, 0) + 1 WHERE google_id = $1",
+        [googleId]
+      );
+      console.log("[grills-latvia/ads] Ad inserted, id:", result.rows[0].id);
+      return res.status(201).json({
+        resStatus: true,
+        resMessage: "Vieta saglabāta",
+        resOkCode: 1
+      });
+
+    } catch (err) {
+      console.log("[grills-latvia/ads] DB insert error:", err.message);
+      return res.status(503).json({
+        resStatus: false,
+        resMessage: "Servera kļūda",
+        resErrorCode: 23
+      });
+
+    } finally {
+      if (client) client.release();
+    }
+
+  } catch (err) {
+    console.log("[grills-latvia/ads] Unhandled error:", err.message);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Servera kļūda",
+      resErrorCode: 24
+    });
   }
-
-  console.log("UPLOADED IMAGES:", uploadedImages);
-
-  client = await pool.connect();
-
-  const values = [
-    inputName,
-    inputDescription,
-    inputPrice,
-    JSON.stringify(inputRegions),
-    locationArray,
-    JSON.stringify(uploadedImages),
-    ipVisitor,
-    googleId,
-    new Date().toISOString().slice(0, 10),
-    new Date(),
-    new Date(),
-    true
-  ];
-
-  console.log("INSERT VALUES:", values);
-
-  const result = await client.query(insertQuery, values);
-
-  console.log("INSERT RESULT:", result.rowCount);
-
-  return res.status(201).json({
-    resStatus: true,
-    resMessage: "Vieta saglabāta"
-  });
-
-} catch (err) {
-  console.log("=== FATAL ERROR ===");
-  console.log(err);
-  console.log(err.message);
-  console.log(err.stack);
-
-  return res.status(500).json({
-    resStatus: false,
-    resMessage: "Servera kļūda"
-  });
-
-} finally {
-  if (client) client.release();
-}
 });
 router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdPostingCooldown, applyWriteRateLimit, 
   upload.array("images", 5), async (req, res) => {
