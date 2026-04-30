@@ -2096,7 +2096,7 @@ router.post("/post/auth/email-register", blockMaliciousIPs, applyWriteRateLimit,
         ipVisitor,
         auth_provider: "email"
       },
-      process.env.PAGALBAPRO_EMAIL_VERIFY_JWT_SECRET,
+      process.env.JWT_SECRET_PAGALBAPRO_EMAIL_VERIFY,
       { expiresIn: "24h" }
     );
 
@@ -2490,7 +2490,7 @@ router.post("/post/auth/email-verify", blockMaliciousIPs, applyWriteRateLimit, a
   try {
     const decoded = jwt.verify(
       token,
-      process.env.PAGALBAPRO_EMAIL_VERIFY_JWT_SECRET
+      process.env.JWT_SECRET_PAGALBAPRO_EMAIL_VERIFY
     );
 
     const { name, email, passwordHash, ipVisitor, auth_provider } = decoded;

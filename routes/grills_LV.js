@@ -2019,7 +2019,7 @@ router.post("/api/post/grills-latvia/auth/email-register", blockMaliciousIPs, ap
         ipVisitor,
         auth_provider: "email"
       },
-      process.env.GRILSLATVIJA_EMAIL_VERIFY_JWT_SECRET,
+      process.env.JWT_SECRET_GRILSLATVIJA_EMAIL_VERIFY,
       { expiresIn: "24h" }
     );
 
@@ -2315,7 +2315,7 @@ router.post("/api/post/grills-latvia/auth/email-verify", blockMaliciousIPs, appl
   try {
     const decoded = jwt.verify(
       token,
-      process.env.GRILSLATVIJA_EMAIL_VERIFY_JWT_SECRET
+      process.env.JWT_SECRET_GRILSLATVIJA_EMAIL_VERIFY
     );
 
     const { name, email, passwordHash, ipVisitor, auth_provider } = decoded;
