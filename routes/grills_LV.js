@@ -218,7 +218,7 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
       });
     }
     const userRes = await pool.query(
-      `SELECT google_id FROM grills_latvia_sessions WHERE session_id = $1 LIMIT 1`,
+      `SELECT google_id FROM grills_lv_sessions WHERE session_id = $1 LIMIT 1`,
       [sessionId]
     );
     if (!userRes.rowCount) {
@@ -235,7 +235,7 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
     try {
       client = await pool.connect();
       const userAdNumberCheck = await client.query(
-        "SELECT number_ads FROM grills_latvia_users WHERE google_id = $1",
+        "SELECT number_ads FROM grills_lv_users WHERE google_id = $1",
         [googleId]
       );
 
@@ -322,7 +322,7 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
       client = await pool.connect();
 
       const insertQuery = `
-        INSERT INTO grills_latvia_ads
+        INSERT INTO grills_lv_ads
         (name, description, price, city, 
         location, image_url, ip, google_id,
         date, update_date, created_at, 
@@ -357,7 +357,7 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
         });
       }
       await client.query(
-        "UPDATE grills_latvia_users SET number_ads = COALESCE(number_ads, 0) + 1 WHERE google_id = $1",
+        "UPDATE grills_lv_users SET number_ads = COALESCE(number_ads, 0) + 1 WHERE google_id = $1",
         [googleId]
       );
       return res.status(201).json({
@@ -414,7 +414,7 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
   try {
     const userQ = await pool.query(
       `SELECT google_id 
-       FROM grills_latvia_sessions 
+       FROM grills_lv_sessions 
        WHERE session_id = $1 
        LIMIT 1`,
       [sessionId]
@@ -432,7 +432,7 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
     --------------------------------*/
     const adQ = await pool.query(
       `SELECT image_url, google_id 
-       FROM grills_latvia_ads 
+       FROM grills_lv_ads 
        WHERE id = $1 
        LIMIT 1`,
       [adId]
@@ -612,7 +612,7 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
        UPDATE DATABASE
     --------------------------------*/
     const updateQ = `
-      UPDATE grills_latvia_ads 
+      UPDATE grills_lv_ads 
       SET 
         name        = $1,
         description = $2,
@@ -660,7 +660,7 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
 async function createSessionForUser(dbGoogleId, isEmail) {
   const sessionId = crypto.randomUUID(); // generate inline
   await pool.query(
-    `INSERT INTO grills_latvia_sessions (session_id, google_id, is_email) VALUES ($1, $2, $3)`,
+    `INSERT INTO grills_lv_sessions (session_id, google_id, is_email) VALUES ($1, $2, $3)`,
     [sessionId, dbGoogleId, isEmail]
   );
   return sessionId;
@@ -684,7 +684,7 @@ router.post("/api/post/grills-latvia/auth/google", blockMaliciousIPs, applyWrite
     client = await pool.connect();
     const existingByEmailQ = `
       SELECT google_id, auth_provider, email
-      FROM grills_latvia_users
+      FROM grills_lv_users
       WHERE LOWER(email) = LOWER($1)
       LIMIT 1
     `;
@@ -700,7 +700,7 @@ router.post("/api/post/grills-latvia/auth/google", blockMaliciousIPs, applyWrite
       }
     }
     const query = `
-      INSERT INTO grills_latvia_users (google_id, email, name, date, ip)
+      INSERT INTO grills_lv_users (google_id, email, name, date, ip)
       VALUES ($1, $2, $3, $4, $5)
       ON CONFLICT (google_id)
       DO UPDATE SET email = EXCLUDED.email, name = EXCLUDED.name
@@ -750,7 +750,7 @@ router.post("/api/post/grills-latvia/logout", blockMaliciousIPs, applyWriteRateL
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
   const sessionId = req.cookies?.session_id || bearerSid;
 
-  await pool.query(`DELETE FROM grills_latvia_sessions WHERE session_id=$1`, [sessionId]);
+  await pool.query(`DELETE FROM grills_lv_sessions WHERE session_id=$1`, [sessionId]);
 
   res.clearCookie("session_id", {
     httpOnly: true,
@@ -769,7 +769,7 @@ router.post("/api/post/grills-latvia/toggle-activation/:id", blockMaliciousIPs, 
   try {
     // Check if ad exists
     const check = await pool.query(
-      "SELECT is_active FROM grills_latvia_ads WHERE id = $1 LIMIT 1;",
+      "SELECT is_active FROM grills_lv_ads WHERE id = $1 LIMIT 1;",
       [adId]
     );
     if (!check.rowCount) {
@@ -783,7 +783,7 @@ router.post("/api/post/grills-latvia/toggle-activation/:id", blockMaliciousIPs, 
     const newState = !current; // toggle true → false, false → true
     // Update activation state
     const update = await pool.query(
-      "UPDATE grills_latvia_ads SET is_active = $1, created_at = NOW() WHERE id = $2 RETURNING id;",
+      "UPDATE grills_lv_ads SET is_active = $1, created_at = NOW() WHERE id = $2 RETURNING id;",
       [newState, adId]
     );
     if (!update.rowCount) {
@@ -826,7 +826,7 @@ router.post("/api/post/grills-latvia/delete-ad/:id", blockMaliciousIPs, applyWri
     const sessionRes = await pool.query(
       `
       SELECT google_id
-      FROM grills_latvia_sessions
+      FROM grills_lv_sessions
       WHERE session_id = $1
       LIMIT 1;
       `,
@@ -847,7 +847,7 @@ router.post("/api/post/grills-latvia/delete-ad/:id", blockMaliciousIPs, applyWri
     const adRes = await pool.query(
       `
       SELECT image_url
-      FROM grills_latvia_ads
+      FROM grills_lv_ads
       WHERE id = $1 AND google_id = $2
       LIMIT 1;
       `,
@@ -877,12 +877,12 @@ router.post("/api/post/grills-latvia/delete-ad/:id", blockMaliciousIPs, applyWri
     await pool.query("BEGIN");
     // Hard delete ALL reviews + replies
     await pool.query(
-      `DELETE FROM grills_latvia_reviews WHERE ad_id = $1;`,
+      `DELETE FROM grills_lv_reviews WHERE ad_id = $1;`,
       [adId]
     );
     // Hard delete ad
     await pool.query(
-      `DELETE FROM grills_latvia_ads WHERE id = $1;`,
+      `DELETE FROM grills_lv_ads WHERE id = $1;`,
       [adId]
     );
     await pool.query("COMMIT");
@@ -952,7 +952,7 @@ router.post("/api/post/grills-latvia/ad-view", blockMaliciousIPs, applyWriteRate
 
   try {
     await pool.query(
-      "UPDATE grills_latvia_ads SET views = views + 1 WHERE id = $1",
+      "UPDATE grills_lv_ads SET views = views + 1 WHERE id = $1",
       [ad_id]
     );
 
@@ -1012,7 +1012,7 @@ router.post("/api/post/grills-latvia/review", blockMaliciousIPs, applyWriteRateL
     const sessionResult = await pool.query(
       `
       SELECT google_id
-      FROM grills_latvia_sessions
+      FROM grills_lv_sessions
       WHERE session_id = $1
       LIMIT 1
       `,
@@ -1029,7 +1029,7 @@ router.post("/api/post/grills-latvia/review", blockMaliciousIPs, applyWriteRateL
 
     /* ---------- BLOCK SELF-REVIEW ---------- */
     const adOwnerCheck = await pool.query(
-      `SELECT google_id FROM grills_latvia_ads WHERE id = $1 LIMIT 1`,
+      `SELECT google_id FROM grills_lv_ads WHERE id = $1 LIMIT 1`,
       [adId]
     );
     // If the ad exists and the owner is the same as the reviewer
@@ -1045,7 +1045,7 @@ router.post("/api/post/grills-latvia/review", blockMaliciousIPs, applyWriteRateL
     const activeReviewCheck = await pool.query(
       `
       SELECT 1
-      FROM grills_latvia_reviews
+      FROM grills_lv_reviews
       WHERE ad_id = $1
         AND reviewer_id = $2
         AND parent IS NULL
@@ -1065,7 +1065,7 @@ router.post("/api/post/grills-latvia/review", blockMaliciousIPs, applyWriteRateL
     const deletedWithReplyCheck = await pool.query(
       `
       SELECT 1
-      FROM grills_latvia_reviews
+      FROM grills_lv_reviews
       WHERE ad_id = $1
         AND reviewer_id = $2
         AND parent IS NULL
@@ -1092,7 +1092,7 @@ router.post("/api/post/grills-latvia/review", blockMaliciousIPs, applyWriteRateL
     /* ---------- INSERT REVIEW ---------- */
     const insertReviewResult = await pool.query(
       `
-      INSERT INTO grills_latvia_reviews
+      INSERT INTO grills_lv_reviews
       (reviewer_name, review_text, date, reviewer_id, ad_id, parent, rating)
       VALUES ($1, $2, $3, $4, $5, NULL, $6)
       RETURNING id
@@ -1109,7 +1109,7 @@ router.post("/api/post/grills-latvia/review", blockMaliciousIPs, applyWriteRateL
     /* ---------- RECALCULATE AD STATS ---------- */
     await pool.query(
       `
-      UPDATE grills_latvia_ads
+      UPDATE grills_lv_ads
       SET
         average_rating = COALESCE(sub.avg, 0),
         reviews_count  = COALESCE(sub.cnt, 0)
@@ -1117,7 +1117,7 @@ router.post("/api/post/grills-latvia/review", blockMaliciousIPs, applyWriteRateL
         SELECT
           ROUND(AVG(rating), 1) AS avg,
           COUNT(*) AS cnt
-        FROM grills_latvia_reviews
+        FROM grills_lv_reviews
         WHERE ad_id = $1
           AND is_deleted = false
           AND parent IS NULL
@@ -1167,7 +1167,7 @@ router.post("/api/post/grills-latvia/reply", blockMaliciousIPs, applyWriteRateLi
     // 1️⃣ get google_id from session
     const sessionQ = `
       SELECT google_id
-      FROM grills_latvia_sessions
+      FROM grills_lv_sessions
       WHERE session_id = $1
       LIMIT 1
     `;
@@ -1183,7 +1183,7 @@ router.post("/api/post/grills-latvia/reply", blockMaliciousIPs, applyWriteRateLi
     // 2️⃣ verify owner owns this ad
     const adQ = `
       SELECT google_id
-      FROM grills_latvia_ads
+      FROM grills_lv_ads
       WHERE id = $1
       LIMIT 1
     `;
@@ -1203,7 +1203,7 @@ router.post("/api/post/grills-latvia/reply", blockMaliciousIPs, applyWriteRateLi
       now.getFullYear();
     // 4️⃣ insert reply
     const insertQ = `
-      INSERT INTO grills_latvia_reviews
+      INSERT INTO grills_lv_reviews
       (reviewer_name, review_text, date, reviewer_id, ad_id, parent, rating)
       VALUES ('Owner', $1, $2, $3, $4, $5, NULL)
       RETURNING id
@@ -1249,7 +1249,7 @@ router.post("/api/post/grills-latvia/delete-reply", blockMaliciousIPs, applyWrit
     // 1️⃣ get google_id from session
     const sessionQ = `
       SELECT google_id
-      FROM grills_latvia_sessions
+      FROM grills_lv_sessions
       WHERE session_id = $1
       LIMIT 1
     `;
@@ -1267,7 +1267,7 @@ router.post("/api/post/grills-latvia/delete-reply", blockMaliciousIPs, applyWrit
     // 2️⃣ verify ad ownership
     const adQ = `
       SELECT google_id
-      FROM grills_latvia_ads
+      FROM grills_lv_ads
       WHERE id = $1
       LIMIT 1
     `;
@@ -1284,7 +1284,7 @@ router.post("/api/post/grills-latvia/delete-reply", blockMaliciousIPs, applyWrit
     // 3️⃣ verify reply belongs to this ad + owner + is a reply
     const replyQ = `
       SELECT id
-      FROM grills_latvia_reviews
+      FROM grills_lv_reviews
       WHERE id = $1
         AND ad_id = $2
         AND parent IS NOT NULL
@@ -1307,7 +1307,7 @@ router.post("/api/post/grills-latvia/delete-reply", blockMaliciousIPs, applyWrit
 
     // 4️⃣ delete reply
     const deleteQ = `
-      DELETE FROM grills_latvia_reviews
+      DELETE FROM grills_lv_reviews
       WHERE id = $1
     `;
     await pool.query(deleteQ, [replyId]);
@@ -1359,7 +1359,7 @@ router.post("/api/post/grills-latvia/message", blockMaliciousIPs, applyWriteRate
       d.getMonth() + 1
     ).padStart(2, "0")}/${d.getFullYear()}`;
     const insertQ = `
-      INSERT INTO messages_grills_latvia
+      INSERT INTO messages_grills_lv
         (name, email, message, date)
       VALUES ($1, $2, $3, $4)
     `;
@@ -1403,7 +1403,7 @@ router.post("/api/post/grills-latvia/like", blockMaliciousIPs, applyWriteRateLim
     // ---------------------------------------
     const sessionQ = `
       SELECT google_id
-      FROM grills_latvia_sessions
+      FROM grills_lv_sessions
       WHERE session_id = $1
       LIMIT 1
     `;
@@ -1422,7 +1422,7 @@ router.post("/api/post/grills-latvia/like", blockMaliciousIPs, applyWriteRateLim
     // ---------------------------------------
     const adQ = `
       SELECT google_id
-      FROM grills_latvia_ads
+      FROM grills_lv_ads
       WHERE id = $1
       LIMIT 1
     `;
@@ -1441,7 +1441,7 @@ router.post("/api/post/grills-latvia/like", blockMaliciousIPs, applyWriteRateLim
     // ---------------------------------------
     const selectQ = `
       SELECT id, likers
-      FROM grills_latvia_likes
+      FROM grills_lv_likes
       WHERE ad_id = $1
       LIMIT 1
     `;
@@ -1462,7 +1462,7 @@ router.post("/api/post/grills-latvia/like", blockMaliciousIPs, applyWriteRateLim
 
         if (!likers.length) {
           await pool.query(
-            `DELETE FROM grills_latvia_likes WHERE id = $1`,
+            `DELETE FROM grills_lv_likes WHERE id = $1`,
             [row.id]
           );
           return res.json({
@@ -1472,7 +1472,7 @@ router.post("/api/post/grills-latvia/like", blockMaliciousIPs, applyWriteRateLim
           });
         }
         await pool.query(
-          `UPDATE grills_latvia_likes SET likers = $1 WHERE id = $2`,
+          `UPDATE grills_lv_likes SET likers = $1 WHERE id = $2`,
           [JSON.stringify(likers), row.id]
         );
         return res.json({
@@ -1484,7 +1484,7 @@ router.post("/api/post/grills-latvia/like", blockMaliciousIPs, applyWriteRateLim
       // ADD LIKE
       likers.push(liker_google_id);
       await pool.query(
-        `UPDATE grills_latvia_likes SET likers = $1 WHERE id = $2`,
+        `UPDATE grills_lv_likes SET likers = $1 WHERE id = $2`,
         [JSON.stringify(likers), row.id]
       );
 
@@ -1498,7 +1498,7 @@ router.post("/api/post/grills-latvia/like", blockMaliciousIPs, applyWriteRateLim
     // CASE B: NO ROW → CREATE NEW
     // ---------------------------------------
     const insertQ = `
-      INSERT INTO grills_latvia_likes (ad_id, master_id, likers)
+      INSERT INTO grills_lv_likes (ad_id, master_id, likers)
       VALUES ($1, $2, $3)
     `;
     await pool.query(insertQ, [
@@ -1537,7 +1537,7 @@ router.get("/api/get/grills-latvia/like-status", applyReadRateLimit, async (req,
     // Always fetch likes first (PUBLIC)
     const q = `
       SELECT likers
-      FROM grills_latvia_likes
+      FROM grills_lv_likes
       WHERE ad_id = $1
       LIMIT 1
     `;
@@ -1555,7 +1555,7 @@ router.get("/api/get/grills-latvia/like-status", applyReadRateLimit, async (req,
     // Logged user → check session
     const sessionQ = `
       SELECT google_id
-      FROM grills_latvia_sessions
+      FROM grills_lv_sessions
       WHERE session_id = $1
       LIMIT 1
     `;
@@ -1601,7 +1601,7 @@ router.get("/api/get/grills-latvia/reviews/:ad_id", applyReadRateLimit, async (r
         reviewer_id,
         parent,
         rating
-      FROM grills_latvia_reviews
+      FROM grills_lv_reviews
       WHERE ad_id = $1
         AND is_deleted = false
       ORDER BY id ASC
@@ -1641,7 +1641,7 @@ router.get("/api/get/grills-latvia/profile-reviews-ads", applyReadRateLimit, asy
     /* get google id from session */
     const sessionQuery = `
       SELECT google_id
-      FROM grills_latvia_sessions
+      FROM grills_lv_sessions
       WHERE session_id = $1
       LIMIT 1;
     `;
@@ -1660,21 +1660,21 @@ router.get("/api/get/grills-latvia/profile-reviews-ads", applyReadRateLimit, asy
     /* reviews + ad data (NO aliases) */
     const reviewsQuery = `
       SELECT
-        grills_latvia_reviews.id,
-        grills_latvia_reviews.review_text,
-        grills_latvia_reviews.rating,
-        grills_latvia_reviews.date,
-        grills_latvia_reviews.ad_id,
+        grills_lv_reviews.id,
+        grills_lv_reviews.review_text,
+        grills_lv_reviews.rating,
+        grills_lv_reviews.date,
+        grills_lv_reviews.ad_id,
 
-        grills_latvia_ads.name  AS ad_owner_name,
-        grills_latvia_ads.image_url AS ad_image_url
-      FROM grills_latvia_reviews
-      JOIN grills_latvia_ads
-        ON grills_latvia_ads.id = grills_latvia_reviews.ad_id
-      WHERE grills_latvia_reviews.reviewer_id = $1
-        AND grills_latvia_reviews.is_deleted = false
-        AND grills_latvia_reviews.parent IS NULL
-      ORDER BY grills_latvia_reviews.id DESC;
+        grills_lv_ads.name  AS ad_owner_name,
+        grills_lv_ads.image_url AS ad_image_url
+      FROM grills_lv_reviews
+      JOIN grills_lv_ads
+        ON grills_lv_ads.id = grills_lv_reviews.ad_id
+      WHERE grills_lv_reviews.reviewer_id = $1
+        AND grills_lv_reviews.is_deleted = false
+        AND grills_lv_reviews.parent IS NULL
+      ORDER BY grills_lv_reviews.id DESC;
     `;
 
     const reviewsRes = await pool.query(reviewsQuery, [googleId]);
@@ -1712,7 +1712,7 @@ router.get("/api/get/grills-latvia/profile-replies-ads", applyReadRateLimit, asy
     /* get google id from session */
     const sessionQuery = `
       SELECT google_id
-      FROM grills_latvia_sessions
+      FROM grills_lv_sessions
       WHERE session_id = $1
       LIMIT 1;
     `;
@@ -1733,20 +1733,20 @@ router.get("/api/get/grills-latvia/profile-replies-ads", applyReadRateLimit, asy
     // replies written BY the user 
     const repliesQuery = `
       SELECT
-        grills_latvia_reviews.id,
-        grills_latvia_reviews.review_text,
-        grills_latvia_reviews.date,
-        grills_latvia_reviews.ad_id,
+        grills_lv_reviews.id,
+        grills_lv_reviews.review_text,
+        grills_lv_reviews.date,
+        grills_lv_reviews.ad_id,
 
-        grills_latvia_ads.name  AS ad_owner_name,
-        grills_latvia_ads.image_url AS ad_image_url
-      FROM grills_latvia_reviews
-      JOIN grills_latvia_ads
-        ON grills_latvia_ads.id = grills_latvia_reviews.ad_id
-      WHERE grills_latvia_reviews.reviewer_id = $1
-        AND grills_latvia_reviews.parent IS NOT NULL
-        AND grills_latvia_reviews.is_deleted = false
-      ORDER BY grills_latvia_reviews.id DESC;
+        grills_lv_ads.name  AS ad_owner_name,
+        grills_lv_ads.image_url AS ad_image_url
+      FROM grills_lv_reviews
+      JOIN grills_lv_ads
+        ON grills_lv_ads.id = grills_lv_reviews.ad_id
+      WHERE grills_lv_reviews.reviewer_id = $1
+        AND grills_lv_reviews.parent IS NOT NULL
+        AND grills_lv_reviews.is_deleted = false
+      ORDER BY grills_lv_reviews.id DESC;
     `;
 
     const repliesRes = await pool.query(repliesQuery, [googleId]);
@@ -1794,7 +1794,7 @@ router.delete("/api/delete/grills-latvia/review/:id", blockMaliciousIPs, applyWr
     const sessionRes = await pool.query(
       `
       SELECT google_id
-      FROM grills_latvia_sessions
+      FROM grills_lv_sessions
       WHERE session_id = $1
       LIMIT 1;
       `,
@@ -1813,7 +1813,7 @@ router.delete("/api/delete/grills-latvia/review/:id", blockMaliciousIPs, applyWr
     const ownershipRes = await pool.query(
       `
       SELECT id, parent, ad_id
-      FROM grills_latvia_reviews
+      FROM grills_lv_reviews
       WHERE id = $1
         AND reviewer_id = $2
       LIMIT 1;
@@ -1833,7 +1833,7 @@ router.delete("/api/delete/grills-latvia/review/:id", blockMaliciousIPs, applyWr
     // Reply → hard delete
     if (parent !== null) {
       await pool.query(
-        `DELETE FROM grills_latvia_reviews WHERE id = $1;`,
+        `DELETE FROM grills_lv_reviews WHERE id = $1;`,
         [reviewId]
       );
     } else {
@@ -1841,7 +1841,7 @@ router.delete("/api/delete/grills-latvia/review/:id", blockMaliciousIPs, applyWr
       const replyRes = await pool.query(
         `
         SELECT 1
-        FROM grills_latvia_reviews
+        FROM grills_lv_reviews
         WHERE parent = $1
         LIMIT 1;
         `,
@@ -1852,7 +1852,7 @@ router.delete("/api/delete/grills-latvia/review/:id", blockMaliciousIPs, applyWr
         // Soft delete review + replies
         await pool.query(
           `
-          UPDATE grills_latvia_reviews
+          UPDATE grills_lv_reviews
           SET is_deleted = true
           WHERE id = $1 OR parent = $1;
           `,
@@ -1861,7 +1861,7 @@ router.delete("/api/delete/grills-latvia/review/:id", blockMaliciousIPs, applyWr
       } else {
         // Hard delete review
         await pool.query(
-          `DELETE FROM grills_latvia_reviews WHERE id = $1;`,
+          `DELETE FROM grills_lv_reviews WHERE id = $1;`,
           [reviewId]
         );
       }
@@ -1869,7 +1869,7 @@ router.delete("/api/delete/grills-latvia/review/:id", blockMaliciousIPs, applyWr
     /* ---------- RECALCULATE STATS ---------- */
     await pool.query(
       `
-      UPDATE grills_latvia_ads
+      UPDATE grills_lv_ads
       SET
         average_rating = COALESCE(sub.avg, 0),
         reviews_count  = COALESCE(sub.cnt, 0)
@@ -1877,7 +1877,7 @@ router.delete("/api/delete/grills-latvia/review/:id", blockMaliciousIPs, applyWr
         SELECT
           ROUND(AVG(rating), 1) AS avg,
           COUNT(*) AS cnt
-        FROM grills_latvia_reviews
+        FROM grills_lv_reviews
         WHERE ad_id = $1
           AND is_deleted = false
           AND parent IS NULL
@@ -1918,13 +1918,13 @@ router.get("/api/get/grills-latvia/session-user", blockMaliciousIPs, applyReadRa
   try {
     const query = `
       SELECT 
-        grills_latvia_users.google_id,
-        grills_latvia_users.email,
-        grills_latvia_users.name
-      FROM grills_latvia_sessions
-      JOIN grills_latvia_users
-        ON grills_latvia_users.google_id = grills_latvia_sessions.google_id
-      WHERE grills_latvia_sessions.session_id = $1
+        grills_lv_users.google_id,
+        grills_lv_users.email,
+        grills_lv_users.name
+      FROM grills_lv_sessions
+      JOIN grills_lv_users
+        ON grills_lv_users.google_id = grills_lv_sessions.google_id
+      WHERE grills_lv_sessions.session_id = $1
       LIMIT 1;
     `;
 
@@ -1998,7 +1998,7 @@ router.post("/api/post/grills-latvia/auth/email-register", blockMaliciousIPs, ap
   try {
     const checkQ = `
       SELECT google_id
-      FROM grills_latvia_users
+      FROM grills_lv_users
       WHERE email = $1
       LIMIT 1
     `;
@@ -2079,7 +2079,7 @@ router.post("/api/post/grills-latvia/auth/email-login", blockMaliciousIPs, apply
   try {
     const userQ = `
       SELECT google_id, email, name, password_hash, auth_provider, email_verified
-      FROM grills_latvia_users
+      FROM grills_lv_users
       WHERE email = $1
       LIMIT 1
     `;
@@ -2150,7 +2150,7 @@ router.post("/api/post/grills-latvia/auth/email-forget", blockMaliciousIPs, appl
     client = await pool.connect();
     const userQuery = `
       SELECT google_id, email, name, auth_provider
-      FROM grills_latvia_users
+      FROM grills_lv_users
       WHERE LOWER(email) = $1
       LIMIT 1;
     `;
@@ -2174,7 +2174,7 @@ router.post("/api/post/grills-latvia/auth/email-forget", blockMaliciousIPs, appl
     const resetToken = crypto.randomBytes(32).toString("hex");
     const resetExpires = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
     const updateQuery = `
-      UPDATE grills_latvia_users
+      UPDATE grills_lv_users
       SET password_reset_token = $1,
           password_reset_expires = $2
       WHERE google_id = $3
@@ -2246,7 +2246,7 @@ router.post("/api/post/grills-latvia/auth/email-reset", blockMaliciousIPs, apply
 
     const userQuery = `
       SELECT google_id, email, password_reset_token, password_reset_expires
-      FROM grills_latvia_users
+      FROM grills_lv_users
       WHERE password_reset_token = $1
       LIMIT 1;
     `;
@@ -2273,7 +2273,7 @@ router.post("/api/post/grills-latvia/auth/email-reset", blockMaliciousIPs, apply
     const newPasswordHash = await bcrypt.hash(newPassword, 12);
 
     const updateQuery = `
-      UPDATE grills_latvia_users
+      UPDATE grills_lv_users
       SET password_hash = $1,
           password_reset_token = NULL,
           password_reset_expires = NULL
@@ -2322,7 +2322,7 @@ router.post("/api/post/grills-latvia/auth/email-verify", blockMaliciousIPs, appl
 
     const checkQ = `
       SELECT google_id
-      FROM grills_latvia_users
+      FROM grills_lv_users
       WHERE email = $1
       LIMIT 1
     `;
@@ -2354,7 +2354,7 @@ router.post("/api/post/grills-latvia/auth/email-verify", blockMaliciousIPs, appl
       googleId = generateEmailGoogleId();
 
       const r = await pool.query(
-        `SELECT google_id FROM grills_latvia_users WHERE google_id = $1 LIMIT 1`,
+        `SELECT google_id FROM grills_lv_users WHERE google_id = $1 LIMIT 1`,
         [googleId]
       );
 
@@ -2368,7 +2368,7 @@ router.post("/api/post/grills-latvia/auth/email-verify", blockMaliciousIPs, appl
     const today = new Date().toISOString().slice(0, 10);
 
     const insertQ = `
-      INSERT INTO grills_latvia_users
+      INSERT INTO grills_lv_users
       (google_id, email, name, date, ip, auth_provider, password_hash, email_verified)
       VALUES ($1,$2,$3,$4,$5,$6,$7,true)
       RETURNING google_id
@@ -2438,7 +2438,7 @@ router.get("/api/get/grills-latvia/ad/:id", applyReadRateLimit, async (req, res)
         id, name, description, price, city, date, views,
         image_url, google_id,
         average_rating, reviews_count
-      FROM grills_latvia_ads
+      FROM grills_lv_ads
       WHERE id = $1
       LIMIT 1
     `;
@@ -2459,14 +2459,14 @@ router.get("/api/get/grills-latvia/ad/:id", applyReadRateLimit, async (req, res)
     // --- REGION BASED ---
     if (region !== undefined) {
       const newerQ = `
-        SELECT id FROM grills_latvia_ads
+        SELECT id FROM grills_lv_ads
         WHERE id > $1
           AND city @> $2
         ORDER BY id ASC
         LIMIT 1
       `;
       const olderQ = `
-        SELECT id FROM grills_latvia_ads
+        SELECT id FROM grills_lv_ads
         WHERE id < $1
           AND city @> $2
         ORDER BY id DESC
@@ -2480,7 +2480,7 @@ router.get("/api/get/grills-latvia/ad/:id", applyReadRateLimit, async (req, res)
     // --- FALLBACK (global) ---
     if (!newerId) {
       const r = await pool.query(
-        `SELECT id FROM grills_latvia_ads
+        `SELECT id FROM grills_lv_ads
         WHERE id > $1
         ORDER BY id ASC
         LIMIT 1`,
@@ -2490,7 +2490,7 @@ router.get("/api/get/grills-latvia/ad/:id", applyReadRateLimit, async (req, res)
     }
     if (!olderId) {
       const r = await pool.query(
-        `SELECT id FROM grills_latvia_ads
+        `SELECT id FROM grills_lv_ads
         WHERE id < $1
         ORDER BY id DESC
         LIMIT 1`,
@@ -2533,7 +2533,7 @@ router.get("/api/get/grills-latvia/user-ads", applyReadRateLimit, async (req, re
     // find google_id from session
     const sessionQuery = `
       SELECT google_id
-      FROM grills_latvia_sessions
+      FROM grills_lv_sessions
       WHERE session_id = $1
       LIMIT 1;
     `;
@@ -2558,7 +2558,7 @@ router.get("/api/get/grills-latvia/user-ads", applyReadRateLimit, async (req, re
         date,
         created_at,      
         is_active       
-      FROM grills_latvia_ads
+      FROM grills_lv_ads
       WHERE google_id = $1
       ORDER BY date DESC, id DESC;
     `;
@@ -2626,7 +2626,7 @@ router.get("/api/get/grills-latvia/search", blockMaliciousIPs, applyReadRateLimi
     // 1️⃣ capped count
     const countQ = `
       SELECT COUNT(*)
-      FROM grills_latvia_ads
+      FROM grills_lv_ads
       WHERE is_active = true
         AND (description ILIKE $1)
     `;
@@ -2642,7 +2642,7 @@ router.get("/api/get/grills-latvia/search", blockMaliciousIPs, applyReadRateLimi
         id, name, description, price, city, date, views,
         image_url, google_id,
         average_rating, reviews_count
-      FROM grills_latvia_ads
+      FROM grills_lv_ads
       WHERE is_active = true
         AND (description ILIKE $1)
       ORDER BY date DESC
@@ -2759,7 +2759,7 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
 
     const countQ = `
       SELECT COUNT(*)
-      FROM grills_latvia_ads
+      FROM grills_lv_ads
       ${whereClause}
     `;
     const countR = await pool.query(countQ, values);
@@ -2773,7 +2773,7 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
         id, name, description, price, city, date, views,
         image_url, google_id,
         average_rating, reviews_count
-      FROM grills_latvia_ads
+      FROM grills_lv_ads
       ${whereClause}
       ORDER BY date DESC
       LIMIT $${i} OFFSET $${i + 1}
@@ -2813,7 +2813,7 @@ router.get("/api/get/grills-latvia/homepage/carousel", async (req, res) => {
         average_rating,
         reviews_count,
         image_url ->> 0 AS image
-      FROM grills_latvia_carousel
+      FROM grills_lv_carousel
       ORDER BY id DESC
     `;
     const result = await pool.query(q);
