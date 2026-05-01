@@ -361,7 +361,7 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
         cleanInputDescription,                   // $2
         cleanInputPrice,                         // $3
         JSON.stringify(inputRegions),            // $4 (city)
-        locationArray,                                // $5 ✅ location (jsonb)
+        JSON.stringify(locationArray),           // $5 (jsonb)
         JSON.stringify(uploadedImages),          // $6
         ipVisitor,                                // $7
         googleId,                                 // $8
