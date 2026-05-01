@@ -370,7 +370,11 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
         new Date(),                               // $11
         true                                      // $12
       ];
-      
+      console.log("[grills-latvia/ads] city value:", JSON.stringify(inputRegions));
+console.log("[grills-latvia/ads] location value:", locationArray);
+console.log("[grills-latvia/ads] image_url value:", JSON.stringify(uploadedImages));
+console.log("[grills-latvia/ads] all values types:", values.map((v, i) => `$${i+1}: ${typeof v} = ${JSON.stringify(v)}`));
+console.log("[grills-latvia/ads] price raw:", inputPrice, "| cleaned:", cleanInputPrice, "| type:", typeof cleanInputPrice);
       const result = await client.query(insertQuery, values);
       if (!result.rowCount) {
         console.log("[grills-latvia/ads] DB insert returned no rows");
