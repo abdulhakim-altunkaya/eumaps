@@ -2490,7 +2490,12 @@ router.get("/api/get/grills-latvia/ad/:id", applyReadRateLimit, async (req, res)
     console.log("[grills-latvia/ad] ad.image_url:", ad.image_url, "| type:", typeof ad.image_url);
     console.log("[grills-latvia/ad] ad raw:", JSON.stringify(ad));
 
-    const region = ad.city?.[0];
+    const cityArr = Array.isArray(ad.city)
+      ? ad.city
+      : typeof ad.city === "string"
+        ? JSON.parse(ad.city)
+        : [];
+    const region = cityArr[0];
     console.log("[grills-latvia/ad] region:", region);
     let newerId = null;
     let olderId = null;
