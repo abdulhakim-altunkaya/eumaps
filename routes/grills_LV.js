@@ -2499,14 +2499,14 @@ router.get("/api/get/grills-latvia/ad/:id", applyReadRateLimit, async (req, res)
       const newerQ = `
         SELECT id FROM grills_lv_ads
         WHERE id > $1
-          AND city @> $2
+          AND city::jsonb @> $2::jsonb
         ORDER BY id ASC
         LIMIT 1
       `;
       const olderQ = `
         SELECT id FROM grills_lv_ads
         WHERE id < $1
-          AND city @> $2
+          AND city::jsonb @> $2::jsonb
         ORDER BY id DESC
         LIMIT 1
       `;
