@@ -190,11 +190,10 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
       resErrorCode: 9
     });
   }
-  if (inputName.length < 5 || inputName.length > 40) {
-    console.log("[grills-latvia/ads] inputName length invalid:", inputName.length);
+  if (inputName.length < 5 || inputName.length > 120) {
     return res.status(400).json({
       resStatus: false,
-      resMessage: "Vārds ir pārāk garš vai pārāk īss",
+      resMessage: "Virsraksts ir pārāk garš vai pārāk īss",
       resErrorCode: 10
     });
   }
