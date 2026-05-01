@@ -2463,6 +2463,7 @@ router.post("/api/post/grills-latvia/auth/email-verify", blockMaliciousIPs, appl
 
 router.get("/api/get/grills-latvia/ad/:id", applyReadRateLimit, async (req, res) => {
   const adId = req.params.id;
+  console.log("[grills-latvia/ad] GET request, adId:", adId);
   try {
     const q = `
       SELECT 
@@ -2474,20 +2475,26 @@ router.get("/api/get/grills-latvia/ad/:id", applyReadRateLimit, async (req, res)
       LIMIT 1
     `;
     const r = await pool.query(q, [adId]);
+    console.log("[grills-latvia/ad] DB rowCount:", r.rowCount);
     if (!r.rowCount) {
+      console.log("[grills-latvia/ad] Ad not found for id:", adId);
       return res.json({
         resStatus: false,
         resErrorCode: 1,
-        resMessage:"Vieta nav atrasta"
+        resMessage: "Vieta nav atrasta"
       });
     }
 
     const ad = r.rows[0];
-    // extract single region (since it's only 1 element in the city array.)
+    console.log("[grills-latvia/ad] ad.city:", ad.city, "| type:", typeof ad.city, "| isArray:", Array.isArray(ad.city));
+    console.log("[grills-latvia/ad] ad.image_url:", ad.image_url, "| type:", typeof ad.image_url);
+    console.log("[grills-latvia/ad] ad raw:", JSON.stringify(ad));
+
     const region = ad.city?.[0];
+    console.log("[grills-latvia/ad] region:", region);
     let newerId = null;
     let olderId = null;
-    // --- REGION BASED ---
+
     if (region !== undefined) {
       const newerQ = `
         SELECT id FROM grills_lv_ads
@@ -2507,29 +2514,29 @@ router.get("/api/get/grills-latvia/ad/:id", applyReadRateLimit, async (req, res)
       const olderR = await pool.query(olderQ, [adId, [region]]);
       newerId = newerR.rows[0]?.id || null;
       olderId = olderR.rows[0]?.id || null;
+      console.log("[grills-latvia/ad] region-based newerId:", newerId, "| olderId:", olderId);
+    } else {
+      console.log("[grills-latvia/ad] region undefined, skipping region-based nav");
     }
-    // --- FALLBACK (global) ---
+
     if (!newerId) {
       const r = await pool.query(
-        `SELECT id FROM grills_lv_ads
-        WHERE id > $1
-        ORDER BY id ASC
-        LIMIT 1`,
+        `SELECT id FROM grills_lv_ads WHERE id > $1 ORDER BY id ASC LIMIT 1`,
         [adId]
       );
       newerId = r.rows[0]?.id || null;
+      console.log("[grills-latvia/ad] fallback newerId:", newerId);
     }
     if (!olderId) {
       const r = await pool.query(
-        `SELECT id FROM grills_lv_ads
-        WHERE id < $1
-        ORDER BY id DESC
-        LIMIT 1`,
+        `SELECT id FROM grills_lv_ads WHERE id < $1 ORDER BY id DESC LIMIT 1`,
         [adId]
       );
       olderId = r.rows[0]?.id || null;
+      console.log("[grills-latvia/ad] fallback olderId:", olderId);
     }
 
+    console.log("[grills-latvia/ad] sending response, newerId:", newerId, "| olderId:", olderId);
     return res.json({
       resStatus: true,
       resOkCode: 1,
@@ -2539,7 +2546,7 @@ router.get("/api/get/grills-latvia/ad/:id", applyReadRateLimit, async (req, res)
     });
 
   } catch (err) {
-    console.error("GET ad error:", err);
+    console.error("[grills-latvia/ad] error:", err.message);
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 2,
