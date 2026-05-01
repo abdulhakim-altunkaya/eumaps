@@ -2843,6 +2843,9 @@ router.get("/api/get/grills-latvia/map-postings", blockMaliciousIPs, applyReadRa
         SELECT
           id,
           name,
+          description,
+          price,
+          city,
           location,
           image_url
         FROM grills_lv_ads
