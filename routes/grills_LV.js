@@ -2515,8 +2515,8 @@ router.get("/api/get/grills-latvia/ad/:id", applyReadRateLimit, async (req, res)
         ORDER BY id DESC
         LIMIT 1
       `;
-      const newerR = await pool.query(newerQ, [adId, [region]]);
-      const olderR = await pool.query(olderQ, [adId, [region]]);
+      const newerR = await pool.query(newerQ, [adId, JSON.stringify([region])]);
+      const olderR = await pool.query(olderQ, [adId, JSON.stringify([region])]);
       newerId = newerR.rows[0]?.id || null;
       olderId = olderR.rows[0]?.id || null;
       console.log("[grills-latvia/ad] region-based newerId:", newerId, "| olderId:", olderId);
