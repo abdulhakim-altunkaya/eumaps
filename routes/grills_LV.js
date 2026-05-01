@@ -2831,7 +2831,50 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
     });
   }
 });
-
+router.get("/api/get/grills-latvia/map-postings", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
+    let client;
+    try {
+      const ipVisitor = req.headers["x-forwarded-for"]
+        ? req.headers["x-forwarded-for"].split(",")[0]
+        : req.socket.remoteAddress || req.ip;
+      console.log("[grills-latvia/map-postings] GET request from IP:", ipVisitor);
+      client = await pool.connect();
+      const query = `
+        SELECT
+          id,
+          name,
+          location,
+          image_url
+        FROM grills_lv_ads
+        WHERE is_active = true
+          AND location IS NOT NULL
+        ORDER BY id DESC
+        LIMIT 1000
+      `;
+      const result = await client.query(query);
+      console.log(
+        "[grills-latvia/map-postings] Postings loaded:",
+        result.rowCount
+      );
+      return res.status(200).json({
+        resStatus: true,
+        postings: result.rows
+      });
+    } catch (err) {
+      console.log(
+        "[grills-latvia/map-postings] Server error:",
+        err.message
+      );
+      return res.status(500).json({
+        resStatus: false,
+        resMessage: "Servera kļūda",
+        resErrorCode: 1
+      });
+    } finally {
+      if (client) client.release();
+    }
+  }
+);
 router.get("/api/get/grills-latvia/homepage/carousel", async (req, res) => {
   try {
     const q = `
