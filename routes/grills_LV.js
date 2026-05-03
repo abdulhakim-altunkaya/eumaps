@@ -564,7 +564,7 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       resErrorCode: 11
     });
   }
-  if (inputName.length < 5 || inputName.length > 40) {
+  if (inputName.length < 5 || inputName.length > 120) {
     return res.status(400).json({
       resStatus: false,
       resMessage: "Vārds ir pārāk garš vai pārāk īss",
@@ -2719,6 +2719,7 @@ router.get("/api/get/grills-latvia/search", blockMaliciousIPs, applyReadRateLimi
 });
 router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMaliciousIPs, async (req, res) => {
   const q = (req.query.q || "").trim();
+
   if (q.length < 3 || q.length > 60) {
     return res.json({
       resStatus: false,
@@ -2726,6 +2727,7 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
       resMessage: "Meklējums par īsu vai garu"
     });
   }
+
   if (!/^[^<>]{3,60}$/.test(q)) {
     return res.json({
       resStatus: false,
@@ -2733,7 +2735,9 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
       resMessage: "Nederīgs meklējums"
     });
   }
-  const { city, minRating, minReviews } = req.query;
+
+  const { city, price, minReviews, minLikes } = req.query;
+
   const PAGE_SIZE = 12;
   const HARD_CAP = 1000;
 
@@ -2761,15 +2765,15 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
     const values = [];
     let i = 1;
 
-    // base search
     conditions.push(`is_active = true`);
-    conditions.push(`(description ILIKE $${i})`);
+    conditions.push(`description ILIKE $${i}`);
     values.push(`%${q}%`);
     i++;
 
-    // city filter
+    // city
     if (city) {
       const cityId = Number(city);
+
       if (!Number.isNaN(cityId)) {
         conditions.push(`city::jsonb @> $${i}::jsonb`);
         values.push(JSON.stringify([cityId]));
@@ -2777,22 +2781,37 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
       }
     }
 
-    // rating filter
-    if (minRating) {
-      const r = Number(minRating);
-      if (!Number.isNaN(r)) {
-        conditions.push(`average_rating >= $${i}`);
-        values.push(r);
+    // free / paid
+    if (price === "free") {
+      conditions.push(`TRIM(price) = $${i}`);
+      values.push("Bezmaksas");
+      i++;
+    }
+
+    if (price === "paid") {
+      conditions.push(`TRIM(price) <> $${i}`);
+      values.push("Bezmaksas");
+      i++;
+    }
+
+    // reviews
+    if (minReviews) {
+      const rc = Number(minReviews);
+
+      if (!Number.isNaN(rc)) {
+        conditions.push(`reviews_count >= $${i}`);
+        values.push(rc);
         i++;
       }
     }
 
-    // reviews filter
-    if (minReviews) {
-      const rc = Number(minReviews);
-      if (!Number.isNaN(rc)) {
-        conditions.push(`reviews_count >= $${i}`);
-        values.push(rc);
+    // likes
+    if (minLikes) {
+      const lc = Number(minLikes);
+
+      if (!Number.isNaN(lc)) {
+        conditions.push(`likes_count >= $${i}`);
+        values.push(lc);
         i++;
       }
     }
@@ -2804,6 +2823,7 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
       FROM grills_lv_ads
       ${whereClause}
     `;
+
     const countR = await pool.query(countQ, values);
 
     const realTotal = parseInt(countR.rows[0].count, 10);
@@ -2811,10 +2831,10 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
     const totalPages = Math.ceil(totalResults / PAGE_SIZE);
 
     const dataQ = `
-      SELECT 
+      SELECT
         id, name, description, price, city, date, views,
         image_url, google_id,
-        average_rating, reviews_count
+        average_rating, reviews_count, likes_count
       FROM grills_lv_ads
       ${whereClause}
       ORDER BY date DESC
@@ -2836,6 +2856,7 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
 
   } catch (err) {
     console.error("Search filter error:", err);
+
     return res.status(500).json({
       resStatus: false,
       resMessage: "Servera kļūda"
