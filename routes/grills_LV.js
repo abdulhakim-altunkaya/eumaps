@@ -2880,6 +2880,148 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
     });
   }
 });
+router.get("/api/get/grills-latvia/index-filter", applyReadRateLimit, blockMaliciousIPs, async (req, res) => {
+  const { city, price, minReviews, minLikes } = req.query;
+
+  const PAGE_SIZE = 12;
+  const HARD_CAP = 1000;
+
+  let page = parseInt(req.query.page, 10) || 1;
+  if (page < 1) page = 1;
+
+  const limit = PAGE_SIZE;
+  const offset = (page - 1) * limit;
+
+  if (offset >= HARD_CAP) {
+    return res.json({
+      resStatus: true,
+      ads: [],
+      pagination: {
+        page,
+        pageSize: PAGE_SIZE,
+        totalResults: HARD_CAP,
+        totalPages: Math.ceil(HARD_CAP / PAGE_SIZE)
+      }
+    });
+  }
+
+  try {
+    const conditions = [];
+    const values = [];
+    let i = 1;
+
+    conditions.push(`a.is_active = true`);
+
+    if (city) {
+      const cityId = Number(city);
+
+      if (!Number.isNaN(cityId)) {
+        conditions.push(`a.city::jsonb @> $${i}::jsonb`);
+        values.push(JSON.stringify([cityId]));
+        i++;
+      }
+    }
+
+    if (price === "free") {
+      conditions.push(`TRIM(a.price) = $${i}`);
+      values.push("Bezmaksas");
+      i++;
+    }
+
+    if (price === "paid") {
+      conditions.push(`a.price IS NOT NULL AND TRIM(a.price) <> '' AND TRIM(a.price) <> $${i}`);
+      values.push("Bezmaksas");
+      i++;
+    }
+
+    if (minReviews) {
+      const rc = Number(minReviews);
+
+      if (!Number.isNaN(rc)) {
+        conditions.push(`a.reviews_count >= $${i}`);
+        values.push(rc);
+        i++;
+      }
+    }
+
+    if (minLikes) {
+      const lc = Number(minLikes);
+
+      if (!Number.isNaN(lc)) {
+        conditions.push(`COALESCE(l.likes_count, 0) >= $${i}`);
+        values.push(lc);
+        i++;
+      }
+    }
+
+    const whereClause = `WHERE ${conditions.join(" AND ")}`;
+
+    const likesJoin = `
+      LEFT JOIN (
+        SELECT
+          ad_id,
+          COALESCE(MAX(jsonb_array_length(likers)), 0) AS likes_count
+        FROM grills_lv_likes
+        GROUP BY ad_id
+      ) l ON l.ad_id = a.id
+    `;
+
+    const countQ = `
+      SELECT COUNT(*)
+      FROM grills_lv_ads a
+      ${likesJoin}
+      ${whereClause}
+    `;
+
+    const countR = await pool.query(countQ, values);
+
+    const realTotal = parseInt(countR.rows[0].count, 10);
+    const totalResults = Math.min(realTotal, HARD_CAP);
+    const totalPages = Math.ceil(totalResults / PAGE_SIZE);
+
+    const dataQ = `
+      SELECT
+        a.id,
+        a.name,
+        a.description,
+        a.price,
+        a.city,
+        a.date,
+        a.views,
+        a.image_url,
+        a.google_id,
+        a.average_rating,
+        a.reviews_count,
+        COALESCE(l.likes_count, 0) AS likes_count
+      FROM grills_lv_ads a
+      ${likesJoin}
+      ${whereClause}
+      ORDER BY a.date DESC
+      LIMIT $${i} OFFSET $${i + 1}
+    `;
+
+    const dataR = await pool.query(dataQ, [...values, limit, offset]);
+
+    return res.json({
+      resStatus: true,
+      ads: dataR.rows,
+      pagination: {
+        page,
+        pageSize: PAGE_SIZE,
+        totalResults,
+        totalPages
+      }
+    });
+
+  } catch (err) {
+    console.error("Index filter error:", err);
+
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Servera kļūda"
+    });
+  }
+});
 router.get("/api/get/grills-latvia/map-postings", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
     let client;
     try {
