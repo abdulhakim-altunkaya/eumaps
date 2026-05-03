@@ -2765,8 +2765,8 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
     const values = [];
     let i = 1;
 
-    conditions.push(`is_active = true`);
-    conditions.push(`description ILIKE $${i}`);
+    conditions.push(`a.is_active = true`);
+    conditions.push(`a.description ILIKE $${i}`);
     values.push(`%${q}%`);
     i++;
 
@@ -2775,7 +2775,7 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
       const cityId = Number(city);
 
       if (!Number.isNaN(cityId)) {
-        conditions.push(`city::jsonb @> $${i}::jsonb`);
+        conditions.push(`a.city::jsonb @> $${i}::jsonb`);
         values.push(JSON.stringify([cityId]));
         i++;
       }
@@ -2783,13 +2783,13 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
 
     // free / paid
     if (price === "free") {
-      conditions.push(`TRIM(price) = $${i}`);
+      conditions.push(`TRIM(a.price) = $${i}`);
       values.push("Bezmaksas");
       i++;
     }
 
     if (price === "paid") {
-      conditions.push(`TRIM(price) <> $${i}`);
+      conditions.push(`TRIM(a.price) <> $${i}`);
       values.push("Bezmaksas");
       i++;
     }
@@ -2799,18 +2799,27 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
       const rc = Number(minReviews);
 
       if (!Number.isNaN(rc)) {
-        conditions.push(`reviews_count >= $${i}`);
+        conditions.push(`a.reviews_count >= $${i}`);
         values.push(rc);
         i++;
       }
     }
 
-    // likes
+    // likes (from grills_lv_likes table)
     if (minLikes) {
       const lc = Number(minLikes);
 
       if (!Number.isNaN(lc)) {
-        conditions.push(`likes_count >= $${i}`);
+        conditions.push(`
+          COALESCE(
+            jsonb_array_length(
+              CASE
+                WHEN l.likers IS NULL OR l.likers = '' THEN '[]'::jsonb
+                ELSE l.likers::jsonb
+              END
+            ), 0
+          ) >= $${i}
+        `);
         values.push(lc);
         i++;
       }
@@ -2820,7 +2829,8 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
 
     const countQ = `
       SELECT COUNT(*)
-      FROM grills_lv_ads
+      FROM grills_lv_ads a
+      LEFT JOIN grills_lv_likes l ON l.ad_id = a.id
       ${whereClause}
     `;
 
@@ -2832,12 +2842,29 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
 
     const dataQ = `
       SELECT
-        id, name, description, price, city, date, views,
-        image_url, google_id,
-        average_rating, reviews_count, likes_count
-      FROM grills_lv_ads
+        a.id,
+        a.name,
+        a.description,
+        a.price,
+        a.city,
+        a.date,
+        a.views,
+        a.image_url,
+        a.google_id,
+        a.average_rating,
+        a.reviews_count,
+        COALESCE(
+          jsonb_array_length(
+            CASE
+              WHEN l.likers IS NULL OR l.likers = '' THEN '[]'::jsonb
+              ELSE l.likers::jsonb
+            END
+          ), 0
+        ) AS likes_count
+      FROM grills_lv_ads a
+      LEFT JOIN grills_lv_likes l ON l.ad_id = a.id
       ${whereClause}
-      ORDER BY date DESC
+      ORDER BY a.date DESC
       LIMIT $${i} OFFSET $${i + 1}
     `;
 
