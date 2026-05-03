@@ -2805,20 +2805,24 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
       }
     }
 
-    // likes (from grills_lv_likes table)
+    // likes
     if (minLikes) {
       const lc = Number(minLikes);
 
       if (!Number.isNaN(lc)) {
         conditions.push(`
-          COALESCE(
-            jsonb_array_length(
-              CASE
-                WHEN l.likers IS NULL OR l.likers = '' THEN '[]'::jsonb
-                ELSE l.likers::jsonb
-              END
-            ), 0
-          ) >= $${i}
+          CASE
+            WHEN l.likers IS NULL
+              OR TRIM(l.likers) = ''
+              OR TRIM(l.likers) = '[]'
+            THEN 0
+            ELSE array_length(
+              string_to_array(
+                replace(replace(replace(l.likers,'[',''),']',''),'"',''),
+                ','
+              ),1
+            )
+          END >= $${i}
         `);
         values.push(lc);
         i++;
@@ -2853,14 +2857,18 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
         a.google_id,
         a.average_rating,
         a.reviews_count,
-        COALESCE(
-          jsonb_array_length(
-            CASE
-              WHEN l.likers IS NULL OR l.likers = '' THEN '[]'::jsonb
-              ELSE l.likers::jsonb
-            END
-          ), 0
-        ) AS likes_count
+        CASE
+          WHEN l.likers IS NULL
+            OR TRIM(l.likers) = ''
+            OR TRIM(l.likers) = '[]'
+          THEN 0
+          ELSE array_length(
+            string_to_array(
+              replace(replace(replace(l.likers,'[',''),']',''),'"',''),
+              ','
+            ),1
+          )
+        END AS likes_count
       FROM grills_lv_ads a
       LEFT JOIN grills_lv_likes l ON l.ad_id = a.id
       ${whereClause}
