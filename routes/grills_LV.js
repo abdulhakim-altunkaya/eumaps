@@ -2892,19 +2892,6 @@ router.get("/api/get/grills-latvia/index-filter", applyReadRateLimit, blockMalic
   const limit = PAGE_SIZE;
   const offset = (page - 1) * limit;
 
-  if (offset >= HARD_CAP) {
-    return res.json({
-      resStatus: true,
-      ads: [],
-      pagination: {
-        page,
-        pageSize: PAGE_SIZE,
-        totalResults: HARD_CAP,
-        totalPages: Math.ceil(HARD_CAP / PAGE_SIZE)
-      }
-    });
-  }
-
   try {
     const conditions = [];
     const values = [];
@@ -2929,7 +2916,7 @@ router.get("/api/get/grills-latvia/index-filter", applyReadRateLimit, blockMalic
     }
 
     if (price === "paid") {
-      conditions.push(`a.price IS NOT NULL AND TRIM(a.price) <> '' AND TRIM(a.price) <> $${i}`);
+      conditions.push(`TRIM(a.price) <> $${i}`);
       values.push("Bezmaksas");
       i++;
     }
@@ -2938,7 +2925,7 @@ router.get("/api/get/grills-latvia/index-filter", applyReadRateLimit, blockMalic
       const rc = Number(minReviews);
 
       if (!Number.isNaN(rc)) {
-        conditions.push(`a.reviews_count >= $${i}`);
+        conditions.push(`COALESCE(a.reviews_count,0) >= $${i}`);
         values.push(rc);
         i++;
       }
@@ -2948,7 +2935,7 @@ router.get("/api/get/grills-latvia/index-filter", applyReadRateLimit, blockMalic
       const lc = Number(minLikes);
 
       if (!Number.isNaN(lc)) {
-        conditions.push(`COALESCE(l.likes_count, 0) >= $${i}`);
+        conditions.push(`COALESCE(l.likes_count,0) >= $${i}`);
         values.push(lc);
         i++;
       }
@@ -2960,9 +2947,8 @@ router.get("/api/get/grills-latvia/index-filter", applyReadRateLimit, blockMalic
       LEFT JOIN (
         SELECT
           ad_id,
-          COALESCE(MAX(jsonb_array_length(likers)), 0) AS likes_count
+          jsonb_array_length(likers) AS likes_count
         FROM grills_lv_likes
-        GROUP BY ad_id
       ) l ON l.ad_id = a.id
     `;
 
@@ -2975,9 +2961,8 @@ router.get("/api/get/grills-latvia/index-filter", applyReadRateLimit, blockMalic
 
     const countR = await pool.query(countQ, values);
 
-    const realTotal = parseInt(countR.rows[0].count, 10);
-    const totalResults = Math.min(realTotal, HARD_CAP);
-    const totalPages = Math.ceil(totalResults / PAGE_SIZE);
+    const totalResults = Math.min(parseInt(countR.rows[0].count, 10), HARD_CAP);
+    const totalPages = Math.max(1, Math.ceil(totalResults / PAGE_SIZE));
 
     const dataQ = `
       SELECT
@@ -2992,7 +2977,7 @@ router.get("/api/get/grills-latvia/index-filter", applyReadRateLimit, blockMalic
         a.google_id,
         a.average_rating,
         a.reviews_count,
-        COALESCE(l.likes_count, 0) AS likes_count
+        COALESCE(l.likes_count,0) AS likes_count
       FROM grills_lv_ads a
       ${likesJoin}
       ${whereClause}
@@ -3006,10 +2991,9 @@ router.get("/api/get/grills-latvia/index-filter", applyReadRateLimit, blockMalic
       resStatus: true,
       ads: dataR.rows,
       pagination: {
-        page,
-        pageSize: PAGE_SIZE,
-        totalResults,
-        totalPages
+        currentPage: page,
+        totalPages,
+        totalResults
       }
     });
 
