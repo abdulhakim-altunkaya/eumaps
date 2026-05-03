@@ -2770,7 +2770,6 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
     values.push(`%${q}%`);
     i++;
 
-    // city
     if (city) {
       const cityId = Number(city);
 
@@ -2781,7 +2780,6 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
       }
     }
 
-    // free / paid
     if (price === "free") {
       conditions.push(`TRIM(a.price) = $${i}`);
       values.push("Bezmaksas");
@@ -2789,12 +2787,11 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
     }
 
     if (price === "paid") {
-      conditions.push(`TRIM(a.price) <> $${i}`);
+      conditions.push(`a.price IS NOT NULL AND TRIM(a.price) <> '' AND TRIM(a.price) <> $${i}`);
       values.push("Bezmaksas");
       i++;
     }
 
-    // reviews
     if (minReviews) {
       const rc = Number(minReviews);
 
@@ -2805,25 +2802,11 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
       }
     }
 
-    // likes
     if (minLikes) {
       const lc = Number(minLikes);
 
       if (!Number.isNaN(lc)) {
-        conditions.push(`
-          CASE
-            WHEN l.likers IS NULL
-              OR TRIM(l.likers) = ''
-              OR TRIM(l.likers) = '[]'
-            THEN 0
-            ELSE array_length(
-              string_to_array(
-                replace(replace(replace(l.likers,'[',''),']',''),'"',''),
-                ','
-              ),1
-            )
-          END >= $${i}
-        `);
+        conditions.push(`COALESCE(l.likes_count, 0) >= $${i}`);
         values.push(lc);
         i++;
       }
@@ -2831,10 +2814,20 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
 
     const whereClause = `WHERE ${conditions.join(" AND ")}`;
 
+    const likesJoin = `
+      LEFT JOIN (
+        SELECT 
+          ad_id,
+          COALESCE(MAX(jsonb_array_length(likers)), 0) AS likes_count
+        FROM grills_lv_likes
+        GROUP BY ad_id
+      ) l ON l.ad_id = a.id
+    `;
+
     const countQ = `
       SELECT COUNT(*)
       FROM grills_lv_ads a
-      LEFT JOIN grills_lv_likes l ON l.ad_id = a.id
+      ${likesJoin}
       ${whereClause}
     `;
 
@@ -2857,20 +2850,9 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
         a.google_id,
         a.average_rating,
         a.reviews_count,
-        CASE
-          WHEN l.likers IS NULL
-            OR TRIM(l.likers) = ''
-            OR TRIM(l.likers) = '[]'
-          THEN 0
-          ELSE array_length(
-            string_to_array(
-              replace(replace(replace(l.likers,'[',''),']',''),'"',''),
-              ','
-            ),1
-          )
-        END AS likes_count
+        COALESCE(l.likes_count, 0) AS likes_count
       FROM grills_lv_ads a
-      LEFT JOIN grills_lv_likes l ON l.ad_id = a.id
+      ${likesJoin}
       ${whereClause}
       ORDER BY a.date DESC
       LIMIT $${i} OFFSET $${i + 1}
