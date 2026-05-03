@@ -2974,6 +2974,7 @@ router.get("/api/get/grills-latvia/index-filter", applyReadRateLimit, blockMalic
         a.date,
         a.views,
         a.image_url,
+        a.location,
         a.google_id,
         a.average_rating,
         a.reviews_count,
