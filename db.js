@@ -2,6 +2,7 @@ require("dotenv").config();
 const { Pool } = require("pg");
 const { createClient } = require("@supabase/supabase-js");
 const multer = require("multer");
+const ws = require("ws");
 
 // ---- PostgreSQL (Supabase Postgres) ----
 const pool = new Pool({
@@ -12,7 +13,12 @@ const pool = new Pool({
 // ---- Supabase Storage (server-side secret key) ----
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SECRET_KEY // MUST be the service_role or anon key with storage permissions
+  process.env.SUPABASE_SECRET_KEY, // MUST be the service_role or anon key with storage permissions
+  {
+    realtime: {
+      transport: ws
+    }
+  }
 );
 
 // ---- Multer Configuration (upload up to 5 images, 3MB max each) ----
