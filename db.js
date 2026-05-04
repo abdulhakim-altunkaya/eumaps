@@ -12,7 +12,8 @@ const pool = new Pool({
 // ---- Supabase Storage (server-side secret key) ----
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SECRET_KEY // MUST be the service_role or anon key with storage permissions
+  process.env.SUPABASE_SECRET_KEY, // MUST be the service_role or anon key with storage permissions
+  {realtime: { enabled: false }}
 );
 
 // ---- Multer Configuration (upload up to 5 images, 3MB max each) ----
