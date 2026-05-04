@@ -2464,13 +2464,15 @@ router.get("/api/get/grills-latvia/ad/:id", applyReadRateLimit, async (req, res)
   const adId = req.params.id;
   console.log("[grills-latvia/ad] GET request, adId:", adId);
   try {
-    const q = `
+const q = `
       SELECT 
-        id, name, description, price, city, date, views,
-        image_url, google_id, location,
-        average_rating, reviews_count
-      FROM grills_lv_ads
-      WHERE id = $1
+        a.id, a.name, a.description, a.price, a.city, a.date, a.views,
+        a.image_url, a.google_id, a.location,
+        a.average_rating, a.reviews_count,
+        u.name AS poster_name
+      FROM grills_lv_ads a
+      LEFT JOIN grills_lv_users u ON u.google_id = a.google_id
+      WHERE a.id = $1
       LIMIT 1
     `;
     const r = await pool.query(q, [adId]);
