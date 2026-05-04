@@ -2467,7 +2467,7 @@ router.get("/api/get/grills-latvia/ad/:id", applyReadRateLimit, async (req, res)
     const q = `
       SELECT 
         id, name, description, price, city, date, views,
-        image_url, google_id,
+        image_url, google_id, location,
         average_rating, reviews_count
       FROM grills_lv_ads
       WHERE id = $1
