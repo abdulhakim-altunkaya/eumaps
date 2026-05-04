@@ -2594,6 +2594,7 @@ router.get("/api/get/grills-latvia/user-ads", applyReadRateLimit, async (req, re
       SELECT 
         id, 
         description, 
+        name,
         price, 
         city, 
         image_url, 
