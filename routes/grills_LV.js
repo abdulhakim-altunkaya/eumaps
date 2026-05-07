@@ -2628,6 +2628,7 @@ router.get("/api/get/grills-latvia/user-ads", applyReadRateLimit, async (req, re
 //above route is used by profile. Below route is used by public for posting owner html.
 router.get("/api/get/grills-latvia/posting-owner-ads", applyReadRateLimit, async (req, res) => {
   const { gid } = req.query;
+  console.log("posting-owner-ads: gid =", gid);
   if (!gid) {
     return res.status(200).json({
       resStatus: false,
@@ -2654,6 +2655,7 @@ router.get("/api/get/grills-latvia/posting-owner-ads", applyReadRateLimit, async
       ORDER BY date DESC, id DESC;
     `;
     const adsRes = await pool.query(adsQuery, [gid]);
+    console.log("posting-owner-ads: rows returned =", adsRes.rowCount);
     return res.status(200).json({
       resStatus: true,
       resMessage: "Ielādētas vietas",
