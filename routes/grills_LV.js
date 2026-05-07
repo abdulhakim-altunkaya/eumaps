@@ -2601,6 +2601,7 @@ router.get("/api/get/grills-latvia/user-ads", applyReadRateLimit, async (req, re
         city, 
         image_url, 
         date,
+        location,
         created_at,      
         is_active       
       FROM grills_lv_ads
@@ -2616,6 +2617,51 @@ router.get("/api/get/grills-latvia/user-ads", applyReadRateLimit, async (req, re
     });
   } catch (error) {
     console.error("User ads fetch error:", error);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Servera kļūda",
+      resErrorCode: 3,
+      ads: []
+    });
+  }
+});
+//above route is used by profile. Below route is used by public for posting owner html.
+router.get("/api/get/grills-latvia/posting-owner-ads", applyReadRateLimit, async (req, res) => {
+  const { gid } = req.query;
+  if (!gid) {
+    return res.status(200).json({
+      resStatus: false,
+      resMessage: "Nav norādīts īpašnieks",
+      resErrorCode: 1,
+      ads: []
+    });
+  }
+  try {
+    const adsQuery = `
+      SELECT 
+        id, 
+        description, 
+        name,
+        price, 
+        city, 
+        image_url, 
+        date,
+        location,
+        created_at,      
+        is_active       
+      FROM grills_lv_ads
+      WHERE google_id = $1
+      ORDER BY date DESC, id DESC;
+    `;
+    const adsRes = await pool.query(adsQuery, [gid]);
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "Ielādētas vietas",
+      resOkCode: 1,
+      ads: adsRes.rows
+    });
+  } catch (error) {
+    console.error("Owner ads fetch error:", error);
     return res.status(500).json({
       resStatus: false,
       resMessage: "Servera kļūda",
