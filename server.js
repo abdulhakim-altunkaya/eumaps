@@ -57,7 +57,8 @@ const allowedOrigins = [
   "https://grilslatvija.lv",
   "https://www.grilslatvija.lv",
   "http://grilslatvija.lv",
-  "http://www.grilslatvija.lv"
+  "http://www.grilslatvija.lv",
+  "https://grilslatvija.netlify.app"
 ];
 app.use(cors({
   origin: function (origin, callback) {
