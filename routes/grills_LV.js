@@ -2679,6 +2679,8 @@ router.get("/api/get/grills-latvia/posting-owner-ads", applyReadRateLimit, async
         is_active       
       FROM grills_lv_ads
       WHERE google_id = $1
+      WHERE google_id = $1
+      AND is_active = true
       ORDER BY date DESC, id DESC;
     `;
     const adsRes = await pool.query(adsQuery, [gid]);
