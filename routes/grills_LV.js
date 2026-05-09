@@ -418,6 +418,7 @@ console.log("[grills-latvia/ads] price raw:", inputPrice, "| cleaned:", cleanInp
 router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdPostingCooldown, applyWriteRateLimit, 
   upload.array("images", 5), async (req, res) => {
   const adId = req.params.id;
+  console.log(`[update-ad] START | adId=${adId}`);
   const MIN_IMAGE_SIZE = 2 * 1024;           // 2 KB
   const MAX_IMAGE_SIZE = 3 * 1024 * 1024;  // 3 MB. Normally I should say 1.8 but just give some
   //error room to the frontend here I am saying 3
@@ -435,6 +436,7 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
   const sessionId = req.cookies?.session_id || bearerSid;
   if (!sessionId) {
+    console.log(`[update-ad] FAIL | no sessionId | adId=${adId}`);
     return res.status(401).json({
       resStatus: false,
       resMessage: "Lūdzu, piesakieties",
@@ -450,6 +452,7 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       [sessionId]
     );
     if (!userQ.rowCount) {
+      console.log(`[update-ad] FAIL | invalid session | adId=${adId}`);
       return res.status(401).json({
         resStatus: false,
         resMessage: "Nederīga sesija",
@@ -457,6 +460,7 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       });
     }
     const googleId = userQ.rows[0].google_id;
+    console.log(`[update-ad] session OK | googleId=${googleId} | adId=${adId}`);
     /* -------------------------------
        CHECK IF AD BELONGS TO USER
     --------------------------------*/
@@ -468,6 +472,7 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       [adId]
     );
     if (!adQ.rowCount) {
+      console.log(`[update-ad] FAIL | ad not found | adId=${adId}`);
       return res.json({
         resStatus: false,
         resMessage: "Vieta neeksistē",
@@ -476,12 +481,14 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
     }
 
     if (adQ.rows[0].google_id !== googleId) {
+      console.log(`[update-ad] FAIL | ownership mismatch | adId=${adId} | googleId=${googleId}`);
       return res.status(403).json({
         resStatus: false,
         resMessage: "Reikalingas prisijungimas",
         resErrorCode: 4
       });
     }
+    console.log(`[update-ad] ownership OK | adId=${adId}`);
     /* -------------------------------
        PARSE JSON FORM DATA
     --------------------------------*/
@@ -489,6 +496,7 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
     try {
       formData = JSON.parse(req.body.formData);
     } catch (err) {
+      console.log(`[update-ad] FAIL | formData parse error | adId=${adId}`, err.message);
       return res.status(400).json({
         resStatus: false,
         resMessage: "Nederīgi formas dati",
@@ -504,6 +512,7 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       latitude,
       longitude
     } = formData;
+    console.log(`[update-ad] formData parsed | name="${inputName}" | price="${inputPrice}" | regions=${JSON.stringify(inputRegions)} | lat=${latitude} | lng=${longitude} | existingImages=${existingImages?.length ?? 0}`);
 
     function sanitizeInput(str) {
       if (typeof str !== 'string') return '';
@@ -518,6 +527,7 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
     const cleanInputName = sanitizeInput(inputName);
 
   if ( !inputName || !inputPrice || !inputDescription ) {
+    console.log(`[update-ad] FAIL | missing required fields | adId=${adId}`);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Lūdzu, aizpildiet obligātos laukus",
@@ -528,6 +538,7 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
   const lat = Number(latitude);
   const lng = Number(longitude);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    console.log(`[update-ad] FAIL | non-finite coords | lat=${latitude} lng=${longitude} | adId=${adId}`);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Nederīgas koordinātas",
@@ -536,6 +547,7 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
   }
   // latitude: -90 to 90
   if (lat < -90 || lat > 90) {
+    console.log(`[update-ad] FAIL | lat out of range | lat=${lat} | adId=${adId}`);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Latitude ārpus diapazona",
@@ -544,6 +556,7 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
   }
   // longitude: -180 to 180
   if (lng < -180 || lng > 180) {
+    console.log(`[update-ad] FAIL | lng out of range | lng=${lng} | adId=${adId}`);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Longitude ārpus diapazona",
@@ -558,6 +571,7 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
 
   //OTHER VALIDATIONS
   if (!Array.isArray(inputRegions) || inputRegions.length === 0) {
+    console.log(`[update-ad] FAIL | no regions selected | adId=${adId}`);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Reģioni nav izvēlēti",
@@ -565,6 +579,7 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
     });
   }
   if (inputName.length < 5 || inputName.length > 120) {
+    console.log(`[update-ad] FAIL | name length invalid | length=${inputName.length} | adId=${adId}`);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Vārds ir pārāk garš vai pārāk īss",
@@ -572,6 +587,7 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
     });
   }
   if (inputPrice.length < 1 || inputPrice.length > 40) {
+    console.log(`[update-ad] FAIL | price length invalid | length=${inputPrice.length} | adId=${adId}`);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Cena ir pārāk gara vai pārāk īsa",
@@ -579,6 +595,7 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
     });
   }
   if (inputDescription.length < 50 || inputDescription.length > 1000) {
+    console.log(`[update-ad] FAIL | description length invalid | length=${inputDescription.length} | adId=${adId}`);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Apraksts ir pārāk garš vai pārāk īss",
@@ -590,12 +607,14 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
        HANDLE NEW IMAGE UPLOADS
     --------------------------------*/
     const files = req.files;
+    console.log(`[update-ad] new files received: ${files?.length ?? 0} | adId=${adId}`);
     let finalImages = Array.isArray(existingImages) ? existingImages : [];
 
     // Validate new images if any
     if (files && files.length > 0) {
       //image checks before uploading
       for (const f of files) {
+        console.log(`[update-ad] validating file | name=${f.originalname} | type=${f.mimetype} | size=${f.size}`);
         if (!ALLOWED_IMAGE_TYPES.includes(f.mimetype)) {
           return res.status(400).json({
             resStatus: false,
@@ -622,22 +641,26 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       const uploadedImages = [];
       for (const f of files) {
         const fileName = makeSafeName();
+        console.log(`[update-ad] uploading to Supabase | fileName=${fileName}`);
         const { error } = await supabase.storage
           .from("masters_latvia_storage")
           .upload(fileName, f.buffer, { contentType: f.mimetype });
         if (error) {
+          console.log(`[update-ad] FAIL | Supabase upload error | fileName=${fileName}`, error);
           return res.status(503).json({
             resStatus: false,
             resMessage: "Attēla augšupielāde neizdevās",
             resErrorCode: 22
           });
         }
+        console.log(`[update-ad] upload OK | fileName=${fileName}`);
         uploadedImages.push(
           `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_latvia_storage/${fileName}`
         );
       }
       finalImages = [...finalImages, ...uploadedImages];
     }
+    console.log(`[update-ad] finalImages count=${finalImages.length} | adId=${adId}`);
     /* -------------------------------
        UPDATE DATABASE
     --------------------------------*/
@@ -665,20 +688,24 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       adId,                                    // $8
       googleId                                 // $9
     ];
+    console.log(`[update-ad] running UPDATE query | adId=${adId} | googleId=${googleId}`);
     const result = await pool.query(updateQ, values);
     if (!result.rowCount) {
+      console.log(`[update-ad] FAIL | UPDATE returned 0 rows | adId=${adId}`);
       return res.json({
         resStatus: false,
         resMessage: "Kļūda atjauninot",
         resErrorCode: 23
       });
     }
+    console.log(`[update-ad] SUCCESS | adId=${adId}`);
     return res.json({
       resStatus: true,
       resMessage: "Izmaiņas saglabātas",
       resOkCode: 1
     });
   } catch (err) {
+    console.error(`[update-ad] UNCAUGHT ERROR | adId=${adId}`, err);
     return res.status(500).json({
       resStatus: false,
       resMessage: "Servera kļūda",
