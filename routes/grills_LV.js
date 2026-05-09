@@ -683,7 +683,7 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       cleanInputPrice,                         // $3
       JSON.stringify(inputRegions),            // $4
       JSON.stringify(locationArray),           // $5 (jsonb)
-      finalImages,                             // $6 (jsonb, no stringify)
+      JSON.stringify(finalImages),             // $6 (jsonb)
       new Date(),                               // $7
       adId,                                    // $8
       googleId                                 // $9
