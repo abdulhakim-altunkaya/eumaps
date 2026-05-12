@@ -1579,6 +1579,193 @@ router.post("/api/post/grills-latvia/like", blockMaliciousIPs, applyWriteRateLim
     });
   }
 });
+router.post("/api/post/grills-latvia/profile-picture", blockMaliciousIPs, applyWriteRateLimit,
+  upload.single("profilePicture"), async (req, res) => {
+
+    const MIN_IMAGE_SIZE = 2 * 1024;
+    const MAX_IMAGE_SIZE = 1.5 * 1024 * 1024;
+
+    const ALLOWED_IMAGE_TYPES = [
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "image/webp"
+    ];
+    let client;
+    try {
+      const ipVisitor = req.headers["x-forwarded-for"]
+        ? req.headers["x-forwarded-for"].split(",")[0]
+        : req.socket.remoteAddress || req.ip;
+      console.log(
+        "[grills-latvia/profile-picture] POST request from IP:",
+        ipVisitor
+      );
+      /* -------------------------------------------
+         SESSION VALIDATION
+      ------------------------------------------- */
+      const auth = req.headers.authorization || "";
+      const bearerSid = auth.startsWith("Bearer ")
+        ? auth.slice(7).trim()
+        : null;
+      const sessionId = req.cookies?.session_id || bearerSid;
+      if (!sessionId) {
+        return res.status(401).json({
+          resStatus: false,
+          resMessage: "Piesakieties, lai turpinātu",
+          resErrorCode: 1
+        });
+      }
+      const userRes = await pool.query(
+        `SELECT google_id FROM grills_lv_sessions
+         WHERE session_id = $1
+         LIMIT 1`,
+        [sessionId]
+      );
+      if (!userRes.rowCount) {
+        return res.status(401).json({
+          resStatus: false,
+          resMessage: "Nederīga sesija",
+          resErrorCode: 2
+        });
+      }
+      const googleId = userRes.rows[0].google_id;
+      console.log(
+        "[grills-latvia/profile-picture] Authenticated google_id:",
+        googleId
+      );
+      /* -------------------------------------------
+         IMAGE VALIDATION
+      ------------------------------------------- */
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({
+          resStatus: false,
+          resMessage: "Nav pievienots attēls",
+          resErrorCode: 3
+        });
+      }
+      if (!ALLOWED_IMAGE_TYPES.includes(file.mimetype)) {
+        return res.status(400).json({
+          resStatus: false,
+          resMessage: "Nederīgs faila formāts",
+          resErrorCode: 4
+        });
+      }
+      if (file.size < MIN_IMAGE_SIZE) {
+        return res.status(400).json({
+          resStatus: false,
+          resMessage: "Attēls ir bojāts vai tukšs",
+          resErrorCode: 5
+        });
+      }
+      // FINAL LIMIT
+      if (file.size > MAX_IMAGE_SIZE) {
+        return res.status(400).json({
+          resStatus: false,
+          resMessage: "Attēls ir pārāk liels",
+          resErrorCode: 7
+        });
+      }
+      /* -------------------------------------------
+         GET OLD PROFILE IMAGE
+      ------------------------------------------- */
+      client = await pool.connect();
+      const oldImageRes = await client.query(
+        `SELECT profile_img
+         FROM grills_lv_users
+         WHERE google_id = $1
+         LIMIT 1`,
+        [googleId]
+      );
+      const oldImageUrl =
+        oldImageRes.rows[0]?.profile_img || null;
+      /* -------------------------------------------
+         DELETE OLD SUPABASE IMAGE
+      ------------------------------------------- */
+      if (oldImageUrl) {
+        try {
+          const oldPath = oldImageUrl.split(
+            "/masters_latvia_storage/"
+          )[1];
+          if (oldPath) {
+            const { error: deleteError } =
+              await supabase.storage
+                .from("masters_latvia_storage")
+                .remove([oldPath]);
+            if (deleteError) {
+              console.log(
+                "[profile-picture] Failed deleting old image:",
+                deleteError.message
+              );
+            }
+          }
+        } catch (err) {
+          console.log(
+            "[profile-picture] Old image cleanup error:",
+            err.message
+          );
+        }
+      }
+      /* -------------------------------------------
+         UPLOAD NEW IMAGE
+      ------------------------------------------- */
+      const fileName = makeSafeName();
+      const { error: uploadError } =
+        await supabase.storage
+          .from("masters_latvia_storage")
+          .upload(fileName, file.buffer, {
+            contentType: file.mimetype
+          });
+      if (uploadError) {
+        console.log(
+          "[profile-picture] Supabase upload error:",
+          uploadError.message
+        );
+        return res.status(503).json({
+          resStatus: false,
+          resMessage: "Attēla augšupielāde neizdevās",
+          resErrorCode: 8
+        });
+      }
+      const imageUrl =
+        `${process.env.SUPABASE_URL}` +
+        `/storage/v1/object/public/masters_latvia_storage/${fileName}`;
+      /* -------------------------------------------
+         UPDATE USER
+      ------------------------------------------- */
+      await client.query(
+        `UPDATE grills_lv_users
+         SET profile_img = $1
+         WHERE google_id = $2`,
+        [imageUrl, googleId]
+      );
+      console.log(
+        "[profile-picture] Profile image updated:",
+        googleId
+      );
+      return res.status(201).json({
+        resStatus: true,
+        resMessage: "Profila attēls saglabāts",
+        imageUrl,
+        resOkCode: 1
+      });
+    } catch (err) {
+      console.log(
+        "[profile-picture] Unhandled error:",
+        err.message
+      );
+      return res.status(500).json({
+        resStatus: false,
+        resMessage: "Servera kļūda",
+        resErrorCode: 9
+      });
+    } finally {
+      if (client) {
+        client.release();
+      }
+    }
+  }
+);
 router.get("/api/get/grills-latvia/like-status", applyReadRateLimit, async (req, res) => {
   const auth = req.headers.authorization || "";
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
@@ -2486,7 +2673,194 @@ router.post("/api/post/grills-latvia/auth/email-verify", blockMaliciousIPs, appl
     });
   }
 });
-
+router.delete("/api/delete/grills-latvia/profile-picture", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
+  let client;
+  try {
+    console.log("[grills-latvia/profile-picture] DELETE request");
+    /* SESSION VALIDATION */
+    const auth = req.headers.authorization || "";
+    const bearerSid = auth.startsWith("Bearer ")
+      ? auth.slice(7).trim()
+      : null;
+    const sessionId = req.cookies?.session_id || bearerSid;
+    if (!sessionId) {
+      return res.status(401).json({
+        resStatus: false,
+        resMessage: "Piesakieties, lai turpinātu",
+        resErrorCode: 1
+      });
+    }
+    const sessionRes = await pool.query(
+      `SELECT google_id
+       FROM grills_lv_sessions
+       WHERE session_id = $1
+       LIMIT 1`,
+      [sessionId]
+    );
+    if (!sessionRes.rowCount) {
+      return res.status(401).json({
+        resStatus: false,
+        resMessage: "Nederīga sesija",
+        resErrorCode: 2
+      });
+    }
+    const googleId = sessionRes.rows[0].google_id;
+    console.log("[grills-latvia/profile-picture] google_id:", googleId);
+    /* GET CURRENT IMAGE */
+    client = await pool.connect();
+    const userRes = await client.query(
+      `SELECT profile_img
+       FROM grills_lv_users
+       WHERE google_id = $1
+       LIMIT 1`,
+      [googleId]
+    );
+    if (!userRes.rowCount) {
+      return res.status(404).json({
+        resStatus: false,
+        resMessage: "Lietotājs nav atrasts",
+        resErrorCode: 3
+      });
+    }
+    const profileImg = userRes.rows[0]?.profile_img || null;
+    console.log("[grills-latvia/profile-picture] profile_img:", profileImg);
+    /* NOTHING TODELETE */
+    if (!profileImg) {
+      return res.json({
+        resStatus: true,
+        resMessage: "Profila attēls jau ir dzēsts",
+        resOkCode: 1
+      });
+    }
+    /* DELETE FROM SUPABASE */
+    try {
+      const filePath = profileImg.split(
+        "/masters_latvia_storage/"
+      )[1];
+      if (filePath) {
+        const { error: deleteError } =
+          await supabase.storage
+            .from("masters_latvia_storage")
+            .remove([filePath]);
+        if (deleteError) {
+          console.log(
+            "[profile-picture] Supabase delete error:",
+            deleteError.message
+          );
+          return res.status(503).json({
+            resStatus: false,
+            resMessage: "Attēla dzēšana neizdevās",
+            resErrorCode: 4
+          });
+        }
+      }
+    } catch (err) {
+      console.log(
+        "[profile-picture] Supabase cleanup error:",
+        err.message
+      );
+      return res.status(503).json({
+        resStatus: false,
+        resMessage: "Attēla dzēšana neizdevās",
+        resErrorCode: 5
+      });
+    }
+    /* UPDATE DATABASE */
+    await client.query(
+      `UPDATE grills_lv_users
+       SET profile_img = NULL
+       WHERE google_id = $1`,
+      [googleId]
+    );
+    console.log(
+      "[grills-latvia/profile-picture] Profile image deleted:",
+      googleId
+    );
+    return res.json({
+      resStatus: true,
+      resMessage: "Profila attēls dzēsts",
+      resOkCode: 2
+    });
+  } catch (err) {
+    console.error(
+      "[grills-latvia/profile-picture] DELETE error:",
+      err.message
+    );
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Servera kļūda",
+      resErrorCode: 6
+    });
+  } finally {
+    if (client) {
+      client.release();
+    }
+  }
+});
+router.get("/api/get/grills-latvia/profile-picture", applyReadRateLimit, async (req, res) => {
+  try {
+    console.log("[grills-latvia/profile-picture] GET request");
+    /* SESSION VALIDATION */
+    const auth = req.headers.authorization || "";
+    const bearerSid = auth.startsWith("Bearer ")
+      ? auth.slice(7).trim()
+      : null;
+    const sessionId = req.cookies?.session_id || bearerSid;
+    if (!sessionId) {
+      return res.status(401).json({
+        resStatus: false,
+        resMessage: "Piesakieties, lai turpinātu",
+        resErrorCode: 1
+      });
+    }
+    const sessionRes = await pool.query(
+      `SELECT google_id
+       FROM grills_lv_sessions
+       WHERE session_id = $1
+       LIMIT 1`,
+      [sessionId]
+    );
+    if (!sessionRes.rowCount) {
+      return res.status(401).json({
+        resStatus: false,
+        resMessage: "Nederīga sesija",
+        resErrorCode: 2
+      });
+    }
+    const googleId = sessionRes.rows[0].google_id;
+    console.log("[grills-latvia/profile-picture] google_id:", googleId);
+    /* GET PROFILE IMAGE */
+    const userRes = await pool.query(
+      `SELECT profile_img
+       FROM grills_lv_users
+       WHERE google_id = $1
+       LIMIT 1`,
+      [googleId]
+    );
+    console.log("[grills-latvia/profile-picture] DB rowCount:", userRes.rowCount);
+    if (!userRes.rowCount) {
+      return res.status(404).json({
+        resStatus: false,
+        resMessage: "Lietotājs nav atrasts",
+        resErrorCode: 3
+      });
+    }
+    const profileImg = userRes.rows[0]?.profile_img || null;
+    console.log("[grills-latvia/profile-picture] profile_img:", profileImg);
+    return res.json({
+      resStatus: true,
+      resOkCode: 1,
+      profile_img: profileImg
+    });
+  } catch (err) {
+    console.error("[grills-latvia/profile-picture] error:", err.message);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Servera kļūda",
+      resErrorCode: 4
+    });
+  }
+});
 router.get("/api/get/grills-latvia/ad/:id", applyReadRateLimit, async (req, res) => {
   const adId = req.params.id;
   console.log("[grills-latvia/ad] GET request, adId:", adId);

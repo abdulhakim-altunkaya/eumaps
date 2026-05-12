@@ -60,16 +60,26 @@ const allowedOrigins = [
   "http://www.grilslatvija.lv",
   "https://grilslatvija.netlify.app"
 ];
+
+const allowedOrigins = [
+    "https://grilslatvija.lv",
+  "https://www.grilslatvija.lv",
+  "http://grilslatvija.lv",
+  "http://www.grilslatvija.lv",
+  "https://grilslatvija.netlify.app"
+  ];
 app.use(cors({
   origin: function (origin, callback) {
-    const normalizedOrigin = origin?.replace(/\/$/, '');  // remove trailing slash if present
+    const normalizedOrigin = origin?.replace(/\/$/, '');
 
-    if (!origin || origin === "null" || allowedOrigins.includes(normalizedOrigin)) {
+    if (normalizedOrigin && allowedOrigins.includes(normalizedOrigin)) {
       return callback(null, true);
     }
     return callback(new Error('Not allowed by CORS'));
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 /*
