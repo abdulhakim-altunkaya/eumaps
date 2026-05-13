@@ -64,18 +64,41 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    const normalizedOrigin = origin?.replace(/\/$/, '');
 
-    if (normalizedOrigin && allowedOrigins.includes(normalizedOrigin)) {
+    const normalizedOrigin =
+      origin?.replace(/\/$/, '');
+
+    if (!origin) {
       return callback(null, true);
     }
-    return callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
 
+    if (
+      normalizedOrigin &&
+      allowedOrigins.includes(normalizedOrigin)
+    ) {
+      return callback(null, true);
+    }
+
+    return callback(
+      new Error('Not allowed by CORS')
+    );
+  },
+
+  credentials: true,
+
+  methods: [
+    'GET',
+    'POST',
+    'PUT',
+    'DELETE',
+    'OPTIONS'
+  ],
+
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization'
+  ],
+}));
 /*
   "http://127.0.0.1:8080",
   "http://192.168.8.103:8080",
