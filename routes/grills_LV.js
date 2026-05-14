@@ -942,6 +942,12 @@ router.post("/api/post/grills-latvia/delete-ad/:id", blockMaliciousIPs, applyWri
       `DELETE FROM grills_lv_ads WHERE id = $1;`,
       [adId]
     );
+    await pool.query(
+      `UPDATE grills_lv_users
+      SET number_ads = GREATEST(number_ads - 1, 0)
+      WHERE google_id = $1`,
+      [googleId]
+    );
     await pool.query("COMMIT");
     /* ---------- DELETE IMAGES (NON-BLOCKING) ---------- */
     if (filesToDelete.length > 0) {
