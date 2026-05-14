@@ -3113,6 +3113,50 @@ router.get("/api/get/grills-latvia/poster-profile-picture/:gid", applyReadRateLi
     }
   }
 );
+router.get("/api/get/grills-latvia/poster-likes/:gid", applyReadRateLimit, async (req, res) => {
+    try {
+      const gid = req.params.gid;
+      if (!gid) {
+        return res.status(400).json({
+          resStatus: false,
+          resMessage: "Trūkst gid",
+          resErrorCode: 1
+        });
+      }
+      const likesRes = await pool.query(
+        `SELECT likers
+         FROM grills_lv_likes
+         WHERE master_id = $1`,
+        [gid]
+      );
+      let totalLikes = 0;
+      for (const row of likesRes.rows) {
+        let likers = row.likers;
+        if (typeof likers === "string") {
+          try {
+            likers = JSON.parse(likers);
+          } catch {
+            likers = [];
+          }
+        }
+        if (Array.isArray(likers)) {
+          totalLikes += likers.length;
+        }
+      }
+      return res.json({
+        resStatus: true,
+        resOkCode: 1,
+        totalLikes
+      });
+    } catch (err) {
+      return res.status(500).json({
+        resStatus: false,
+        resMessage: "Servera kļūda",
+        resErrorCode: 2
+      });
+    }
+  }
+);
 router.get("/api/get/grills-latvia/search", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
   const q = (req.query.q || "").trim();
 
