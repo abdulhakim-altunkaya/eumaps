@@ -826,7 +826,10 @@ router.post("/api/post/grills-latvia/toggle-activation/:id", blockMaliciousIPs, 
   try {
     // Check if ad exists
     const check = await pool.query(
-      "SELECT is_active FROM grills_lv_ads WHERE id = $1 LIMIT 1;",
+      `SELECT is_active, google_id
+       FROM grills_lv_ads
+       WHERE id = $1
+       LIMIT 1;`,
       [adId]
     );
     if (!check.rowCount) {
@@ -837,10 +840,15 @@ router.post("/api/post/grills-latvia/toggle-activation/:id", blockMaliciousIPs, 
       });
     }
     const current = check.rows[0].is_active;
-    const newState = !current; // toggle true → false, false → true
+    const googleId = check.rows[0].google_id;
+    const newState = !current;
     // Update activation state
     const update = await pool.query(
-      "UPDATE grills_lv_ads SET is_active = $1, created_at = NOW() WHERE id = $2 RETURNING id;",
+      `UPDATE grills_lv_ads
+       SET is_active = $1,
+           created_at = NOW()
+       WHERE id = $2
+       RETURNING id;`,
       [newState, adId]
     );
     if (!update.rowCount) {
@@ -850,6 +858,15 @@ router.post("/api/post/grills-latvia/toggle-activation/:id", blockMaliciousIPs, 
         resErrorCode: 2
       });
     }
+    await pool.query(
+      `UPDATE grills_lv_users
+       SET number_ads = GREATEST(
+         number_ads + $1,
+         0
+       )
+       WHERE google_id = $2`,
+      [newState ? 1 : -1, googleId]
+    );
     return res.status(200).json({
       resStatus: true,
       resMessage: newState ? "Aktivizēts" : "Deaktivizēts",
@@ -857,7 +874,6 @@ router.post("/api/post/grills-latvia/toggle-activation/:id", blockMaliciousIPs, 
       is_active: newState
     });
   } catch (err) {
-    console.error("Toggle error:", err);
     return res.status(500).json({
       resStatus: false,
       resMessage: "Servera kļūda",
