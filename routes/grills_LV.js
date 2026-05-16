@@ -3690,52 +3690,70 @@ router.get("/api/get/grills-latvia/index-filter", applyReadRateLimit, blockMalic
   }
 });
 router.get("/api/get/grills-latvia/map-postings", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
-    let client;
-    try {
-      const ipVisitor = req.headers["x-forwarded-for"]
-        ? req.headers["x-forwarded-for"].split(",")[0]
-        : req.socket.remoteAddress || req.ip;
-      console.log("[grills-latvia/map-postings] GET request from IP:", ipVisitor);
-      client = await pool.connect();
-      const query = `
-        SELECT
-          id,
-          name,
-          description,
-          price,
-          city,
-          location,
-          image_url
-        FROM grills_lv_ads
-        WHERE is_active = true
-          AND location IS NOT NULL
-        ORDER BY id DESC
-        LIMIT 1000
-      `;
-      const result = await client.query(query);
-      console.log(
-        "[grills-latvia/map-postings] Postings loaded:",
-        result.rowCount
-      );
-      return res.status(200).json({
-        resStatus: true,
-        postings: result.rows
-      });
-    } catch (err) {
-      console.log(
-        "[grills-latvia/map-postings] Server error:",
-        err.message
-      );
-      return res.status(500).json({
+  let client;
+  try {
+    const ipVisitor = req.headers["x-forwarded-for"]
+      ? req.headers["x-forwarded-for"].split(",")[0]
+      : req.socket.remoteAddress || req.ip;
+    const north = Number(req.query.north);
+    const south = Number(req.query.south);
+    const east = Number(req.query.east);
+    const west = Number(req.query.west);
+    if (
+      !Number.isFinite(north) ||
+      !Number.isFinite(south) ||
+      !Number.isFinite(east) ||
+      !Number.isFinite(west)
+    ) {
+      return res.status(400).json({
         resStatus: false,
-        resMessage: "Servera kļūda",
-        resErrorCode: 1
+        resMessage: "Nederīgas koordinātas",
+        resErrorCode: 3
       });
-    } finally {
-      if (client) client.release();
     }
+    client = await pool.connect();
+    const query = `
+      SELECT
+        id,
+        name,
+        description,
+        price,
+        city,
+        location,
+        image_url
+      FROM grills_lv_ads
+      WHERE is_active = true
+        AND location IS NOT NULL
+        AND (location->>0)::float BETWEEN $1 AND $2
+        AND (location->>1)::float BETWEEN $3 AND $4
+      ORDER BY id DESC
+      LIMIT 100
+    `;
+    const values = [
+      south,
+      north,
+      west,
+      east
+    ];
+    const result = await client.query(query, values);
+    return res.status(200).json({
+      resStatus: true,
+      postings: result.rows
+    });
+  } catch (err) {
+    console.log(
+      "[grills-latvia/map-postings] Server error:",
+      err.message
+    );
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Servera kļūda",
+      resErrorCode: 1
+    });
+  } finally {
+    if (client) client.release();
   }
-);
+});
 router.get("/api/get/grills-latvia/homepage/carousel", async (req, res) => {
   try {
     const q = `
