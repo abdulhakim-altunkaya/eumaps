@@ -3325,8 +3325,6 @@ router.get("/api/get/grills-latvia/search", blockMaliciousIPs, applyReadRateLimi
       resMessage: "Nederīgs meklējums"
     });
   }
-
-
   // 🚫 block deep offsets
   if (offset >= HARD_CAP) {
     return res.json({
@@ -3341,21 +3339,21 @@ router.get("/api/get/grills-latvia/search", blockMaliciousIPs, applyReadRateLimi
       }
     });
   }
-
   try {
     // 1️⃣ capped count
     const countQ = `
       SELECT COUNT(*)
       FROM grills_lv_ads
       WHERE is_active = true
-        AND (description ILIKE $1)
+      AND (
+        description ILIKE $1
+        OR name ILIKE $1
+      )
     `;
     const countR = await pool.query(countQ, [`%${q}%`]);
-
     const realTotal = parseInt(countR.rows[0].count, 10);
     const totalResults = Math.min(realTotal, HARD_CAP);
     const totalPages = Math.ceil(totalResults / PAGE_SIZE);
-
     // 2️⃣ paged data
     const dataQ = `
       SELECT 
@@ -3364,7 +3362,10 @@ router.get("/api/get/grills-latvia/search", blockMaliciousIPs, applyReadRateLimi
         average_rating, reviews_count
       FROM grills_lv_ads
       WHERE is_active = true
-        AND (description ILIKE $1)
+        AND (
+          description ILIKE $1
+          OR name ILIKE $1
+        )
       ORDER BY date DESC
       LIMIT $2 OFFSET $3
     `;
@@ -3444,7 +3445,10 @@ router.get("/api/get/grills-latvia/search-filter", applyReadRateLimit, blockMali
     let i = 1;
 
     conditions.push(`a.is_active = true`);
-    conditions.push(`a.description ILIKE $${i}`);
+    conditions.push(`(
+      a.description ILIKE $${i}
+      OR a.name ILIKE $${i}
+    )`);
     values.push(`%${q}%`);
     i++;
 
