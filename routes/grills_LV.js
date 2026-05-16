@@ -3204,10 +3204,8 @@ router.get("/api/get/grills-latvia/poster-stats/:gid", applyReadRateLimit, async
         memberSince: "-"
       });
     }
-    const totalPosts =
-      userRes.rows[0].number_ads || 0;
-    const rawDate =
-      userRes.rows[0].date;
+    const totalPosts = userRes.rows[0].number_ads || 0;
+    const rawDate = userRes.rows[0].date;
     let memberSince = "-";
     if (rawDate) {
       const d = new Date(rawDate);
@@ -3215,11 +3213,21 @@ router.get("/api/get/grills-latvia/poster-stats/:gid", applyReadRateLimit, async
       const year = d.getFullYear();
       memberSince = `${month}-${year}`;
     }
+    const reviewsLeftRes = await pool.query(
+      `SELECT COUNT(*) AS total_reviews_left
+      FROM grills_lv_reviews
+      WHERE reviewer_id = $1
+      AND is_deleted IS NOT TRUE
+      AND parent IS NULL`,
+      [gid]
+    );
+    const totalReviewsLeft = Number(reviewsLeftRes.rows[0]?.total_reviews_left) || 0;
     return res.json({
       resStatus: true,
       resOkCode: 2,
       totalPosts,
-      memberSince
+      memberSince,
+      totalReviewsLeft,
     });
   } catch (err) {
     return res.status(500).json({
