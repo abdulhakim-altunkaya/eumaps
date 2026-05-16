@@ -3229,6 +3229,68 @@ router.get("/api/get/grills-latvia/poster-stats/:gid", applyReadRateLimit, async
     });
   }
 });
+router.get("/api/get/grills-latvia/poster-review-stats/:gid", applyReadRateLimit, async (req, res) => {
+  try {
+    const gid = req.params.gid;
+    if (!gid) {
+      return res.status(400).json({
+        resStatus: false,
+        resMessage: "Trūkst gid",
+        resErrorCode: 1
+      });
+    }
+    // GET ALL AD IDS OF THIS POSTER
+    const adsRes = await pool.query(
+      `SELECT id
+       FROM grills_lv_ads
+       WHERE google_id = $1`,
+      [gid]
+    );
+    if (!adsRes.rowCount) {
+      return res.json({
+        resStatus: true,
+        resOkCode: 1,
+        totalReviews: 0,
+        overallRating: 0
+      });
+    }
+    const adIds = adsRes.rows.map(row => row.id);
+    // GET ALL REVIEWS OF THOSE ADS
+    const reviewsRes = await pool.query(
+      `SELECT rating
+       FROM grills_lv_reviews
+       WHERE ad_id = ANY($1)
+       AND is_deleted IS NOT TRUE
+       AND parent IS NULL
+       AND rating IS NOT NULL`,
+      [adIds]
+    );
+    const totalReviews = reviewsRes.rowCount || 0;
+    let overallRating = 0;
+    if (totalReviews > 0) {
+      const totalRating = reviewsRes.rows.reduce(
+        (sum, row) => sum + Number(row.rating || 0),
+        0
+      );
+      overallRating = (
+        totalRating / totalReviews
+      ).toFixed(1);
+    }
+    return res.json({
+      resStatus: true,
+      resOkCode: 2,
+      totalReviews,
+      overallRating
+    });
+  } catch (err) {
+    console.error("poster-review-stats error:", err);
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Servera kļūda",
+      resErrorCode: 2
+    });
+  }
+});
 router.get("/api/get/grills-latvia/search", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
   const q = (req.query.q || "").trim();
 
