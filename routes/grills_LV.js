@@ -77,7 +77,6 @@ router.post("/api/post/grills-latvia/save-visitor", checkLogCooldown(3 * 60 * 10
       resOkCode: 1
     });
   } catch (err) {
-    console.error("Visitor log error:", err);
     return res.status(200).json({
       resStatus: false,
       resMessage: "Apmeklētāja reģistrācija neizdevās – iekšēja kļūda",
@@ -101,7 +100,6 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
   const ipVisitor = req.headers["x-forwarded-for"]
     ? req.headers["x-forwarded-for"].split(",")[0]
     : req.socket.remoteAddress || req.ip;
-  console.log("[grills-latvia/ads] POST request from IP:", ipVisitor);
   let client;
   let formData;
   /* -------------------------------------------
@@ -110,7 +108,6 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
   try {
     formData = JSON.parse(req.body.formData);
   } catch (err) {
-    console.log("[grills-latvia/ads] Failed to parse formData:", err.message);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Nederīgi formas dati",
@@ -138,7 +135,6 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
   const cleanInputName = sanitizeInput(inputName);
 
   if (!inputName || !inputPrice || !inputDescription) {
-    console.log("[grills-latvia/ads] Missing required fields");
     return res.status(400).json({
       resStatus: false,
       resMessage: "Nav aizpildīti obligātie lauki",
@@ -150,7 +146,6 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
   const lat = Number(latitude);
   const lng = Number(longitude);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-    console.log("[grills-latvia/ads] Invalid coordinates:", latitude, longitude);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Nederīgas koordinātas",
@@ -159,7 +154,6 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
   }
   // latitude: -90 to 90
   if (lat < -90 || lat > 90) {
-    console.log("[grills-latvia/ads] Latitude out of range:", lat);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Latitude ārpus diapazona",
@@ -168,7 +162,6 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
   }
   // longitude: -180 to 180
   if (lng < -180 || lng > 180) {
-    console.log("[grills-latvia/ads] Longitude out of range:", lng);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Longitude ārpus diapazona",
@@ -179,11 +172,8 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
   const latRounded = Number(lat.toFixed(6));
   const lngRounded = Number(lng.toFixed(6));
   const locationArray = [latRounded, lngRounded];
-  console.log("[grills-latvia/ads] Location:", locationArray);
-
 
   if (!Array.isArray(inputRegions) || inputRegions.length === 0) {
-    console.log("[grills-latvia/ads] No regions selected");
     return res.status(400).json({
       resStatus: false,
       resMessage: "Nav izvēlēti reģioni",
@@ -198,7 +188,6 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
     });
   }
   if (inputPrice.length < 1 || inputPrice.length > 40) {
-    console.log("[grills-latvia/ads] inputPrice length invalid:", inputPrice.length);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Cena ir pārāk gara vai pārāk īsa",
@@ -206,7 +195,6 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
     });
   }
   if (inputDescription.length < 50 || inputDescription.length > 1000) {
-    console.log("[grills-latvia/ads] inputDescription length invalid:", inputDescription.length);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Apraksts ir pārāk garš vai pārāk īss",
@@ -221,7 +209,6 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
     const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
     const sessionId = req.cookies?.session_id || bearerSid;
     if (!sessionId) {
-      console.log("[grills-latvia/ads] No session ID provided");
       return res.status(401).json({
         resStatus: false,
         resMessage: "Piesakieties, lai turpinātu",
@@ -233,7 +220,6 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
       [sessionId]
     );
     if (!userRes.rowCount) {
-      console.log("[grills-latvia/ads] Invalid session ID");
       return res.status(401).json({
         resStatus: false,
         resMessage: "Nederīga sesija",
@@ -241,7 +227,6 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
       });
     }
     const googleId = userRes.rows[0].google_id;
-    console.log("[grills-latvia/ads] Authenticated google_id:", googleId);
     /* -------------------------------------------
         max 50 ads per user
     ------------------------------------------- */
@@ -253,7 +238,6 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
       );
 
       if (userAdNumberCheck.rows[0]?.number_ads >= 50) {
-        console.log("[grills-latvia/ads] Ad limit reached for google_id:", googleId);
         return res.status(403).json({
           resStatus: false,
           resMessage: "Sasniegts limits (maksimums 50)",
@@ -261,7 +245,6 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
         });
       }
     } catch (err) {
-      console.log("[grills-latvia/ads] Error checking ad count:", err.message);
       return res.status(500).json({
         resStatus: false,
         resMessage: "Sistēmas kļūda. Mēģiniet vēlreiz vēlāk",
@@ -280,7 +263,6 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
     const files = req.files;
 
     if (!files || files.length < 1 || files.length > 5) {
-      console.log("[grills-latvia/ads] Invalid file count:", files?.length);
       return res.status(400).json({
         resStatus: false,
         resMessage: "Nepieciešami 1–5 attēli",
@@ -291,7 +273,6 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
     let uploadedImages = [];
     for (const f of files) {
       if (!ALLOWED_IMAGE_TYPES.includes(f.mimetype)) {
-        console.log("[grills-latvia/ads] Invalid file type:", f.mimetype);
         return res.status(400).json({
           resStatus: false,
           resMessage: "Nederīgs faila formāts",
@@ -300,7 +281,6 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
       }
 
       if (f.size < MIN_IMAGE_SIZE) {
-        console.log("[grills-latvia/ads] File too small:", f.size);
         return res.status(400).json({
           resStatus: false,
           resMessage: "Attēla fails ir bojāts vai tukšs",
@@ -309,7 +289,6 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
       }
 
       if (f.size > MAX_IMAGE_SIZE) {
-        console.log("[grills-latvia/ads] File too large:", f.size);
         return res.status(400).json({
           resStatus: false,
           resMessage: "Attēls ir pārāk liels (maks. 1,8 MB)",
@@ -318,13 +297,11 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
       }
 
       const fileName = makeSafeName();
-      console.log("[grills-latvia/ads] Uploading image:", fileName);
       const { error } = await supabase.storage
         .from("masters_latvia_storage")
         .upload(fileName, f.buffer, { contentType: f.mimetype });
 
       if (error) {
-        console.log("[grills-latvia/ads] Supabase upload error:", error.message);
         return res.status(503).json({
           resStatus: false,
           resMessage: "Attēla augšupielāde neizdevās",
@@ -336,7 +313,6 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
         `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_latvia_storage/${fileName}`
       );
     }
-    console.log("[grills-latvia/ads] Images uploaded:", uploadedImages.length);
     /* -------------------------------------------
        DATABASE INSERT
     ------------------------------------------- */
@@ -369,14 +345,8 @@ router.post("/api/post/grills-latvia/ads", blockMaliciousIPs, enforceAdPostingCo
         new Date(),                               // $11
         true                                      // $12
       ];
-      console.log("[grills-latvia/ads] city value:", JSON.stringify(inputRegions));
-console.log("[grills-latvia/ads] location value:", locationArray);
-console.log("[grills-latvia/ads] image_url value:", JSON.stringify(uploadedImages));
-console.log("[grills-latvia/ads] all values types:", values.map((v, i) => `$${i+1}: ${typeof v} = ${JSON.stringify(v)}`));
-console.log("[grills-latvia/ads] price raw:", inputPrice, "| cleaned:", cleanInputPrice, "| type:", typeof cleanInputPrice);
       const result = await client.query(insertQuery, values);
       if (!result.rowCount) {
-        console.log("[grills-latvia/ads] DB insert returned no rows");
         return res.status(503).json({
           resStatus: false,
           resMessage: "Datu saglabāšana neizdevās",
@@ -387,7 +357,6 @@ console.log("[grills-latvia/ads] price raw:", inputPrice, "| cleaned:", cleanInp
         "UPDATE grills_lv_users SET number_ads = COALESCE(number_ads, 0) + 1 WHERE google_id = $1",
         [googleId]
       );
-      console.log("[grills-latvia/ads] Ad inserted, id:", result.rows[0].id);
       return res.status(201).json({
         resStatus: true,
         resMessage: "Vieta saglabāta",
@@ -395,7 +364,6 @@ console.log("[grills-latvia/ads] price raw:", inputPrice, "| cleaned:", cleanInp
       });
 
     } catch (err) {
-      console.log("[grills-latvia/ads] DB insert error:", err.message);
       return res.status(503).json({
         resStatus: false,
         resMessage: "Servera kļūda",
@@ -407,7 +375,6 @@ console.log("[grills-latvia/ads] price raw:", inputPrice, "| cleaned:", cleanInp
     }
 
   } catch (err) {
-    console.log("[grills-latvia/ads] Unhandled error:", err.message);
     return res.status(500).json({
       resStatus: false,
       resMessage: "Servera kļūda",
@@ -418,7 +385,6 @@ console.log("[grills-latvia/ads] price raw:", inputPrice, "| cleaned:", cleanInp
 router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdPostingCooldown, applyWriteRateLimit, 
   upload.array("images", 5), async (req, res) => {
   const adId = req.params.id;
-  console.log(`[update-ad] START | adId=${adId}`);
   const MIN_IMAGE_SIZE = 2 * 1024;           // 2 KB
   const MAX_IMAGE_SIZE = 3 * 1024 * 1024;  // 3 MB. Normally I should say 1.8 but just give some
   //error room to the frontend here I am saying 3
@@ -436,7 +402,6 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
   const bearerSid = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
   const sessionId = req.cookies?.session_id || bearerSid;
   if (!sessionId) {
-    console.log(`[update-ad] FAIL | no sessionId | adId=${adId}`);
     return res.status(401).json({
       resStatus: false,
       resMessage: "Lūdzu, piesakieties",
@@ -452,7 +417,6 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       [sessionId]
     );
     if (!userQ.rowCount) {
-      console.log(`[update-ad] FAIL | invalid session | adId=${adId}`);
       return res.status(401).json({
         resStatus: false,
         resMessage: "Nederīga sesija",
@@ -460,7 +424,6 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       });
     }
     const googleId = userQ.rows[0].google_id;
-    console.log(`[update-ad] session OK | googleId=${googleId} | adId=${adId}`);
     /* -------------------------------
        CHECK IF AD BELONGS TO USER
     --------------------------------*/
@@ -472,7 +435,6 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       [adId]
     );
     if (!adQ.rowCount) {
-      console.log(`[update-ad] FAIL | ad not found | adId=${adId}`);
       return res.json({
         resStatus: false,
         resMessage: "Vieta neeksistē",
@@ -481,14 +443,12 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
     }
 
     if (adQ.rows[0].google_id !== googleId) {
-      console.log(`[update-ad] FAIL | ownership mismatch | adId=${adId} | googleId=${googleId}`);
       return res.status(403).json({
         resStatus: false,
         resMessage: "Reikalingas prisijungimas",
         resErrorCode: 4
       });
     }
-    console.log(`[update-ad] ownership OK | adId=${adId}`);
     /* -------------------------------
        PARSE JSON FORM DATA
     --------------------------------*/
@@ -496,7 +456,6 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
     try {
       formData = JSON.parse(req.body.formData);
     } catch (err) {
-      console.log(`[update-ad] FAIL | formData parse error | adId=${adId}`, err.message);
       return res.status(400).json({
         resStatus: false,
         resMessage: "Nederīgi formas dati",
@@ -512,7 +471,6 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       latitude,
       longitude
     } = formData;
-    console.log(`[update-ad] formData parsed | name="${inputName}" | price="${inputPrice}" | regions=${JSON.stringify(inputRegions)} | lat=${latitude} | lng=${longitude} | existingImages=${existingImages?.length ?? 0}`);
 
     function sanitizeInput(str) {
       if (typeof str !== 'string') return '';
@@ -527,7 +485,6 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
     const cleanInputName = sanitizeInput(inputName);
 
   if ( !inputName || !inputPrice || !inputDescription ) {
-    console.log(`[update-ad] FAIL | missing required fields | adId=${adId}`);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Lūdzu, aizpildiet obligātos laukus",
@@ -538,7 +495,6 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
   const lat = Number(latitude);
   const lng = Number(longitude);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-    console.log(`[update-ad] FAIL | non-finite coords | lat=${latitude} lng=${longitude} | adId=${adId}`);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Nederīgas koordinātas",
@@ -547,7 +503,6 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
   }
   // latitude: -90 to 90
   if (lat < -90 || lat > 90) {
-    console.log(`[update-ad] FAIL | lat out of range | lat=${lat} | adId=${adId}`);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Latitude ārpus diapazona",
@@ -556,7 +511,6 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
   }
   // longitude: -180 to 180
   if (lng < -180 || lng > 180) {
-    console.log(`[update-ad] FAIL | lng out of range | lng=${lng} | adId=${adId}`);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Longitude ārpus diapazona",
@@ -571,7 +525,6 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
 
   //OTHER VALIDATIONS
   if (!Array.isArray(inputRegions) || inputRegions.length === 0) {
-    console.log(`[update-ad] FAIL | no regions selected | adId=${adId}`);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Reģioni nav izvēlēti",
@@ -579,7 +532,6 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
     });
   }
   if (inputName.length < 5 || inputName.length > 120) {
-    console.log(`[update-ad] FAIL | name length invalid | length=${inputName.length} | adId=${adId}`);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Vārds ir pārāk garš vai pārāk īss",
@@ -587,7 +539,6 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
     });
   }
   if (inputPrice.length < 1 || inputPrice.length > 40) {
-    console.log(`[update-ad] FAIL | price length invalid | length=${inputPrice.length} | adId=${adId}`);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Cena ir pārāk gara vai pārāk īsa",
@@ -595,7 +546,6 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
     });
   }
   if (inputDescription.length < 50 || inputDescription.length > 1000) {
-    console.log(`[update-ad] FAIL | description length invalid | length=${inputDescription.length} | adId=${adId}`);
     return res.status(400).json({
       resStatus: false,
       resMessage: "Apraksts ir pārāk garš vai pārāk īss",
@@ -607,14 +557,12 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
        HANDLE NEW IMAGE UPLOADS
     --------------------------------*/
     const files = req.files;
-    console.log(`[update-ad] new files received: ${files?.length ?? 0} | adId=${adId}`);
     let finalImages = Array.isArray(existingImages) ? existingImages : [];
 
     // Validate new images if any
     if (files && files.length > 0) {
       //image checks before uploading
       for (const f of files) {
-        console.log(`[update-ad] validating file | name=${f.originalname} | type=${f.mimetype} | size=${f.size}`);
         if (!ALLOWED_IMAGE_TYPES.includes(f.mimetype)) {
           return res.status(400).json({
             resStatus: false,
@@ -641,26 +589,22 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       const uploadedImages = [];
       for (const f of files) {
         const fileName = makeSafeName();
-        console.log(`[update-ad] uploading to Supabase | fileName=${fileName}`);
         const { error } = await supabase.storage
           .from("masters_latvia_storage")
           .upload(fileName, f.buffer, { contentType: f.mimetype });
         if (error) {
-          console.log(`[update-ad] FAIL | Supabase upload error | fileName=${fileName}`, error);
           return res.status(503).json({
             resStatus: false,
             resMessage: "Attēla augšupielāde neizdevās",
             resErrorCode: 22
           });
         }
-        console.log(`[update-ad] upload OK | fileName=${fileName}`);
         uploadedImages.push(
           `${process.env.SUPABASE_URL}/storage/v1/object/public/masters_latvia_storage/${fileName}`
         );
       }
       finalImages = [...finalImages, ...uploadedImages];
     }
-    console.log(`[update-ad] finalImages count=${finalImages.length} | adId=${adId}`);
     /* -------------------------------
        UPDATE DATABASE
     --------------------------------*/
@@ -688,24 +632,20 @@ router.put("/api/put/grills-latvia/update-ad/:id", blockMaliciousIPs, enforceAdP
       adId,                                    // $8
       googleId                                 // $9
     ];
-    console.log(`[update-ad] running UPDATE query | adId=${adId} | googleId=${googleId}`);
     const result = await pool.query(updateQ, values);
     if (!result.rowCount) {
-      console.log(`[update-ad] FAIL | UPDATE returned 0 rows | adId=${adId}`);
       return res.json({
         resStatus: false,
         resMessage: "Kļūda atjauninot",
         resErrorCode: 23
       });
     }
-    console.log(`[update-ad] SUCCESS | adId=${adId}`);
     return res.json({
       resStatus: true,
       resMessage: "Izmaiņas saglabātas",
       resOkCode: 1
     });
   } catch (err) {
-    console.error(`[update-ad] UNCAUGHT ERROR | adId=${adId}`, err);
     return res.status(500).json({
       resStatus: false,
       resMessage: "Servera kļūda",
@@ -784,7 +724,6 @@ router.post("/api/post/grills-latvia/auth/google", blockMaliciousIPs, applyWrite
     });
 
   } catch (error) {
-    console.error("Google Auth Error Backend:", error);
     if (error.message?.includes("Invalid") || error.message?.includes("JWT")) {
       return res.status(401).json({
         resStatus: false,
@@ -983,8 +922,6 @@ router.post("/api/post/grills-latvia/delete-ad/:id", blockMaliciousIPs, applyWri
 
   } catch (err) {
     await pool.query("ROLLBACK");
-
-    console.error("Delete ad error:", err);
     return res.status(500).json({
       resStatus: false,
       resMessage: "Servera kļūda",
@@ -1042,7 +979,6 @@ router.post("/api/post/grills-latvia/ad-view", blockMaliciousIPs, applyWriteRate
     });
 
   } catch (err) {
-    console.error("View save error:", err);
     return res.json({
       resStatus: false,
       resErrorCode: 3,
@@ -1593,7 +1529,6 @@ router.post("/api/post/grills-latvia/like", blockMaliciousIPs, applyWriteRateLim
     });
 
   } catch (err) {
-    console.error(err);
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 99,
@@ -1618,10 +1553,6 @@ router.post("/api/post/grills-latvia/profile-picture", blockMaliciousIPs, applyW
       const ipVisitor = req.headers["x-forwarded-for"]
         ? req.headers["x-forwarded-for"].split(",")[0]
         : req.socket.remoteAddress || req.ip;
-      console.log(
-        "[grills-latvia/profile-picture] POST request from IP:",
-        ipVisitor
-      );
       /* -------------------------------------------
          SESSION VALIDATION
       ------------------------------------------- */
@@ -1651,10 +1582,6 @@ router.post("/api/post/grills-latvia/profile-picture", blockMaliciousIPs, applyW
         });
       }
       const googleId = userRes.rows[0].google_id;
-      console.log(
-        "[grills-latvia/profile-picture] Authenticated google_id:",
-        googleId
-      );
       /* -------------------------------------------
          IMAGE VALIDATION
       ------------------------------------------- */
@@ -1715,17 +1642,11 @@ router.post("/api/post/grills-latvia/profile-picture", blockMaliciousIPs, applyW
                 .from("masters_latvia_storage")
                 .remove([oldPath]);
             if (deleteError) {
-              console.log(
-                "[profile-picture] Failed deleting old image:",
-                deleteError.message
-              );
+              console.log("Failed deleting old image:", deleteError.message);
             }
           }
         } catch (err) {
-          console.log(
-            "[profile-picture] Old image cleanup error:",
-            err.message
-          );
+          console.log("Old image cleanup error:", err.message);
         }
       }
       /* -------------------------------------------
@@ -1739,10 +1660,6 @@ router.post("/api/post/grills-latvia/profile-picture", blockMaliciousIPs, applyW
             contentType: file.mimetype
           });
       if (uploadError) {
-        console.log(
-          "[profile-picture] Supabase upload error:",
-          uploadError.message
-        );
         return res.status(503).json({
           resStatus: false,
           resMessage: "Attēla augšupielāde neizdevās",
@@ -1761,10 +1678,6 @@ router.post("/api/post/grills-latvia/profile-picture", blockMaliciousIPs, applyW
          WHERE google_id = $2`,
         [imageUrl, googleId]
       );
-      console.log(
-        "[profile-picture] Profile image updated:",
-        googleId
-      );
       return res.status(201).json({
         resStatus: true,
         resMessage: "Profila attēls saglabāts",
@@ -1772,10 +1685,6 @@ router.post("/api/post/grills-latvia/profile-picture", blockMaliciousIPs, applyW
         resOkCode: 1
       });
     } catch (err) {
-      console.log(
-        "[profile-picture] Unhandled error:",
-        err.message
-      );
       return res.status(500).json({
         resStatus: false,
         resMessage: "Servera kļūda",
@@ -2554,8 +2463,6 @@ router.post("/api/post/grills-latvia/auth/email-reset", blockMaliciousIPs, apply
     });
 
   } catch (error) {
-    console.error("[email-reset] full error:", error);
-
     return res.status(500).json({
       resStatus: false,
       resMessage: "Neizdevās atjaunināt paroli",
@@ -2698,7 +2605,6 @@ router.post("/api/post/grills-latvia/auth/email-verify", blockMaliciousIPs, appl
 router.delete("/api/delete/grills-latvia/profile-picture", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
   let client;
   try {
-    console.log("[grills-latvia/profile-picture] DELETE request");
     /* SESSION VALIDATION */
     const auth = req.headers.authorization || "";
     const bearerSid = auth.startsWith("Bearer ")
@@ -2727,7 +2633,6 @@ router.delete("/api/delete/grills-latvia/profile-picture", blockMaliciousIPs, ap
       });
     }
     const googleId = sessionRes.rows[0].google_id;
-    console.log("[grills-latvia/profile-picture] google_id:", googleId);
     /* GET CURRENT IMAGE */
     client = await pool.connect();
     const userRes = await client.query(
@@ -2745,7 +2650,6 @@ router.delete("/api/delete/grills-latvia/profile-picture", blockMaliciousIPs, ap
       });
     }
     const profileImg = userRes.rows[0]?.profile_img || null;
-    console.log("[grills-latvia/profile-picture] profile_img:", profileImg);
     /* NOTHING TODELETE */
     if (!profileImg) {
       return res.json({
@@ -2765,10 +2669,6 @@ router.delete("/api/delete/grills-latvia/profile-picture", blockMaliciousIPs, ap
             .from("masters_latvia_storage")
             .remove([filePath]);
         if (deleteError) {
-          console.log(
-            "[profile-picture] Supabase delete error:",
-            deleteError.message
-          );
           return res.status(503).json({
             resStatus: false,
             resMessage: "Attēla dzēšana neizdevās",
@@ -2777,10 +2677,6 @@ router.delete("/api/delete/grills-latvia/profile-picture", blockMaliciousIPs, ap
         }
       }
     } catch (err) {
-      console.log(
-        "[profile-picture] Supabase cleanup error:",
-        err.message
-      );
       return res.status(503).json({
         resStatus: false,
         resMessage: "Attēla dzēšana neizdevās",
@@ -2794,20 +2690,12 @@ router.delete("/api/delete/grills-latvia/profile-picture", blockMaliciousIPs, ap
        WHERE google_id = $1`,
       [googleId]
     );
-    console.log(
-      "[grills-latvia/profile-picture] Profile image deleted:",
-      googleId
-    );
     return res.json({
       resStatus: true,
       resMessage: "Profila attēls dzēsts",
       resOkCode: 2
     });
   } catch (err) {
-    console.error(
-      "[grills-latvia/profile-picture] DELETE error:",
-      err.message
-    );
     return res.status(500).json({
       resStatus: false,
       resMessage: "Servera kļūda",
@@ -2821,7 +2709,6 @@ router.delete("/api/delete/grills-latvia/profile-picture", blockMaliciousIPs, ap
 });
 router.get("/api/get/grills-latvia/profile-picture", applyReadRateLimit, async (req, res) => {
   try {
-    console.log("[grills-latvia/profile-picture] GET request");
     /* SESSION VALIDATION */
     const auth = req.headers.authorization || "";
     const bearerSid = auth.startsWith("Bearer ")
@@ -2850,7 +2737,6 @@ router.get("/api/get/grills-latvia/profile-picture", applyReadRateLimit, async (
       });
     }
     const googleId = sessionRes.rows[0].google_id;
-    console.log("[grills-latvia/profile-picture] google_id:", googleId);
     /* GET PROFILE IMAGE */
     const userRes = await pool.query(
       `SELECT profile_img
@@ -2859,7 +2745,6 @@ router.get("/api/get/grills-latvia/profile-picture", applyReadRateLimit, async (
        LIMIT 1`,
       [googleId]
     );
-    console.log("[grills-latvia/profile-picture] DB rowCount:", userRes.rowCount);
     if (!userRes.rowCount) {
       return res.status(404).json({
         resStatus: false,
@@ -2868,14 +2753,12 @@ router.get("/api/get/grills-latvia/profile-picture", applyReadRateLimit, async (
       });
     }
     const profileImg = userRes.rows[0]?.profile_img || null;
-    console.log("[grills-latvia/profile-picture] profile_img:", profileImg);
     return res.json({
       resStatus: true,
       resOkCode: 1,
       profile_img: profileImg
     });
   } catch (err) {
-    console.error("[grills-latvia/profile-picture] error:", err.message);
     return res.status(500).json({
       resStatus: false,
       resMessage: "Servera kļūda",
@@ -2885,9 +2768,8 @@ router.get("/api/get/grills-latvia/profile-picture", applyReadRateLimit, async (
 });
 router.get("/api/get/grills-latvia/ad/:id", applyReadRateLimit, async (req, res) => {
   const adId = req.params.id;
-  console.log("[grills-latvia/ad] GET request, adId:", adId);
   try {
-const q = `
+  const q = `
       SELECT 
         a.id, a.name, a.description, a.price, a.city, a.date, a.views,
         a.image_url, a.google_id, a.location,
@@ -2899,28 +2781,20 @@ const q = `
       LIMIT 1
     `;
     const r = await pool.query(q, [adId]);
-    console.log("[grills-latvia/ad] DB rowCount:", r.rowCount);
     if (!r.rowCount) {
-      console.log("[grills-latvia/ad] Ad not found for id:", adId);
       return res.json({
         resStatus: false,
         resErrorCode: 1,
         resMessage: "Vieta nav atrasta"
       });
     }
-
     const ad = r.rows[0];
-    console.log("[grills-latvia/ad] ad.city:", ad.city, "| type:", typeof ad.city, "| isArray:", Array.isArray(ad.city));
-    console.log("[grills-latvia/ad] ad.image_url:", ad.image_url, "| type:", typeof ad.image_url);
-    console.log("[grills-latvia/ad] ad raw:", JSON.stringify(ad));
-
     const cityArr = Array.isArray(ad.city)
       ? ad.city
       : typeof ad.city === "string"
         ? JSON.parse(ad.city)
         : [];
     const region = cityArr[0];
-    console.log("[grills-latvia/ad] region:", region);
     let newerId = null;
     let olderId = null;
 
@@ -2943,9 +2817,8 @@ const q = `
       const olderR = await pool.query(olderQ, [adId, JSON.stringify([region])]);
       newerId = newerR.rows[0]?.id || null;
       olderId = olderR.rows[0]?.id || null;
-      console.log("[grills-latvia/ad] region-based newerId:", newerId, "| olderId:", olderId);
     } else {
-      console.log("[grills-latvia/ad] region undefined, skipping region-based nav");
+      console.log("region undefined, skipping arrow navigation");
     }
 
     if (!newerId) {
@@ -2954,7 +2827,6 @@ const q = `
         [adId]
       );
       newerId = r.rows[0]?.id || null;
-      console.log("[grills-latvia/ad] fallback newerId:", newerId);
     }
     if (!olderId) {
       const r = await pool.query(
@@ -2962,10 +2834,7 @@ const q = `
         [adId]
       );
       olderId = r.rows[0]?.id || null;
-      console.log("[grills-latvia/ad] fallback olderId:", olderId);
     }
-
-    console.log("[grills-latvia/ad] sending response, newerId:", newerId, "| olderId:", olderId);
     return res.json({
       resStatus: true,
       resOkCode: 1,
@@ -2975,7 +2844,6 @@ const q = `
     });
 
   } catch (err) {
-    console.error("[grills-latvia/ad] error:", err.message);
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 2,
@@ -3051,7 +2919,6 @@ router.get("/api/get/grills-latvia/user-ads", applyReadRateLimit, async (req, re
 //above route is used by profile. Below route is used by public for posting owner html.
 router.get("/api/get/grills-latvia/posting-owner-ads", applyReadRateLimit, async (req, res) => {
   const { gid } = req.query;
-  console.log("posting-owner-ads: gid =", gid);
   if (!gid) {
     return res.status(200).json({
       resStatus: false,
@@ -3079,7 +2946,6 @@ router.get("/api/get/grills-latvia/posting-owner-ads", applyReadRateLimit, async
       ORDER BY date DESC, id DESC;
     `;
     const adsRes = await pool.query(adsQuery, [gid]);
-    console.log("posting-owner-ads: rows returned =", adsRes.rowCount);
     return res.status(200).json({
       resStatus: true,
       resMessage: "Ielādētas vietas",
@@ -3087,7 +2953,6 @@ router.get("/api/get/grills-latvia/posting-owner-ads", applyReadRateLimit, async
       ads: adsRes.rows
     });
   } catch (error) {
-    console.error("Owner ads fetch error:", error);
     return res.status(500).json({
       resStatus: false,
       resMessage: "Servera kļūda",
@@ -3741,10 +3606,6 @@ router.get("/api/get/grills-latvia/map-postings", blockMaliciousIPs, applyReadRa
       postings: result.rows
     });
   } catch (err) {
-    console.log(
-      "[grills-latvia/map-postings] Server error:",
-      err.message
-    );
     return res.status(500).json({
       resStatus: false,
       resMessage: "Servera kļūda",
@@ -3776,7 +3637,6 @@ router.get("/api/get/grills-latvia/homepage/carousel", async (req, res) => {
       resData: result.rows
     });
   } catch (err) {
-    console.error("CAROUSEL FETCH ERROR:", err);
     return res.status(500).json({
       resStatus: false,
       resMessage: "Neizdevās ielādēt karuseli",

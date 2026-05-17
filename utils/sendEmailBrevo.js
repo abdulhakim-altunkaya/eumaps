@@ -23,7 +23,7 @@ const MAIL_SITES = {
   },
   grilslatvija: {
     apiKey: process.env.BREVO_API_KEY_GRILSLATVIJA,
-    fromEmail: "info@grilslatvija.com",
+    fromEmail: "info@grilslatvija.lv",
     fromName: "Grils Latvija",
   },
 };
