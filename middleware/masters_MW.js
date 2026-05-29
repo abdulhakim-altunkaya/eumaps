@@ -10,15 +10,12 @@ const blockedIPAddresses = [
 
 // IPs to exclude from visitor logging (bots, crawlers that can visit but aren't logged)
 const excludedFromLoggingIPs = new Set([ 
-  "212.3.197.163",
-  "212.3.194.8",
+  "212.3.197.163", "212.3.194.8", "212.3.195.119",
   "84.15.219.255",
-  "80.89.79.47",
-  "80.89.79.139",
-  "80.89.79.39",
-  "66.249.92.161",
-  "66.102.8.230",
+  "80.89.79.47", "80.89.79.139", "80.89.79.39", "80.89.75.5",
+  "66.249.92.161", "66.249.70.201", "66.102.8.230", "66.102.9.224",
   "18.232.186.236",
+  "35.172.226.126",
 ]);
 
 // Helper function to extract client IP address

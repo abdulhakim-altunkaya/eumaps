@@ -58,7 +58,12 @@ const allowedOrigins = [
   "https://www.grilslatvija.lv",
   "http://grilslatvija.lv",
   "http://www.grilslatvija.lv",
-  "https://grilslatvija.netlify.app"
+  "https://grilslatvija.netlify.app",
+  "https://filebeef.com",
+  "https://www.filebeef.com",
+  "http://filebeef.com",
+  "http://www.filebeef.com",
+  "https://filebeef.netlify.app"
 ];
 
 
@@ -129,6 +134,8 @@ const mastersSLRoutes = require("./routes/masters_SL");
 app.use("/api/master-sierraleone", mastersSLRoutes);
 const grillsLVRoutes = require("./routes/grills_LV");
 app.use("/", grillsLVRoutes);
+const filebeefRoutes = require("./routes/filebeef");
+app.use("/", filebeefRoutes);
 
 //This function for now will be used safely convert image file names to alphanumerical values
 //currently used by latvia masters

@@ -26,6 +26,11 @@ const MAIL_SITES = {
     fromEmail: "info@grilslatvija.lv",
     fromName: "Grils Latvija",
   },
+  filebeef: {
+    apiKey: process.env.BREVO_API_KEY_FILEBEEF,
+    fromEmail: "info@filebeef.com",
+    fromName: "FileBeef",
+  },
 };
 
 async function sendEmailBrevo({ site, to, subject, html, text }) {
