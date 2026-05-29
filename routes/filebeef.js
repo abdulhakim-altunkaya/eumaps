@@ -2,6 +2,12 @@ const express = require("express");
 const router = express.Router();
 const crypto = require("crypto");
 const bcrypt = require("bcrypt");
+
+
+const { pool, supabase, upload } = require("../db");
+const useragent = require("useragent");
+const axios = require("axios");
+
 const jwt = require("jsonwebtoken");
 const { pool, upload } = require("../db");
 const sendEmailBrevo = require("../utils/sendEmailBrevo");

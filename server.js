@@ -113,8 +113,8 @@ app.use(cors({
 const { OAuth2Client } = require("google-auth-library");
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID); // FIXED
 
+app.options('*', cors())
 app.set('trust proxy', 1);
-
 //we need this as we use req.body to send data from frontend to backend
 app.use(express.json());
 
@@ -122,7 +122,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'client/build')));
 //For serving from build directory, you need to install path package and initiate it:
 
-app.options('*', cors())
+
 //import and then mount masters master routes
 //Mounting routes must come after cors and other imports
 const mastersLTRoutes = require("./routes/masters_LT");
