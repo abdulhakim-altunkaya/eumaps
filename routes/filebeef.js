@@ -31,7 +31,8 @@ function setSessionCookie(res, token) {
   res.cookie("filebeef_session", token, {
     httpOnly: true,
     secure: true,
-    sameSite: "none",
+    sameSite: "lax",
+    domain: ".filebeef.com",
     path: "/",
     maxAge: SESSION_MAX_AGE
   });
