@@ -557,21 +557,34 @@ router.delete("/api/delete/filebeef/auth/account", requireAuth, async (req, res)
   let client;
   try {
     client = await pool.connect();
-    // cascades handle sessions, usage, daily_usage, payments
+
+    // cancel Stripe subscription if exists
+    const userResult = await client.query(
+      `SELECT stripe_sub_id FROM filebeef_users WHERE id = $1`, [userId]
+    );
+    const stripeSubId = userResult.rows[0]?.stripe_sub_id;
+
+    if (stripeSubId) {
+      try {
+        await stripe.subscriptions.cancel(stripeSubId);
+      } catch (stripeErr) {
+        console.error("Stripe cancel on delete error:", stripeErr.message);
+        // continue with deletion even if Stripe cancel fails
+      }
+    }
+
+    // delete user — cascades handle sessions, usage, payments
     await client.query(`DELETE FROM filebeef_users WHERE id = $1`, [userId]);
-    res.clearCookie("filebeef_session", { 
-      path: "/", 
-      sameSite: "none", 
-      secure: true 
-    });
+    res.clearCookie("filebeef_session", { path: "/", sameSite: "none", secure: true });
     return res.status(200).json({ resStatus: true, resMessage: "Account deleted", resOkCode: 1 });
+
   } catch (err) {
+    console.error("Delete account error:", err.message);
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
   } finally {
     if (client) client.release();
   }
 });
-
 // ══════════════════════════════════════════════════════════════════════════
 //  PAYMENT ROUTES
 // ══════════════════════════════════════════════════════════════════════════
