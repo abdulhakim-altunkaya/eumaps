@@ -572,15 +572,9 @@ router.delete("/api/delete/filebeef/auth/account", requireAuth, async (req, res)
   }
 });
 
-
-
-
 // ══════════════════════════════════════════════════════════════════════════
 //  PAYMENT ROUTES
 // ══════════════════════════════════════════════════════════════════════════
-
-
-
 // ── CHECKOUT ──────────────────────────────────────────────────────────────
 router.post("/api/post/filebeef/payments/checkout", requireAuth, async (req, res) => {
   const { billing } = req.body;
@@ -596,7 +590,6 @@ router.post("/api/post/filebeef/payments/checkout", requireAuth, async (req, res
   }
 
   try {
-    // get or create Stripe customer
     let stripeCustomerId = req.filebeefUser.stripe_customer_id;
 
     if (!stripeCustomerId) {
@@ -624,6 +617,7 @@ router.post("/api/post/filebeef/payments/checkout", requireAuth, async (req, res
     return res.status(200).json({ resStatus: true, resOkCode: 1, url: session.url });
 
   } catch (err) {
+    console.error("Stripe checkout error:", err.message);
     return res.status(500).json({ resStatus: false, resMessage: "Failed to create checkout session", resErrorCode: 99 });
   }
 });
@@ -636,6 +630,7 @@ router.post("/api/post/filebeef/payments/webhook", express.raw({ type: "applicat
     try {
       event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
     } catch (err) {
+      console.error("Webhook signature error:", err.message);
       return res.status(400).json({ resStatus: false, resMessage: `Webhook error: ${err.message}` });
     }
 
@@ -647,9 +642,16 @@ router.post("/api/post/filebeef/payments/webhook", express.raw({ type: "applicat
           const sub = event.data.object;
           const stripeCustomerId = sub.customer;
           const status = sub.status;
-          const priceId = sub.items.data[0]?.price?.id;
-          const interval = sub.items.data[0]?.price?.recurring?.interval;
-          const expiresAt = new Date(sub.current_period_end * 1000);
+
+          // safely extract price and interval
+          const items = sub.items && sub.items.data ? sub.items.data : [];
+          const firstItem = items[0] || {};
+          const price = firstItem.price || firstItem.plan || {};
+          const recurring = price.recurring || {};
+          const interval = recurring.interval || price.interval || "month";
+          const expiresAt = sub.current_period_end
+            ? new Date(sub.current_period_end * 1000)
+            : null;
 
           const plan = status === "active" ? "pro" : "free";
           const planInterval = interval === "year" ? "year" : "month";
@@ -686,7 +688,6 @@ router.post("/api/post/filebeef/payments/webhook", express.raw({ type: "applicat
           const stripeInvoiceId = invoice.id;
           const stripePaymentId = invoice.payment_intent;
 
-          // get user id
           const userResult = await pool.query(
             `SELECT id, plan_interval FROM filebeef_users WHERE stripe_customer_id = $1 LIMIT 1`,
             [stripeCustomerId]
@@ -699,7 +700,7 @@ router.post("/api/post/filebeef/payments/webhook", express.raw({ type: "applicat
             `INSERT INTO filebeef_payments 
              (user_id, stripe_payment_id, stripe_invoice_id, amount_cents, currency, plan, plan_interval, status)
              VALUES ($1, $2, $3, $4, $5, 'pro', $6, 'paid')`,
-            [user.id, stripePaymentId, stripeInvoiceId, amountPaid, currency, user.plan_interval]
+            [user.id, stripePaymentId, stripeInvoiceId, amountPaid, currency, user.plan_interval || "month"]
           );
           break;
         }
@@ -708,6 +709,7 @@ router.post("/api/post/filebeef/payments/webhook", express.raw({ type: "applicat
       return res.status(200).json({ received: true });
 
     } catch (err) {
+      console.error("Webhook processing error:", err.message);
       return res.status(500).json({ resStatus: false, resMessage: "Webhook processing error", resErrorCode: 99 });
     }
   }
@@ -727,7 +729,6 @@ router.post("/api/post/filebeef/payments/cancel", requireAuth, async (req, res) 
       return res.status(400).json({ resStatus: false, resMessage: "No active subscription found", resErrorCode: 1 });
     }
 
-    // cancel at period end — user keeps access until expiry
     await stripe.subscriptions.update(stripeSubId, { cancel_at_period_end: true });
 
     await pool.query(
@@ -738,6 +739,7 @@ router.post("/api/post/filebeef/payments/cancel", requireAuth, async (req, res) 
     return res.status(200).json({ resStatus: true, resMessage: "Subscription will cancel at end of billing period", resOkCode: 1 });
 
   } catch (err) {
+    console.error("Cancel subscription error:", err.message);
     return res.status(500).json({ resStatus: false, resMessage: "Failed to cancel subscription", resErrorCode: 99 });
   }
 });
