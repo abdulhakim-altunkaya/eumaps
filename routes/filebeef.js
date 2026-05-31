@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const crypto = require("crypto");
 const bcrypt = require("bcrypt");
-
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const jwt = require("jsonwebtoken");
 const { pool, upload } = require("../db");
@@ -569,6 +569,176 @@ router.delete("/api/delete/filebeef/auth/account", requireAuth, async (req, res)
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
   } finally {
     if (client) client.release();
+  }
+});
+
+
+
+
+// ══════════════════════════════════════════════════════════════════════════
+//  PAYMENT ROUTES
+// ══════════════════════════════════════════════════════════════════════════
+
+
+
+// ── CHECKOUT ──────────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/payments/checkout", requireAuth, async (req, res) => {
+  const { billing } = req.body;
+  const userId = req.filebeefUser.user_id;
+  const userEmail = req.filebeefUser.email;
+
+  const priceId = billing === "annual"
+    ? process.env.STRIPE_ANNUAL_PRICE_ID
+    : process.env.STRIPE_MONTHLY_PRICE_ID;
+
+  if (!priceId) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid billing type", resErrorCode: 1 });
+  }
+
+  try {
+    // get or create Stripe customer
+    let stripeCustomerId = req.filebeefUser.stripe_customer_id;
+
+    if (!stripeCustomerId) {
+      const customer = await stripe.customers.create({
+        email: userEmail,
+        metadata: { filebeef_user_id: String(userId) }
+      });
+      stripeCustomerId = customer.id;
+      await pool.query(
+        `UPDATE filebeef_users SET stripe_customer_id = $1 WHERE id = $2`,
+        [stripeCustomerId, userId]
+      );
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      customer: stripeCustomerId,
+      payment_method_types: ["card"],
+      line_items: [{ price: priceId, quantity: 1 }],
+      mode: "subscription",
+      success_url: `${process.env.FRONTEND_URL_FILEBEEF}/dashboard.html?payment=success`,
+      cancel_url: `${process.env.FRONTEND_URL_FILEBEEF}/pricing.html?payment=cancelled`,
+      metadata: { filebeef_user_id: String(userId), billing }
+    });
+
+    return res.status(200).json({ resStatus: true, resOkCode: 1, url: session.url });
+
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Failed to create checkout session", resErrorCode: 99 });
+  }
+});
+
+// ── WEBHOOK ───────────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/payments/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+    const sig = req.headers["stripe-signature"];
+    let event;
+
+    try {
+      event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    } catch (err) {
+      return res.status(400).json({ resStatus: false, resMessage: `Webhook error: ${err.message}` });
+    }
+
+    try {
+      switch (event.type) {
+
+        case "customer.subscription.created":
+        case "customer.subscription.updated": {
+          const sub = event.data.object;
+          const stripeCustomerId = sub.customer;
+          const status = sub.status;
+          const priceId = sub.items.data[0]?.price?.id;
+          const interval = sub.items.data[0]?.price?.recurring?.interval;
+          const expiresAt = new Date(sub.current_period_end * 1000);
+
+          const plan = status === "active" ? "pro" : "free";
+          const planInterval = interval === "year" ? "year" : "month";
+
+          await pool.query(
+            `UPDATE filebeef_users 
+             SET plan = $1, plan_interval = $2, plan_expires_at = $3,
+                 stripe_sub_id = $4, sub_status = $5, updated_at = NOW()
+             WHERE stripe_customer_id = $6`,
+            [plan, planInterval, expiresAt, sub.id, status, stripeCustomerId]
+          );
+          break;
+        }
+
+        case "customer.subscription.deleted": {
+          const sub = event.data.object;
+          const stripeCustomerId = sub.customer;
+
+          await pool.query(
+            `UPDATE filebeef_users
+             SET plan = 'free', plan_interval = null, plan_expires_at = null,
+                 stripe_sub_id = null, sub_status = 'cancelled', updated_at = NOW()
+             WHERE stripe_customer_id = $1`,
+            [stripeCustomerId]
+          );
+          break;
+        }
+
+        case "invoice.payment_succeeded": {
+          const invoice = event.data.object;
+          const stripeCustomerId = invoice.customer;
+          const amountPaid = invoice.amount_paid;
+          const currency = invoice.currency;
+          const stripeInvoiceId = invoice.id;
+          const stripePaymentId = invoice.payment_intent;
+
+          // get user id
+          const userResult = await pool.query(
+            `SELECT id, plan_interval FROM filebeef_users WHERE stripe_customer_id = $1 LIMIT 1`,
+            [stripeCustomerId]
+          );
+          if (!userResult.rowCount) break;
+
+          const user = userResult.rows[0];
+
+          await pool.query(
+            `INSERT INTO filebeef_payments 
+             (user_id, stripe_payment_id, stripe_invoice_id, amount_cents, currency, plan, plan_interval, status)
+             VALUES ($1, $2, $3, $4, $5, 'pro', $6, 'paid')`,
+            [user.id, stripePaymentId, stripeInvoiceId, amountPaid, currency, user.plan_interval]
+          );
+          break;
+        }
+      }
+
+      return res.status(200).json({ received: true });
+
+    } catch (err) {
+      return res.status(500).json({ resStatus: false, resMessage: "Webhook processing error", resErrorCode: 99 });
+    }
+  }
+);
+
+// ── CANCEL SUBSCRIPTION ───────────────────────────────────────────────────
+router.post("/api/post/filebeef/payments/cancel", requireAuth, async (req, res) => {
+  const userId = req.filebeefUser.user_id;
+
+  try {
+    const result = await pool.query(
+      `SELECT stripe_sub_id FROM filebeef_users WHERE id = $1`, [userId]
+    );
+    const stripeSubId = result.rows[0]?.stripe_sub_id;
+
+    if (!stripeSubId) {
+      return res.status(400).json({ resStatus: false, resMessage: "No active subscription found", resErrorCode: 1 });
+    }
+
+    // cancel at period end — user keeps access until expiry
+    await stripe.subscriptions.update(stripeSubId, { cancel_at_period_end: true });
+
+    await pool.query(
+      `UPDATE filebeef_users SET sub_status = 'cancelling', updated_at = NOW() WHERE id = $1`,
+      [userId]
+    );
+
+    return res.status(200).json({ resStatus: true, resMessage: "Subscription will cancel at end of billing period", resOkCode: 1 });
+
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Failed to cancel subscription", resErrorCode: 99 });
   }
 });
 

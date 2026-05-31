@@ -115,6 +115,8 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID); // FIXED
 
 app.options('*', cors())
 app.set('trust proxy', 1);
+// Stripe webhook needs raw body — must come before express.json()
+app.use('/api/post/filebeef/payments/webhook', express.raw({ type: 'application/json' }))
 //we need this as we use req.body to send data from frontend to backend
 app.use(express.json());
 
