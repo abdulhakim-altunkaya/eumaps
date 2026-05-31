@@ -70,7 +70,6 @@ async function requireAuth(req, res, next) {
     if (new Date(session.expires_at) < new Date()) {
       return res.status(401).json({ resStatus: false, resMessage: "Session expired", resErrorCode: 3 });
     }
-    // auto-downgrade expired pro plans
     if (session.plan === "pro" && session.plan_expires_at && new Date(session.plan_expires_at) < new Date()) {
       await pool.query(
         `UPDATE filebeef_users SET plan = 'free', sub_status = 'expired' WHERE id = $1`,
@@ -85,7 +84,7 @@ async function requireAuth(req, res, next) {
   }
 }
 
-// ── RATE LIMITER (filebeef-specific, in-memory) ───────────────────────────
+// ── RATE LIMITER ───────────────────────────────────────────────────────────
 const filebeefRateStore = Object.create(null);
 function filebeefWriteLimit(req, res, next) {
   const ip = getClientIp(req);
@@ -102,10 +101,10 @@ function filebeefWriteLimit(req, res, next) {
   next();
 }
 
-// ── DAILY LIMIT CHECK ─────────────────────────────────────────────────────
+// ── DAILY LIMIT CHECK ──────────────────────────────────────────────────────
 async function checkDailyLimit(req, res, next) {
   const user = req.filebeefUser;
-  if (user.plan === "pro") return next(); // pro = unlimited
+  if (user.plan === "pro") return next();
   try {
     const today = new Date().toISOString().slice(0, 10);
     const result = await pool.query(
@@ -126,7 +125,7 @@ async function checkDailyLimit(req, res, next) {
   }
 }
 
-// ── LOG USAGE ─────────────────────────────────────────────────────────────
+// ── LOG USAGE ──────────────────────────────────────────────────────────────
 async function logUsage(userId, tool, inputFormat, outputFormat, fileSizeKb, status, ip) {
   try {
     const today = new Date().toISOString().slice(0, 10);
@@ -141,9 +140,7 @@ async function logUsage(userId, tool, inputFormat, outputFormat, fileSizeKb, sta
        ON CONFLICT (user_id, date) DO UPDATE SET count = filebeef_daily_usage.count + 1`,
       [userId, today]
     );
-  } catch (_) {
-    // silent — don't break conversion if logging fails
-  }
+  } catch (_) {}
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -169,8 +166,6 @@ router.post("/api/post/filebeef/auth/register", filebeefWriteLimit, async (req, 
   let client;
   try {
     client = await pool.connect();
-
-    // check if email already exists
     const existing = await client.query(
       `SELECT id, auth_provider FROM filebeef_users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
       [email]
@@ -192,12 +187,11 @@ router.post("/api/post/filebeef/auth/register", filebeefWriteLimit, async (req, 
     const verificationJwt = jwt.sign({ email, token: verificationToken }, JWT_EMAIL, { expiresIn: "24h" });
 
     await client.query(
-      `INSERT INTO filebeef_users (email, password_hash, auth_provider, verified, verification_token)
-       VALUES ($1, $2, 'email', false, $3)`,
+      `INSERT INTO filebeef_users (email, password_hash, auth_provider, verified, verification_token, has_password)
+       VALUES ($1, $2, 'email', false, $3, true)`,
       [email.toLowerCase().trim(), passwordHash, verificationToken]
     );
 
-    // send verification email
     const verifyUrl = `${FRONTEND_URL}/verify-email.html?token=${verificationJwt}`;
     await sendEmailBrevo({
       site: "filebeef",
@@ -270,7 +264,7 @@ router.post("/api/post/filebeef/auth/login", filebeefWriteLimit, async (req, res
   try {
     client = await pool.connect();
     const result = await client.query(
-      `SELECT id, email, password_hash, auth_provider, verified, plan
+      `SELECT id, email, password_hash, auth_provider, verified, plan, has_password
        FROM filebeef_users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
       [email]
     );
@@ -279,13 +273,15 @@ router.post("/api/post/filebeef/auth/login", filebeefWriteLimit, async (req, res
     }
     const user = result.rows[0];
 
-    if (user.auth_provider === "google") {
+    // Google-only account (no password set)
+    if (user.auth_provider === "google" && !user.has_password) {
       return res.status(401).json({
         resStatus: false,
         resMessage: "This account uses Google login. Please continue with Google.",
         resErrorCode: 3
       });
     }
+
     if (!user.verified) {
       return res.status(401).json({ resStatus: false, resMessage: "Please verify your email before logging in.", resErrorCode: 4 });
     }
@@ -330,9 +326,9 @@ router.post("/api/post/filebeef/auth/google", filebeefWriteLimit, async (req, re
 
     client = await pool.connect();
 
-    // check if email exists with password auth
+    // check if email exists as email-only account (no google_id)
     const existingEmail = await client.query(
-      `SELECT id, auth_provider FROM filebeef_users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+      `SELECT id, auth_provider, has_password FROM filebeef_users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
       [email]
     );
     if (existingEmail.rowCount && existingEmail.rows[0].auth_provider === "email") {
@@ -343,10 +339,9 @@ router.post("/api/post/filebeef/auth/google", filebeefWriteLimit, async (req, re
       });
     }
 
-    // upsert user
     const result = await client.query(
-      `INSERT INTO filebeef_users (email, auth_provider, google_id, verified)
-       VALUES ($1, 'google', $2, true)
+      `INSERT INTO filebeef_users (email, auth_provider, google_id, verified, has_password)
+       VALUES ($1, 'google', $2, true, false)
        ON CONFLICT (google_id) DO UPDATE SET email = EXCLUDED.email, updated_at = NOW()
        RETURNING id, email, plan`,
       [email.toLowerCase().trim(), googleId]
@@ -381,12 +376,7 @@ router.post("/api/post/filebeef/auth/logout", async (req, res) => {
       await pool.query(`DELETE FROM filebeef_sessions WHERE token = $1`, [token]);
     } catch (_) {}
   }
-
-  res.clearCookie("filebeef_session", { 
-    path: "/", 
-    sameSite: "none", 
-    secure: true 
-  });
+  res.clearCookie("filebeef_session", { path: "/", sameSite: "none", secure: true });
   return res.status(200).json({ resStatus: true, resMessage: "Logged out", resOkCode: 1 });
 });
 
@@ -398,7 +388,7 @@ router.get("/api/get/filebeef/auth/me", requireAuth, async (req, res) => {
     const [dailyResult, totalResult, userResult] = await Promise.all([
       pool.query(`SELECT count FROM filebeef_daily_usage WHERE user_id = $1 AND date = $2`, [user.user_id, today]),
       pool.query(`SELECT COUNT(*) FROM filebeef_usage WHERE user_id = $1 AND status = 'success'`, [user.user_id]),
-      pool.query(`SELECT created_at, auth_provider, plan, plan_interval, plan_expires_at FROM filebeef_users WHERE id = $1`, [user.user_id])
+      pool.query(`SELECT created_at, auth_provider, has_password, plan, plan_interval, plan_expires_at FROM filebeef_users WHERE id = $1`, [user.user_id])
     ]);
     const userData = userResult.rows[0];
     return res.status(200).json({
@@ -407,6 +397,7 @@ router.get("/api/get/filebeef/auth/me", requireAuth, async (req, res) => {
       email: user.email,
       plan: userData.plan,
       authProvider: userData.auth_provider,
+      hasPassword: userData.has_password,
       billingInterval: userData.plan_interval,
       expiresAt: userData.plan_expires_at,
       todayCount: dailyResult.rows[0]?.count || 0,
@@ -420,7 +411,7 @@ router.get("/api/get/filebeef/auth/me", requireAuth, async (req, res) => {
 
 // ── FORGOT PASSWORD ───────────────────────────────────────────────────────
 router.post("/api/post/filebeef/auth/forgot-password", filebeefWriteLimit, async (req, res) => {
-  const { email } = req.body;
+  const { email, forceReset } = req.body;
   if (!email) {
     return res.status(400).json({ resStatus: false, resMessage: "Email required", resErrorCode: 1 });
   }
@@ -431,20 +422,34 @@ router.post("/api/post/filebeef/auth/forgot-password", filebeefWriteLimit, async
       `SELECT id, auth_provider FROM filebeef_users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
       [email]
     );
-    // always return success to prevent email enumeration
-    if (!result.rowCount || result.rows[0].auth_provider === "google") {
+
+    if (!result.rowCount) {
+      // prevent email enumeration
       return res.status(200).json({ resStatus: true, resMessage: "If that email exists, a reset link was sent.", resOkCode: 1 });
     }
-    const userId = result.rows[0].id;
+
+    const user = result.rows[0];
+
+    // Google account — inform frontend unless user explicitly requests reset
+    if (user.auth_provider === "google" && !forceReset) {
+      return res.status(200).json({
+        resStatus: true,
+        resOkCode: 2,
+        isGoogle: true,
+        resMessage: "This email is registered with Google."
+      });
+    }
+
+    // send reset email (works for both email and google accounts)
     const resetToken = crypto.randomBytes(32).toString("hex");
     const resetExpires = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
 
     await client.query(
       `UPDATE filebeef_users SET reset_token = $1, reset_token_expires = $2 WHERE id = $3`,
-      [resetToken, resetExpires, userId]
+      [resetToken, resetExpires, user.id]
     );
 
-    const resetJwt = jwt.sign({ userId, token: resetToken }, JWT_EMAIL, { expiresIn: "1h" });
+    const resetJwt = jwt.sign({ userId: user.id, token: resetToken }, JWT_EMAIL, { expiresIn: "1h" });
     const resetUrl = `${FRONTEND_URL}/reset-password.html?token=${resetJwt}`;
 
     await sendEmailBrevo({
@@ -493,15 +498,20 @@ router.post("/api/post/filebeef/auth/reset-password", filebeefWriteLimit, async 
       return res.status(400).json({ resStatus: false, resMessage: "Invalid or expired reset link", resErrorCode: 3 });
     }
     const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+    // set password and mark has_password = true (covers Google account conversion)
     await client.query(
-      `UPDATE filebeef_users SET password_hash = $1, reset_token = null, reset_token_expires = null, updated_at = NOW()
+      `UPDATE filebeef_users 
+       SET password_hash = $1, reset_token = null, reset_token_expires = null,
+           has_password = true, verified = true, updated_at = NOW()
        WHERE id = $2`,
       [passwordHash, decoded.userId]
     );
-    // invalidate all sessions after password reset
+
+    // invalidate all sessions
     await client.query(`DELETE FROM filebeef_sessions WHERE user_id = $1`, [decoded.userId]);
 
-    return res.status(200).json({ resStatus: true, resMessage: "Password updated. Please log in.", resOkCode: 1 });
+    return res.status(200).json({ resStatus: true, resMessage: "Password set. You can now log in with email and password.", resOkCode: 1 });
 
   } catch (err) {
     if (err.name === "TokenExpiredError") {
@@ -524,16 +534,16 @@ router.post("/api/post/filebeef/auth/change-password", requireAuth, filebeefWrit
   if (newPassword.length < 8) {
     return res.status(400).json({ resStatus: false, resMessage: "New password must be at least 8 characters", resErrorCode: 2 });
   }
-  if (req.filebeefUser.auth_provider === "google") {
-    return res.status(400).json({ resStatus: false, resMessage: "Google accounts cannot change password here", resErrorCode: 3 });
-  }
 
   let client;
   try {
     client = await pool.connect();
     const result = await client.query(
-      `SELECT password_hash FROM filebeef_users WHERE id = $1`, [userId]
+      `SELECT password_hash, has_password FROM filebeef_users WHERE id = $1`, [userId]
     );
+    if (!result.rows[0].has_password) {
+      return res.status(400).json({ resStatus: false, resMessage: "No password set. Use forgot password to set one.", resErrorCode: 3 });
+    }
     const match = await bcrypt.compare(currentPassword, result.rows[0].password_hash);
     if (!match) {
       return res.status(401).json({ resStatus: false, resMessage: "Current password is incorrect", resErrorCode: 4 });
@@ -558,7 +568,6 @@ router.delete("/api/delete/filebeef/auth/account", requireAuth, async (req, res)
   try {
     client = await pool.connect();
 
-    // cancel Stripe subscription if exists
     const userResult = await client.query(
       `SELECT stripe_sub_id FROM filebeef_users WHERE id = $1`, [userId]
     );
@@ -569,11 +578,9 @@ router.delete("/api/delete/filebeef/auth/account", requireAuth, async (req, res)
         await stripe.subscriptions.cancel(stripeSubId);
       } catch (stripeErr) {
         console.error("Stripe cancel on delete error:", stripeErr.message);
-        // continue with deletion even if Stripe cancel fails
       }
     }
 
-    // delete user — cascades handle sessions, usage, payments
     await client.query(`DELETE FROM filebeef_users WHERE id = $1`, [userId]);
     res.clearCookie("filebeef_session", { path: "/", sameSite: "none", secure: true });
     return res.status(200).json({ resStatus: true, resMessage: "Account deleted", resOkCode: 1 });
@@ -585,9 +592,11 @@ router.delete("/api/delete/filebeef/auth/account", requireAuth, async (req, res)
     if (client) client.release();
   }
 });
+
 // ══════════════════════════════════════════════════════════════════════════
 //  PAYMENT ROUTES
 // ══════════════════════════════════════════════════════════════════════════
+
 // ── CHECKOUT ──────────────────────────────────────────────────────────────
 router.post("/api/post/filebeef/payments/checkout", requireAuth, async (req, res) => {
   const { billing } = req.body;
@@ -637,120 +646,98 @@ router.post("/api/post/filebeef/payments/checkout", requireAuth, async (req, res
 
 // ── WEBHOOK ───────────────────────────────────────────────────────────────
 router.post("/api/post/filebeef/payments/webhook", express.raw({ type: "application/json" }), async (req, res) => {
-    const sig = req.headers["stripe-signature"];
-    let event;
+  const sig = req.headers["stripe-signature"];
+  let event;
 
-    try {
-      event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
-    } catch (err) {
-      console.error("Webhook signature error:", err.message);
-      return res.status(400).json({ resStatus: false, resMessage: `Webhook error: ${err.message}` });
-    }
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error("Webhook signature error:", err.message);
+    return res.status(400).json({ resStatus: false, resMessage: `Webhook error: ${err.message}` });
+  }
 
-    try {
-      switch (event.type) {
+  try {
+    switch (event.type) {
 
-        case "customer.subscription.created":
-        case "customer.subscription.updated": {
-          const sub = event.data.object;
-          const stripeCustomerId = sub.customer;
-          const status = sub.status;
+      case "customer.subscription.created":
+      case "customer.subscription.updated": {
+        const sub = event.data.object;
+        const stripeCustomerId = sub.customer;
+        const status = sub.status;
+        const items = sub.items && sub.items.data ? sub.items.data : [];
+        const firstItem = items[0] || {};
+        const price = firstItem.price || firstItem.plan || {};
+        const recurring = price.recurring || {};
+        const interval = recurring.interval || price.interval || "month";
+        const expiresAt = sub.current_period_end ? new Date(sub.current_period_end * 1000) : null;
+        const plan = status === "active" ? "pro" : "free";
+        const planInterval = interval === "year" ? "year" : "month";
 
-          // safely extract price and interval
-          const items = sub.items && sub.items.data ? sub.items.data : [];
-          const firstItem = items[0] || {};
-          const price = firstItem.price || firstItem.plan || {};
-          const recurring = price.recurring || {};
-          const interval = recurring.interval || price.interval || "month";
-          const expiresAt = sub.current_period_end
-            ? new Date(sub.current_period_end * 1000)
-            : null;
-
-          const plan = status === "active" ? "pro" : "free";
-          const planInterval = interval === "year" ? "year" : "month";
-
-          await pool.query(
-            `UPDATE filebeef_users 
-             SET plan = $1, plan_interval = $2, plan_expires_at = $3,
-                 stripe_sub_id = $4, sub_status = $5, updated_at = NOW()
-             WHERE stripe_customer_id = $6`,
-            [plan, planInterval, expiresAt, sub.id, status, stripeCustomerId]
-          );
-          break;
-        }
-
-        case "customer.subscription.deleted": {
-          const sub = event.data.object;
-          const stripeCustomerId = sub.customer;
-
-          await pool.query(
-            `UPDATE filebeef_users
-             SET plan = 'free', plan_interval = null, plan_expires_at = null,
-                 stripe_sub_id = null, sub_status = 'cancelled', updated_at = NOW()
-             WHERE stripe_customer_id = $1`,
-            [stripeCustomerId]
-          );
-          break;
-        }
-
-        case "invoice.payment_succeeded": {
-          const invoice = event.data.object;
-          const stripeCustomerId = invoice.customer;
-          const amountPaid = invoice.amount_paid;
-          const currency = invoice.currency;
-          const stripeInvoiceId = invoice.id;
-          const stripePaymentId = invoice.payment_intent;
-
-          const userResult = await pool.query(
-            `SELECT id, plan_interval FROM filebeef_users WHERE stripe_customer_id = $1 LIMIT 1`,
-            [stripeCustomerId]
-          );
-          if (!userResult.rowCount) break;
-
-          const user = userResult.rows[0];
-
-          await pool.query(
-            `INSERT INTO filebeef_payments 
-             (user_id, stripe_payment_id, stripe_invoice_id, amount_cents, currency, plan, plan_interval, status)
-             VALUES ($1, $2, $3, $4, $5, 'pro', $6, 'paid')`,
-            [user.id, stripePaymentId, stripeInvoiceId, amountPaid, currency, user.plan_interval || "month"]
-          );
-          break;
-        }
+        await pool.query(
+          `UPDATE filebeef_users 
+           SET plan = $1, plan_interval = $2, plan_expires_at = $3,
+               stripe_sub_id = $4, sub_status = $5, updated_at = NOW()
+           WHERE stripe_customer_id = $6`,
+          [plan, planInterval, expiresAt, sub.id, status, stripeCustomerId]
+        );
+        break;
       }
 
-      return res.status(200).json({ received: true });
+      case "customer.subscription.deleted": {
+        const sub = event.data.object;
+        await pool.query(
+          `UPDATE filebeef_users
+           SET plan = 'free', plan_interval = null, plan_expires_at = null,
+               stripe_sub_id = null, sub_status = 'cancelled', updated_at = NOW()
+           WHERE stripe_customer_id = $1`,
+          [sub.customer]
+        );
+        break;
+      }
 
-    } catch (err) {
-      console.error("Webhook processing error:", err.message);
-      return res.status(500).json({ resStatus: false, resMessage: "Webhook processing error", resErrorCode: 99 });
+      case "invoice.payment_succeeded": {
+        const invoice = event.data.object;
+        const userResult = await pool.query(
+          `SELECT id, plan_interval FROM filebeef_users WHERE stripe_customer_id = $1 LIMIT 1`,
+          [invoice.customer]
+        );
+        if (!userResult.rowCount) break;
+        const user = userResult.rows[0];
+        await pool.query(
+          `INSERT INTO filebeef_payments 
+           (user_id, stripe_payment_id, stripe_invoice_id, amount_cents, currency, plan, plan_interval, status)
+           VALUES ($1, $2, $3, $4, $5, 'pro', $6, 'paid')`,
+          [user.id, invoice.payment_intent, invoice.id, invoice.amount_paid, invoice.currency, user.plan_interval || "month"]
+        );
+        break;
+      }
     }
+
+    return res.status(200).json({ received: true });
+
+  } catch (err) {
+    console.error("Webhook processing error:", err.message);
+    return res.status(500).json({ resStatus: false, resMessage: "Webhook processing error", resErrorCode: 99 });
   }
-);
+});
 
 // ── CANCEL SUBSCRIPTION ───────────────────────────────────────────────────
 router.post("/api/post/filebeef/payments/cancel", requireAuth, async (req, res) => {
   const userId = req.filebeefUser.user_id;
-
   try {
     const result = await pool.query(
       `SELECT stripe_sub_id FROM filebeef_users WHERE id = $1`, [userId]
     );
     const stripeSubId = result.rows[0]?.stripe_sub_id;
-
     if (!stripeSubId) {
       return res.status(400).json({ resStatus: false, resMessage: "No active subscription found", resErrorCode: 1 });
     }
-
     await stripe.subscriptions.update(stripeSubId, { cancel_at_period_end: true });
-
     await pool.query(
       `UPDATE filebeef_users SET sub_status = 'cancelling', updated_at = NOW() WHERE id = $1`,
       [userId]
     );
-
     return res.status(200).json({ resStatus: true, resMessage: "Subscription will cancel at end of billing period", resOkCode: 1 });
-
   } catch (err) {
     console.error("Cancel subscription error:", err.message);
     return res.status(500).json({ resStatus: false, resMessage: "Failed to cancel subscription", resErrorCode: 99 });
