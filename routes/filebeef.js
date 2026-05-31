@@ -743,7 +743,38 @@ router.post("/api/post/filebeef/payments/cancel", requireAuth, async (req, res) 
     return res.status(500).json({ resStatus: false, resMessage: "Failed to cancel subscription", resErrorCode: 99 });
   }
 });
+//Contact form on about.html
+router.post("/api/post/filebeef/contact", filebeefWriteLimit, async (req, res) => {
+  const { name, email, subject, message } = req.body;
+  const ip = getClientIp(req);
 
+  if (!name || !email || !subject || !message) {
+    return res.status(400).json({ resStatus: false, resMessage: "All fields are required", resErrorCode: 1 });
+  }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid email address", resErrorCode: 2 });
+  }
+  if (name.length > 100 || subject.length > 200 || message.length > 2000) {
+    return res.status(400).json({ resStatus: false, resMessage: "Input too long", resErrorCode: 3 });
+  }
+
+  let client;
+  try {
+    client = await pool.connect();
+    await client.query(
+      `INSERT INTO messages_filebeef (name, email, subject, message, ip)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [name.trim(), email.trim().toLowerCase(), subject.trim(), message.trim(), ip]
+    );
+    return res.status(200).json({ resStatus: true, resMessage: "Message sent", resOkCode: 1 });
+  } catch (err) {
+    console.error("Contact form error:", err.message);
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  } finally {
+    if (client) client.release();
+  }
+});
 // ══════════════════════════════════════════════════════════════════════════
 //  EXPORTS (conversion routes will be added below in next steps)
 // ══════════════════════════════════════════════════════════════════════════
