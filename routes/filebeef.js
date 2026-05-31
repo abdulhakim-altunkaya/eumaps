@@ -388,7 +388,7 @@ router.get("/api/get/filebeef/auth/me", requireAuth, async (req, res) => {
     const [dailyResult, totalResult, userResult] = await Promise.all([
       pool.query(`SELECT count FROM filebeef_daily_usage WHERE user_id = $1 AND date = $2`, [user.user_id, today]),
       pool.query(`SELECT COUNT(*) FROM filebeef_usage WHERE user_id = $1 AND status = 'success'`, [user.user_id]),
-      pool.query(`SELECT created_at, auth_provider, has_password, plan, plan_interval, plan_expires_at FROM filebeef_users WHERE id = $1`, [user.user_id])
+      pool.query(`SELECT created_at, auth_provider, has_password, plan, plan_interval, plan_expires_at, sub_status FROM filebeef_users WHERE id = $1`, [user.user_id])
     ]);
     const userData = userResult.rows[0];
     return res.status(200).json({
@@ -402,7 +402,8 @@ router.get("/api/get/filebeef/auth/me", requireAuth, async (req, res) => {
       expiresAt: userData.plan_expires_at,
       todayCount: dailyResult.rows[0]?.count || 0,
       totalCount: totalResult.rows[0]?.count || 0,
-      createdAt: userData.created_at
+      createdAt: userData.created_at,
+      subStatus: userData.sub_status
     });
   } catch (err) {
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
