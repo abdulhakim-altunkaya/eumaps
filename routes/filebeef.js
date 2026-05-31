@@ -31,8 +31,7 @@ function setSessionCookie(res, token) {
   res.cookie("filebeef_session", token, {
     httpOnly: true,
     secure: true,
-    sameSite: "lax",
-    domain: ".filebeef.com",
+    sameSite: "none",
     path: "/",
     maxAge: SESSION_MAX_AGE
   });
@@ -382,7 +381,12 @@ router.post("/api/post/filebeef/auth/logout", async (req, res) => {
       await pool.query(`DELETE FROM filebeef_sessions WHERE token = $1`, [token]);
     } catch (_) {}
   }
-  res.clearCookie("filebeef_session", { path: "/", sameSite: "none", secure: true });
+
+  res.clearCookie("filebeef_session", { 
+    path: "/", 
+    sameSite: "none", 
+    secure: true 
+  });
   return res.status(200).json({ resStatus: true, resMessage: "Logged out", resOkCode: 1 });
 });
 
@@ -555,7 +559,11 @@ router.delete("/api/delete/filebeef/auth/account", requireAuth, async (req, res)
     client = await pool.connect();
     // cascades handle sessions, usage, daily_usage, payments
     await client.query(`DELETE FROM filebeef_users WHERE id = $1`, [userId]);
-    res.clearCookie("filebeef_session", { path: "/", sameSite: "none", secure: true });
+    res.clearCookie("filebeef_session", { 
+      path: "/", 
+      sameSite: "none", 
+      secure: true 
+    });
     return res.status(200).json({ resStatus: true, resMessage: "Account deleted", resOkCode: 1 });
   } catch (err) {
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
