@@ -788,7 +788,7 @@ const multer = require("multer");
 const LIMITS = {
   anon:       { daily: 1,  sizeMB: 5  },
   free:       { daily: 2,  sizeMB: 10 },
-  pro:        { daily: 20, sizeMB: 15 }
+  pro:        { daily: 50, sizeMB: 15 }
 };
 
 // ── ALLOWED IMAGE TYPES ────────────────────────────────────────────────────
@@ -989,6 +989,413 @@ router.post("/api/post/filebeef/image/convert", optionalAuth, imageUpload.single
         resMessage: "Conversion failed. Please check the file and try again.",
         resErrorCode: 99
       });
+    }
+  }
+);
+
+// ── IMAGE OPTIMIZER (compress + resize) ───────────────────────────────────
+router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.single("file"), async (req, res) => {
+    const user = req.filebeefUser;
+    const ip = getClientIp(req);
+    const tier = getTier(user);
+    const limits = LIMITS[tier];
+
+    if (!req.file) {
+      return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
+    }
+    if (req.file.size > limits.sizeMB * 1024 * 1024) {
+      return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB on your plan.`, resErrorCode: 2 });
+    }
+    if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype)) {
+      return res.status(400).json({ resStatus: false, resMessage: "Unsupported file type.", resErrorCode: 3 });
+    }
+
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    if (!limitCheck.allowed) {
+      return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+    }
+
+    const quality = Math.min(100, Math.max(1, parseInt(req.body.quality) || 75));
+    const width = req.body.width ? parseInt(req.body.width) : null;
+    const height = req.body.height ? parseInt(req.body.height) : null;
+    const inputFormat = req.file.mimetype.split("/")[1] || "unknown";
+    const fileSizeKb = Math.round(req.file.size / 1024);
+
+    try {
+      let sharpInstance = sharp(req.file.buffer);
+
+      if (width || height) {
+        sharpInstance = sharpInstance.resize(width || null, height || null, { withoutEnlargement: true, fit: "inside" });
+      }
+
+      // output in same format as input, default jpeg
+      const outputFormat = inputFormat === "png" ? "png" : inputFormat === "webp" ? "webp" : "jpeg";
+      if (outputFormat === "png") sharpInstance = sharpInstance.png({ compressionLevel: Math.round((100 - quality) / 11) });
+      else if (outputFormat === "webp") sharpInstance = sharpInstance.webp({ quality });
+      else sharpInstance = sharpInstance.jpeg({ quality });
+
+      const outputBuffer = await sharpInstance.toBuffer();
+      const ext = outputFormat === "jpeg" ? "jpg" : outputFormat;
+      const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
+
+      await incrementUsage(user?.user_id, ip, tier, "image-optimize", inputFormat, outputFormat, fileSizeKb, "success");
+
+      res.set({
+        "Content-Type": outputFormat === "jpeg" ? "image/jpeg" : `image/${outputFormat}`,
+        "Content-Disposition": `attachment; filename="${originalName}_optimized.${ext}"`,
+        "Content-Length": outputBuffer.length
+      });
+      return res.status(200).send(outputBuffer);
+
+    } catch (err) {
+      console.error("Image optimize error:", err.message);
+      await incrementUsage(user?.user_id, ip, tier, "image-optimize", inputFormat, null, fileSizeKb, "failed");
+      return res.status(500).json({ resStatus: false, resMessage: "Optimization failed.", resErrorCode: 99 });
+    }
+  }
+);
+
+// ── FLIP & ROTATE ──────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/image/flip-rotate", optionalAuth, imageUpload.single("file"), async (req, res) => {
+    const user = req.filebeefUser;
+    const ip = getClientIp(req);
+    const tier = getTier(user);
+    const limits = LIMITS[tier];
+
+    if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
+    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
+    if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype)) return res.status(400).json({ resStatus: false, resMessage: "Unsupported file type.", resErrorCode: 3 });
+
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+
+    const rotate = parseInt(req.body.rotate) || 0;       // 0, 90, 180, 270
+    const flipH = req.body.flipH === "true";              // horizontal flip
+    const flipV = req.body.flipV === "true";              // vertical flip
+    const inputFormat = req.file.mimetype.split("/")[1] || "unknown";
+    const fileSizeKb = Math.round(req.file.size / 1024);
+
+    try {
+      let sharpInstance = sharp(req.file.buffer);
+      if (rotate) sharpInstance = sharpInstance.rotate(rotate);
+      if (flipH) sharpInstance = sharpInstance.flop();
+      if (flipV) sharpInstance = sharpInstance.flip();
+
+      const outputFormat = inputFormat === "png" ? "png" : inputFormat === "webp" ? "webp" : "jpeg";
+      if (outputFormat === "png") sharpInstance = sharpInstance.png();
+      else if (outputFormat === "webp") sharpInstance = sharpInstance.webp();
+      else sharpInstance = sharpInstance.jpeg({ quality: 90 });
+
+      const outputBuffer = await sharpInstance.toBuffer();
+      const ext = outputFormat === "jpeg" ? "jpg" : outputFormat;
+      const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
+
+      await incrementUsage(user?.user_id, ip, tier, "image-flip-rotate", inputFormat, outputFormat, fileSizeKb, "success");
+
+      res.set({
+        "Content-Type": outputFormat === "jpeg" ? "image/jpeg" : `image/${outputFormat}`,
+        "Content-Disposition": `attachment; filename="${originalName}_rotated.${ext}"`,
+        "Content-Length": outputBuffer.length
+      });
+      return res.status(200).send(outputBuffer);
+
+    } catch (err) {
+      console.error("Flip/rotate error:", err.message);
+      await incrementUsage(user?.user_id, ip, tier, "image-flip-rotate", inputFormat, null, fileSizeKb, "failed");
+      return res.status(500).json({ resStatus: false, resMessage: "Operation failed.", resErrorCode: 99 });
+    }
+  }
+);
+
+// ── EXIF REMOVER ───────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/image/exif-remove", optionalAuth, imageUpload.single("file"), async (req, res) => {
+    const user = req.filebeefUser;
+    const ip = getClientIp(req);
+    const tier = getTier(user);
+    const limits = LIMITS[tier];
+
+    if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
+    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
+    if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype)) return res.status(400).json({ resStatus: false, resMessage: "Unsupported file type.", resErrorCode: 3 });
+
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+
+    const inputFormat = req.file.mimetype.split("/")[1] || "unknown";
+    const fileSizeKb = Math.round(req.file.size / 1024);
+
+    try {
+      // sharp strips EXIF by default when converting
+      const outputFormat = inputFormat === "png" ? "png" : inputFormat === "webp" ? "webp" : "jpeg";
+      let sharpInstance = sharp(req.file.buffer).withMetadata(false);
+
+      if (outputFormat === "png") sharpInstance = sharpInstance.png();
+      else if (outputFormat === "webp") sharpInstance = sharpInstance.webp();
+      else sharpInstance = sharpInstance.jpeg({ quality: 95 });
+
+      const outputBuffer = await sharpInstance.toBuffer();
+      const ext = outputFormat === "jpeg" ? "jpg" : outputFormat;
+      const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
+
+      await incrementUsage(user?.user_id, ip, tier, "image-exif-remove", inputFormat, outputFormat, fileSizeKb, "success");
+
+      res.set({
+        "Content-Type": outputFormat === "jpeg" ? "image/jpeg" : `image/${outputFormat}`,
+        "Content-Disposition": `attachment; filename="${originalName}_clean.${ext}"`,
+        "Content-Length": outputBuffer.length
+      });
+      return res.status(200).send(outputBuffer);
+
+    } catch (err) {
+      console.error("EXIF remove error:", err.message);
+      await incrementUsage(user?.user_id, ip, tier, "image-exif-remove", inputFormat, null, fileSizeKb, "failed");
+      return res.status(500).json({ resStatus: false, resMessage: "EXIF removal failed.", resErrorCode: 99 });
+    }
+  }
+);
+
+// ── HEIC TO JPG ────────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/image/heic-to-jpg", optionalAuth, imageUpload.single("file"), async (req, res) => {
+    const user = req.filebeefUser;
+    const ip = getClientIp(req);
+    const tier = getTier(user);
+    const limits = LIMITS[tier];
+
+    if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
+    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
+
+    const allowedHeic = ["image/heic", "image/heif"];
+    if (!allowedHeic.includes(req.file.mimetype)) {
+      return res.status(400).json({ resStatus: false, resMessage: "Please upload a HEIC or HEIF file.", resErrorCode: 3 });
+    }
+
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+
+    const quality = Math.min(100, Math.max(1, parseInt(req.body.quality) || 90));
+    const fileSizeKb = Math.round(req.file.size / 1024);
+
+    try {
+      const heicConvert = require("heic-convert");
+      const outputBuffer = await heicConvert({
+        buffer: req.file.buffer,
+        format: "JPEG",
+        quality: quality / 100
+      });
+
+      const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
+      await incrementUsage(user?.user_id, ip, tier, "heic-to-jpg", "heic", "jpeg", fileSizeKb, "success");
+
+      res.set({
+        "Content-Type": "image/jpeg",
+        "Content-Disposition": `attachment; filename="${originalName}.jpg"`,
+        "Content-Length": outputBuffer.length
+      });
+      return res.status(200).send(Buffer.from(outputBuffer));
+
+    } catch (err) {
+      console.error("HEIC convert error:", err.message);
+      await incrementUsage(user?.user_id, ip, tier, "heic-to-jpg", "heic", "jpeg", fileSizeKb, "failed");
+      return res.status(500).json({ resStatus: false, resMessage: "HEIC conversion failed.", resErrorCode: 99 });
+    }
+  }
+);
+
+// ── SVG OPTIMIZER ──────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/image/svg-optimize", optionalAuth, async (req, res) => {
+    const user = req.filebeefUser;
+    const ip = getClientIp(req);
+    const tier = getTier(user);
+
+    // SVG size limits (smaller than images)
+    const svgLimits = { anon: 1, free: 2, pro: 5 };
+    const sizeLimitMB = svgLimits[tier];
+
+    const svgUpload = multer({
+      storage: multer.memoryStorage(),
+      limits: { fileSize: svgLimits.pro * 1024 * 1024, files: 1 }
+    }).single("file");
+
+    svgUpload(req, res, async (err) => {
+      if (err) return res.status(400).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 1 });
+      if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
+      if (req.file.size > sizeLimitMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${sizeLimitMB}MB.`, resErrorCode: 2 });
+      if (req.file.mimetype !== "image/svg+xml" && !req.file.originalname.endsWith(".svg")) {
+        return res.status(400).json({ resStatus: false, resMessage: "Please upload an SVG file.", resErrorCode: 3 });
+      }
+
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+
+      const fileSizeKb = Math.round(req.file.size / 1024);
+
+      try {
+        const { optimize } = require("svgo");
+        const svgString = req.file.buffer.toString("utf8");
+        const result = optimize(svgString, {
+          plugins: [
+            { name: "preset-default" },
+            { name: "removeComments" },
+            { name: "removeMetadata" },
+            { name: "removeTitle" },
+            { name: "removeDesc" }
+          ]
+        });
+
+        const outputBuffer = Buffer.from(result.data, "utf8");
+        const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
+
+        await incrementUsage(user?.user_id, ip, tier, "svg-optimize", "svg", "svg", fileSizeKb, "success");
+
+        res.set({
+          "Content-Type": "image/svg+xml",
+          "Content-Disposition": `attachment; filename="${originalName}_optimized.svg"`,
+          "Content-Length": outputBuffer.length
+        });
+        return res.status(200).send(outputBuffer);
+
+      } catch (err) {
+        console.error("SVG optimize error:", err.message);
+        await incrementUsage(user?.user_id, ip, tier, "svg-optimize", "svg", "svg", fileSizeKb, "failed");
+        return res.status(500).json({ resStatus: false, resMessage: "SVG optimization failed.", resErrorCode: 99 });
+      }
+    });
+  }
+);
+
+// ── COLOR PALETTE ──────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/image/color-palette", optionalAuth, imageUpload.single("file"), async (req, res) => {
+    const user = req.filebeefUser;
+    const ip = getClientIp(req);
+    const tier = getTier(user);
+    const limits = LIMITS[tier];
+
+    if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
+    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
+    if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype)) return res.status(400).json({ resStatus: false, resMessage: "Unsupported file type.", resErrorCode: 3 });
+
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+
+    const fileSizeKb = Math.round(req.file.size / 1024);
+    const colorCount = Math.min(10, Math.max(3, parseInt(req.body.colorCount) || 6));
+
+    try {
+      // resize to small thumbnail for fast color extraction
+      const { data, info } = await sharp(req.file.buffer)
+        .resize(150, 150, { fit: "cover" })
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+
+      // sample pixels and cluster into dominant colors
+      const pixels = [];
+      for (let i = 0; i < data.length; i += info.channels) {
+        pixels.push([data[i], data[i + 1], data[i + 2]]);
+      }
+
+      // simple median cut — sample every Nth pixel for speed
+      const step = Math.max(1, Math.floor(pixels.length / 500));
+      const sampled = pixels.filter((_, idx) => idx % step === 0);
+
+      // quantize into buckets by rounding to nearest 32
+      const colorMap = {};
+      for (const [r, g, b] of sampled) {
+        const key = `${Math.round(r / 32) * 32},${Math.round(g / 32) * 32},${Math.round(b / 32) * 32}`;
+        colorMap[key] = (colorMap[key] || 0) + 1;
+      }
+
+      const sorted = Object.entries(colorMap)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, colorCount)
+        .map(([key]) => {
+          const [r, g, b] = key.split(",").map(Number);
+          const hex = "#" + [r, g, b].map(v => v.toString(16).padStart(2, "0")).join("");
+          return { r, g, b, hex };
+        });
+
+      await incrementUsage(user?.user_id, ip, tier, "color-palette", req.file.mimetype.split("/")[1], null, fileSizeKb, "success");
+
+      return res.status(200).json({
+        resStatus: true,
+        resOkCode: 1,
+        colors: sorted
+      });
+
+    } catch (err) {
+      console.error("Color palette error:", err.message);
+      await incrementUsage(user?.user_id, ip, tier, "color-palette", req.file.mimetype.split("/")[1], null, fileSizeKb, "failed");
+      return res.status(500).json({ resStatus: false, resMessage: "Color extraction failed.", resErrorCode: 99 });
+    }
+  }
+);
+
+// ── IMAGE WATERMARK ────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/image/watermark", optionalAuth, imageUpload.single("file"), async (req, res) => {
+    const user = req.filebeefUser;
+    const ip = getClientIp(req);
+    const tier = getTier(user);
+    const limits = LIMITS[tier];
+
+    if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
+    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
+    if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype)) return res.status(400).json({ resStatus: false, resMessage: "Unsupported file type.", resErrorCode: 3 });
+
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+
+    const text = (req.body.text || "FileBeef").substring(0, 50);
+    const opacity = Math.min(1, Math.max(0.1, parseFloat(req.body.opacity) || 0.4));
+    const position = req.body.position || "bottom-right";
+    const inputFormat = req.file.mimetype.split("/")[1] || "unknown";
+    const fileSizeKb = Math.round(req.file.size / 1024);
+
+    try {
+      const image = sharp(req.file.buffer);
+      const meta = await image.metadata();
+      const width = meta.width || 800;
+      const height = meta.height || 600;
+
+      const fontSize = Math.max(16, Math.round(Math.min(width, height) * 0.05));
+      const opacityHex = Math.round(opacity * 255).toString(16).padStart(2, "0");
+
+      const svgText = `
+        <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+          <style>
+            .wm { font-family: Arial, sans-serif; font-size: ${fontSize}px; fill: #ffffff; fill-opacity: ${opacity}; }
+          </style>
+          <text
+            class="wm"
+            x="${position.includes("right") ? width - 20 : position.includes("center") ? width / 2 : 20}"
+            y="${position.includes("bottom") ? height - 20 : position.includes("middle") ? height / 2 : 40}"
+            text-anchor="${position.includes("right") ? "end" : position.includes("center") ? "middle" : "start"}"
+          >${text}</text>
+        </svg>
+      `;
+
+      const outputFormat = inputFormat === "png" ? "png" : inputFormat === "webp" ? "webp" : "jpeg";
+      let sharpInstance = sharp(req.file.buffer).composite([{ input: Buffer.from(svgText), top: 0, left: 0 }]);
+
+      if (outputFormat === "png") sharpInstance = sharpInstance.png();
+      else if (outputFormat === "webp") sharpInstance = sharpInstance.webp({ quality: 90 });
+      else sharpInstance = sharpInstance.jpeg({ quality: 90 });
+
+      const outputBuffer = await sharpInstance.toBuffer();
+      const ext = outputFormat === "jpeg" ? "jpg" : outputFormat;
+      const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
+
+      await incrementUsage(user?.user_id, ip, tier, "image-watermark", inputFormat, outputFormat, fileSizeKb, "success");
+
+      res.set({
+        "Content-Type": outputFormat === "jpeg" ? "image/jpeg" : `image/${outputFormat}`,
+        "Content-Disposition": `attachment; filename="${originalName}_watermarked.${ext}"`,
+        "Content-Length": outputBuffer.length
+      });
+      return res.status(200).send(outputBuffer);
+
+    } catch (err) {
+      console.error("Watermark error:", err.message);
+      await incrementUsage(user?.user_id, ip, tier, "image-watermark", inputFormat, null, fileSizeKb, "failed");
+      return res.status(500).json({ resStatus: false, resMessage: "Watermark failed.", resErrorCode: 99 });
     }
   }
 );
