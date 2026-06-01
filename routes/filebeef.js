@@ -776,7 +776,220 @@ router.post("/api/post/filebeef/contact", filebeefWriteLimit, async (req, res) =
     if (client) client.release();
   }
 });
+
 // ══════════════════════════════════════════════════════════════════════════
-//  EXPORTS (conversion routes will be added below in next steps)
+//  CONVERSION ROUTES
 // ══════════════════════════════════════════════════════════════════════════
+
+const sharp = require("sharp");
+const multer = require("multer");
+
+// ── LIMITS PER TIER ────────────────────────────────────────────────────────
+const LIMITS = {
+  anon:       { daily: 1,  sizeMB: 5  },
+  free:       { daily: 2,  sizeMB: 10 },
+  pro:        { daily: 20, sizeMB: 15 }
+};
+
+// ── ALLOWED IMAGE TYPES ────────────────────────────────────────────────────
+const ALLOWED_IMAGE_TYPES = [
+  "image/jpeg", "image/png", "image/webp",
+  "image/avif", "image/gif", "image/heic", "image/heif"
+];
+
+// ── MULTER FOR IMAGES ──────────────────────────────────────────────────────
+const imageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: LIMITS.pro.sizeMB * 1024 * 1024, files: 1 }
+});
+
+// ── OPTIONAL AUTH MIDDLEWARE ───────────────────────────────────────────────
+// Does not block — just attaches user if session exists
+async function optionalAuth(req, res, next) {
+  const token = req.cookies?.filebeef_session;
+  req.filebeefUser = null;
+  if (!token) return next();
+  try {
+    const result = await pool.query(
+      `SELECT s.user_id, s.expires_at, u.email, u.plan, u.auth_provider,
+              u.plan_expires_at, u.stripe_customer_id, u.stripe_sub_id
+       FROM filebeef_sessions s
+       JOIN filebeef_users u ON u.id = s.user_id
+       WHERE s.token = $1 LIMIT 1`,
+      [token]
+    );
+    if (!result.rowCount) return next();
+    const session = result.rows[0];
+    if (new Date(session.expires_at) < new Date()) return next();
+    // auto-downgrade expired pro
+    if (session.plan === "pro" && session.plan_expires_at && new Date(session.plan_expires_at) < new Date()) {
+      await pool.query(
+        `UPDATE filebeef_users SET plan = 'free', sub_status = 'expired' WHERE id = $1`,
+        [session.user_id]
+      );
+      session.plan = "free";
+    }
+    req.filebeefUser = session;
+  } catch (_) {}
+  next();
+}
+
+// ── TIER RESOLVER ──────────────────────────────────────────────────────────
+function getTier(user) {
+  if (!user) return "anon";
+  if (user.plan === "pro") return "pro";
+  return "free";
+}
+
+// ── DAILY LIMIT CHECK (all tiers) ─────────────────────────────────────────
+async function checkConversionLimit(userId, ip, tier) {
+  const limit = LIMITS[tier].daily;
+  const today = new Date().toISOString().slice(0, 10);
+
+  if (tier === "anon") {
+    const result = await pool.query(
+      `SELECT count FROM filebeef_anon_usage WHERE ip = $1 AND date = $2`,
+      [ip, today]
+    );
+    const used = result.rows[0]?.count || 0;
+    return { allowed: used < limit, used, limit };
+  } else {
+    const result = await pool.query(
+      `SELECT count FROM filebeef_daily_usage WHERE user_id = $1 AND date = $2`,
+      [userId, today]
+    );
+    const used = result.rows[0]?.count || 0;
+    return { allowed: used < limit, used, limit };
+  }
+}
+
+// ── INCREMENT USAGE ────────────────────────────────────────────────────────
+async function incrementUsage(userId, ip, tier, tool, inputFormat, outputFormat, fileSizeKb, status) {
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    if (tier === "anon") {
+      await pool.query(
+        `INSERT INTO filebeef_anon_usage (ip, date, count)
+         VALUES ($1, $2, 1)
+         ON CONFLICT (ip, date) DO UPDATE SET count = filebeef_anon_usage.count + 1`,
+        [ip, today]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO filebeef_daily_usage (user_id, date, count)
+         VALUES ($1, $2, 1)
+         ON CONFLICT (user_id, date) DO UPDATE SET count = filebeef_daily_usage.count + 1`,
+        [userId, today]
+      );
+      await pool.query(
+        `INSERT INTO filebeef_usage (user_id, tool, input_format, output_format, file_size_kb, status, ip)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [userId, tool, inputFormat || null, outputFormat || null, fileSizeKb || null, status, ip]
+      );
+    }
+  } catch (_) {}
+}
+
+// ── IMAGE CONVERT ──────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/image/convert", optionalAuth, imageUpload.single("file"), async (req, res) => {
+    const user = req.filebeefUser;
+    const ip = getClientIp(req);
+    const tier = getTier(user);
+    const limits = LIMITS[tier];
+
+    if (!req.file) {
+      return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
+    }
+
+    // file size check
+    const sizeLimit = limits.sizeMB * 1024 * 1024;
+    if (req.file.size > sizeLimit) {
+      return res.status(400).json({
+        resStatus: false,
+        resMessage: `File too large. Max ${limits.sizeMB}MB on your plan.`,
+        resErrorCode: 2
+      });
+    }
+
+    // mime type check
+    if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype)) {
+      return res.status(400).json({
+        resStatus: false,
+        resMessage: "Unsupported file type. Allowed: PNG, JPG, WEBP, AVIF, GIF.",
+        resErrorCode: 3
+      });
+    }
+
+    // format check
+    const format = req.body.format || "jpeg";
+    const quality = Math.min(100, Math.max(1, parseInt(req.body.quality) || 75));
+    const allowedFormats = ["jpeg", "png", "webp", "avif"];
+    if (!allowedFormats.includes(format)) {
+      return res.status(400).json({
+        resStatus: false,
+        resMessage: "Invalid output format.",
+        resErrorCode: 4
+      });
+    }
+
+    // daily limit check
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    if (!limitCheck.allowed) {
+      return res.status(403).json({
+        resStatus: false,
+        resMessage: `Daily limit reached (${limitCheck.limit}/day on your plan). ${tier === "anon" ? "Register for more conversions." : tier === "free" ? "Upgrade to Pro for more." : ""}`,
+        resErrorCode: 5,
+        limitReached: true,
+        tier
+      });
+    }
+
+    const inputFormat = req.file.mimetype.split("/")[1] || "unknown";
+    const fileSizeKb = Math.round(req.file.size / 1024);
+
+    try {
+      let sharpInstance = sharp(req.file.buffer);
+
+      switch (format) {
+        case "jpeg":
+          sharpInstance = sharpInstance.jpeg({ quality });
+          break;
+        case "png":
+          sharpInstance = sharpInstance.png({ compressionLevel: Math.round((100 - quality) / 11) });
+          break;
+        case "webp":
+          sharpInstance = sharpInstance.webp({ quality });
+          break;
+        case "avif":
+          sharpInstance = sharpInstance.avif({ quality });
+          break;
+      }
+
+      const outputBuffer = await sharpInstance.toBuffer();
+      const ext = format === "jpeg" ? "jpg" : format;
+      const mimeType = format === "jpeg" ? "image/jpeg" : `image/${format}`;
+      const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
+      const outputFilename = `${originalName}.${ext}`;
+
+      await incrementUsage(user?.user_id, ip, tier, "image-convert", inputFormat, format, fileSizeKb, "success");
+
+      res.set({
+        "Content-Type": mimeType,
+        "Content-Disposition": `attachment; filename="${outputFilename}"`,
+        "Content-Length": outputBuffer.length
+      });
+
+      return res.status(200).send(outputBuffer);
+
+    } catch (err) {
+      console.error("Image convert error:", err.message);
+      await incrementUsage(user?.user_id, ip, tier, "image-convert", inputFormat, format, fileSizeKb, "failed");
+      return res.status(500).json({
+        resStatus: false,
+        resMessage: "Conversion failed. Please check the file and try again.",
+        resErrorCode: 99
+      });
+    }
+  }
+);
 module.exports = router;
