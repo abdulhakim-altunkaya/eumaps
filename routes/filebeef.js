@@ -1489,8 +1489,7 @@ router.post("/api/post/filebeef/pdf/merge", optionalAuth, pdfMultiUpload.array("
   }
 );
 
-// ── SPLIT PDF ──────────────────────────────────────────────────────────────
-// Returns individual pages as separate PDFs in a ZIP
+// ── SPLIT PDF  ────────────────────
 router.post("/api/post/filebeef/pdf/split", optionalAuth, pdfUpload.single("file"), async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user); const limits = getPdfLimits(tier);
@@ -1500,47 +1499,49 @@ router.post("/api/post/filebeef/pdf/split", optionalAuth, pdfUpload.single("file
     const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
-    // split mode: "pages" (each page separate) or "range" (e.g. "1-3,4-6")
     const mode = req.body.mode || "pages";
     const rangeInput = req.body.range || "";
     try {
+      const JSZip = require("jszip");
       const pdfDoc = await PDFDocument.load(req.file.buffer);
       const totalPages = pdfDoc.getPageCount();
-      const archiver = require("archiver");
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
-      res.set({ "Content-Type": "application/zip", "Content-Disposition": `attachment; filename="${originalName}_split.zip"` });
-      const archive = archiver("zip", { zlib: { level: 6 } });
-      archive.pipe(res);
+      const zip = new JSZip();
       if (mode === "pages") {
         for (let i = 0; i < totalPages; i++) {
           const newDoc = await PDFDocument.create();
           const [page] = await newDoc.copyPages(pdfDoc, [i]);
           newDoc.addPage(page);
           const buf = await newDoc.save();
-          archive.append(Buffer.from(buf), { name: `${originalName}_page_${i + 1}.pdf` });
+          zip.file(`${originalName}_page_${i + 1}.pdf`, Buffer.from(buf));
         }
       } else {
-        // range mode
-        const ranges = rangeInput.split(",").map(r => r.trim());
+        const ranges = rangeInput.split(",").map(r => r.trim()).filter(Boolean);
         for (const range of ranges) {
-          const [startStr, endStr] = range.split("-");
-          const start = Math.max(1, parseInt(startStr)) - 1;
-          const end = Math.min(totalPages, parseInt(endStr || startStr)) - 1;
+          const parts = range.split("-");
+          const start = Math.max(1, parseInt(parts[0])) - 1;
+          const end = Math.min(totalPages, parseInt(parts[1] || parts[0])) - 1;
           const newDoc = await PDFDocument.create();
           const indices = [];
           for (let i = start; i <= end; i++) indices.push(i);
           const pages = await newDoc.copyPages(pdfDoc, indices);
           pages.forEach(p => newDoc.addPage(p));
           const buf = await newDoc.save();
-          archive.append(Buffer.from(buf), { name: `${originalName}_${range}.pdf` });
+          zip.file(`${originalName}_${range}.pdf`, Buffer.from(buf));
         }
       }
-      await archive.finalize();
+      const zipBuffer = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE", compressionOptions: { level: 6 } });
       await incrementUsage(user?.user_id, ip, tier, "pdf-split", "pdf", "pdf", fileSizeKb, "success");
+      res.set({
+        "Content-Type": "application/zip",
+        "Content-Disposition": `attachment; filename="${originalName}_split.zip"`,
+        "Content-Length": zipBuffer.length
+      });
+      return res.status(200).send(zipBuffer);
     } catch (err) {
       console.error("PDF split error:", err.message);
       await incrementUsage(user?.user_id, ip, tier, "pdf-split", "pdf", "pdf", fileSizeKb, "failed");
-      if (!res.headersSent) return res.status(500).json({ resStatus: false, resMessage: "Split failed.", resErrorCode: 99 });
+      return res.status(500).json({ resStatus: false, resMessage: "Split failed.", resErrorCode: 99 });
     }
   }
 );
@@ -1752,8 +1753,7 @@ router.post("/api/post/filebeef/pdf/flatten", optionalAuth, pdfUpload.single("fi
 // ── PDF GRAYSCALE ──────────────────────────────────────────────────────────
 // Note: true grayscale requires rendering each page as image then rebuilding
 // This approach uses pdf-lib to embed grayscale-converted page images
-router.post("/api/post/filebeef/pdf/grayscale", optionalAuth, pdfUpload.single("file"),
-  async (req, res) => {
+router.post("/api/post/filebeef/pdf/grayscale", optionalAuth, pdfUpload.single("file"), async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user); const limits = getPdfLimits(tier);
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
@@ -1789,9 +1789,7 @@ router.post("/api/post/filebeef/pdf/grayscale", optionalAuth, pdfUpload.single("
 );
 
 // ── PDF TO TEXT ────────────────────────────────────────────────────────────
-router.post("/api/post/filebeef/pdf/to-text",
-  optionalAuth, pdfUpload.single("file"),
-  async (req, res) => {
+router.post("/api/post/filebeef/pdf/to-text", optionalAuth, pdfUpload.single("file"), async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user); const limits = getPdfLimits(tier);
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
@@ -1817,9 +1815,7 @@ router.post("/api/post/filebeef/pdf/to-text",
 );
 
 // ── PDF EDIT METADATA ──────────────────────────────────────────────────────
-router.post("/api/post/filebeef/pdf/metadata",
-  optionalAuth, pdfUpload.single("file"),
-  async (req, res) => {
+router.post("/api/post/filebeef/pdf/metadata", optionalAuth, pdfUpload.single("file"), async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user); const limits = getPdfLimits(tier);
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
@@ -1849,9 +1845,7 @@ router.post("/api/post/filebeef/pdf/metadata",
 );
 
 // ── PDF REPAIR ─────────────────────────────────────────────────────────────
-router.post("/api/post/filebeef/pdf/repair",
-  optionalAuth, pdfUpload.single("file"),
-  async (req, res) => {
+router.post("/api/post/filebeef/pdf/repair", optionalAuth, pdfUpload.single("file"), async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user); const limits = getPdfLimits(tier);
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
@@ -1877,9 +1871,7 @@ router.post("/api/post/filebeef/pdf/repair",
 );
 
 // ── IMAGE TO PDF ───────────────────────────────────────────────────────────
-router.post("/api/post/filebeef/pdf/image-to-pdf",
-  optionalAuth, pdfMultiUpload.array("files", 20),
-  async (req, res) => {
+router.post("/api/post/filebeef/pdf/image-to-pdf", optionalAuth, pdfMultiUpload.array("files", 20), async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user); const limits = getPdfLimits(tier);
     const files = req.files;
@@ -1921,9 +1913,7 @@ router.post("/api/post/filebeef/pdf/image-to-pdf",
 
 // ── WORD TO PDF ────────────────────────────────────────────────────────────
 // Uses mammoth (docx→html) + puppeteer (html→pdf)
-router.post("/api/post/filebeef/pdf/word-to-pdf",
-  optionalAuth,
-  async (req, res) => {
+router.post("/api/post/filebeef/pdf/word-to-pdf", optionalAuth, async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user); const limits = getPdfLimits(tier);
     const wordUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: limits.sizeMB * 1024 * 1024, files: 1 } }).single("file");
@@ -1959,9 +1949,7 @@ router.post("/api/post/filebeef/pdf/word-to-pdf",
 );
 
 // ── HTML TO PDF ────────────────────────────────────────────────────────────
-router.post("/api/post/filebeef/pdf/html-to-pdf",
-  optionalAuth,
-  async (req, res) => {
+router.post("/api/post/filebeef/pdf/html-to-pdf", optionalAuth, async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user);
     // accepts either a file upload or a URL
@@ -2000,9 +1988,7 @@ router.post("/api/post/filebeef/pdf/html-to-pdf",
 
 // ── PDF TO JPG ─────────────────────────────────────────────────────────────
 // Uses puppeteer to render pages as images
-router.post("/api/post/filebeef/pdf/to-jpg",
-  optionalAuth, pdfUpload.single("file"),
-  async (req, res) => {
+router.post("/api/post/filebeef/pdf/to-jpg", optionalAuth, pdfUpload.single("file"), async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user); const limits = getPdfLimits(tier);
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
@@ -2060,9 +2046,7 @@ router.post("/api/post/filebeef/pdf/to-jpg",
 );
 
 // ── GET PDF INFO ───────────────────────────────────────────────────────────
-router.post("/api/post/filebeef/pdf/info",
-  optionalAuth, pdfUpload.single("file"),
-  async (req, res) => {
+router.post("/api/post/filebeef/pdf/info", optionalAuth, pdfUpload.single("file"), async (req, res) => {
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
     try {
@@ -2075,9 +2059,7 @@ router.post("/api/post/filebeef/pdf/info",
 );
 
 // ── DELETE PDF PAGES ───────────────────────────────────────────────────────
-router.post("/api/post/filebeef/pdf/delete-pages",
-  optionalAuth, pdfUpload.single("file"),
-  async (req, res) => {
+router.post("/api/post/filebeef/pdf/delete-pages", optionalAuth, pdfUpload.single("file"), async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user); const limits = getPdfLimits(tier);
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
@@ -2109,9 +2091,7 @@ router.post("/api/post/filebeef/pdf/delete-pages",
 );
 
 // ── EXTRACT PDF PAGES ──────────────────────────────────────────────────────
-router.post("/api/post/filebeef/pdf/extract-pages",
-  optionalAuth, pdfUpload.single("file"),
-  async (req, res) => {
+router.post("/api/post/filebeef/pdf/extract-pages", optionalAuth, pdfUpload.single("file"), async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user); const limits = getPdfLimits(tier);
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
@@ -2152,9 +2132,7 @@ router.post("/api/post/filebeef/pdf/extract-pages",
 );
 
 // ── ORGANIZE PDF ───────────────────────────────────────────────────────────
-router.post("/api/post/filebeef/pdf/organize",
-  optionalAuth, pdfUpload.single("file"),
-  async (req, res) => {
+router.post("/api/post/filebeef/pdf/organize", optionalAuth, pdfUpload.single("file"), async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user); const limits = getPdfLimits(tier);
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
@@ -2187,9 +2165,7 @@ router.post("/api/post/filebeef/pdf/organize",
 );
 
 // ── CROP PDF ───────────────────────────────────────────────────────────────
-router.post("/api/post/filebeef/pdf/crop",
-  optionalAuth, pdfUpload.single("file"),
-  async (req, res) => {
+router.post("/api/post/filebeef/pdf/crop", optionalAuth, pdfUpload.single("file"), async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user); const limits = getPdfLimits(tier);
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
