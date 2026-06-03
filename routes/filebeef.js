@@ -2798,4 +2798,89 @@ function woffToTtf(woffBuffer) {
   return sfnt;
 }
 
+
+
+
+// ── MARKDOWN TO PDF ────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/data/markdown-to-pdf", optionalAuth, async (req, res) => {
+    const user = req.filebeefUser; const ip = getClientIp(req);
+    const tier = getTier(user);
+
+    const mdUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024, files: 1 } }).single("file");
+    mdUpload(req, res, async (err) => {
+      if (err) return res.status(400).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 1 });
+      if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
+      if (!req.file.originalname.match(/\.(md|markdown|txt)$/i)) {
+        return res.status(400).json({ resStatus: false, resMessage: "Please upload a .md or .markdown file.", resErrorCode: 2 });
+      }
+
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+
+      const fileSizeKb = Math.round(req.file.size / 1024);
+      try {
+        const { marked } = require("marked");
+        const puppeteer = require("puppeteer");
+
+        const markdown = req.file.buffer.toString("utf8");
+        const htmlContent = marked(markdown);
+
+        const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { font-family: Georgia, serif; font-size: 13px; line-height: 1.8; margin: 0; padding: 0; color: #1a1a1a; }
+  h1, h2, h3, h4, h5, h6 { font-family: Arial, sans-serif; margin-top: 24px; margin-bottom: 8px; }
+  h1 { font-size: 28px; border-bottom: 1px solid #ddd; padding-bottom: 8px; }
+  h2 { font-size: 22px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+  h3 { font-size: 18px; }
+  p { margin: 0 0 14px; }
+  code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-family: monospace; font-size: 12px; }
+  pre { background: #f5f5f5; padding: 14px; border-radius: 4px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  blockquote { border-left: 3px solid #ccc; margin: 0 0 14px 0; padding: 4px 16px; color: #666; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 14px; }
+  th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+  th { background: #f5f5f5; font-weight: 600; }
+  ul, ol { margin: 0 0 14px; padding-left: 24px; }
+  li { margin-bottom: 4px; }
+  a { color: #0066cc; }
+  img { max-width: 100%; }
+  hr { border: none; border-top: 1px solid #ddd; margin: 24px 0; }
+</style>
+</head>
+<body>${htmlContent}</body>
+</html>`;
+
+        const browser = await puppeteer.launch({ args: ["--no-sandbox", "--disable-setuid-sandbox"] });
+        const page = await browser.newPage();
+        await page.setContent(html, { waitUntil: "networkidle0" });
+        const pdfBuffer = await page.pdf({
+          format: "A4",
+          margin: { top: "20mm", bottom: "20mm", left: "18mm", right: "18mm" },
+          printBackground: true
+        });
+        await browser.close();
+
+        const originalName = req.file.originalname.replace(/\.(md|markdown|txt)$/i, "");
+        await incrementUsage(user?.user_id, ip, tier, "markdown-to-pdf", "md", "pdf", fileSizeKb, "success");
+
+        res.set({
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="${originalName}.pdf"`,
+          "Content-Length": pdfBuffer.length
+        });
+        return res.status(200).send(pdfBuffer);
+
+      } catch (err) {
+        console.error("Markdown to PDF error:", err.message);
+        await incrementUsage(user?.user_id, ip, tier, "markdown-to-pdf", "md", "pdf", fileSizeKb, "failed");
+        return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
+      }
+    });
+  }
+);
+
+
 module.exports = router;
