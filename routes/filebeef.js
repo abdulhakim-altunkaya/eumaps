@@ -2881,6 +2881,14 @@ router.post("/api/post/filebeef/data/markdown-to-pdf", optionalAuth, async (req,
     });
   }
 );
-
+router.get("/api/get/filebeef/check-ffmpeg", async (req, res) => {
+  const { execSync } = require('child_process')
+  try {
+    const version = execSync('ffmpeg -version').toString().split('\n')[0]
+    return res.status(200).json({ available: true, version })
+  } catch(e) {
+    return res.status(200).json({ available: false, error: e.message })
+  }
+})
 
 module.exports = router;
