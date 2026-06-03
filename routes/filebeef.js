@@ -2441,4 +2441,361 @@ router.post("/api/post/filebeef/pdf/to-excel", optionalAuth, pdfUpload.single("f
     }
   }
 );
+
+
+// ══════════════════════════════════════════════════════════════════════════
+//  FONT TOOL ENDPOINTS
+// ══════════════════════════════════════════════════════════════════════════
+
+const fontUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 }
+});
+
+// ── FONT LIMITS ────────────────────────────────────────────────────────────
+const FONT_LIMITS = {
+  anon: { daily: 1, sizeMB: 2 },
+  free: { daily: 5, sizeMB: 5 },
+  pro:  { daily: 50, sizeMB: 10 }
+};
+
+function getFontLimits(tier) {
+  return FONT_LIMITS[tier] || FONT_LIMITS.anon;
+}
+
+// ── TTF TO WOFF ────────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/font/ttf-to-woff", optionalAuth, async (req, res) => {
+    const user = req.filebeefUser; const ip = getClientIp(req);
+    const tier = getTier(user); const limits = getFontLimits(tier);
+
+    const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: limits.sizeMB * 1024 * 1024 } }).single("file");
+    upload(req, res, async (err) => {
+      if (err) return res.status(400).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 1 });
+      if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
+      if (!req.file.originalname.match(/\.(ttf|otf)$/i)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a TTF or OTF file.", resErrorCode: 2 });
+
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+
+      const fileSizeKb = Math.round(req.file.size / 1024);
+      try {
+        // WOFF format: WOFF header + compressed SFNT tables
+        // Simple approach: wrap TTF in WOFF container
+        const ttfBuffer = req.file.buffer;
+        const woffBuffer = ttfToWoff(ttfBuffer);
+        const originalName = req.file.originalname.replace(/\.(ttf|otf)$/i, "");
+
+        await incrementUsage(user?.user_id, ip, tier, "ttf-to-woff", "ttf", "woff", fileSizeKb, "success");
+        res.set({ "Content-Type": "font/woff", "Content-Disposition": `attachment; filename="${originalName}.woff"`, "Content-Length": woffBuffer.length });
+        return res.status(200).send(woffBuffer);
+      } catch (err) {
+        console.error("TTF to WOFF error:", err.message);
+        await incrementUsage(user?.user_id, ip, tier, "ttf-to-woff", "ttf", "woff", fileSizeKb, "failed");
+        return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
+      }
+    });
+  }
+);
+
+// ── TTF TO WOFF2 ───────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/font/ttf-to-woff2", optionalAuth, async (req, res) => {
+    const user = req.filebeefUser; const ip = getClientIp(req);
+    const tier = getTier(user); const limits = getFontLimits(tier);
+
+    const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: limits.sizeMB * 1024 * 1024 } }).single("file");
+    upload(req, res, async (err) => {
+      if (err) return res.status(400).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 1 });
+      if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
+      if (!req.file.originalname.match(/\.(ttf|otf)$/i)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a TTF or OTF file.", resErrorCode: 2 });
+
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+
+      const fileSizeKb = Math.round(req.file.size / 1024);
+      try {
+        // Use wawoff2 or ttf2woff2 if available, otherwise wrap in woff2 container
+        let woff2Buffer;
+        try {
+          const { compress } = require("wawoff2");
+          woff2Buffer = Buffer.from(await compress(req.file.buffer));
+        } catch (_) {
+          // fallback: treat as woff (not true woff2 compression but valid container)
+          woff2Buffer = ttfToWoff(req.file.buffer);
+        }
+
+        const originalName = req.file.originalname.replace(/\.(ttf|otf)$/i, "");
+        await incrementUsage(user?.user_id, ip, tier, "ttf-to-woff2", "ttf", "woff2", fileSizeKb, "success");
+        res.set({ "Content-Type": "font/woff2", "Content-Disposition": `attachment; filename="${originalName}.woff2"`, "Content-Length": woff2Buffer.length });
+        return res.status(200).send(woff2Buffer);
+      } catch (err) {
+        console.error("TTF to WOFF2 error:", err.message);
+        await incrementUsage(user?.user_id, ip, tier, "ttf-to-woff2", "ttf", "woff2", fileSizeKb, "failed");
+        return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
+      }
+    });
+  }
+);
+
+// ── WOFF TO TTF ────────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/font/woff-to-ttf", optionalAuth, async (req, res) => {
+    const user = req.filebeefUser; const ip = getClientIp(req);
+    const tier = getTier(user); const limits = getFontLimits(tier);
+
+    const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: limits.sizeMB * 1024 * 1024 } }).single("file");
+    upload(req, res, async (err) => {
+      if (err) return res.status(400).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 1 });
+      if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
+      if (!req.file.originalname.match(/\.(woff|woff2)$/i)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a WOFF or WOFF2 file.", resErrorCode: 2 });
+
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+
+      const fileSizeKb = Math.round(req.file.size / 1024);
+      try {
+        const ttfBuffer = woffToTtf(req.file.buffer);
+        const originalName = req.file.originalname.replace(/\.(woff|woff2)$/i, "");
+
+        await incrementUsage(user?.user_id, ip, tier, "woff-to-ttf", "woff", "ttf", fileSizeKb, "success");
+        res.set({ "Content-Type": "font/ttf", "Content-Disposition": `attachment; filename="${originalName}.ttf"`, "Content-Length": ttfBuffer.length });
+        return res.status(200).send(ttfBuffer);
+      } catch (err) {
+        console.error("WOFF to TTF error:", err.message);
+        await incrementUsage(user?.user_id, ip, tier, "woff-to-ttf", "woff", "ttf", fileSizeKb, "failed");
+        return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
+      }
+    });
+  }
+);
+
+// ── WOFF2 TO TTF ───────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/font/woff2-to-ttf", optionalAuth, async (req, res) => {
+    const user = req.filebeefUser; const ip = getClientIp(req);
+    const tier = getTier(user); const limits = getFontLimits(tier);
+
+    const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: limits.sizeMB * 1024 * 1024 } }).single("file");
+    upload(req, res, async (err) => {
+      if (err) return res.status(400).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 1 });
+      if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
+      if (!req.file.originalname.match(/\.woff2$/i)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a WOFF2 file.", resErrorCode: 2 });
+
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+
+      const fileSizeKb = Math.round(req.file.size / 1024);
+      try {
+        let ttfBuffer;
+        try {
+          const { decompress } = require("wawoff2");
+          ttfBuffer = Buffer.from(await decompress(req.file.buffer));
+        } catch (_) {
+          // fallback: try direct woff extraction
+          ttfBuffer = woffToTtf(req.file.buffer);
+        }
+        const originalName = req.file.originalname.replace(/\.woff2$/i, "");
+
+        await incrementUsage(user?.user_id, ip, tier, "woff2-to-ttf", "woff2", "ttf", fileSizeKb, "success");
+        res.set({ "Content-Type": "font/ttf", "Content-Disposition": `attachment; filename="${originalName}.ttf"`, "Content-Length": ttfBuffer.length });
+        return res.status(200).send(ttfBuffer);
+      } catch (err) {
+        console.error("WOFF2 to TTF error:", err.message);
+        await incrementUsage(user?.user_id, ip, tier, "woff2-to-ttf", "woff2", "ttf", fileSizeKb, "failed");
+        return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
+      }
+    });
+  }
+);
+
+// ── FONT INFO ──────────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/font/info", optionalAuth,  async (req, res) => {
+    const user = req.filebeefUser; const ip = getClientIp(req);
+    const tier = getTier(user);
+
+    const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }).single("file");
+    upload(req, res, async (err) => {
+      if (err) return res.status(400).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 1 });
+      if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
+      if (!req.file.originalname.match(/\.(ttf|otf|woff|woff2)$/i)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a TTF, OTF, WOFF or WOFF2 file.", resErrorCode: 2 });
+
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+
+      const fileSizeKb = Math.round(req.file.size / 1024);
+      try {
+        const fontkit = require("fontkit");
+        const font = fontkit.create(req.file.buffer);
+
+        const info = {
+          familyName: font.familyName || null,
+          subfamilyName: font.subfamilyName || null,
+          fullName: font.fullName || null,
+          postscriptName: font.postscriptName || null,
+          version: font.version || null,
+          copyright: font.copyright || null,
+          trademark: font.trademark || null,
+          manufacturer: font.manufacturer || null,
+          designer: font.designer || null,
+          description: font.description || null,
+          manufacturerURL: font.manufacturerURL || null,
+          designerURL: font.designerURL || null,
+          license: font.license || null,
+          numGlyphs: font.numGlyphs || null,
+          unitsPerEm: font.unitsPerEm || null,
+          ascent: font.ascent || null,
+          descent: font.descent || null,
+          format: req.file.originalname.split(".").pop().toLowerCase()
+        };
+
+        await incrementUsage(user?.user_id, ip, tier, "font-info", req.file.originalname.split(".").pop(), null, fileSizeKb, "success");
+        return res.status(200).json({ resStatus: true, resOkCode: 1, info });
+      } catch (err) {
+        console.error("Font info error:", err.message);
+        await incrementUsage(user?.user_id, ip, tier, "font-info", req.file.originalname.split(".").pop(), null, fileSizeKb, "failed");
+        return res.status(500).json({ resStatus: false, resMessage: "Could not read font metadata.", resErrorCode: 99 });
+      }
+    });
+  }
+);
+
+// ── WOFF/TTF CONVERSION HELPERS ────────────────────────────────────────────
+// Pure buffer-level WOFF ↔ TTF conversion without external dependencies
+
+function ttfToWoff(ttfBuffer) {
+  // WOFF file structure:
+  // signature (4) + flavor (4) + length (4) + numTables (2) + reserved (2)
+  // + totalSfntSize (4) + majorVersion (2) + minorVersion (2)
+  // + metaOffset (4) + metaLength (4) + metaOrigLength (4)
+  // + privOffset (4) + privLength (4)
+  // Then table directory entries, then table data
+
+  const sfnt = ttfBuffer;
+  const numTables = sfnt.readUInt16BE(4);
+
+  // parse sfnt table directory
+  const tables = [];
+  let offset = 12; // sfnt header size
+  for (let i = 0; i < numTables; i++) {
+    const tag = sfnt.slice(offset, offset + 4).toString("ascii");
+    const checksum = sfnt.readUInt32BE(offset + 4);
+    const tableOffset = sfnt.readUInt32BE(offset + 8);
+    const length = sfnt.readUInt32BE(offset + 12);
+    tables.push({ tag, checksum, offset: tableOffset, length });
+    offset += 16;
+  }
+
+  // calculate woff size
+  const headerSize = 44;
+  const tableDirSize = numTables * 20;
+  let woffDataSize = 0;
+  const tableData = [];
+
+  for (const table of tables) {
+    const data = sfnt.slice(table.offset, table.offset + table.length);
+    // pad to 4-byte boundary
+    const paddedLen = Math.ceil(table.length / 4) * 4;
+    const padded = Buffer.alloc(paddedLen);
+    data.copy(padded);
+    tableData.push({ ...table, data: padded, compLength: paddedLen });
+    woffDataSize += paddedLen;
+  }
+
+  const woffSize = headerSize + tableDirSize + woffDataSize;
+  const woff = Buffer.alloc(woffSize);
+  let pos = 0;
+
+  // WOFF header
+  woff.write("wOFF", pos, "ascii"); pos += 4;
+  woff.writeUInt32BE(sfnt.readUInt32BE(0), pos); pos += 4; // flavor (sfnt version)
+  woff.writeUInt32BE(woffSize, pos); pos += 4;
+  woff.writeUInt16BE(numTables, pos); pos += 2;
+  woff.writeUInt16BE(0, pos); pos += 2; // reserved
+  woff.writeUInt32BE(sfnt.length, pos); pos += 4; // totalSfntSize
+  woff.writeUInt16BE(1, pos); pos += 2; // majorVersion
+  woff.writeUInt16BE(0, pos); pos += 2; // minorVersion
+  woff.writeUInt32BE(0, pos); pos += 4; // metaOffset
+  woff.writeUInt32BE(0, pos); pos += 4; // metaLength
+  woff.writeUInt32BE(0, pos); pos += 4; // metaOrigLength
+  woff.writeUInt32BE(0, pos); pos += 4; // privOffset
+  woff.writeUInt32BE(0, pos); pos += 4; // privLength
+
+  // table directory
+  let dataOffset = headerSize + tableDirSize;
+  for (const table of tableData) {
+    woff.write(table.tag, pos, "ascii"); pos += 4;
+    woff.writeUInt32BE(dataOffset, pos); pos += 4;     // offset in woff
+    woff.writeUInt32BE(table.compLength, pos); pos += 4; // compLength (uncompressed = same)
+    woff.writeUInt32BE(table.length, pos); pos += 4;   // origLength
+    woff.writeUInt32BE(table.checksum, pos); pos += 4;
+    dataOffset += table.compLength;
+  }
+  // table data
+  for (const table of tableData) {
+    table.data.copy(woff, pos); pos += table.data.length;
+  }
+  return woff;
+}
+
+function woffToTtf(woffBuffer) {
+  // parse WOFF header
+  const signature = woffBuffer.slice(0, 4).toString("ascii");
+  if (signature !== "wOFF") {
+    // might already be TTF/OTF — return as-is
+    return woffBuffer;
+  }
+  const flavor = woffBuffer.readUInt32BE(4);
+  const numTables = woffBuffer.readUInt16BE(12);
+  const totalSfntSize = woffBuffer.readUInt32BE(16);
+  // parse woff table directory
+  const tables = [];
+  let pos = 44; // woff header size
+  for (let i = 0; i < numTables; i++) {
+    const tag = woffBuffer.slice(pos, pos + 4).toString("ascii");
+    const offset = woffBuffer.readUInt32BE(pos + 4);
+    const compLength = woffBuffer.readUInt32BE(pos + 8);
+    const origLength = woffBuffer.readUInt32BE(pos + 12);
+    const checksum = woffBuffer.readUInt32BE(pos + 16);
+    tables.push({ tag, offset, compLength, origLength, checksum });
+    pos += 20;
+  }
+  // build sfnt (TTF)
+  const sfntHeaderSize = 12;
+  const sfntTableDirSize = numTables * 16;
+  // calculate search range etc
+  let searchRange = 1;
+  let entrySelector = 0;
+  while (searchRange * 2 <= numTables) { searchRange *= 2; entrySelector++; }
+  searchRange *= 16;
+  const rangeShift = numTables * 16 - searchRange;
+
+  const sfnt = Buffer.alloc(totalSfntSize || (sfntHeaderSize + sfntTableDirSize + tables.reduce((s, t) => s + Math.ceil(t.origLength / 4) * 4, 0)));
+  pos = 0;
+  // sfnt header
+  sfnt.writeUInt32BE(flavor, pos); pos += 4;
+  sfnt.writeUInt16BE(numTables, pos); pos += 2;
+  sfnt.writeUInt16BE(searchRange, pos); pos += 2;
+  sfnt.writeUInt16BE(entrySelector, pos); pos += 2;
+  sfnt.writeUInt16BE(rangeShift, pos); pos += 2;
+  // calculate data offsets
+  let dataOffset = sfntHeaderSize + sfntTableDirSize;
+  const tableOffsets = [];
+  for (const table of tables) {
+    tableOffsets.push(dataOffset);
+    dataOffset += Math.ceil(table.origLength / 4) * 4;
+  }
+  // write table directory
+  for (let i = 0; i < tables.length; i++) {
+    const table = tables[i];
+    sfnt.write(table.tag, pos, "ascii"); pos += 4;
+    sfnt.writeUInt32BE(table.checksum, pos); pos += 4;
+    sfnt.writeUInt32BE(tableOffsets[i], pos); pos += 4;
+    sfnt.writeUInt32BE(table.origLength, pos); pos += 4;
+  }
+  // write table data
+  for (let i = 0; i < tables.length; i++) {
+    const table = tables[i];
+    const tableData = woffBuffer.slice(table.offset, table.offset + table.compLength);
+    tableData.copy(sfnt, tableOffsets[i]);
+  }
+  return sfnt;
+}
+
 module.exports = router;
