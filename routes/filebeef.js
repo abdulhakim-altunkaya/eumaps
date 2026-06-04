@@ -2797,10 +2797,6 @@ function woffToTtf(woffBuffer) {
   }
   return sfnt;
 }
-
-
-
-
 // ── MARKDOWN TO PDF ────────────────────────────────────────────────────────
 router.post("/api/post/filebeef/data/markdown-to-pdf", optionalAuth, async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
@@ -2881,14 +2877,276 @@ router.post("/api/post/filebeef/data/markdown-to-pdf", optionalAuth, async (req,
     });
   }
 );
-router.get("/api/get/filebeef/check-ffmpeg", async (req, res) => {
-  const { execSync } = require('child_process')
-  try {
-    const version = execSync('ffmpeg -version').toString().split('\n')[0]
-    return res.status(200).json({ available: true, version })
-  } catch(e) {
-    return res.status(200).json({ available: false, error: e.message })
+
+// ══════════════════════════════════════════════════════════════════════════
+//  VIDEO & GIF ENDPOINTS
+// ══════════════════════════════════════════════════════════════════════════
+
+const ffmpeg = require("fluent-ffmpeg");
+const os = require("os");
+const fs = require("fs");
+const path = require("path");
+
+// ── VIDEO/AUDIO LIMITS ─────────────────────────────────────────────────────
+const VIDEO_LIMITS = {
+  anon: { daily: 1,  sizeMB: 25  },
+  free: { daily: 2,  sizeMB: 50  },
+  pro:  { daily: 20, sizeMB: 200 }
+};
+
+function getVideoLimits(tier) { return VIDEO_LIMITS[tier] || VIDEO_LIMITS.anon; }
+
+const videoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: VIDEO_LIMITS.pro.sizeMB * 1024 * 1024, files: 1 }
+});
+
+const videoMultiUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: VIDEO_LIMITS.pro.sizeMB * 1024 * 1024, files: 10 }
+});
+
+// ── FFMPEG HELPER — write buffer to temp file, run ffmpeg, return output buffer ──
+function runFfmpeg(inputBuffer, inputExt, outputExt, buildCommand) {
+  return new Promise((resolve, reject) => {
+    const tmpIn  = path.join(os.tmpdir(), `fb_in_${Date.now()}.${inputExt}`);
+    const tmpOut = path.join(os.tmpdir(), `fb_out_${Date.now()}.${outputExt}`);
+    fs.writeFileSync(tmpIn, inputBuffer);
+    const cmd = buildCommand(ffmpeg(tmpIn), tmpOut);
+    cmd
+      .on("end", () => {
+        try {
+          const result = fs.readFileSync(tmpOut);
+          fs.unlinkSync(tmpIn);
+          fs.unlinkSync(tmpOut);
+          resolve(result);
+        } catch (e) { reject(e); }
+      })
+      .on("error", (err) => {
+        try { fs.unlinkSync(tmpIn); } catch (_) {}
+        try { fs.unlinkSync(tmpOut); } catch (_) {}
+        reject(err);
+      })
+      .save(tmpOut);
+  });
+}
+
+// ── VIDEO TO GIF ───────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/video/to-gif", optionalAuth, videoUpload.single("file"), async (req, res) => {
+    const user = req.filebeefUser; const ip = getClientIp(req);
+    const tier = getTier(user); const limits = getVideoLimits(tier);
+    if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
+    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+    const fileSizeKb = Math.round(req.file.size / 1024);
+    const fps = Math.min(15, Math.max(5, parseInt(req.body.fps) || 10));
+    const width = Math.min(800, Math.max(100, parseInt(req.body.width) || 480));
+    const startTime = parseFloat(req.body.start) || 0;
+    const duration = Math.min(30, Math.max(1, parseFloat(req.body.duration) || 5));
+    const inputExt = (req.file.originalname.split(".").pop() || "mp4").toLowerCase();
+    try {
+      const outputBuffer = await runFfmpeg(req.file.buffer, inputExt, "gif", (cmd, out) =>
+        cmd
+          .seekInput(startTime)
+          .duration(duration)
+          .outputOptions([
+            `-vf`, `fps=${fps},scale=${width}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`,
+            `-loop`, `0`
+          ])
+      );
+      const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
+      await incrementUsage(user?.user_id, ip, tier, "video-to-gif", inputExt, "gif", fileSizeKb, "success");
+      res.set({ "Content-Type": "image/gif", "Content-Disposition": `attachment; filename="${originalName}.gif"`, "Content-Length": outputBuffer.length });
+      return res.status(200).send(outputBuffer);
+    } catch (err) {
+      console.error("Video to GIF error:", err.message);
+      await incrementUsage(user?.user_id, ip, tier, "video-to-gif", inputExt, "gif", fileSizeKb, "failed");
+      return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
+    }
   }
-})
+);
+// ── GIF OPTIMIZER ──────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/video/gif-optimize", optionalAuth, videoUpload.single("file"), async (req, res) => {
+    const user = req.filebeefUser; const ip = getClientIp(req);
+    const tier = getTier(user); const limits = getVideoLimits(tier);
+    if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
+    if (!req.file.originalname.match(/\.gif$/i) && req.file.mimetype !== "image/gif") return res.status(400).json({ resStatus: false, resMessage: "Please upload a GIF file.", resErrorCode: 2 });
+    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+    const fileSizeKb = Math.round(req.file.size / 1024);
+    const fps = Math.min(15, Math.max(3, parseInt(req.body.fps) || 10));
+    try {
+      // re-encode gif with optimized palette and reduced fps
+      const outputBuffer = await runFfmpeg(req.file.buffer, "gif", "gif", (cmd, out) =>
+        cmd.outputOptions([
+          `-vf`, `fps=${fps},split[s0][s1];[s0]palettegen=max_colors=128[p];[s1][p]paletteuse=dither=bayer`,
+          `-loop`, `0`
+        ])
+      );
+      const originalName = req.file.originalname.replace(/\.gif$/i, "");
+      await incrementUsage(user?.user_id, ip, tier, "gif-optimize", "gif", "gif", fileSizeKb, "success");
+      res.set({ "Content-Type": "image/gif", "Content-Disposition": `attachment; filename="${originalName}_optimized.gif"`, "Content-Length": outputBuffer.length });
+      return res.status(200).send(outputBuffer);
+    } catch (err) {
+      console.error("GIF optimize error:", err.message);
+      await incrementUsage(user?.user_id, ip, tier, "gif-optimize", "gif", "gif", fileSizeKb, "failed");
+      return res.status(500).json({ resStatus: false, resMessage: "Optimization failed.", resErrorCode: 99 });
+    }
+  }
+);
+// ── GIF RESIZE ─────────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/video/gif-resize", optionalAuth, videoUpload.single("file"), async (req, res) => {
+    const user = req.filebeefUser; const ip = getClientIp(req);
+    const tier = getTier(user); const limits = getVideoLimits(tier);
+    if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
+    if (!req.file.originalname.match(/\.gif$/i) && req.file.mimetype !== "image/gif") return res.status(400).json({ resStatus: false, resMessage: "Please upload a GIF file.", resErrorCode: 2 });
+    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+    const fileSizeKb = Math.round(req.file.size / 1024);
+    const width = Math.min(1920, Math.max(50, parseInt(req.body.width) || 320));
+    try {
+      const outputBuffer = await runFfmpeg(req.file.buffer, "gif", "gif", (cmd, out) =>
+        cmd.outputOptions([
+          `-vf`, `scale=${width}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`,
+          `-loop`, `0`
+        ])
+      );
+      const originalName = req.file.originalname.replace(/\.gif$/i, "");
+      await incrementUsage(user?.user_id, ip, tier, "gif-resize", "gif", "gif", fileSizeKb, "success");
+      res.set({ "Content-Type": "image/gif", "Content-Disposition": `attachment; filename="${originalName}_resized.gif"`, "Content-Length": outputBuffer.length });
+      return res.status(200).send(outputBuffer);
+    } catch (err) {
+      console.error("GIF resize error:", err.message);
+      await incrementUsage(user?.user_id, ip, tier, "gif-resize", "gif", "gif", fileSizeKb, "failed");
+      return res.status(500).json({ resStatus: false, resMessage: "Resize failed.", resErrorCode: 99 });
+    }
+  }
+);
+// ── VIDEO COMPRESSOR (Pro only) ────────────────────────────────────────────
+router.post("/api/post/filebeef/video/compress", optionalAuth, videoUpload.single("file"), async (req, res) => {
+    const user = req.filebeefUser; const ip = getClientIp(req);
+    const tier = getTier(user); const limits = getVideoLimits(tier);
+    if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
+    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
+    if (tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "Video Compressor is a Pro feature.", resErrorCode: 4, proOnly: true });
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+    const fileSizeKb = Math.round(req.file.size / 1024);
+    const quality = req.body.quality || "medium"; // low / medium / high
+    const crf = quality === "low" ? 32 : quality === "high" ? 20 : 26;
+    const inputExt = (req.file.originalname.split(".").pop() || "mp4").toLowerCase();
+    try {
+      const outputBuffer = await runFfmpeg(req.file.buffer, inputExt, "mp4", (cmd, out) =>
+        cmd
+          .videoCodec("libx264")
+          .audioCodec("aac")
+          .outputOptions([`-crf`, String(crf), `-preset`, `fast`, `-movflags`, `+faststart`])
+      );
+      const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
+      await incrementUsage(user?.user_id, ip, tier, "video-compress", inputExt, "mp4", fileSizeKb, "success");
+      res.set({ "Content-Type": "video/mp4", "Content-Disposition": `attachment; filename="${originalName}_compressed.mp4"`, "Content-Length": outputBuffer.length });
+      return res.status(200).send(outputBuffer);
+    } catch (err) {
+      console.error("Video compress error:", err.message);
+      await incrementUsage(user?.user_id, ip, tier, "video-compress", inputExt, "mp4", fileSizeKb, "failed");
+      return res.status(500).json({ resStatus: false, resMessage: "Compression failed.", resErrorCode: 99 });
+    }
+  }
+);
+// ── VIDEO TRIMMER (Pro only) ───────────────────────────────────────────────
+router.post("/api/post/filebeef/video/trim", optionalAuth, videoUpload.single("file"), async (req, res) => {
+    const user = req.filebeefUser; const ip = getClientIp(req);
+    const tier = getTier(user); const limits = getVideoLimits(tier);
+    if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
+    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
+    if (tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "Video Trimmer is a Pro feature.", resErrorCode: 4, proOnly: true });
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+    const fileSizeKb = Math.round(req.file.size / 1024);
+    const start = parseFloat(req.body.start) || 0;
+    const end = parseFloat(req.body.end) || null;
+    const inputExt = (req.file.originalname.split(".").pop() || "mp4").toLowerCase();
+    try {
+      const outputBuffer = await runFfmpeg(req.file.buffer, inputExt, "mp4", (cmd, out) => {
+        cmd.seekInput(start);
+        if (end && end > start) cmd.duration(end - start);
+        return cmd
+          .videoCodec("copy")
+          .audioCodec("copy")
+          .outputOptions([`-movflags`, `+faststart`]);
+      });
+      const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
+      await incrementUsage(user?.user_id, ip, tier, "video-trim", inputExt, "mp4", fileSizeKb, "success");
+      res.set({ "Content-Type": "video/mp4", "Content-Disposition": `attachment; filename="${originalName}_trimmed.mp4"`, "Content-Length": outputBuffer.length });
+      return res.status(200).send(outputBuffer);
+    } catch (err) {
+      console.error("Video trim error:", err.message);
+      await incrementUsage(user?.user_id, ip, tier, "video-trim", inputExt, "mp4", fileSizeKb, "failed");
+      return res.status(500).json({ resStatus: false, resMessage: "Trim failed.", resErrorCode: 99 });
+    }
+  }
+);
+// ── VIDEO CONVERTER (Pro only) ─────────────────────────────────────────────
+router.post("/api/post/filebeef/video/convert", optionalAuth, videoUpload.single("file"), async (req, res) => {
+    const user = req.filebeefUser; const ip = getClientIp(req);
+    const tier = getTier(user); const limits = getVideoLimits(tier);
+    if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
+    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
+    if (tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "Video Converter is a Pro feature.", resErrorCode: 4, proOnly: true });
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+    const fileSizeKb = Math.round(req.file.size / 1024);
+    const format = req.body.format || "mp4";
+    const allowedFormats = ["mp4", "webm", "avi", "mov", "mkv"];
+    if (!allowedFormats.includes(format)) return res.status(400).json({ resStatus: false, resMessage: "Invalid output format.", resErrorCode: 3 });
+    const inputExt = (req.file.originalname.split(".").pop() || "mp4").toLowerCase();
+    const mimeMap = { mp4: "video/mp4", webm: "video/webm", avi: "video/x-msvideo", mov: "video/quicktime", mkv: "video/x-matroska" };
+    try {
+      const outputBuffer = await runFfmpeg(req.file.buffer, inputExt, format, (cmd, out) =>
+        cmd.outputOptions([`-movflags`, `+faststart`])
+      );
+      const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
+      await incrementUsage(user?.user_id, ip, tier, "video-convert", inputExt, format, fileSizeKb, "success");
+      res.set({ "Content-Type": mimeMap[format] || "video/mp4", "Content-Disposition": `attachment; filename="${originalName}.${format}"`, "Content-Length": outputBuffer.length });
+      return res.status(200).send(outputBuffer);
+    } catch (err) {
+      console.error("Video convert error:", err.message);
+      await incrementUsage(user?.user_id, ip, tier, "video-convert", inputExt, format, fileSizeKb, "failed");
+      return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
+    }
+  }
+);
+// ── EXTRACT AUDIO ──────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/video/extract-audio", optionalAuth, videoUpload.single("file"), async (req, res) => {
+    const user = req.filebeefUser; const ip = getClientIp(req);
+    const tier = getTier(user); const limits = getVideoLimits(tier);
+    if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
+    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+    const fileSizeKb = Math.round(req.file.size / 1024);
+    const format = req.body.format || "mp3";
+    const allowedFormats = ["mp3", "aac", "wav", "ogg", "flac"];
+    if (!allowedFormats.includes(format)) return res.status(400).json({ resStatus: false, resMessage: "Invalid audio format.", resErrorCode: 3 });
+    const inputExt = (req.file.originalname.split(".").pop() || "mp4").toLowerCase();
+    const mimeMap = { mp3: "audio/mpeg", aac: "audio/aac", wav: "audio/wav", ogg: "audio/ogg", flac: "audio/flac" };
+    try {
+      const outputBuffer = await runFfmpeg(req.file.buffer, inputExt, format, (cmd, out) =>
+        cmd.noVideo().audioCodec(format === "mp3" ? "libmp3lame" : format === "aac" ? "aac" : format === "ogg" ? "libvorbis" : "copy")
+      );
+      const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
+      await incrementUsage(user?.user_id, ip, tier, "extract-audio", inputExt, format, fileSizeKb, "success");
+      res.set({ "Content-Type": mimeMap[format], "Content-Disposition": `attachment; filename="${originalName}.${format}"`, "Content-Length": outputBuffer.length });
+      return res.status(200).send(outputBuffer);
+    } catch (err) {
+      console.error("Extract audio error:", err.message);
+      await incrementUsage(user?.user_id, ip, tier, "extract-audio", inputExt, format, fileSizeKb, "failed");
+      return res.status(500).json({ resStatus: false, resMessage: "Audio extraction failed.", resErrorCode: 99 });
+    }
+  }
+);
 
 module.exports = router;
