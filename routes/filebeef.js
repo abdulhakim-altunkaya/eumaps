@@ -2890,8 +2890,8 @@ const path = require("path");
 // ── VIDEO/AUDIO LIMITS ─────────────────────────────────────────────────────
 const VIDEO_LIMITS = {
   anon: { daily: 1,  sizeMB: 25  },
-  free: { daily: 2,  sizeMB: 50  },
-  pro:  { daily: 20, sizeMB: 200 }
+  free: { daily: 1,  sizeMB: 25  },
+  pro:  { daily: 1,  sizeMB: 100 }
 };
 
 function getVideoLimits(tier) { return VIDEO_LIMITS[tier] || VIDEO_LIMITS.anon; }
@@ -3145,6 +3145,180 @@ router.post("/api/post/filebeef/video/extract-audio", optionalAuth, videoUpload.
       console.error("Extract audio error:", err.message);
       await incrementUsage(user?.user_id, ip, tier, "extract-audio", inputExt, format, fileSizeKb, "failed");
       return res.status(500).json({ resStatus: false, resMessage: "Audio extraction failed.", resErrorCode: 99 });
+    }
+  }
+);
+
+// ══════════════════════════════════════════════════════════════════════════
+//  AUDIO ENDPOINTS
+// ══════════════════════════════════════════════════════════════════════════
+
+// ── AUDIO LIMITS ───────────────────────────────────────────────────────────
+const AUDIO_LIMITS = {
+  anon: { daily: 1, sizeMB: 25  },
+  free: { daily: 1, sizeMB: 25  },
+  pro:  { daily: 1, sizeMB: 100 }
+};
+
+function getAudioLimits(tier) { return AUDIO_LIMITS[tier] || AUDIO_LIMITS.anon; }
+
+const audioUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: AUDIO_LIMITS.pro.sizeMB * 1024 * 1024, files: 1 }
+});
+
+const audioMultiUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: AUDIO_LIMITS.pro.sizeMB * 1024 * 1024, files: 10 }
+});
+
+const ALLOWED_AUDIO_TYPES = [
+  "audio/mpeg", "audio/mp3", "audio/wav", "audio/wave", "audio/x-wav",
+  "audio/ogg", "audio/flac", "audio/x-flac", "audio/aac", "audio/mp4",
+  "audio/x-m4a", "audio/webm"
+];
+
+function isAudio(file) {
+  return ALLOWED_AUDIO_TYPES.includes(file.mimetype) ||
+    file.originalname.match(/\.(mp3|wav|ogg|flac|aac|m4a|wma|webm)$/i);
+}
+
+// ── AUDIO CONVERTER ────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/audio/convert", optionalAuth, audioUpload.single("file"), async (req, res) => {
+    const user = req.filebeefUser; const ip = getClientIp(req);
+    const tier = getTier(user); const limits = getAudioLimits(tier);
+    if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
+    if (!isAudio(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload an audio file.", resErrorCode: 2 });
+    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+    const format = req.body.format || "mp3";
+    const allowedFormats = ["mp3", "wav", "ogg", "flac", "aac", "m4a"];
+    if (!allowedFormats.includes(format)) return res.status(400).json({ resStatus: false, resMessage: "Invalid output format.", resErrorCode: 4 });
+    const inputExt = (req.file.originalname.split(".").pop() || "mp3").toLowerCase();
+    const fileSizeKb = Math.round(req.file.size / 1024);
+    const mimeMap = { mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg", flac: "audio/flac", aac: "audio/aac", m4a: "audio/mp4" };
+    try {
+      const codecMap = { mp3: "libmp3lame", wav: "pcm_s16le", ogg: "libvorbis", flac: "flac", aac: "aac", m4a: "aac" };
+      const outputBuffer = await runFfmpeg(req.file.buffer, inputExt, format, (cmd, out) =>
+        cmd.audioCodec(codecMap[format]).noVideo()
+      );
+      const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
+      await incrementUsage(user?.user_id, ip, tier, "audio-convert", inputExt, format, fileSizeKb, "success");
+      res.set({ "Content-Type": mimeMap[format], "Content-Disposition": `attachment; filename="${originalName}.${format}"`, "Content-Length": outputBuffer.length });
+      return res.status(200).send(outputBuffer);
+    } catch (err) {
+      console.error("Audio convert error:", err.message);
+      await incrementUsage(user?.user_id, ip, tier, "audio-convert", inputExt, format, fileSizeKb, "failed");
+      return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
+    }
+  }
+);
+
+// ── AUDIO COMPRESSOR ───────────────────────────────────────────────────────
+router.post("/api/post/filebeef/audio/compress", optionalAuth, audioUpload.single("file"), async (req, res) => {
+    const user = req.filebeefUser; const ip = getClientIp(req);
+    const tier = getTier(user); const limits = getAudioLimits(tier);
+    if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
+    if (!isAudio(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload an audio file.", resErrorCode: 2 });
+    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+    const fileSizeKb = Math.round(req.file.size / 1024);
+    const quality = req.body.quality || "medium";
+    const bitrateMap = { low: "64k", medium: "128k", high: "192k" };
+    const bitrate = bitrateMap[quality] || "128k";
+    const inputExt = (req.file.originalname.split(".").pop() || "mp3").toLowerCase();
+    try {
+      const outputBuffer = await runFfmpeg(req.file.buffer, inputExt, "mp3", (cmd, out) =>
+        cmd.audioCodec("libmp3lame").audioBitrate(bitrate).noVideo()
+      );
+      const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
+      await incrementUsage(user?.user_id, ip, tier, "audio-compress", inputExt, "mp3", fileSizeKb, "success");
+      res.set({ "Content-Type": "audio/mpeg", "Content-Disposition": `attachment; filename="${originalName}_compressed.mp3"`, "Content-Length": outputBuffer.length });
+      return res.status(200).send(outputBuffer);
+    } catch (err) {
+      console.error("Audio compress error:", err.message);
+      await incrementUsage(user?.user_id, ip, tier, "audio-compress", inputExt, "mp3", fileSizeKb, "failed");
+      return res.status(500).json({ resStatus: false, resMessage: "Compression failed.", resErrorCode: 99 });
+    }
+  }
+);
+
+// ── AUDIO TRIMMER (Pro only) ───────────────────────────────────────────────
+router.post("/api/post/filebeef/audio/trim", optionalAuth, audioUpload.single("file"), async (req, res) => {
+    const user = req.filebeefUser; const ip = getClientIp(req);
+    const tier = getTier(user); const limits = getAudioLimits(tier);
+    if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
+    if (!isAudio(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload an audio file.", resErrorCode: 2 });
+    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
+    if (tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "Audio Trimmer is a Pro feature.", resErrorCode: 4, proOnly: true });
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+    const fileSizeKb = Math.round(req.file.size / 1024);
+    const start = parseFloat(req.body.start) || 0;
+    const end = req.body.end ? parseFloat(req.body.end) : null;
+    if (end && end <= start) return res.status(400).json({ resStatus: false, resMessage: "End time must be greater than start time.", resErrorCode: 6 });
+    const inputExt = (req.file.originalname.split(".").pop() || "mp3").toLowerCase();
+    try {
+      const outputBuffer = await runFfmpeg(req.file.buffer, inputExt, "mp3", (cmd, out) => {
+        cmd.seekInput(start);
+        if (end) cmd.duration(end - start);
+        return cmd.audioCodec("libmp3lame").audioBitrate("192k").noVideo();
+      });
+      const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
+      await incrementUsage(user?.user_id, ip, tier, "audio-trim", inputExt, "mp3", fileSizeKb, "success");
+      res.set({ "Content-Type": "audio/mpeg", "Content-Disposition": `attachment; filename="${originalName}_trimmed.mp3"`, "Content-Length": outputBuffer.length });
+      return res.status(200).send(outputBuffer);
+    } catch (err) {
+      console.error("Audio trim error:", err.message);
+      await incrementUsage(user?.user_id, ip, tier, "audio-trim", inputExt, "mp3", fileSizeKb, "failed");
+      return res.status(500).json({ resStatus: false, resMessage: "Trim failed.", resErrorCode: 99 });
+    }
+  }
+);
+
+// ── AUDIO MERGER (Pro only) ────────────────────────────────────────────────
+router.post("/api/post/filebeef/audio/merge", optionalAuth, audioMultiUpload.array("files", 10), async (req, res) => {
+    const user = req.filebeefUser; const ip = getClientIp(req);
+    const tier = getTier(user); const limits = getAudioLimits(tier);
+    const files = req.files;
+    if (!files || files.length < 2) return res.status(400).json({ resStatus: false, resMessage: "Please upload at least 2 audio files.", resErrorCode: 1 });
+    if (tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "Audio Merger is a Pro feature.", resErrorCode: 4, proOnly: true });
+    for (const f of files) {
+      if (!isAudio(f)) return res.status(400).json({ resStatus: false, resMessage: `${f.originalname} is not a supported audio file.`, resErrorCode: 2 });
+      if (f.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `${f.originalname} is too large. Max ${limits.sizeMB}MB per file.`, resErrorCode: 3 });
+    }
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+    const totalKb = Math.round(files.reduce((s, f) => s + f.size, 0) / 1024);
+    try {
+      // write all input files to temp
+      const tmpFiles = files.map((f, i) => {
+        const ext = (f.originalname.split(".").pop() || "mp3").toLowerCase();
+        const tmp = path.join(os.tmpdir(), `fb_merge_${Date.now()}_${i}.${ext}`);
+        fs.writeFileSync(tmp, f.buffer);
+        return tmp;
+      });
+      const tmpOut = path.join(os.tmpdir(), `fb_merged_${Date.now()}.mp3`);
+      await new Promise((resolve, reject) => {
+        const cmd = ffmpeg();
+        tmpFiles.forEach(f => cmd.input(f));
+        cmd
+          .on("end", resolve)
+          .on("error", reject)
+          .mergeToFile(tmpOut, os.tmpdir());
+      });
+      const outputBuffer = fs.readFileSync(tmpOut);
+      tmpFiles.forEach(f => { try { fs.unlinkSync(f); } catch (_) {} });
+      try { fs.unlinkSync(tmpOut); } catch (_) {}
+      await incrementUsage(user?.user_id, ip, tier, "audio-merge", "multiple", "mp3", totalKb, "success");
+      res.set({ "Content-Type": "audio/mpeg", "Content-Disposition": `attachment; filename="merged.mp3"`, "Content-Length": outputBuffer.length });
+      return res.status(200).send(outputBuffer);
+    } catch (err) {
+      console.error("Audio merge error:", err.message);
+      await incrementUsage(user?.user_id, ip, tier, "audio-merge", "multiple", "mp3", totalKb, "failed");
+      return res.status(500).json({ resStatus: false, resMessage: "Merge failed.", resErrorCode: 99 });
     }
   }
 );
