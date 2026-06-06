@@ -2377,33 +2377,42 @@ router.post("/api/post/filebeef/pdf/ocr", optionalAuth, pdfUpload.single("file")
 
 // ── PDF TO WORD ────────────────────────────────────────────────────────────
 // Extracts text from PDF and creates a .docx — basic, not layout-preserving
-router.post("/api/post/filebeef/pdf/to-word", optionalAuth, pdfUpload.single("file"), async (req, res) => {
+// ── WORD TO PDF ────────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/pdf/word-to-pdf", optionalAuth, async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user); const limits = getPdfLimits(tier);
-    if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
-    if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
-    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
-    if (tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "PDF to Word is a Pro feature.", resErrorCode: 4, proOnly: true });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
-    if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
-    const fileSizeKb = Math.round(req.file.size / 1024);
-    try {
-      const pdfParse = require("pdf-parse");
-      const { Document, Packer, Paragraph, TextRun } = require("docx");
-      const data = await pdfParse(req.file.buffer);
-      const lines = data.text.split("\n");
-      const paragraphs = lines.map(line => new Paragraph({ children: [new TextRun({ text: line, size: 24, font: "Arial" })] }));
-      const doc = new Document({ sections: [{ properties: {}, children: paragraphs }] });
-      const docxBuffer = await Packer.toBuffer(doc);
-      const originalName = req.file.originalname.replace(/\.pdf$/i, "");
-      await incrementUsage(user?.user_id, ip, tier, "pdf-to-word", "pdf", "docx", fileSizeKb, "success");
-      res.set({ "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "Content-Disposition": `attachment; filename="${originalName}.docx"`, "Content-Length": docxBuffer.length });
-      return res.status(200).send(docxBuffer);
-    } catch (err) {
-      console.error("PDF to Word error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "pdf-to-word", "pdf", "docx", fileSizeKb, "failed");
-      return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
-    }
+    const wordUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: limits.sizeMB * 1024 * 1024, files: 1 } }).single("file");
+    wordUpload(req, res, async (err) => {
+      if (err) return res.status(400).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 1 });
+      if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
+      if (!req.file.originalname.match(/\.(docx|doc)$/i)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a .docx or .doc file.", resErrorCode: 2 });
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+      const fileSizeKb = Math.round(req.file.size / 1024);
+      try {
+        const { execFile } = require("child_process");
+        const ext = req.file.originalname.match(/\.doc$/i) ? "doc" : "docx";
+        const tmpIn = path.join(os.tmpdir(), `fb_word_${Date.now()}.${ext}`);
+        fs.writeFileSync(tmpIn, req.file.buffer);
+        await new Promise((resolve, reject) => {
+          execFile("libreoffice", ["--headless", "--convert-to", "pdf", "--outdir", os.tmpdir(), tmpIn], (err) => {
+            if (err) reject(err); else resolve();
+          });
+        });
+        const tmpOut = tmpIn.replace(/\.(docx|doc)$/i, ".pdf");
+        const outputBuffer = fs.readFileSync(tmpOut);
+        fs.unlinkSync(tmpIn);
+        fs.unlinkSync(tmpOut);
+        const originalName = req.file.originalname.replace(/\.(docx|doc)$/i, "");
+        await incrementUsage(user?.user_id, ip, tier, "word-to-pdf", "docx", "pdf", fileSizeKb, "success");
+        res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}.pdf"`, "Content-Length": outputBuffer.length });
+        return res.status(200).send(outputBuffer);
+      } catch (err) {
+        console.error("Word to PDF error:", err.message);
+        await incrementUsage(user?.user_id, ip, tier, "word-to-pdf", "docx", "pdf", fileSizeKb, "failed");
+        return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
+      }
+    });
   }
 );
 
@@ -3319,6 +3328,166 @@ router.post("/api/post/filebeef/audio/merge", optionalAuth, audioMultiUpload.arr
       console.error("Audio merge error:", err.message);
       await incrementUsage(user?.user_id, ip, tier, "audio-merge", "multiple", "mp3", totalKb, "failed");
       return res.status(500).json({ resStatus: false, resMessage: "Merge failed.", resErrorCode: 99 });
+    }
+  }
+);
+
+
+
+
+// ── POWERPOINT TO PDF ──────────────────────────────────────────────────────
+router.post("/api/post/filebeef/pdf/pptx-to-pdf", optionalAuth, async (req, res) => {
+    const user = req.filebeefUser; const ip = getClientIp(req);
+    const tier = getTier(user); const limits = getPdfLimits(tier);
+    const pptxUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: limits.sizeMB * 1024 * 1024, files: 1 } }).single("file");
+    pptxUpload(req, res, async (err) => {
+      if (err) return res.status(400).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 1 });
+      if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
+      if (!req.file.originalname.match(/\.(pptx|ppt)$/i)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a .pptx or .ppt file.", resErrorCode: 2 });
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+      const fileSizeKb = Math.round(req.file.size / 1024);
+      try {
+        const { execFile } = require("child_process");
+        const tmpIn = path.join(os.tmpdir(), `fb_pptx_${Date.now()}.pptx`);
+        fs.writeFileSync(tmpIn, req.file.buffer);
+        await new Promise((resolve, reject) => {
+          execFile("libreoffice", ["--headless", "--convert-to", "pdf", "--outdir", os.tmpdir(), tmpIn], (err) => {
+            if (err) reject(err); else resolve();
+          });
+        });
+        const tmpOut = tmpIn.replace(/\.pptx$/i, ".pdf");
+        const outputBuffer = fs.readFileSync(tmpOut);
+        fs.unlinkSync(tmpIn);
+        fs.unlinkSync(tmpOut);
+        const originalName = req.file.originalname.replace(/\.(pptx|ppt)$/i, "");
+        await incrementUsage(user?.user_id, ip, tier, "pptx-to-pdf", "pptx", "pdf", fileSizeKb, "success");
+        res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}.pdf"`, "Content-Length": outputBuffer.length });
+        return res.status(200).send(outputBuffer);
+      } catch (err) {
+        console.error("PPTX to PDF error:", err.message);
+        await incrementUsage(user?.user_id, ip, tier, "pptx-to-pdf", "pptx", "pdf", fileSizeKb, "failed");
+        return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
+      }
+    });
+  }
+);
+
+// ── RTF TO PDF ─────────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/pdf/rtf-to-pdf", optionalAuth, async (req, res) => {
+    const user = req.filebeefUser; const ip = getClientIp(req);
+    const tier = getTier(user); const limits = getPdfLimits(tier);
+    const rtfUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: limits.sizeMB * 1024 * 1024, files: 1 } }).single("file");
+    rtfUpload(req, res, async (err) => {
+      if (err) return res.status(400).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 1 });
+      if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
+      if (!req.file.originalname.match(/\.rtf$/i)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a .rtf file.", resErrorCode: 2 });
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+      const fileSizeKb = Math.round(req.file.size / 1024);
+      try {
+        const { execFile } = require("child_process");
+        const tmpIn = path.join(os.tmpdir(), `fb_rtf_${Date.now()}.rtf`);
+        fs.writeFileSync(tmpIn, req.file.buffer);
+        await new Promise((resolve, reject) => {
+          execFile("libreoffice", ["--headless", "--convert-to", "pdf", "--outdir", os.tmpdir(), tmpIn], (err) => {
+            if (err) reject(err); else resolve();
+          });
+        });
+        const tmpOut = tmpIn.replace(/\.rtf$/i, ".pdf");
+        const outputBuffer = fs.readFileSync(tmpOut);
+        fs.unlinkSync(tmpIn);
+        fs.unlinkSync(tmpOut);
+        const originalName = req.file.originalname.replace(/\.rtf$/i, "");
+        await incrementUsage(user?.user_id, ip, tier, "rtf-to-pdf", "rtf", "pdf", fileSizeKb, "success");
+        res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}.pdf"`, "Content-Length": outputBuffer.length });
+        return res.status(200).send(outputBuffer);
+      } catch (err) {
+        console.error("RTF to PDF error:", err.message);
+        await incrementUsage(user?.user_id, ip, tier, "rtf-to-pdf", "rtf", "pdf", fileSizeKb, "failed");
+        return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
+      }
+    });
+  }
+);
+
+// ── ODT TO PDF ─────────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/pdf/odt-to-pdf", optionalAuth, async (req, res) => {
+    const user = req.filebeefUser; const ip = getClientIp(req);
+    const tier = getTier(user); const limits = getPdfLimits(tier);
+    const odtUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: limits.sizeMB * 1024 * 1024, files: 1 } }).single("file");
+    odtUpload(req, res, async (err) => {
+      if (err) return res.status(400).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 1 });
+      if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
+      if (!req.file.originalname.match(/\.odt$/i)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a .odt file.", resErrorCode: 2 });
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+      const fileSizeKb = Math.round(req.file.size / 1024);
+      try {
+        const { execFile } = require("child_process");
+        const tmpIn = path.join(os.tmpdir(), `fb_odt_${Date.now()}.odt`);
+        fs.writeFileSync(tmpIn, req.file.buffer);
+        await new Promise((resolve, reject) => {
+          execFile("libreoffice", ["--headless", "--convert-to", "pdf", "--outdir", os.tmpdir(), tmpIn], (err) => {
+            if (err) reject(err); else resolve();
+          });
+        });
+        const tmpOut = tmpIn.replace(/\.odt$/i, ".pdf");
+        const outputBuffer = fs.readFileSync(tmpOut);
+        fs.unlinkSync(tmpIn);
+        fs.unlinkSync(tmpOut);
+        const originalName = req.file.originalname.replace(/\.odt$/i, "");
+        await incrementUsage(user?.user_id, ip, tier, "odt-to-pdf", "odt", "pdf", fileSizeKb, "success");
+        res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}.pdf"`, "Content-Length": outputBuffer.length });
+        return res.status(200).send(outputBuffer);
+      } catch (err) {
+        console.error("ODT to PDF error:", err.message);
+        await incrementUsage(user?.user_id, ip, tier, "odt-to-pdf", "odt", "pdf", fileSizeKb, "failed");
+        return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
+      }
+    });
+  }
+);
+
+// ── PDF TO POWERPOINT ──────────────────────────────────────────────────────
+// Extracts text per page and builds a .pptx — basic, not layout-preserving
+router.post("/api/post/filebeef/pdf/to-pptx", optionalAuth, pdfUpload.single("file"), async (req, res) => {
+    const user = req.filebeefUser; const ip = getClientIp(req);
+    const tier = getTier(user); const limits = getPdfLimits(tier);
+    if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
+    if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
+    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
+    if (tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "PDF to PowerPoint is a Pro feature.", resErrorCode: 4, proOnly: true });
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+    const fileSizeKb = Math.round(req.file.size / 1024);
+    try {
+      const pdfParse = require("pdf-parse");
+      const pptx = require("pptxgenjs");
+      const data = await pdfParse(req.file.buffer);
+      const pages = data.text.split(/\f/).filter(p => p.trim()); // \f = form feed = page break
+      const prs = new pptx();
+      for (const pageText of pages) {
+        const slide = prs.addSlide();
+        slide.addText(pageText.trim().substring(0, 1000), {
+          x: 0.5, y: 0.5, w: "90%", h: "90%",
+          fontSize: 12, fontFace: "Arial", color: "1a1a1a",
+          wrap: true, valign: "top"
+        });
+      }
+      const pptxBuffer = await prs.write({ outputType: "nodebuffer" });
+      const originalName = req.file.originalname.replace(/\.pdf$/i, "");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-to-pptx", "pdf", "pptx", fileSizeKb, "success");
+      res.set({
+        "Content-Type": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "Content-Disposition": `attachment; filename="${originalName}.pptx"`,
+        "Content-Length": pptxBuffer.length
+      });
+      return res.status(200).send(pptxBuffer);
+    } catch (err) {
+      console.error("PDF to PPTX error:", err.message);
+      await incrementUsage(user?.user_id, ip, tier, "pdf-to-pptx", "pdf", "pptx", fileSizeKb, "failed");
+      return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
     }
   }
 );
