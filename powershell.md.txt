@@ -1,0 +1,53 @@
+ssh root@45.93.139.61
+enter password
+then go to root of the project:
+cd /root/eumaps
+
+
+USEFUL COMMANDS:
+pm2 status
+pm2 logs eumaps
+pm2 restart eumaps
+cd /root/eumaps
+git pull
+
+
+
+CASE 1: normal code changes
+On your computer:
+	git add .
+	git commit -m "update"
+	git push
+On VPS:	ssh root@45.93.139.61
+	cd /root/eumaps
+	git pull
+	pm2 restart eumaps
+	pm2 status
+
+
+
+CASE 2:  if package.json or package-lock.json changed.
+On your computer:
+	git add .
+	git commit -m "update packages"
+	git push
+On VPS:	ssh root@45.93.139.61
+	cd /root/eumaps
+	git pull
+	npm install
+	pm2 restart eumaps
+	pm2 status
+
+
+
+CASE 3: .env changes
+On VPS:	ssh root@45.93.139.61
+	cd /root/eumaps
+	nano .env
+Edit values, then save:
+	Ctrl + O
+	Enter
+	Ctrl + X
+Restart:pm2 restart eumaps
+	pm2 status
+

@@ -788,8 +788,8 @@ router.post("/api/post/filebeef/contact", filebeefWriteLimit, async (req, res) =
 // ── LIMITS PER TIER ────────────────────────────────────────────────────────
 const LIMITS = {
   anon:       { daily: 1,  sizeMB: 5  },
-  free:       { daily: 2,  sizeMB: 10 },
-  pro:        { daily: 50, sizeMB: 15 }
+  free:       { daily: 2,  sizeMB: 8 },
+  pro:        { daily: 6,  sizeMB: 8 }
 };
 
 // ── ALLOWED IMAGE TYPES ────────────────────────────────────────────────────
@@ -1407,9 +1407,9 @@ router.post("/api/post/filebeef/image/watermark", optionalAuth, imageUpload.sing
 
 // ── PDF SIZE LIMITS ────────────────────────────────────────────────────────
 const PDF_LIMITS = {
-  anon: { daily: 1,  sizeMB: 5  },
-  free: { daily: 5,  sizeMB: 10 },
-  pro:  { daily: 50, sizeMB: 20 }
+  anon: { daily: 1,  sizeMB: 3 },
+  free: { daily: 2,  sizeMB: 5 },
+  pro:  { daily: 5,  sizeMB: 10 }
 };
 
 const pdfUpload = multer({
@@ -2455,8 +2455,8 @@ const fontUpload = multer({
 // ── FONT LIMITS ────────────────────────────────────────────────────────────
 const FONT_LIMITS = {
   anon: { daily: 1, sizeMB: 2 },
-  free: { daily: 5, sizeMB: 5 },
-  pro:  { daily: 50, sizeMB: 10 }
+  free: { daily: 2, sizeMB: 2 },
+  pro:  { daily: 5, sizeMB: 3 }
 };
 
 function getFontLimits(tier) {
@@ -2889,9 +2889,9 @@ const path = require("path");
 
 // ── VIDEO/AUDIO LIMITS ─────────────────────────────────────────────────────
 const VIDEO_LIMITS = {
-  anon: { daily: 1,  sizeMB: 25  },
+  anon: { daily: 1,  sizeMB: 20  },
   free: { daily: 1,  sizeMB: 25  },
-  pro:  { daily: 1,  sizeMB: 100 }
+  pro:  { daily: 1,  sizeMB: 50 }
 };
 
 function getVideoLimits(tier) { return VIDEO_LIMITS[tier] || VIDEO_LIMITS.anon; }
@@ -3155,9 +3155,9 @@ router.post("/api/post/filebeef/video/extract-audio", optionalAuth, videoUpload.
 
 // ── AUDIO LIMITS ───────────────────────────────────────────────────────────
 const AUDIO_LIMITS = {
-  anon: { daily: 1, sizeMB: 25  },
+  anon: { daily: 1, sizeMB: 20  },
   free: { daily: 1, sizeMB: 25  },
-  pro:  { daily: 1, sizeMB: 100 }
+  pro:  { daily: 1, sizeMB: 50 }
 };
 
 function getAudioLimits(tier) { return AUDIO_LIMITS[tier] || AUDIO_LIMITS.anon; }
