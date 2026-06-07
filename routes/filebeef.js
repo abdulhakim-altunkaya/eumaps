@@ -2030,9 +2030,10 @@ router.post("/api/post/filebeef/pdf/to-jpg", optionalAuth, pdfUpload.single("fil
         const singleBuf = Buffer.from(await newDoc.save());
         const b64 = singleBuf.toString("base64");
         const bpage = await browser.newPage();
-        await bpage.setContent(`<html><body style="margin:0;padding:0;"><embed src="data:application/pdf;base64,${b64}" width="800" height="1131" /></body></html>`);
-        await bpage.waitForTimeout(300);
-        const shot = await bpage.screenshot({ type: "jpeg", quality: 85 });
+        await bpage.setViewport({ width: 800, height: 1131, deviceScaleFactor: 1 });
+        await bpage.setContent(`<!DOCTYPE html><html><head><style>*{margin:0;padding:0;}html,body{width:800px;height:1131px;overflow:hidden;background:#fff;}embed{display:block;width:800px;height:1131px;}</style></head><body><embed src="data:application/pdf;base64,${b64}" type="application/pdf" width="800" height="1131" /></body></html>`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const shot = await bpage.screenshot({ type: "jpeg", quality: 85, clip: { x: 0, y: 0, width: 800, height: 1131 } });
         await bpage.close();
         zip.file(`${originalName}_page_${i + 1}.jpg`, shot);
       }
@@ -2343,9 +2344,9 @@ router.post("/api/post/filebeef/pdf/ocr", optionalAuth, pdfUpload.single("file")
         const singleBuf = Buffer.from(await singleDoc.save());
         const b64 = singleBuf.toString("base64");
         const bpage = await browser.newPage();
-        await bpage.setViewport({ width: 800, height: 1131 });
-        await bpage.setContent(`<html><body style="margin:0;"><embed src="data:application/pdf;base64,${b64}" width="800" height="1131" /></body></html>`);
-        await bpage.waitForTimeout(500);
+        await bpage.setViewport({ width: 800, height: 1131, deviceScaleFactor: 1 });
+        await bpage.setContent(`<!DOCTYPE html><html><head><style>*{margin:0;padding:0;}html,body{width:800px;height:1131px;overflow:hidden;background:#fff;}embed{display:block;width:800px;height:1131px;}</style></head><body><embed src="data:application/pdf;base64,${b64}" type="application/pdf" width="800" height="1131" /></body></html>`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
         const imgBuf = await bpage.screenshot({ type: "png" });
         await bpage.close();
         // OCR the image
@@ -3867,9 +3868,11 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
           const b64 = singleBuf.toString('base64')
 
           const bpage = await browser.newPage()
-          await bpage.setViewport({ width: Math.round(pageWidth), height: Math.round(pageHeight) })
-          await bpage.setContent(`<html><body style="margin:0;padding:0;background:#fff;"><embed src="data:application/pdf;base64,${b64}" width="${Math.round(pageWidth)}" height="${Math.round(pageHeight)}" /></body></html>`)
-          await new Promise(resolve => setTimeout(resolve, 500))
+          const pw = Math.round(pageWidth)
+          const ph = Math.round(pageHeight)
+          await bpage.setViewport({ width: pw, height: ph, deviceScaleFactor: 1 })
+          await bpage.setContent(`<!DOCTYPE html><html><head><style>*{margin:0;padding:0;}html,body{width:${pw}px;height:${ph}px;overflow:hidden;background:#fff;}embed{display:block;width:${pw}px;height:${ph}px;}</style></head><body><embed src="data:application/pdf;base64,${b64}" type="application/pdf" width="${pw}" height="${ph}" /></body></html>`)
+          await new Promise(resolve => setTimeout(resolve, 1000))
 
           // paint white rectangles over erase areas using page.evaluate
           await bpage.evaluate((strokes, pw, ph) => {
@@ -3886,7 +3889,7 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
             }
           }, strokes, Math.round(pageWidth), Math.round(pageHeight))
 
-          const imgBuf = await bpage.screenshot({ type: 'png' })
+          const imgBuf = await bpage.screenshot({ type: 'png', clip: { x: 0, y: 0, width: pw, height: ph } })
           await bpage.close()
 
           // embed the screenshot back as a full-page image
