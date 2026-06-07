@@ -3492,4 +3492,387 @@ router.post("/api/post/filebeef/pdf/to-pptx", optionalAuth, pdfUpload.single("fi
   }
 );
 
+// ── PDF EDITOR ─────────────────────────────────────────────────────────────
+const EDITOR_LIMITS = {
+  guest: {
+    sizeMB: 3,
+    savesPerDay: 1,
+    maxAnnotations: 3,
+    allowedTypes: ['highlight', 'text'],
+    sigDataMaxKB: 200,
+    watermark: true
+  },
+  free: {
+    sizeMB: 3,
+    savesPerDay: 1,
+    maxAnnotations: 6,
+    allowedTypes: ['highlight', 'text', 'pen', 'sticky'],
+    sigDataMaxKB: 200,
+    watermark: false
+  },
+  pro: {
+    sizeMB: 20,
+    savesPerDay: 5,
+    maxAnnotations: 50,
+    allowedTypes: ['highlight', 'text', 'pen', 'sticky', 'rectangle', 'circle', 'arrow', 'image', 'signature', 'redact'],
+    sigDataMaxKB: 500,
+    watermark: false
+  }
+}
+
+const EDITOR_DAILY_SAVES = {
+  guest: 1,
+  free: 1,
+  pro: 5
+}
+
+// separate daily save tracking table: filebeef_editor_saves (user_id or ip, date, count)
+async function checkEditorSaveLimit(userId, ip, tier) {
+  const today = new Date().toISOString().slice(0, 10)
+  const limit = EDITOR_DAILY_SAVES[tier]
+  if (tier === 'anon' || tier === 'guest') {
+    const result = await pool.query(
+      `SELECT count FROM filebeef_anon_usage WHERE ip = $1 AND date = $2`,
+      [ip, today]
+    )
+    const used = result.rows[0]?.count || 0
+    return { allowed: used < limit, used, limit }
+  } else {
+    const result = await pool.query(
+      `SELECT count FROM filebeef_editor_saves WHERE user_id = $1 AND date = $2`,
+      [userId, today]
+    )
+    const used = result.rows[0]?.count || 0
+    return { allowed: used < limit, used, limit }
+  }
+}
+
+async function incrementEditorSaves(userId, ip, tier) {
+  const today = new Date().toISOString().slice(0, 10)
+  try {
+    if (tier === 'anon' || tier === 'guest') {
+      await pool.query(
+        `INSERT INTO filebeef_anon_usage (ip, date, count)
+         VALUES ($1, $2, 1)
+         ON CONFLICT (ip, date) DO UPDATE SET count = filebeef_anon_usage.count + 1`,
+        [ip, today]
+      )
+    } else {
+      await pool.query(
+        `INSERT INTO filebeef_editor_saves (user_id, date, count)
+         VALUES ($1, $2, 1)
+         ON CONFLICT (user_id, date) DO UPDATE SET count = filebeef_editor_saves.count + 1`,
+        [userId, today]
+      )
+    }
+  } catch (_) {}
+}
+
+const editorUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: EDITOR_LIMITS.pro.sizeMB * 1024 * 1024, files: 1 }
+})
+
+router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('file'), async (req, res) => {
+  const user = req.filebeefUser
+  const ip = getClientIp(req)
+  const tier = getTier(user)
+  const limits = EDITOR_LIMITS[tier] || EDITOR_LIMITS.guest
+
+  // ── FILE CHECKS ──
+  if (!req.file) return res.status(400).json({ resStatus: false, resMessage: 'No file uploaded.', resErrorCode: 1 })
+  if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: 'Please upload a PDF.', resErrorCode: 2 })
+  if (req.file.size > limits.sizeMB * 1024 * 1024) {
+    return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB on your plan.`, resErrorCode: 3 })
+  }
+
+  // ── PARSE ANNOTATIONS ──
+  let annotations
+  try {
+    annotations = JSON.parse(req.body.annotations || '[]')
+  } catch (_) {
+    return res.status(400).json({ resStatus: false, resMessage: 'Invalid annotations data.', resErrorCode: 4 })
+  }
+
+  if (!Array.isArray(annotations)) {
+    return res.status(400).json({ resStatus: false, resMessage: 'Annotations must be an array.', resErrorCode: 4 })
+  }
+
+  // ── ANNOTATION COUNT CHECK ──
+  if (annotations.length > limits.maxAnnotations) {
+    return res.status(400).json({ resStatus: false, resMessage: `Too many annotations. Max ${limits.maxAnnotations} on your plan.`, resErrorCode: 5 })
+  }
+
+  // ── ANNOTATION TYPE CHECK ──
+  const allowedTypes = limits.allowedTypes
+  const VALID_TYPES = ['highlight', 'text', 'pen', 'sticky', 'rectangle', 'circle', 'arrow', 'image', 'signature', 'redact']
+  for (const ann of annotations) {
+    if (!VALID_TYPES.includes(ann.type)) {
+      return res.status(400).json({ resStatus: false, resMessage: `Invalid annotation type: ${ann.type}`, resErrorCode: 6 })
+    }
+    if (!allowedTypes.includes(ann.type)) {
+      return res.status(400).json({ resStatus: false, resMessage: `Annotation type "${ann.type}" is not allowed on your plan.`, resErrorCode: 7 })
+    }
+    // validate page number
+    if (!ann.page || typeof ann.page !== 'number' || ann.page < 1) {
+      return res.status(400).json({ resStatus: false, resMessage: 'Invalid page number in annotation.', resErrorCode: 8 })
+    }
+    // validate coordinates are numbers
+    const coordFields = ['x', 'y', 'width', 'height', 'cx', 'cy', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2']
+    for (const field of coordFields) {
+      if (ann[field] !== undefined && typeof ann[field] !== 'number') {
+        return res.status(400).json({ resStatus: false, resMessage: `Invalid coordinate "${field}" in annotation.`, resErrorCode: 9 })
+      }
+    }
+    // validate image/signature data size
+    if ((ann.type === 'signature' || ann.type === 'image') && ann.data) {
+      const sizeKB = Math.round(ann.data.length * 0.75 / 1024)
+      if (sizeKB > limits.sigDataMaxKB) {
+        return res.status(400).json({ resStatus: false, resMessage: `Image data too large. Max ${limits.sigDataMaxKB}KB.`, resErrorCode: 10 })
+      }
+    }
+    // validate pen path
+    if (ann.type === 'pen') {
+      if (!Array.isArray(ann.path) || ann.path.length < 2) {
+        return res.status(400).json({ resStatus: false, resMessage: 'Invalid pen path.', resErrorCode: 11 })
+      }
+      if (ann.path.length > 5000) {
+        return res.status(400).json({ resStatus: false, resMessage: 'Pen path too long.', resErrorCode: 12 })
+      }
+    }
+  }
+
+  // ── DAILY SAVE LIMIT CHECK ──
+  const saveCheck = await checkEditorSaveLimit(user?.user_id, ip, tier)
+  if (!saveCheck.allowed) {
+    return res.status(403).json({
+      resStatus: false,
+      resMessage: `Daily save limit reached (${saveCheck.limit}/day on your plan). Upgrade to Pro for more.`,
+      resErrorCode: 13,
+      limitReached: true,
+      tier
+    })
+  }
+
+  const fileSizeKb = Math.round(req.file.size / 1024)
+
+  try {
+    const pdfDoc = await PDFDocument.load(req.file.buffer)
+    const totalPages = pdfDoc.getPageCount()
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+
+    for (const ann of annotations) {
+      // validate page within bounds
+      if (ann.page > totalPages) continue
+
+      const page = pdfDoc.getPage(ann.page - 1)
+      const { width: pageWidth, height: pageHeight } = page.getSize()
+
+      // convert hex color to rgb
+      const c = hexToRgb(ann.color || '#000000')
+
+      switch (ann.type) {
+
+        case 'highlight': {
+          // PDF coords: y is from bottom, canvas coords: y is from top
+          const pdfY = pageHeight - ann.y - ann.height
+          page.drawRectangle({
+            x: ann.x, y: pdfY,
+            width: ann.width, height: ann.height,
+            color: rgb(c.r, c.g, c.b),
+            opacity: ann.opacity || 0.4
+          })
+          break
+        }
+
+        case 'text': {
+          const pdfY = pageHeight - ann.y
+          const weight = ann.fontWeight === 'bold' ? boldFont : font
+          const safeText = (ann.text || '').replace(/[^\x20-\x7E]/g, '')
+          if (safeText) {
+            page.drawText(safeText, {
+              x: ann.x, y: pdfY,
+              size: ann.fontSize || 14,
+              font: weight,
+              color: rgb(c.r, c.g, c.b),
+              opacity: ann.opacity || 1
+            })
+          }
+          break
+        }
+
+        case 'sticky': {
+          const pdfY = pageHeight - ann.y - 80
+          const bgColor = hexToRgb(ann.color || '#FFD600')
+          page.drawRectangle({
+            x: ann.x, y: pdfY,
+            width: 160, height: 80,
+            color: rgb(bgColor.r, bgColor.g, bgColor.b),
+            opacity: ann.opacity || 0.85
+          })
+          const lines = (ann.text || '').split('\n').slice(0, 4)
+          lines.forEach((line, i) => {
+            const safeLine = line.replace(/[^\x20-\x7E]/g, '').substring(0, 30)
+            if (safeLine) {
+              page.drawText(safeLine, {
+                x: ann.x + 8,
+                y: pdfY + 80 - 18 - i * 14,
+                size: 10, font,
+                color: rgb(0, 0, 0), opacity: 1
+              })
+            }
+          })
+          break
+        }
+
+        case 'pen': {
+          // draw as series of line segments
+          for (let i = 1; i < ann.path.length; i++) {
+            const p1 = ann.path[i - 1]
+            const p2 = ann.path[i]
+            page.drawLine({
+              start: { x: p1.x, y: pageHeight - p1.y },
+              end:   { x: p2.x, y: pageHeight - p2.y },
+              thickness: ann.strokeSize || 3,
+              color: rgb(c.r, c.g, c.b),
+              opacity: ann.opacity || 1
+            })
+          }
+          break
+        }
+
+        case 'rectangle': {
+          const pdfY = pageHeight - ann.y - ann.height
+          page.drawRectangle({
+            x: ann.x, y: pdfY,
+            width: ann.width, height: ann.height,
+            borderColor: rgb(c.r, c.g, c.b),
+            borderWidth: ann.strokeSize || 3,
+            opacity: ann.opacity || 1
+          })
+          break
+        }
+
+        case 'circle': {
+          page.drawEllipse({
+            x: ann.cx, y: pageHeight - ann.cy,
+            xScale: ann.rx, yScale: ann.ry,
+            borderColor: rgb(c.r, c.g, c.b),
+            borderWidth: ann.strokeSize || 3,
+            opacity: ann.opacity || 1
+          })
+          break
+        }
+
+        case 'arrow': {
+          // line
+          page.drawLine({
+            start: { x: ann.x1, y: pageHeight - ann.y1 },
+            end:   { x: ann.x2, y: pageHeight - ann.y2 },
+            thickness: ann.strokeSize || 3,
+            color: rgb(c.r, c.g, c.b),
+            opacity: ann.opacity || 1
+          })
+          // arrowhead triangle
+          const angle = Math.atan2(ann.y2 - ann.y1, ann.x2 - ann.x1)
+          const size = 10 + (ann.strokeSize || 3) * 2
+          const tip = { x: ann.x2, y: pageHeight - ann.y2 }
+          const left = {
+            x: tip.x - size * Math.cos(angle - Math.PI / 6),
+            y: tip.y + size * Math.sin(angle - Math.PI / 6)
+          }
+          const right = {
+            x: tip.x - size * Math.cos(angle + Math.PI / 6),
+            y: tip.y + size * Math.sin(angle + Math.PI / 6)
+          }
+          page.drawLine({ start: tip, end: left, thickness: ann.strokeSize || 3, color: rgb(c.r, c.g, c.b), opacity: ann.opacity || 1 })
+          page.drawLine({ start: tip, end: right, thickness: ann.strokeSize || 3, color: rgb(c.r, c.g, c.b), opacity: ann.opacity || 1 })
+          break
+        }
+
+        case 'redact': {
+          const pdfY = pageHeight - ann.y - ann.height
+          page.drawRectangle({
+            x: ann.x, y: pdfY,
+            width: ann.width, height: ann.height,
+            color: rgb(0, 0, 0),
+            opacity: 1
+          })
+          break
+        }
+
+        case 'signature':
+        case 'image': {
+          if (!ann.data) break
+          try {
+            const base64Data = ann.data.split(',')[1]
+            if (!base64Data) break
+            const imgBuffer = Buffer.from(base64Data, 'base64')
+            let embeddedImg
+            if (ann.data.startsWith('data:image/png')) {
+              embeddedImg = await pdfDoc.embedPng(imgBuffer)
+            } else {
+              embeddedImg = await pdfDoc.embedJpg(imgBuffer)
+            }
+            const pdfY = pageHeight - ann.y - ann.height
+            page.drawImage(embeddedImg, {
+              x: ann.x, y: pdfY,
+              width: ann.width, height: ann.height,
+              opacity: ann.opacity || 1
+            })
+          } catch (_) { /* skip invalid image */ }
+          break
+        }
+      }
+    }
+
+    // ── WATERMARK FOR GUEST ──
+    if (limits.watermark) {
+      const watermarkFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+      const pages = pdfDoc.getPages()
+      for (const page of pages) {
+        const { width, height } = page.getSize()
+        const text = 'Made with FileBeef'
+        const fontSize = 10
+        const textWidth = watermarkFont.widthOfTextAtSize(text, fontSize)
+        page.drawText(text, {
+          x: width - textWidth - 10,
+          y: 10,
+          size: fontSize,
+          font: watermarkFont,
+          color: rgb(0.6, 0.6, 0.6),
+          opacity: 0.7
+        })
+      }
+    }
+
+    const outputBuffer = await pdfDoc.save()
+    const originalName = req.file.originalname.replace(/\.pdf$/i, '')
+
+    await incrementEditorSaves(user?.user_id, ip, tier)
+    await incrementUsage(user?.user_id, ip, tier, 'pdf-editor', 'pdf', 'pdf', fileSizeKb, 'success')
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${originalName}_edited.pdf"`,
+      'Content-Length': outputBuffer.length
+    })
+    return res.status(200).send(Buffer.from(outputBuffer))
+
+  } catch (err) {
+    console.error('PDF editor error:', err.message)
+    await incrementUsage(user?.user_id, ip, tier, 'pdf-editor', 'pdf', 'pdf', fileSizeKb, 'failed')
+    return res.status(500).json({ resStatus: false, resMessage: 'Failed to apply annotations.', resErrorCode: 99 })
+  }
+})
+
+// ── HEX TO RGB HELPER ──────────────────────────────────────────────────────
+function hexToRgb(hex) {
+  const clean = hex.replace('#', '')
+  const r = parseInt(clean.substring(0, 2), 16) / 255
+  const g = parseInt(clean.substring(2, 4), 16) / 255
+  const b = parseInt(clean.substring(4, 6), 16) / 255
+  return { r: isNaN(r) ? 0 : r, g: isNaN(g) ? 0 : g, b: isNaN(b) ? 0 : b }
+}
 module.exports = router;
