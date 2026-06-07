@@ -3527,7 +3527,6 @@ const EDITOR_DAILY_SAVES = {
   pro: 5
 }
 
-// separate daily save tracking table: filebeef_editor_saves (user_id or ip, date, count)
 async function checkEditorSaveLimit(userId, ip, tier) {
   const today = new Date().toISOString().slice(0, 10)
   const limit = EDITOR_DAILY_SAVES[tier]
@@ -3614,25 +3613,21 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
     if (!allowedTypes.includes(ann.type)) {
       return res.status(400).json({ resStatus: false, resMessage: `Annotation type "${ann.type}" is not allowed on your plan.`, resErrorCode: 7 })
     }
-    // validate page number
     if (!ann.page || typeof ann.page !== 'number' || ann.page < 1) {
       return res.status(400).json({ resStatus: false, resMessage: 'Invalid page number in annotation.', resErrorCode: 8 })
     }
-    // validate coordinates are numbers
     const coordFields = ['x', 'y', 'width', 'height', 'cx', 'cy', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2']
     for (const field of coordFields) {
       if (ann[field] !== undefined && typeof ann[field] !== 'number') {
         return res.status(400).json({ resStatus: false, resMessage: `Invalid coordinate "${field}" in annotation.`, resErrorCode: 9 })
       }
     }
-    // validate image/signature data size
     if ((ann.type === 'signature' || ann.type === 'image') && ann.data) {
       const sizeKB = Math.round(ann.data.length * 0.75 / 1024)
       if (sizeKB > limits.sigDataMaxKB) {
         return res.status(400).json({ resStatus: false, resMessage: `Image data too large. Max ${limits.sigDataMaxKB}KB.`, resErrorCode: 10 })
       }
     }
-    // validate pen path
     if (ann.type === 'pen') {
       if (!Array.isArray(ann.path) || ann.path.length < 2) {
         return res.status(400).json({ resStatus: false, resMessage: 'Invalid pen path.', resErrorCode: 11 })
@@ -3664,19 +3659,15 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
     for (const ann of annotations) {
-      // validate page within bounds
       if (ann.page > totalPages) continue
 
       const page = pdfDoc.getPage(ann.page - 1)
       const { width: pageWidth, height: pageHeight } = page.getSize()
-
-      // convert hex color to rgb
       const c = hexToRgb(ann.color || '#000000')
 
       switch (ann.type) {
 
         case 'highlight': {
-          // PDF coords: y is from bottom, canvas coords: y is from top
           const pdfY = pageHeight - ann.y - ann.height
           page.drawRectangle({
             x: ann.x, y: pdfY,
@@ -3728,7 +3719,6 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
         }
 
         case 'pen': {
-          // draw as series of line segments
           for (let i = 1; i < ann.path.length; i++) {
             const p1 = ann.path[i - 1]
             const p2 = ann.path[i]
@@ -3767,7 +3757,6 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
         }
 
         case 'arrow': {
-          // line
           page.drawLine({
             start: { x: ann.x1, y: pageHeight - ann.y1 },
             end:   { x: ann.x2, y: pageHeight - ann.y2 },
@@ -3775,7 +3764,6 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
             color: rgb(c.r, c.g, c.b),
             opacity: ann.opacity || 1
           })
-          // arrowhead triangle
           const angle = Math.atan2(ann.y2 - ann.y1, ann.x2 - ann.x1)
           const size = 10 + (ann.strokeSize || 3) * 2
           const tip = { x: ann.x2, y: pageHeight - ann.y2 }
@@ -3828,6 +3816,7 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
         }
       }
     }
+
     // ── ERASE STROKES ──
     let eraseStrokes = []
     try {
@@ -3835,13 +3824,11 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
     } catch (_) {}
 
     if (Array.isArray(eraseStrokes) && eraseStrokes.length > 0) {
-      // validate erase strokes
       const MAX_ERASE_STROKES = 500
       if (eraseStrokes.length > MAX_ERASE_STROKES) {
         eraseStrokes = eraseStrokes.slice(0, MAX_ERASE_STROKES)
       }
 
-      // group strokes by page
       const strokesByPage = {}
       for (const stroke of eraseStrokes) {
         if (!stroke.page || stroke.page > totalPages) continue
@@ -3850,7 +3837,6 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
         strokesByPage[stroke.page].push(stroke)
       }
 
-      // for each affected page: render to image, paint white, re-embed
       if (Object.keys(strokesByPage).length > 0) {
         const puppeteer = require('puppeteer')
         const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] })
@@ -3859,8 +3845,10 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
           const pageNum = parseInt(pageNumStr)
           const pdfPage = pdfDoc.getPage(pageNum - 1)
           const { width: pageWidth, height: pageHeight } = pdfPage.getSize()
+          const pw = Math.round(pageWidth)
+          const ph = Math.round(pageHeight)
 
-          // render single page to image via puppeteer
+          // render single page to image via PDF.js inside Puppeteer
           const singleDoc = await PDFDocument.create()
           const [copiedPage] = await singleDoc.copyPages(pdfDoc, [pageNum - 1])
           singleDoc.addPage(copiedPage)
@@ -3868,34 +3856,56 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
           const b64 = singleBuf.toString('base64')
 
           const bpage = await browser.newPage()
-          const pw = Math.round(pageWidth)
-          const ph = Math.round(pageHeight)
           await bpage.setViewport({ width: pw, height: ph, deviceScaleFactor: 1 })
-          await bpage.setContent(`<!DOCTYPE html><html><head><style>*{margin:0;padding:0;}html,body{width:${pw}px;height:${ph}px;overflow:hidden;background:#fff;}embed{display:block;width:${pw}px;height:${ph}px;}</style></head><body><embed src="data:application/pdf;base64,${b64}" type="application/pdf" width="${pw}" height="${ph}" /></body></html>`)
-          await new Promise(resolve => setTimeout(resolve, 1000))
 
-          // paint white rectangles over erase areas using page.evaluate
-          await bpage.evaluate((strokes, pw, ph) => {
-            const canvas = document.createElement('canvas')
-            canvas.width = pw; canvas.height = ph
-            canvas.style.position = 'absolute'
-            canvas.style.top = '0'; canvas.style.left = '0'
-            document.body.appendChild(canvas)
+          // use PDF.js canvas rendering instead of embed tag
+          await bpage.setContent(`<!DOCTYPE html>
+<html>
+<head>
+<style>*{margin:0;padding:0;}html,body{width:${pw}px;height:${ph}px;background:#fff;overflow:hidden;}</style>
+</head>
+<body>
+<canvas id="pdfCanvas" width="${pw}" height="${ph}"></canvas>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const data = atob('${b64}');
+const arr = new Uint8Array(data.length);
+for (let i = 0; i < data.length; i++) arr[i] = data.charCodeAt(i);
+pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
+  pdf.getPage(1).then(function(page) {
+    const viewport = page.getViewport({ scale: 1 });
+    const canvas = document.getElementById('pdfCanvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise.then(function() {
+      window._pdfRendered = true;
+    });
+  });
+});
+</script>
+</body>
+</html>`)
+
+          // wait for PDF.js to finish rendering
+          await bpage.waitForFunction('window._pdfRendered === true', { timeout: 15000 })
+
+          // paint white rectangles over erase areas on top of the rendered PDF
+          await bpage.evaluate((strokes) => {
+            const canvas = document.getElementById('pdfCanvas')
             const ctx = canvas.getContext('2d')
             ctx.fillStyle = '#ffffff'
             for (const stroke of strokes) {
               const half = stroke.size / 2
               ctx.fillRect(stroke.x - half, stroke.y - half, stroke.size, stroke.size)
             }
-          }, strokes, Math.round(pageWidth), Math.round(pageHeight))
+          }, strokes)
 
           const imgBuf = await bpage.screenshot({ type: 'png', clip: { x: 0, y: 0, width: pw, height: ph } })
           await bpage.close()
 
-          // embed the screenshot back as a full-page image
+          // embed the screenshot back as a full-page image replacing page content
           const embeddedImg = await pdfDoc.embedPng(imgBuf)
-
-          // replace page content with the image
           pdfPage.drawImage(embeddedImg, {
             x: 0, y: 0,
             width: pageWidth,
@@ -3907,6 +3917,7 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
         await browser.close()
       }
     }
+
     // ── WATERMARK FOR GUEST ──
     if (limits.watermark) {
       const watermarkFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
