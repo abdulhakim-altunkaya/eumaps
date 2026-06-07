@@ -3605,7 +3605,7 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
 
   // ── ANNOTATION TYPE CHECK ──
   const allowedTypes = limits.allowedTypes
-  const VALID_TYPES = ['highlight', 'text', 'pen', 'sticky', 'rectangle', 'circle', 'arrow', 'image', 'signature', 'redact']
+  const VALID_TYPES = ['highlight', 'text', 'pen', 'sticky', 'rectangle', 'circle', 'arrow', 'image', 'signature', 'redact', 'eraser']
   for (const ann of annotations) {
     if (!VALID_TYPES.includes(ann.type)) {
       return res.status(400).json({ resStatus: false, resMessage: `Invalid annotation type: ${ann.type}`, resErrorCode: 6 })
@@ -3793,10 +3793,11 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
 
         case 'redact': {
           const pdfY = pageHeight - ann.y - ann.height
+          const rc = hexToRgb(ann.color || '#000000')
           page.drawRectangle({
             x: ann.x, y: pdfY,
             width: ann.width, height: ann.height,
-            color: rgb(0, 0, 0),
+            color: rgb(rc.r, rc.g, rc.b),
             opacity: 1
           })
           break
@@ -3826,7 +3827,83 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
         }
       }
     }
+    // ── ERASE STROKES ──
+    let eraseStrokes = []
+    try {
+      eraseStrokes = JSON.parse(req.body.eraseStrokes || '[]')
+    } catch (_) {}
 
+    if (Array.isArray(eraseStrokes) && eraseStrokes.length > 0) {
+      // validate erase strokes
+      const MAX_ERASE_STROKES = 500
+      if (eraseStrokes.length > MAX_ERASE_STROKES) {
+        eraseStrokes = eraseStrokes.slice(0, MAX_ERASE_STROKES)
+      }
+
+      // group strokes by page
+      const strokesByPage = {}
+      for (const stroke of eraseStrokes) {
+        if (!stroke.page || stroke.page > totalPages) continue
+        if (typeof stroke.x !== 'number' || typeof stroke.y !== 'number' || typeof stroke.size !== 'number') continue
+        if (!strokesByPage[stroke.page]) strokesByPage[stroke.page] = []
+        strokesByPage[stroke.page].push(stroke)
+      }
+
+      // for each affected page: render to image, paint white, re-embed
+      if (Object.keys(strokesByPage).length > 0) {
+        const puppeteer = require('puppeteer')
+        const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] })
+
+        for (const [pageNumStr, strokes] of Object.entries(strokesByPage)) {
+          const pageNum = parseInt(pageNumStr)
+          const pdfPage = pdfDoc.getPage(pageNum - 1)
+          const { width: pageWidth, height: pageHeight } = pdfPage.getSize()
+
+          // render single page to image via puppeteer
+          const singleDoc = await PDFDocument.create()
+          const [copiedPage] = await singleDoc.copyPages(pdfDoc, [pageNum - 1])
+          singleDoc.addPage(copiedPage)
+          const singleBuf = Buffer.from(await singleDoc.save())
+          const b64 = singleBuf.toString('base64')
+
+          const bpage = await browser.newPage()
+          await bpage.setViewport({ width: Math.round(pageWidth), height: Math.round(pageHeight) })
+          await bpage.setContent(`<html><body style="margin:0;padding:0;background:#fff;"><embed src="data:application/pdf;base64,${b64}" width="${Math.round(pageWidth)}" height="${Math.round(pageHeight)}" /></body></html>`)
+          await bpage.waitForTimeout(500)
+
+          // paint white rectangles over erase areas using page.evaluate
+          await bpage.evaluate((strokes, pw, ph) => {
+            const canvas = document.createElement('canvas')
+            canvas.width = pw; canvas.height = ph
+            canvas.style.position = 'absolute'
+            canvas.style.top = '0'; canvas.style.left = '0'
+            document.body.appendChild(canvas)
+            const ctx = canvas.getContext('2d')
+            ctx.fillStyle = '#ffffff'
+            for (const stroke of strokes) {
+              const half = stroke.size / 2
+              ctx.fillRect(stroke.x - half, stroke.y - half, stroke.size, stroke.size)
+            }
+          }, strokes, Math.round(pageWidth), Math.round(pageHeight))
+
+          const imgBuf = await bpage.screenshot({ type: 'png' })
+          await bpage.close()
+
+          // embed the screenshot back as a full-page image
+          const embeddedImg = await pdfDoc.embedPng(imgBuf)
+
+          // replace page content with the image
+          pdfPage.drawImage(embeddedImg, {
+            x: 0, y: 0,
+            width: pageWidth,
+            height: pageHeight,
+            opacity: 1
+          })
+        }
+
+        await browser.close()
+      }
+    }
     // ── WATERMARK FOR GUEST ──
     if (limits.watermark) {
       const watermarkFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
