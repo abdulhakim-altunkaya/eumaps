@@ -3869,7 +3869,7 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
           const bpage = await browser.newPage()
           await bpage.setViewport({ width: Math.round(pageWidth), height: Math.round(pageHeight) })
           await bpage.setContent(`<html><body style="margin:0;padding:0;background:#fff;"><embed src="data:application/pdf;base64,${b64}" width="${Math.round(pageWidth)}" height="${Math.round(pageHeight)}" /></body></html>`)
-          await bpage.waitForTimeout(500)
+          await new Promise(resolve => setTimeout(resolve, 500))
 
           // paint white rectangles over erase areas using page.evaluate
           await bpage.evaluate((strokes, pw, ph) => {
