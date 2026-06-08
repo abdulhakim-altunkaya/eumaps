@@ -3845,8 +3845,9 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
           const pageNum = parseInt(pageNumStr)
           const pdfPage = pdfDoc.getPage(pageNum - 1)
           const { width: pageWidth, height: pageHeight } = pdfPage.getSize()
-          const pw = Math.round(pageWidth)
-          const ph = Math.round(pageHeight)
+          const SCALE = 3
+          const pw = Math.round(pageWidth * SCALE)
+          const ph = Math.round(pageHeight * SCALE)
 
           // render single page to image via PDF.js inside Puppeteer
           const singleDoc = await PDFDocument.create()
@@ -3874,7 +3875,7 @@ const arr = new Uint8Array(data.length);
 for (let i = 0; i < data.length; i++) arr[i] = data.charCodeAt(i);
 pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
   pdf.getPage(1).then(function(page) {
-    const viewport = page.getViewport({ scale: 1 });
+    const viewport = page.getViewport({ scale: ${SCALE} });
     const canvas = document.getElementById('pdfCanvas');
     canvas.width = viewport.width;
     canvas.height = viewport.height;
@@ -3891,15 +3892,15 @@ pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
           await bpage.waitForFunction('window._pdfRendered === true', { timeout: 15000 })
 
           // paint white rectangles over erase areas on top of the rendered PDF
-          await bpage.evaluate((strokes) => {
+          await bpage.evaluate((strokes, scale) => {
             const canvas = document.getElementById('pdfCanvas')
             const ctx = canvas.getContext('2d')
             ctx.fillStyle = '#ffffff'
             for (const stroke of strokes) {
-              const half = stroke.size / 2
-              ctx.fillRect(stroke.x - half, stroke.y - half, stroke.size, stroke.size)
+              const half = (stroke.size * scale) / 2
+              ctx.fillRect(stroke.x * scale - half, stroke.y * scale - half, stroke.size * scale, stroke.size * scale)
             }
-          }, strokes)
+          }, strokes, SCALE)
 
           const imgBuf = await bpage.screenshot({ type: 'png', clip: { x: 0, y: 0, width: pw, height: ph } })
           await bpage.close()
@@ -3967,3 +3968,7 @@ function hexToRgb(hex) {
   return { r: isNaN(r) ? 0 : r, g: isNaN(g) ? 0 : g, b: isNaN(b) ? 0 : b }
 }
 module.exports = router;
+
+
+
+
