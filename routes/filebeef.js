@@ -8,6 +8,11 @@ const sharp = require("sharp");
 const multer = require("multer");
 const { PDFDocument, degrees, rgb, StandardFonts, grayscale } = require("pdf-lib");
 
+//fonts for text tool of pdf editor page
+const fontkit = require('@pdf-lib/fontkit')
+const fs = require('fs')
+const path = require('path')
+
 const jwt = require("jsonwebtoken");
 const { pool, upload } = require("../db");
 const sendEmailBrevo = require("../utils/sendEmailBrevo");
@@ -3521,6 +3526,26 @@ const EDITOR_LIMITS = {
   }
 }
 
+//code block for text tool of pdf editor
+const MS_FONTS = '/usr/share/fonts/truetype/msttcorefonts'
+const APP_FONTS = path.join(__dirname, 'fonts')
+const EDITOR_FONT_FILES = {
+  'dm sans':         { regular: path.join(APP_FONTS, 'DMSans-Regular.ttf'),  bold: path.join(APP_FONTS, 'DMSans-Bold.ttf') },
+  'arial':           { regular: `${MS_FONTS}/Arial.ttf`,           bold: `${MS_FONTS}/Arial_Bold.ttf` },
+  'times new roman': { regular: `${MS_FONTS}/Times_New_Roman.ttf`, bold: `${MS_FONTS}/Times_New_Roman_Bold.ttf` },
+  'georgia':         { regular: `${MS_FONTS}/Georgia.ttf`,         bold: `${MS_FONTS}/Georgia_Bold.ttf` },
+  'garamond':        { regular: '/usr/share/fonts/opentype/ebgaramond/EBGaramond12-Regular.otf', bold: '/usr/share/fonts/opentype/ebgaramond/EBGaramond12-Bold.otf' },
+  'courier new':     { regular: `${MS_FONTS}/Courier_New.ttf`,     bold: `${MS_FONTS}/Courier_New_Bold.ttf` },
+  'verdana':         { regular: `${MS_FONTS}/Verdana.ttf`,         bold: `${MS_FONTS}/Verdana_Bold.ttf` },
+  'trebuchet ms':    { regular: `${MS_FONTS}/Trebuchet_MS.ttf`,    bold: `${MS_FONTS}/Trebuchet_MS_Bold.ttf` },
+  'impact':          { regular: `${MS_FONTS}/Impact.ttf`,          bold: `${MS_FONTS}/Impact.ttf` }
+}
+function editorFontKey(fontFamily) {
+  if (!fontFamily) return null
+  const first = String(fontFamily).split(',')[0].replace(/["']/g, '').trim().toLowerCase()
+  return EDITOR_FONT_FILES[first] ? first : null
+}
+
 const EDITOR_DAILY_SAVES = {
   guest: 1,
   free: 1,
@@ -3657,6 +3682,24 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
     const totalPages = pdfDoc.getPageCount()
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+    pdfDoc.registerFontkit(fontkit)
+
+    const _editorFontCache = {}
+    async function getEditorFont(fontFamily, fontWeight) {
+      const key = editorFontKey(fontFamily)
+      if (!key) return fontWeight === 'bold' ? boldFont : font
+      const variant = fontWeight === 'bold' ? 'bold' : 'regular'
+      const cacheKey = key + ':' + variant
+      if (_editorFontCache[cacheKey]) return _editorFontCache[cacheKey]
+      try {
+        const bytes = fs.readFileSync(EDITOR_FONT_FILES[key][variant])
+        const embedded = await pdfDoc.embedFont(bytes, { subset: true })
+        _editorFontCache[cacheKey] = embedded
+        return embedded
+      } catch (_) {
+        return fontWeight === 'bold' ? boldFont : font
+      }
+    }
 
     for (const ann of annotations) {
       if (ann.page > totalPages) continue
@@ -3680,7 +3723,7 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
 
         case 'text': {
           const pdfY = pageHeight - ann.y
-          const weight = ann.fontWeight === 'bold' ? boldFont : font
+          const weight = await getEditorFont(ann.fontFamily, ann.fontWeight)
           const safeText = (ann.text || '').replace(/[^\x20-\x7E]/g, '')
           if (safeText) {
             page.drawText(safeText, {
