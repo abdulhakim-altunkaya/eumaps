@@ -9,9 +9,8 @@ const multer = require("multer");
 const { PDFDocument, degrees, rgb, StandardFonts, grayscale } = require("pdf-lib");
 
 //fonts for text tool of pdf editor page
-const fontkit = require('@pdf-lib/fontkit')
-const fs = require('fs')
-const path = require('path');
+const fontkit = require('@pdf-lib/fontkit');
+const fs = require('fs');
 
 const jwt = require("jsonwebtoken");
 const { pool, upload } = require("../db");
