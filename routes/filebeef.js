@@ -11,7 +11,7 @@ const { PDFDocument, degrees, rgb, StandardFonts, grayscale } = require("pdf-lib
 //fonts for text tool of pdf editor page
 const fontkit = require('@pdf-lib/fontkit')
 const fs = require('fs')
-const path = require('path')
+const path = require('path');
 
 const jwt = require("jsonwebtoken");
 const { pool, upload } = require("../db");
@@ -2899,7 +2899,6 @@ router.post("/api/post/filebeef/data/markdown-to-pdf", optionalAuth, async (req,
 
 const ffmpeg = require("fluent-ffmpeg");
 const os = require("os");
-const fs = require("fs");
 const path = require("path");
 
 // ── VIDEO/AUDIO LIMITS ─────────────────────────────────────────────────────
