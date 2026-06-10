@@ -3740,6 +3740,8 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
           const noteW = ann.width || 160
           const noteH = ann.height || 80
           const noteScale = noteW / 160
+          const fs = ann.fontSize || 10 * noteScale
+          const noteFont = await getEditorFont(ann.fontFamily, 'normal')
           const pdfY = pageHeight - ann.y - noteH
           const bgColor = hexToRgb(ann.color || '#FFD600')
           page.drawRectangle({
@@ -3748,14 +3750,27 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
             color: rgb(bgColor.r, bgColor.g, bgColor.b),
             opacity: ann.opacity || 0.85
           })
-          const lines = (ann.text || '').split('\n').slice(0, 4)
-          lines.forEach((line, i) => {
-            const safeLine = line.replace(/[^\x20-\x7E]/g, '').substring(0, 30)
+
+          // word-wrap to match the editor preview
+          const lines = []
+          for (const rawLine of (ann.text || '').split('\n')) {
+            let line = ''
+            for (const word of rawLine.split(' ')) {
+              const test = line + (line ? ' ' : '') + word
+              if (test.length * fs * 0.55 > noteW * 0.9 && line) { lines.push(line); line = word }
+              else line = test
+            }
+            if (line) lines.push(line)
+            if (lines.length >= 5) break
+          }
+
+          lines.slice(0, 5).forEach((line, i) => {
+            const safeLine = line.replace(/[^\x20-\x7E]/g, '')
             if (safeLine) {
               page.drawText(safeLine, {
                 x: ann.x + 8 * noteScale,
-                y: pdfY + noteH - 18 * noteScale - i * 14 * noteScale,
-                size: 10 * noteScale, font,
+                y: pdfY + noteH - (fs + 7 * noteScale) - i * fs * 1.3,
+                size: fs, font: noteFont,
                 color: rgb(0, 0, 0), opacity: 1
               })
             }
