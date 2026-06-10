@@ -3737,11 +3737,14 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
         }
 
         case 'sticky': {
-          const pdfY = pageHeight - ann.y - 80
+          const noteW = ann.width || 160
+          const noteH = ann.height || 80
+          const noteScale = noteW / 160
+          const pdfY = pageHeight - ann.y - noteH
           const bgColor = hexToRgb(ann.color || '#FFD600')
           page.drawRectangle({
             x: ann.x, y: pdfY,
-            width: 160, height: 80,
+            width: noteW, height: noteH,
             color: rgb(bgColor.r, bgColor.g, bgColor.b),
             opacity: ann.opacity || 0.85
           })
@@ -3750,9 +3753,9 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
             const safeLine = line.replace(/[^\x20-\x7E]/g, '').substring(0, 30)
             if (safeLine) {
               page.drawText(safeLine, {
-                x: ann.x + 8,
-                y: pdfY + 80 - 18 - i * 14,
-                size: 10, font,
+                x: ann.x + 8 * noteScale,
+                y: pdfY + noteH - 18 * noteScale - i * 14 * noteScale,
+                size: 10 * noteScale, font,
                 color: rgb(0, 0, 0), opacity: 1
               })
             }
