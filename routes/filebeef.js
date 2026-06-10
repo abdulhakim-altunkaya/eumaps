@@ -6,7 +6,8 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const sharp = require("sharp");
 const multer = require("multer");
-const { PDFDocument, degrees, rgb, StandardFonts, grayscale, LineCapStyle } = require("pdf-lib");
+const { PDFDocument, StandardFonts, rgb, degrees, grayscale, LineCapStyle, LineJoinStyle, 
+  pushGraphicsState, popGraphicsState, setLineJoin } = require("pdf-lib");
 
 //fonts for text tool of pdf editor page
 const fontkit = require('@pdf-lib/fontkit');
@@ -3761,6 +3762,7 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
 
         case 'pen': {
           const d = 'M ' + ann.path.map(p => `${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(' L ')
+          page.pushOperators(pushGraphicsState(), setLineJoin(LineJoinStyle.Round))
           page.drawSvgPath(d, {
             x: 0,
             y: pageHeight,
@@ -3769,6 +3771,7 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
             borderOpacity: ann.opacity || 1,
             borderLineCap: LineCapStyle.Round
           })
+          page.pushOperators(popGraphicsState())
           break
         }
 
