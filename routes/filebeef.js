@@ -3733,14 +3733,15 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
         case 'text': {
           const pdfY = pageHeight - ann.y
           const weight = await getEditorFont(ann.fontFamily, ann.fontWeight)
-          const safeText = (ann.text || '').replace(/[^\x20-\x7E]/g, '')
+          const safeText = (ann.text || '').replace(/[^\x20-\x7E\n]/g, '')
           if (safeText) {
             page.drawText(safeText, {
               x: ann.x, y: pdfY,
               size: ann.fontSize || 14,
               font: weight,
               color: rgb(c.r, c.g, c.b),
-              opacity: ann.opacity || 1
+              opacity: ann.opacity || 1,
+              lineHeight: (ann.fontSize || 14) * 1.3
             })
           }
           break
