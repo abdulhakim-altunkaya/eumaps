@@ -3652,6 +3652,9 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
         return res.status(400).json({ resStatus: false, resMessage: `Image data too large. Max ${limits.sigDataMaxKB}KB.`, resErrorCode: 10 })
       }
     }
+    if (ann.type === 'text' && typeof ann.text === 'string') {
+      ann.text = ann.text.slice(0, 200)
+    }
     if (ann.type === 'pen') {
       if (!Array.isArray(ann.path) || ann.path.length < 2) {
         return res.status(400).json({ resStatus: false, resMessage: 'Invalid pen path.', resErrorCode: 11 })
