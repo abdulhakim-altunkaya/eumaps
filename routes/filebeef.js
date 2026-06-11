@@ -3537,7 +3537,14 @@ const EDITOR_FONT_FILES = {
   'courier new':     { regular: `${MS_FONTS}/Courier_New.ttf`,     bold: `${MS_FONTS}/Courier_New_Bold.ttf` },
   'verdana':         { regular: `${MS_FONTS}/Verdana.ttf`,         bold: `${MS_FONTS}/Verdana_Bold.ttf` },
   'trebuchet ms':    { regular: `${MS_FONTS}/Trebuchet_MS.ttf`,    bold: `${MS_FONTS}/Trebuchet_MS_Bold.ttf` },
-  'impact':          { regular: `${MS_FONTS}/Impact.ttf`,          bold: `${MS_FONTS}/Impact.ttf` }
+  'impact':          { regular: `${MS_FONTS}/Impact.ttf`,          bold: `${MS_FONTS}/Impact.ttf` },
+  'dancing script':  { regular: path.join(APP_FONTS, 'DancingScript-Regular.ttf'), bold: path.join(APP_FONTS, 'DancingScript-Regular.ttf') },
+  'great vibes':     { regular: path.join(APP_FONTS, 'GreatVibes-Regular.ttf'),    bold: path.join(APP_FONTS, 'GreatVibes-Regular.ttf') },
+  'allura':          { regular: path.join(APP_FONTS, 'Allura-Regular.ttf'),        bold: path.join(APP_FONTS, 'Allura-Regular.ttf') },
+  'sacramento':      { regular: path.join(APP_FONTS, 'Sacramento-Regular.ttf'),    bold: path.join(APP_FONTS, 'Sacramento-Regular.ttf') },
+  'caveat brush':    { regular: path.join(APP_FONTS, 'CaveatBrush-Regular.ttf'),   bold: path.join(APP_FONTS, 'CaveatBrush-Regular.ttf') },
+  'pacifico':        { regular: path.join(APP_FONTS, 'Pacifico-Regular.ttf'),      bold: path.join(APP_FONTS, 'Pacifico-Regular.ttf') },
+  'zen dots':        { regular: path.join(APP_FONTS, 'ZenDots-Regular.ttf'),       bold: path.join(APP_FONTS, 'ZenDots-Regular.ttf') }
 }
 function editorFontKey(fontFamily) {
   if (!fontFamily) return null
