@@ -3748,8 +3748,8 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
         }
 
         case 'sticky': {
-          const noteW = ann.width || 160
-          const noteH = ann.height || 80
+          const noteW = ann.noteW || ann.width || 160
+          const noteH = ann.noteH || ann.height || 80
           const noteScale = noteW / 160
           const fs = ann.fontSize || 10 * noteScale
           const noteFont = await getEditorFont(ann.fontFamily, 'normal')
