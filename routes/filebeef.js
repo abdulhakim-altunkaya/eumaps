@@ -3750,8 +3750,11 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
         case 'sticky': {
           const noteW = ann.noteW || ann.width || 160
           const noteH = ann.noteH || ann.height || 80
-          const noteScale = noteW / 160
-          const fs = ann.fontSize || 10 * noteScale
+          const fs = ann.fontSize || 14
+          const pad = 8
+          const innerW = noteW - pad * 2
+          const lineH = fs * 1.3
+          const maxLines = Math.max(1, Math.floor((noteH - pad * 2) / lineH))
           const noteFont = await getEditorFont(ann.fontFamily, 'normal')
           const pdfY = pageHeight - ann.y - noteH
           const bgColor = hexToRgb(ann.color || '#FFD600')
@@ -3762,25 +3765,39 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
             opacity: ann.opacity || 0.85
           })
 
-          // word-wrap to match the editor preview
+          // character-by-character wrap matching canvas measureText estimate
           const lines = []
-          for (const rawLine of (ann.text || '').split('\n')) {
-            let line = ''
-            for (const word of rawLine.split(' ')) {
-              const test = line + (line ? ' ' : '') + word
-              if (test.length * fs * 0.55 > noteW * 0.9 && line) { lines.push(line); line = word }
-              else line = test
+          for (const paragraph of (ann.text || '').split('\n')) {
+            let current = ''
+            for (const char of paragraph) {
+              const test = current + char
+              if (test.length * fs * 0.6 > innerW && current) {
+                lines.push(current)
+                current = char
+              } else {
+                current = test
+              }
             }
-            if (line) lines.push(line)
-            if (lines.length >= 5) break
+            if (current) lines.push(current)
+            if (lines.length >= maxLines) break
           }
 
-          lines.slice(0, 5).forEach((line, i) => {
+          // truncate with ellipsis
+          let finalLines = lines.slice(0, maxLines)
+          if (lines.length > maxLines) {
+            let last = finalLines[maxLines - 1]
+            while (last.length > 0 && (last + '...').length * fs * 0.6 > innerW) {
+              last = last.slice(0, -1)
+            }
+            finalLines[maxLines - 1] = last + '...'
+          }
+
+          finalLines.forEach((line, i) => {
             const safeLine = line.replace(/[^\x20-\x7E]/g, '')
             if (safeLine) {
               page.drawText(safeLine, {
-                x: ann.x + 8 * noteScale,
-                y: pdfY + noteH - (fs + 7 * noteScale) - i * fs * 1.3,
+                x: ann.x + pad,
+                y: pdfY + noteH - pad - fs - i * lineH,
                 size: fs, font: noteFont,
                 color: rgb(0, 0, 0), opacity: 1
               })
