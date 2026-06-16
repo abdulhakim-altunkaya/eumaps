@@ -88,7 +88,7 @@ app.use(cors({
     }
 
     return callback(
-      new Error('Not allowed by CORS')
+      new Error(`Not allowed by CORS: ${origin}`)
     );
   },
 
