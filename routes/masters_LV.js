@@ -2121,11 +2121,11 @@ router.post("/api/post/master-latvia/auth/email-register", blockMaliciousIPs, ap
     });
 
   } catch (err) {
-
+    console.error("EMAIL REGISTER ERROR:", err);
     return res.status(500).json({
       resStatus: false,
       resErrorCode: 99,
-      resMessage: "Servera kļūda"
+      resMessage: `Servera kļūda, ${err}`
     });
   }
 });
