@@ -3504,7 +3504,8 @@ const EDITOR_LIMITS = {
     savesPerDay: 1,
     maxAnnotations: 3,
     allowedTypes: ['highlight', 'text'],
-    sigDataMaxKB: 200,
+    sigDataMaxKB: 400,
+    imgMaxKB: 500,
     watermark: true
   },
   free: {
@@ -3512,7 +3513,8 @@ const EDITOR_LIMITS = {
     savesPerDay: 1,
     maxAnnotations: 6,
     allowedTypes: ['highlight', 'text', 'pen', 'sticky'],
-    sigDataMaxKB: 200,
+    sigDataMaxKB: 400,
+    imgMaxKB: 500,
     watermark: false
   },
   pro: {
@@ -3520,7 +3522,8 @@ const EDITOR_LIMITS = {
     savesPerDay: 5,
     maxAnnotations: 50,
     allowedTypes: ['highlight', 'text', 'pen', 'sticky', 'rectangle', 'circle', 'arrow', 'image', 'signature', 'redact'],
-    sigDataMaxKB: 500,
+    sigDataMaxKB: 1000,
+    imgMaxKB: 1000,
     watermark: false
   }
 }
@@ -3655,8 +3658,9 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
     }
     if ((ann.type === 'signature' || ann.type === 'image') && ann.data) {
       const sizeKB = Math.round(ann.data.length * 0.75 / 1024)
-      if (sizeKB > limits.sigDataMaxKB) {
-        return res.status(400).json({ resStatus: false, resMessage: `Image data too large. Max ${limits.sigDataMaxKB}KB.`, resErrorCode: 10 })
+      const dataLimit = ann.type === 'image' ? (limits.imgMaxKB || limits.sigDataMaxKB) : limits.sigDataMaxKB
+      if (sizeKB > dataLimit) {
+        return res.status(400).json({ resStatus: false, resMessage: `Image data too large. Max ${dataLimit}KB.`, resErrorCode: 10 })
       }
     }
     if (ann.type === 'text' && typeof ann.text === 'string') {
