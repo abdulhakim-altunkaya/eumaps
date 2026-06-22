@@ -3849,26 +3849,33 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
         }
 
         case 'arrow': {
+          const angle = Math.atan2(ann.y2 - ann.y1, ann.x2 - ann.x1)
+          const size = 10 + (ann.strokeSize || 3) * 2
+          const shaftEndX = ann.x2 - size * 0.8 * Math.cos(angle)
+          const shaftEndY = ann.y2 - size * 0.8 * Math.sin(angle)
           page.drawLine({
             start: { x: ann.x1, y: pageHeight - ann.y1 },
-            end:   { x: ann.x2, y: pageHeight - ann.y2 },
+            end:   { x: shaftEndX, y: pageHeight - shaftEndY },
             thickness: ann.strokeSize || 3,
             color: rgb(c.r, c.g, c.b),
             opacity: ann.opacity || 1
           })
-          const angle = Math.atan2(ann.y2 - ann.y1, ann.x2 - ann.x1)
-          const size = 10 + (ann.strokeSize || 3) * 2
           const tip = { x: ann.x2, y: pageHeight - ann.y2 }
           const left = {
-            x: tip.x - size * Math.cos(angle - Math.PI / 6),
-            y: tip.y + size * Math.sin(angle - Math.PI / 6)
+            x: ann.x2 - size * Math.cos(angle - Math.PI / 7),
+            y: ann.y2 - size * Math.sin(angle - Math.PI / 7)
           }
           const right = {
-            x: tip.x - size * Math.cos(angle + Math.PI / 6),
-            y: tip.y + size * Math.sin(angle + Math.PI / 6)
+            x: ann.x2 - size * Math.cos(angle + Math.PI / 7),
+            y: ann.y2 - size * Math.sin(angle + Math.PI / 7)
           }
-          page.drawLine({ start: tip, end: left, thickness: ann.strokeSize || 3, color: rgb(c.r, c.g, c.b), opacity: ann.opacity || 1 })
-          page.drawLine({ start: tip, end: right, thickness: ann.strokeSize || 3, color: rgb(c.r, c.g, c.b), opacity: ann.opacity || 1 })
+          const svgPath = `M ${tip.x.toFixed(2)} ${tip.y.toFixed(2)} L ${left.x.toFixed(2)} ${left.y.toFixed(2)} L ${right.x.toFixed(2)} ${right.y.toFixed(2)} Z`
+          page.drawSvgPath(svgPath, {
+            x: 0, y: pageHeight,
+            color: rgb(c.r, c.g, c.b),
+            opacity: ann.opacity || 1,
+            scale: 1
+          })
           break
         }
 
@@ -3989,8 +3996,12 @@ pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
             const ctx = canvas.getContext('2d')
             ctx.fillStyle = '#ffffff'
             for (const stroke of strokes) {
-              const half = (stroke.size * scale) / 2
-              ctx.fillRect(stroke.x * scale - half, stroke.y * scale - half, stroke.size * scale, stroke.size * scale)
+              if (stroke._rect) {
+                ctx.fillRect(stroke.x * scale, stroke.y * scale, stroke.w * scale, stroke.h * scale)
+              } else {
+                const half = (stroke.size * scale) / 2
+                ctx.fillRect(stroke.x * scale - half, stroke.y * scale - half, stroke.size * scale, stroke.size * scale)
+              }
             }
           }, strokes, SCALE)
 
