@@ -3855,35 +3855,32 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
           const shaftEndY = ann.y2 - size * 0.8 * Math.sin(angle)
           const arrowColor = rgb(c.r, c.g, c.b)
           const arrowOpacity = ann.opacity || 1
-          const arrowThickness = ann.strokeSize || 3
           // shaft
           page.drawLine({
             start: { x: ann.x1, y: pageHeight - ann.y1 },
             end:   { x: shaftEndX, y: pageHeight - shaftEndY },
-            thickness: arrowThickness,
+            thickness: ann.strokeSize || 3,
             color: arrowColor,
             opacity: arrowOpacity
           })
-          // arrowhead left wing
-          const leftX = ann.x2 - size * Math.cos(angle - Math.PI / 7)
-          const leftY = ann.y2 - size * Math.sin(angle - Math.PI / 7)
-          page.drawLine({
-            start: { x: ann.x2, y: pageHeight - ann.y2 },
-            end:   { x: leftX,  y: pageHeight - leftY },
-            thickness: arrowThickness,
-            color: arrowColor,
-            opacity: arrowOpacity
-          })
-          // arrowhead right wing
+          // filled arrowhead triangle using low-level PDF operators
+          const tipX  = ann.x2
+          const tipY  = pageHeight - ann.y2
+          const leftX  = ann.x2 - size * Math.cos(angle - Math.PI / 7)
+          const leftY  = pageHeight - (ann.y2 - size * Math.sin(angle - Math.PI / 7))
           const rightX = ann.x2 - size * Math.cos(angle + Math.PI / 7)
-          const rightY = ann.y2 - size * Math.sin(angle + Math.PI / 7)
-          page.drawLine({
-            start: { x: ann.x2, y: pageHeight - ann.y2 },
-            end:   { x: rightX, y: pageHeight - rightY },
-            thickness: arrowThickness,
-            color: arrowColor,
-            opacity: arrowOpacity
-          })
+          const rightY = pageHeight - (ann.y2 - size * Math.sin(angle + Math.PI / 7))
+          const { pushGraphicsState: pgs, popGraphicsState: pgsp, setFillingColor, moveTo, lineTo, closePath, fillPath } = PDFLib
+          page.pushOperators(
+            pgs(),
+            setFillingColor(arrowColor),
+            moveTo(tipX, tipY),
+            lineTo(leftX, leftY),
+            lineTo(rightX, rightY),
+            closePath(),
+            fillPath(),
+            pgsp()
+          )
           break
         }
 
