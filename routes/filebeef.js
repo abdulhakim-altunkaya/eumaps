@@ -3860,18 +3860,15 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
             color: rgb(c.r, c.g, c.b),
             opacity: ann.opacity || 1
           })
-          const tip = { x: ann.x2, y: pageHeight - ann.y2 }
-          const left = {
-            x: ann.x2 - size * Math.cos(angle - Math.PI / 7),
-            y: ann.y2 - size * Math.sin(angle - Math.PI / 7)
-          }
-          const right = {
-            x: ann.x2 - size * Math.cos(angle + Math.PI / 7),
-            y: ann.y2 - size * Math.sin(angle + Math.PI / 7)
-          }
-          const svgPath = `M ${tip.x.toFixed(2)} ${tip.y.toFixed(2)} L ${left.x.toFixed(2)} ${left.y.toFixed(2)} L ${right.x.toFixed(2)} ${right.y.toFixed(2)} Z`
+          const tipX = ann.x2
+          const tipY = pageHeight - ann.y2
+          const leftX = ann.x2 - size * Math.cos(angle - Math.PI / 7)
+          const leftY = pageHeight - (ann.y2 - size * Math.sin(angle - Math.PI / 7))
+          const rightX = ann.x2 - size * Math.cos(angle + Math.PI / 7)
+          const rightY = pageHeight - (ann.y2 - size * Math.sin(angle + Math.PI / 7))
+          const svgPath = `M ${tipX.toFixed(2)} ${tipY.toFixed(2)} L ${leftX.toFixed(2)} ${leftY.toFixed(2)} L ${rightX.toFixed(2)} ${rightY.toFixed(2)} Z`
           page.drawSvgPath(svgPath, {
-            x: 0, y: pageHeight,
+            x: 0, y: 0,
             color: rgb(c.r, c.g, c.b),
             opacity: ann.opacity || 1,
             scale: 1
