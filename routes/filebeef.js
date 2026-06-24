@@ -3853,25 +3853,36 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
           const size = 10 + (ann.strokeSize || 3) * 2
           const shaftEndX = ann.x2 - size * 0.8 * Math.cos(angle)
           const shaftEndY = ann.y2 - size * 0.8 * Math.sin(angle)
+          const arrowColor = rgb(c.r, c.g, c.b)
+          const arrowOpacity = ann.opacity || 1
+          const arrowThickness = ann.strokeSize || 3
+          // shaft
           page.drawLine({
             start: { x: ann.x1, y: pageHeight - ann.y1 },
             end:   { x: shaftEndX, y: pageHeight - shaftEndY },
-            thickness: ann.strokeSize || 3,
-            color: rgb(c.r, c.g, c.b),
-            opacity: ann.opacity || 1
+            thickness: arrowThickness,
+            color: arrowColor,
+            opacity: arrowOpacity
           })
-          const tipX = ann.x2
-          const tipY = pageHeight - ann.y2
+          // arrowhead left wing
           const leftX = ann.x2 - size * Math.cos(angle - Math.PI / 7)
-          const leftY = pageHeight - (ann.y2 - size * Math.sin(angle - Math.PI / 7))
+          const leftY = ann.y2 - size * Math.sin(angle - Math.PI / 7)
+          page.drawLine({
+            start: { x: ann.x2, y: pageHeight - ann.y2 },
+            end:   { x: leftX,  y: pageHeight - leftY },
+            thickness: arrowThickness,
+            color: arrowColor,
+            opacity: arrowOpacity
+          })
+          // arrowhead right wing
           const rightX = ann.x2 - size * Math.cos(angle + Math.PI / 7)
-          const rightY = pageHeight - (ann.y2 - size * Math.sin(angle + Math.PI / 7))
-          const svgPath = `M ${tipX.toFixed(2)} ${tipY.toFixed(2)} L ${leftX.toFixed(2)} ${leftY.toFixed(2)} L ${rightX.toFixed(2)} ${rightY.toFixed(2)} Z`
-          page.drawSvgPath(svgPath, {
-            x: 0, y: 0,
-            color: rgb(c.r, c.g, c.b),
-            opacity: ann.opacity || 1,
-            scale: 1
+          const rightY = ann.y2 - size * Math.sin(angle + Math.PI / 7)
+          page.drawLine({
+            start: { x: ann.x2, y: pageHeight - ann.y2 },
+            end:   { x: rightX, y: pageHeight - rightY },
+            thickness: arrowThickness,
+            color: arrowColor,
+            opacity: arrowOpacity
           })
           break
         }
