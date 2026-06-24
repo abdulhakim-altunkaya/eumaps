@@ -3558,7 +3558,7 @@ function editorFontKey(fontFamily) {
 const EDITOR_DAILY_SAVES = {
   guest: 1,
   free: 1,
-  pro: 5
+  pro: 20
 }
 
 async function checkEditorSaveLimit(userId, ip, tier) {
