@@ -3930,7 +3930,7 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
     } catch (_) {}
 
     if (Array.isArray(eraseStrokes) && eraseStrokes.length > 0) {
-      const MAX_ERASE_STROKES = 500
+      const MAX_ERASE_STROKES = 1000
       if (eraseStrokes.length > MAX_ERASE_STROKES) {
         eraseStrokes = eraseStrokes.slice(0, MAX_ERASE_STROKES)
       }
