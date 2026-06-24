@@ -3502,7 +3502,7 @@ const EDITOR_LIMITS = {
   guest: {
     sizeMB: 3,
     savesPerDay: 1,
-    maxAnnotations: 3,
+    maxAnnotations: 2,
     allowedTypes: ['highlight', 'text'],
     sigDataMaxKB: 400,
     imgMaxKB: 500,
@@ -3511,7 +3511,7 @@ const EDITOR_LIMITS = {
   free: {
     sizeMB: 3,
     savesPerDay: 1,
-    maxAnnotations: 6,
+    maxAnnotations: 4,
     allowedTypes: ['highlight', 'text', 'pen', 'sticky'],
     sigDataMaxKB: 400,
     imgMaxKB: 500,
@@ -3520,7 +3520,7 @@ const EDITOR_LIMITS = {
   pro: {
     sizeMB: 20,
     savesPerDay: 5,
-    maxAnnotations: 50,
+    maxAnnotations: 10,
     allowedTypes: ['highlight', 'text', 'pen', 'sticky', 'rectangle', 'circle', 'arrow', 'image', 'signature', 'redact'],
     sigDataMaxKB: 1000,
     imgMaxKB: 1000,
@@ -3931,7 +3931,12 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
       const strokesByPage = {}
       for (const stroke of eraseStrokes) {
         if (!stroke.page || stroke.page > totalPages) continue
-        if (typeof stroke.x !== 'number' || typeof stroke.y !== 'number' || typeof stroke.size !== 'number') continue
+        if (typeof stroke.x !== 'number' || typeof stroke.y !== 'number') continue
+        if (stroke._rect) {
+          if (typeof stroke.w !== 'number' || typeof stroke.h !== 'number') continue
+        } else {
+          if (typeof stroke.size !== 'number') continue
+        }
         if (!strokesByPage[stroke.page]) strokesByPage[stroke.page] = []
         strokesByPage[stroke.page].push(stroke)
       }
