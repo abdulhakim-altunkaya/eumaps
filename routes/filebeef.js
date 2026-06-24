@@ -4020,8 +4020,15 @@ pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
           const imgBuf = await bpage.screenshot({ type: 'png', clip: { x: 0, y: 0, width: pw, height: ph } })
           await bpage.close()
 
-          // embed the screenshot back as a full-page image replacing page content
           const embeddedImg = await pdfDoc.embedPng(imgBuf)
+          const { degrees: deg } = require('pdf-lib')
+          // cover entire page with white first, then draw screenshot on top
+          pdfPage.drawRectangle({
+            x: 0, y: 0,
+            width: pageWidth, height: pageHeight,
+            color: rgb(1, 1, 1),
+            opacity: 1
+          })
           pdfPage.drawImage(embeddedImg, {
             x: 0, y: 0,
             width: pageWidth,
