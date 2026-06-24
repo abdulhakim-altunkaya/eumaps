@@ -7,7 +7,8 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const sharp = require("sharp");
 const multer = require("multer");
 const { PDFDocument, StandardFonts, rgb, degrees, grayscale, LineCapStyle, LineJoinStyle, 
-  pushGraphicsState, popGraphicsState, setLineJoin } = require("pdf-lib");
+  pushGraphicsState, popGraphicsState, setLineJoin, setFillingColor, moveTo, lineTo, 
+  closePath, fillPath } = require("pdf-lib");
 
 //fonts for text tool of pdf editor page
 const fontkit = require('@pdf-lib/fontkit');
@@ -3870,7 +3871,8 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
           const leftY  = pageHeight - (ann.y2 - size * Math.sin(angle - Math.PI / 7))
           const rightX = ann.x2 - size * Math.cos(angle + Math.PI / 7)
           const rightY = pageHeight - (ann.y2 - size * Math.sin(angle + Math.PI / 7))
-          const { pushGraphicsState: pgs, popGraphicsState: pgsp, setFillingColor, moveTo, lineTo, closePath, fillPath } = PDFLib
+          const pgs = pushGraphicsState
+          const pgsp = popGraphicsState
           page.pushOperators(
             pgs(),
             setFillingColor(arrowColor),
