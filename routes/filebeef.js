@@ -8,7 +8,7 @@ const sharp = require("sharp");
 const multer = require("multer");
 const { PDFDocument, StandardFonts, rgb, degrees, grayscale, LineCapStyle, LineJoinStyle, 
   pushGraphicsState, popGraphicsState, setLineJoin, setFillingColor, moveTo, lineTo, 
-  closePath, fillPath } = require("pdf-lib");
+  closePath, fill } = require("pdf-lib");
 
 //fonts for text tool of pdf editor page
 const fontkit = require('@pdf-lib/fontkit');
@@ -3880,7 +3880,7 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
             lineTo(leftX, leftY),
             lineTo(rightX, rightY),
             closePath(),
-            fillPath(),
+            fill(),
             pgsp()
           )
           break
