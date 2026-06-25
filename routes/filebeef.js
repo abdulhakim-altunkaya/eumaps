@@ -3707,7 +3707,7 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
       if (_editorFontCache[cacheKey]) return _editorFontCache[cacheKey]
       try {
         const bytes = fs.readFileSync(EDITOR_FONT_FILES[key][variant])
-        const embedded = await pdfDoc.embedFont(bytes, { subset: true })
+        const embedded = await pdfDoc.embedFont(bytes)
         _editorFontCache[cacheKey] = embedded
         return embedded
       } catch (_) {
