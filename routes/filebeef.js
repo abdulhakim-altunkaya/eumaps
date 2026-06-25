@@ -3742,7 +3742,7 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
           if (!safeText) break
           const fs = ann.fontSize || 14
           const lineH = fs * 1.3
-          const margin = 6
+          const margin = 4
           const maxX = pageWidth - margin
 
           if (ann.preWrapped) {
@@ -3751,7 +3751,7 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
             lines.forEach((line, i) => {
               if (!line) return
               const y = pdfY - i * lineH
-              if (y < margin || y > pageHeight) return
+              if (y <= 0 || y > pageHeight) return
               // clip line to right edge character by character
               let clipped = line
               while (clipped.length > 0) {
