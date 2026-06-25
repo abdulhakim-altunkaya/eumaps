@@ -3955,7 +3955,7 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
       for (const pageNum of puppeteerPages) {
         const pdfPage = pdfDoc.getPage(pageNum - 1)
         const { width: pageWidth, height: pageHeight } = pdfPage.getSize()
-        const SCALE = 5
+        const SCALE = 4
         const pw = Math.round(pageWidth * SCALE)
         const ph = Math.round(pageHeight * SCALE)
 
