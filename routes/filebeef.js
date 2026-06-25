@@ -3736,40 +3736,7 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
         }
 
         case 'text': {
-          const pdfY = pageHeight - ann.y
-          const weight = await getEditorFont(ann.fontFamily, ann.fontWeight)
-          const safeText = (ann.text || '').replace(/[^\x20-\x7E\n]/g, '')
-          if (!safeText) break
-          const fs = ann.fontSize || 14
-          const lineH = fs * 1.3
-          const margin = 4
-
-          if (ann.preWrapped) {
-            const lines = safeText.split('\n')
-            lines.forEach((line, i) => {
-              if (!line) return
-              const y = pdfY - i * lineH
-              if (y < -lineH || y > pageHeight) return
-              page.drawText(line, {
-                x: ann.x, y,
-                size: fs, font: weight,
-                color: rgb(c.r, c.g, c.b),
-                opacity: ann.opacity || 1
-              })
-            })
-          } else {
-            safeText.split('\n').forEach((line, i) => {
-              if (!line) return
-              const y = pdfY - i * lineH
-              if (y < -lineH || y > pageHeight) return
-              page.drawText(line, {
-                x: ann.x, y,
-                size: fs, font: weight,
-                color: rgb(c.r, c.g, c.b),
-                opacity: ann.opacity || 1
-              })
-            })
-          }
+          // handled by Puppeteer canvas rendering below
           break
         }
 
@@ -3944,19 +3911,16 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
       }
     }
 
-    // ── ERASE STROKES ──
+    // ── PUPPETEER CANVAS RENDERING (erase + text annotations) ──
     let eraseStrokes = []
     try {
       eraseStrokes = JSON.parse(req.body.eraseStrokes || '[]')
     } catch (_) {}
 
-    if (Array.isArray(eraseStrokes) && eraseStrokes.length > 0) {
-      const MAX_ERASE_STROKES = 1000
-      if (eraseStrokes.length > MAX_ERASE_STROKES) {
-        eraseStrokes = eraseStrokes.slice(0, MAX_ERASE_STROKES)
-      }
-
-      const strokesByPage = {}
+    // collect erase strokes by page
+    const eraseByPage = {}
+    if (Array.isArray(eraseStrokes)) {
+      if (eraseStrokes.length > 1000) eraseStrokes = eraseStrokes.slice(0, 1000)
       for (const stroke of eraseStrokes) {
         if (!stroke.page || stroke.page > totalPages) continue
         if (typeof stroke.x !== 'number' || typeof stroke.y !== 'number') continue
@@ -3965,34 +3929,45 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
         } else {
           if (typeof stroke.size !== 'number') continue
         }
-        if (!strokesByPage[stroke.page]) strokesByPage[stroke.page] = []
-        strokesByPage[stroke.page].push(stroke)
+        if (!eraseByPage[stroke.page]) eraseByPage[stroke.page] = []
+        eraseByPage[stroke.page].push(stroke)
       }
+    }
 
-      if (Object.keys(strokesByPage).length > 0) {
-        const puppeteer = require('puppeteer')
-        const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] })
+    // collect text annotations by page
+    const textByPage = {}
+    for (const ann of annotations) {
+      if (ann.type !== 'text') continue
+      if (!textByPage[ann.page]) textByPage[ann.page] = []
+      textByPage[ann.page].push(ann)
+    }
 
-        for (const [pageNumStr, strokes] of Object.entries(strokesByPage)) {
-          const pageNum = parseInt(pageNumStr)
-          const pdfPage = pdfDoc.getPage(pageNum - 1)
-          const { width: pageWidth, height: pageHeight } = pdfPage.getSize()
-          const SCALE = 3
-          const pw = Math.round(pageWidth * SCALE)
-          const ph = Math.round(pageHeight * SCALE)
+    // union of all pages needing Puppeteer
+    const puppeteerPages = new Set([
+      ...Object.keys(eraseByPage).map(Number),
+      ...Object.keys(textByPage).map(Number)
+    ])
 
-          // render single page to image via PDF.js inside Puppeteer
-          const singleDoc = await PDFDocument.create()
-          const [copiedPage] = await singleDoc.copyPages(pdfDoc, [pageNum - 1])
-          singleDoc.addPage(copiedPage)
-          const singleBuf = Buffer.from(await singleDoc.save())
-          const b64 = singleBuf.toString('base64')
+    if (puppeteerPages.size > 0) {
+      const puppeteer = require('puppeteer')
+      const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] })
 
-          const bpage = await browser.newPage()
-          await bpage.setViewport({ width: pw, height: ph, deviceScaleFactor: 1 })
+      for (const pageNum of puppeteerPages) {
+        const pdfPage = pdfDoc.getPage(pageNum - 1)
+        const { width: pageWidth, height: pageHeight } = pdfPage.getSize()
+        const SCALE = 3
+        const pw = Math.round(pageWidth * SCALE)
+        const ph = Math.round(pageHeight * SCALE)
 
-          // use PDF.js canvas rendering instead of embed tag
-          await bpage.setContent(`<!DOCTYPE html>
+        const singleDoc = await PDFDocument.create()
+        const [copiedPage] = await singleDoc.copyPages(pdfDoc, [pageNum - 1])
+        singleDoc.addPage(copiedPage)
+        const singleBuf = Buffer.from(await singleDoc.save())
+        const b64 = singleBuf.toString('base64')
+
+        const bpage = await browser.newPage()
+        await bpage.setViewport({ width: pw, height: ph, deviceScaleFactor: 1 })
+        await bpage.setContent(`<!DOCTYPE html>
 <html>
 <head>
 <style>*{margin:0;padding:0;}html,body{width:${pw}px;height:${ph}px;background:#fff;overflow:hidden;}</style>
@@ -4019,14 +3994,13 @@ pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
 </script>
 </body>
 </html>`)
+        await bpage.waitForFunction('window._pdfRendered === true', { timeout: 15000 })
 
-          // wait for PDF.js to finish rendering
-          await bpage.waitForFunction('window._pdfRendered === true', { timeout: 15000 })
-
-          // paint white rectangles over erase areas on top of the rendered PDF
+        // paint erase strokes
+        const strokes = eraseByPage[pageNum] || []
+        if (strokes.length > 0) {
           await bpage.evaluate((strokes, scale) => {
-            const canvas = document.getElementById('pdfCanvas')
-            const ctx = canvas.getContext('2d')
+            const ctx = document.getElementById('pdfCanvas').getContext('2d')
             ctx.fillStyle = '#ffffff'
             for (const stroke of strokes) {
               if (stroke._rect) {
@@ -4037,29 +4011,38 @@ pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
               }
             }
           }, strokes, SCALE)
-
-          const imgBuf = await bpage.screenshot({ type: 'png', clip: { x: 0, y: 0, width: pw, height: ph } })
-          await bpage.close()
-
-          const embeddedImg = await pdfDoc.embedPng(imgBuf)
-          const { degrees: deg } = require('pdf-lib')
-          // cover entire page with white first, then draw screenshot on top
-          pdfPage.drawRectangle({
-            x: 0, y: 0,
-            width: pageWidth, height: pageHeight,
-            color: rgb(1, 1, 1),
-            opacity: 1
-          })
-          pdfPage.drawImage(embeddedImg, {
-            x: 0, y: 0,
-            width: pageWidth,
-            height: pageHeight,
-            opacity: 1
-          })
         }
 
-        await browser.close()
+        // paint text annotations
+        const textAnns = textByPage[pageNum] || []
+        if (textAnns.length > 0) {
+          await bpage.evaluate((anns, scale) => {
+            const ctx = document.getElementById('pdfCanvas').getContext('2d')
+            for (const ann of anns) {
+              const fw = ann.fontWeight === 'bold' ? 'bold ' : ann.fontWeight === 'italic' ? 'italic ' : ''
+              const fs = (ann.fontSize || 14) * scale
+              const lineH = fs * 1.3
+              ctx.save()
+              ctx.globalAlpha = ann.opacity || 1
+              ctx.fillStyle = ann.color || '#000000'
+              ctx.font = `${fw}${fs}px ${ann.fontFamily || 'sans-serif'}`
+              ann.text.split('\n').forEach((line, i) => {
+                if (line) ctx.fillText(line, ann.x * scale, ann.y * scale + i * lineH)
+              })
+              ctx.restore()
+            }
+          }, textAnns, SCALE)
+        }
+
+        const imgBuf = await bpage.screenshot({ type: 'png', clip: { x: 0, y: 0, width: pw, height: ph } })
+        await bpage.close()
+
+        const embeddedImg = await pdfDoc.embedPng(imgBuf)
+        pdfPage.drawRectangle({ x: 0, y: 0, width: pageWidth, height: pageHeight, color: rgb(1, 1, 1), opacity: 1 })
+        pdfPage.drawImage(embeddedImg, { x: 0, y: 0, width: pageWidth, height: pageHeight, opacity: 1 })
       }
+
+      await browser.close()
     }
 
     // ── WATERMARK FOR GUEST ──
