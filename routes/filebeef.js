@@ -3749,7 +3749,7 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
             lines.forEach((line, i) => {
               if (!line) return
               const y = pdfY - i * lineH
-              if (y <= 0 || y > pageHeight) return
+              if (y < -lineH || y > pageHeight) return
               page.drawText(line, {
                 x: ann.x, y,
                 size: fs, font: weight,
@@ -3758,12 +3758,16 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
               })
             })
           } else {
-            page.drawText(safeText, {
-              x: ann.x, y: pdfY,
-              size: fs, font: weight,
-              color: rgb(c.r, c.g, c.b),
-              opacity: ann.opacity || 1,
-              lineHeight: lineH
+            safeText.split('\n').forEach((line, i) => {
+              if (!line) return
+              const y = pdfY - i * lineH
+              if (y < -lineH || y > pageHeight) return
+              page.drawText(line, {
+                x: ann.x, y,
+                size: fs, font: weight,
+                color: rgb(c.r, c.g, c.b),
+                opacity: ann.opacity || 1
+              })
             })
           }
           break
