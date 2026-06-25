@@ -4051,38 +4051,10 @@ pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
               ctx.globalAlpha = ann.opacity || 1
               ctx.fillStyle = ann.color || '#000000'
               ctx.font = `${fw}${fs}px ${ann.fontFamily || 'sans-serif'}`
-              const canvasH = document.getElementById('pdfCanvas').height
-              const canvasW = document.getElementById('pdfCanvas').width
-              const maxLineW = canvasW - ann.x * scale - 6 * scale
-              const drawLines = []
-              if (ann.preWrapped) {
-                drawLines.push(...ann.text.split('\n'))
-              } else {
-                for (const userLine of ann.text.split('\n')) {
-                  let remaining = userLine
-                  while (remaining.length > 0) {
-                    if (ctx.measureText(remaining).width <= maxLineW) {
-                      drawLines.push(remaining)
-                      remaining = ''
-                    } else {
-                      let lo = 1, hi = remaining.length - 1, best = 1
-                      while (lo <= hi) {
-                        const mid = (lo + hi) >> 1
-                        if (ctx.measureText(remaining.slice(0, mid)).width <= maxLineW) {
-                          best = mid; lo = mid + 1
-                        } else {
-                          hi = mid - 1
-                        }
-                      }
-                      drawLines.push(remaining.slice(0, best))
-                      remaining = remaining.slice(best)
-                    }
-                  }
-                }
-              }
-              drawLines.forEach((line, i) => {
-                const y = ann.y * scale + i * lineH
-                if (line && y > 0 && y <= canvasH) ctx.fillText(line, ann.x * scale, y)
+              const textCanvasH = document.getElementById('pdfCanvas').height
+              ann.text.split('\n').forEach((textLine, textLineIdx) => {
+                const textLineY = ann.y * scale + textLineIdx * lineH
+                if (textLine && textLineY > 0 && textLineY <= textCanvasH) ctx.fillText(textLine, ann.x * scale, textLineY)
               })
               ctx.restore()
             }
