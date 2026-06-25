@@ -4005,10 +4005,6 @@ pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
 </body>
 </html>`)
         await bpage.waitForFunction('window._pdfRendered === true', { timeout: 15000 })
-        if (googleFontsUrl) {
-          await bpage.evaluateHandle('document.fonts.ready')
-        }
-
         // paint erase strokes
         const strokes = eraseByPage[pageNum] || []
         if (strokes.length > 0) {
@@ -4029,8 +4025,17 @@ pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
         // paint text annotations
         const textAnns = textByPage[pageNum] || []
         if (textAnns.length > 0) {
-          await bpage.evaluate((anns, scale) => {
+          await bpage.evaluate(async (anns, scale) => {
             const ctx = document.getElementById('pdfCanvas').getContext('2d')
+            // load all required fonts before drawing
+            const fontLoads = []
+            for (const ann of anns) {
+              const fw = ann.fontWeight === 'bold' ? 'bold ' : ann.fontWeight === 'italic' ? 'italic ' : ''
+              const fs = (ann.fontSize || 14) * scale
+              const familyName = (ann.fontFamily || 'sans-serif').split(',')[0].trim().replace(/['"]/g, '')
+              fontLoads.push(document.fonts.load(`${fw}${fs}px "${familyName}"`, ann.text || 'a').catch(() => {}))
+            }
+            await Promise.all(fontLoads)
             for (const ann of anns) {
               const fw = ann.fontWeight === 'bold' ? 'bold ' : ann.fontWeight === 'italic' ? 'italic ' : ''
               const fs = (ann.fontSize || 14) * scale
