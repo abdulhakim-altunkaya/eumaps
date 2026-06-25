@@ -3743,30 +3743,19 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
           const fs = ann.fontSize || 14
           const lineH = fs * 1.3
           const margin = 4
-          const maxX = pageWidth - margin
 
           if (ann.preWrapped) {
-            // lines already wrapped by canvas — draw each one individually
             const lines = safeText.split('\n')
             lines.forEach((line, i) => {
               if (!line) return
               const y = pdfY - i * lineH
               if (y <= 0 || y > pageHeight) return
-              // clip line to right edge character by character
-              let clipped = line
-              while (clipped.length > 0) {
-                const w = weight.widthOfTextAtSize(clipped, fs)
-                if (ann.x + w <= maxX) break
-                clipped = clipped.slice(0, -1)
-              }
-              if (clipped) {
-                page.drawText(clipped, {
-                  x: ann.x, y,
-                  size: fs, font: weight,
-                  color: rgb(c.r, c.g, c.b),
-                  opacity: ann.opacity || 1
-                })
-              }
+              page.drawText(line, {
+                x: ann.x, y,
+                size: fs, font: weight,
+                color: rgb(c.r, c.g, c.b),
+                opacity: ann.opacity || 1
+              })
             })
           } else {
             page.drawText(safeText, {
