@@ -3955,7 +3955,7 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
       for (const pageNum of puppeteerPages) {
         const pdfPage = pdfDoc.getPage(pageNum - 1)
         const { width: pageWidth, height: pageHeight } = pdfPage.getSize()
-        const SCALE = 3
+        const SCALE = 4
         const pw = Math.round(pageWidth * SCALE)
         const ph = Math.round(pageHeight * SCALE)
 
@@ -3967,9 +3967,19 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
 
         const bpage = await browser.newPage()
         await bpage.setViewport({ width: pw, height: ph, deviceScaleFactor: 1 })
+        // collect unique font families needed for this page
+        const pageFonts = [...new Set((textByPage[pageNum] || []).map(a => a.fontFamily).filter(Boolean))]
+        const googleFontsUrl = pageFonts.length > 0
+          ? `https://fonts.googleapis.com/css2?${pageFonts.map(f => {
+              const name = f.split(',')[0].trim().replace(/['"]/g, '')
+              return `family=${encodeURIComponent(name)}:wght@400;700`
+            }).join('&')}&display=swap`
+          : null
+
         await bpage.setContent(`<!DOCTYPE html>
 <html>
 <head>
+${googleFontsUrl ? `<link rel="stylesheet" href="${googleFontsUrl}">` : ''}
 <style>*{margin:0;padding:0;}html,body{width:${pw}px;height:${ph}px;background:#fff;overflow:hidden;}</style>
 </head>
 <body>
@@ -3995,6 +4005,9 @@ pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
 </body>
 </html>`)
         await bpage.waitForFunction('window._pdfRendered === true', { timeout: 15000 })
+        if (googleFontsUrl) {
+          await bpage.evaluateHandle('document.fonts.ready')
+        }
 
         // paint erase strokes
         const strokes = eraseByPage[pageNum] || []
