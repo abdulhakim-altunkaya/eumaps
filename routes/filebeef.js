@@ -4024,6 +4024,13 @@ pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
 
         // paint text annotations
         const textAnns = textByPage[pageNum] || []
+        console.log(`[PDF Editor] Page ${pageNum}: ${textAnns.length} text ann(s)`, textAnns.map(a => ({
+          x: a.x, y: a.y,
+          fontSize: a.fontSize,
+          preWrapped: a.preWrapped || false,
+          lines: a.text?.split('\n').length,
+          textPreview: a.text?.slice(0, 60)
+        })))
         if (textAnns.length > 0) {
           await bpage.evaluate(async (anns, scale) => {
             const ctx = document.getElementById('pdfCanvas').getContext('2d')
