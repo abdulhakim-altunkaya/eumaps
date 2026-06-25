@@ -3956,6 +3956,7 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
         const pdfPage = pdfDoc.getPage(pageNum - 1)
         const { width: pageWidth, height: pageHeight } = pdfPage.getSize()
         const SCALE = 4
+        const DPR = 2
         const pw = Math.round(pageWidth * SCALE)
         const ph = Math.round(pageHeight * SCALE)
 
@@ -3966,7 +3967,7 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
         const b64 = singleBuf.toString('base64')
 
         const bpage = await browser.newPage()
-        await bpage.setViewport({ width: pw, height: ph, deviceScaleFactor: 1 })
+        await bpage.setViewport({ width: pw, height: ph, deviceScaleFactor: DPR })
         // collect unique font families needed for this page
         const pageFonts = [...new Set((textByPage[pageNum] || []).map(a => a.fontFamily).filter(Boolean))]
         const googleFontsUrl = pageFonts.length > 0
@@ -4052,12 +4053,13 @@ pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
           }, textAnns, SCALE)
         }
 
-        const imgBuf = await bpage.screenshot({ type: 'png', clip: { x: 0, y: 0, width: pw, height: ph } })
+        const imgBuf = await bpage.screenshot({ type: 'png', clip: { x: 0, y: 0, width: pw * DPR, height: ph * DPR } })
         await bpage.close()
 
         const embeddedImg = await pdfDoc.embedPng(imgBuf)
         pdfPage.drawRectangle({ x: 0, y: 0, width: pageWidth, height: pageHeight, color: rgb(1, 1, 1), opacity: 1 })
         pdfPage.drawImage(embeddedImg, { x: 0, y: 0, width: pageWidth, height: pageHeight, opacity: 1 })
+        // note: image is drawn at page dimensions regardless of DPR — pdf-lib scales it down correctly
       }
 
       await browser.close()
