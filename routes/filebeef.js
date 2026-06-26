@@ -4051,9 +4051,9 @@ pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
               ctx.globalAlpha = ann.opacity || 1
               ctx.fillStyle = ann.color || '#000000'
               ctx.font = `${fw}${fs}px ${ann.fontFamily || 'sans-serif'}`
-const textCanvasH = document.getElementById('pdfCanvas').height
+              const textCanvasH = document.getElementById('pdfCanvas').height
               const textCanvasW = document.getElementById('pdfCanvas').width
-              const textMaxLineW = textCanvasW - ann.x * scale - 6 * scale
+              const textMaxLineW = textCanvasW - ann.x * scale - 6
               let textCurrentRow = 0
               for (const textRawLine of ann.text.split('\n')) {
                 if (ann.preWrapped) {
@@ -4086,8 +4086,6 @@ const textCanvasH = document.getElementById('pdfCanvas').height
                   textCurrentRow++
                 }
               }
-
-              
               ctx.restore()
             }
           }, textAnns, SCALE)
