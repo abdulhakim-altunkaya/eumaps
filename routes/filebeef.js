@@ -4051,11 +4051,43 @@ pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
               ctx.globalAlpha = ann.opacity || 1
               ctx.fillStyle = ann.color || '#000000'
               ctx.font = `${fw}${fs}px ${ann.fontFamily || 'sans-serif'}`
-              const textCanvasH = document.getElementById('pdfCanvas').height
-              ann.text.split('\n').forEach((textLine, textLineIdx) => {
-                const textLineY = ann.y * scale + textLineIdx * lineH
-                if (textLine && textLineY > 0 && textLineY <= textCanvasH) ctx.fillText(textLine, ann.x * scale, textLineY)
-              })
+const textCanvasH = document.getElementById('pdfCanvas').height
+              const textCanvasW = document.getElementById('pdfCanvas').width
+              const textMaxLineW = textCanvasW - ann.x * scale - 6 * scale
+              let textCurrentRow = 0
+              for (const textRawLine of ann.text.split('\n')) {
+                if (ann.preWrapped) {
+                  const textLineY = ann.y * scale + textCurrentRow * lineH
+                  if (textRawLine && textLineY > 0 && textLineY <= textCanvasH) {
+                    ctx.fillText(textRawLine, ann.x * scale, textLineY)
+                  }
+                  textCurrentRow++
+                } else {
+                  // wrap character by character matching frontend drawAnnotation
+                  let textChunk = ''
+                  for (const textChar of textRawLine) {
+                    if (ctx.measureText(textChunk + textChar).width > textMaxLineW) {
+                      const textChunkY = ann.y * scale + textCurrentRow * lineH
+                      if (textChunk && textChunkY > 0 && textChunkY <= textCanvasH) {
+                        ctx.fillText(textChunk, ann.x * scale, textChunkY)
+                      }
+                      textChunk = textChar
+                      textCurrentRow++
+                    } else {
+                      textChunk += textChar
+                    }
+                  }
+                  if (textChunk) {
+                    const textChunkY = ann.y * scale + textCurrentRow * lineH
+                    if (textChunkY > 0 && textChunkY <= textCanvasH) {
+                      ctx.fillText(textChunk, ann.x * scale, textChunkY)
+                    }
+                  }
+                  textCurrentRow++
+                }
+              }
+
+              
               ctx.restore()
             }
           }, textAnns, SCALE)
