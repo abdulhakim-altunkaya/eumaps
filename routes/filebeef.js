@@ -3785,8 +3785,8 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
             finalLines[maxLines - 1] = last + '...'
           }
 
-          finalLines.forEach((line, i) => {
-            const safeLine = line.replace(/[^\x20-\x7E]/g, '')
+            finalLines.forEach((line, i) => {
+            const safeLine = line.replace(/[<>&"']/g, '')
             if (safeLine) {
               page.drawText(safeLine, {
                 x: ann.x + pad,
@@ -4032,7 +4032,8 @@ pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
           textPreview: a.text?.slice(0, 60)
         })))
         if (textAnns.length > 0) {
-          await bpage.evaluate(async (anns, scale) => {
+          const textZoom = parseFloat(req.body.zoom) || 1
+          await bpage.evaluate(async (anns, scale, zoom) => {
             const ctx = document.getElementById('pdfCanvas').getContext('2d')
             // load all required fonts before drawing
             const fontLoads = []
@@ -4053,7 +4054,7 @@ pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
               ctx.font = `${fw}${fs}px ${ann.fontFamily || 'sans-serif'}`
               const textCanvasH = document.getElementById('pdfCanvas').height
               const textCanvasW = document.getElementById('pdfCanvas').width
-              const textMaxLineW = textCanvasW - ann.x * scale - 6
+              const textMaxLineW = textCanvasW - ann.x * scale - (6 * scale / zoom)
               let textCurrentRow = 0
               for (const textRawLine of ann.text.split('\n')) {
                 if (ann.preWrapped) {
@@ -4088,7 +4089,7 @@ pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
               }
               ctx.restore()
             }
-          }, textAnns, SCALE)
+          }, textAnns, SCALE, textZoom)
         }
         const imgBuf = await bpage.screenshot({ type: 'png', clip: { x: 0, y: 0, width: pw, height: ph } })
         await bpage.close()
