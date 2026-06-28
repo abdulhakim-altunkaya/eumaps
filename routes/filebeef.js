@@ -4033,7 +4033,8 @@ pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
         })))
         if (textAnns.length > 0) {
           const textZoom = parseFloat(req.body.zoom) || 1
-          await bpage.evaluate(async (anns, scale, zoom) => {
+          const textDpr = parseFloat(req.body.dpr) || 1
+          await bpage.evaluate(async (anns, scale, zoom, dpr) => {
             const ctx = document.getElementById('pdfCanvas').getContext('2d')
             // load all required fonts before drawing
             const fontLoads = []
@@ -4052,9 +4053,9 @@ pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
               ctx.globalAlpha = ann.opacity || 1
               ctx.fillStyle = ann.color || '#000000'
               ctx.font = `${fw}${fs}px ${ann.fontFamily || 'sans-serif'}`
-              const textCanvasH = document.getElementById('pdfCanvas').height
+              const textCanvasH = document.getElementById('pdfCanvas').height - Math.round(6 * scale / (zoom * dpr))
               const textCanvasW = document.getElementById('pdfCanvas').width
-              const textMaxLineW = textCanvasW - ann.x * scale - Math.round(6 / zoom * scale)
+              const textMaxLineW = textCanvasW - ann.x * scale - Math.round(6 * scale / (zoom * dpr))
               let textCurrentRow = 0
               for (const textRawLine of ann.text.split('\n')) {
                 if (ann.preWrapped) {
@@ -4089,7 +4090,7 @@ pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
               }
               ctx.restore()
             }
-          }, textAnns, SCALE, textZoom)
+          }, textAnns, SCALE, textZoom, textDpr)
         }
         const imgBuf = await bpage.screenshot({ type: 'png', clip: { x: 0, y: 0, width: pw, height: ph } })
         await bpage.close()
