@@ -4054,7 +4054,7 @@ pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
               ctx.font = `${fw}${fs}px ${ann.fontFamily || 'sans-serif'}`
               const textCanvasH = document.getElementById('pdfCanvas').height
               const textCanvasW = document.getElementById('pdfCanvas').width
-              const textMaxLineW = textCanvasW - ann.x * scale - (6 * scale / zoom)
+              const textMaxLineW = textCanvasW - ann.x * scale - Math.round(6 / zoom * scale)
               let textCurrentRow = 0
               for (const textRawLine of ann.text.split('\n')) {
                 if (ann.preWrapped) {
