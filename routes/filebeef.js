@@ -1413,9 +1413,9 @@ router.post("/api/post/filebeef/image/watermark", optionalAuth, imageUpload.sing
 
 // ── PDF SIZE LIMITS ────────────────────────────────────────────────────────
 const PDF_LIMITS = {
-  anon: { daily: 1,  sizeMB: 3 },
-  free: { daily: 2,  sizeMB: 5 },
-  pro:  { daily: 5,  sizeMB: 10 }
+  anon: { daily: 1,  sizeMB: 2 },
+  free: { daily: 2,  sizeMB: 3 },
+  pro:  { daily: 5,  sizeMB: 20 }
 };
 
 const pdfUpload = multer({
