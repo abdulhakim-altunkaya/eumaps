@@ -1437,7 +1437,42 @@ function getPdfLimits(tier) {
 }
 
 // ── COMPRESS PDF ───────────────────────────────────────────────────────────
-router.post("/api/post/filebeef/pdf/compress", optionalAuth, pdfUpload.single("file"), async (req, res) => {
+const GS_QUALITY_MAP = {
+  low: "/printer",   // 300dpi, best quality, least size reduction
+  medium: "/ebook",  // 150dpi, balanced
+  high: "/screen"    // 72dpi, smallest file, most quality loss
+};
+
+async function ghostscriptCompress(inputBuffer, preset) {
+  const tmpIn = path.join(os.tmpdir(), `fb_pdfc_in_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`);
+  const tmpOut = path.join(os.tmpdir(), `fb_pdfc_out_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`);
+  fs.writeFileSync(tmpIn, inputBuffer);
+
+  try {
+    await new Promise((resolve, reject) => {
+      execFile("gs", [
+        "-sDEVICE=pdfwrite",
+        "-dCompatibilityLevel=1.4",
+        `-dPDFSETTINGS=${preset}`,
+        "-dNOPAUSE", "-dBATCH", "-dQUIET",
+        `-sOutputFile=${tmpOut}`,
+        tmpIn
+      ], { timeout: 60000 }, (err) => err ? reject(err) : resolve());
+    });
+    return fs.readFileSync(tmpOut);
+  } finally {
+    if (fs.existsSync(tmpIn)) fs.unlinkSync(tmpIn);
+    if (fs.existsSync(tmpOut)) fs.unlinkSync(tmpOut);
+  }
+}
+
+router.post("/api/post/filebeef/pdf/compress", optionalAuth, (req, res, next) => {
+  pdfUpload.single("file")(req, res, (err) => {
+    if (err?.code === "LIMIT_FILE_SIZE") return res.status(413).json({ resStatus: false, resMessage: "File too large for upload.", resErrorCode: 3 });
+    if (err) return res.status(500).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 98 });
+    next();
+  });
+}, async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user); const limits = getPdfLimits(tier);
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
@@ -1446,13 +1481,14 @@ router.post("/api/post/filebeef/pdf/compress", optionalAuth, pdfUpload.single("f
     const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
+    const quality = req.body.quality || "medium";
+    const preset = GS_QUALITY_MAP[quality] || GS_QUALITY_MAP.medium;
     try {
-      const pdfDoc = await PDFDocument.load(req.file.buffer, { updateMetadata: false });
-      const outputBuffer = await pdfDoc.save({ useObjectStreams: true, addDefaultPage: false, compress: true });
+      const outputBuffer = await ghostscriptCompress(req.file.buffer, preset);
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
       await incrementUsage(user?.user_id, ip, tier, "pdf-compress", "pdf", "pdf", fileSizeKb, "success");
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}_compressed.pdf"`, "Content-Length": outputBuffer.length });
-      return res.status(200).send(Buffer.from(outputBuffer));
+      return res.status(200).send(outputBuffer);
     } catch (err) {
       console.error("PDF compress error:", err.message);
       await incrementUsage(user?.user_id, ip, tier, "pdf-compress", "pdf", "pdf", fileSizeKb, "failed");
