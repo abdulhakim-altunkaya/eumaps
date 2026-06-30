@@ -680,7 +680,7 @@ router.post("/api/post/filebeef/payments/webhook", express.raw({ type: "applicat
         const price = firstItem.price || firstItem.plan || {};
         const recurring = price.recurring || {};
         const interval = recurring.interval || price.interval || "month";
-        const expiresAt = sub.current_period_end ? new Date(sub.current_period_end * 1000) : null;
+        const expiresAt = sub.current_period_end ? new Date(sub.current_period_end * 1000 + 2 * 24 * 60 * 60 * 1000) : null;
         const plan = status === "active" ? "pro" : "free";
         const planInterval = interval === "year" ? "year" : "month";
 
