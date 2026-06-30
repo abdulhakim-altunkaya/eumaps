@@ -1446,7 +1446,11 @@ const GS_QUALITY_MAP = {
 async function ghostscriptCompress(inputBuffer, preset) {
   const tmpIn = path.join(os.tmpdir(), `fb_pdfc_in_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`);
   const tmpOut = path.join(os.tmpdir(), `fb_pdfc_out_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`);
+  console.log("[pdf-compress] starting ghostscript, preset:", preset);
+  console.log("[pdf-compress] tmpIn:", tmpIn, "tmpOut:", tmpOut);
+  console.log("[pdf-compress] inputBuffer size:", inputBuffer.length);
   fs.writeFileSync(tmpIn, inputBuffer);
+  console.log("[pdf-compress] wrote tmpIn");
 
   try {
     await new Promise((resolve, reject) => {
@@ -1457,9 +1461,14 @@ async function ghostscriptCompress(inputBuffer, preset) {
         "-dNOPAUSE", "-dBATCH", "-dQUIET",
         `-sOutputFile=${tmpOut}`,
         tmpIn
-      ], { timeout: 60000 }, (err) => err ? reject(err) : resolve());
+      ], { timeout: 60000 }, (err) => {
+        if (err) { console.log("[pdf-compress] gs error:", err.message); reject(err); }
+        else { console.log("[pdf-compress] gs completed"); resolve(); }
+      });
     });
-    return fs.readFileSync(tmpOut);
+    const result = fs.readFileSync(tmpOut);
+    console.log("[pdf-compress] output size:", result.length);
+    return result;
   } finally {
     if (fs.existsSync(tmpIn)) fs.unlinkSync(tmpIn);
     if (fs.existsSync(tmpOut)) fs.unlinkSync(tmpOut);
