@@ -3,6 +3,7 @@ const router = express.Router();
 const crypto = require("crypto");
 const bcrypt = require("bcrypt");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const { execFile } = require("child_process");
 
 const sharp = require("sharp");
 const multer = require("multer");
@@ -1476,36 +1477,42 @@ async function ghostscriptCompress(inputBuffer, preset) {
 }
 
 router.post("/api/post/filebeef/pdf/compress", optionalAuth, (req, res, next) => {
+  console.log("[pdf-compress] multer start");
   pdfUpload.single("file")(req, res, (err) => {
-    if (err?.code === "LIMIT_FILE_SIZE") return res.status(413).json({ resStatus: false, resMessage: "File too large for upload.", resErrorCode: 3 });
-    if (err) return res.status(500).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 98 });
+    if (err?.code === "LIMIT_FILE_SIZE") { console.log("[pdf-compress] multer LIMIT_FILE_SIZE"); return res.status(413).json({ resStatus: false, resMessage: "File too large for upload.", resErrorCode: 3 }); }
+    if (err) { console.log("[pdf-compress] multer error:", err.message); return res.status(500).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 98 }); }
+    console.log("[pdf-compress] multer ok, file:", req.file?.originalname, "size:", req.file?.size);
     next();
   });
 }, async (req, res) => {
+    console.log("[pdf-compress] route handler entered");
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user); const limits = getPdfLimits(tier);
-    if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
-    if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
-    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
+    console.log("[pdf-compress] tier:", tier, "limits:", limits);
+    if (!req.file) { console.log("[pdf-compress] no file"); return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 }); }
+    if (!isPdf(req.file)) { console.log("[pdf-compress] not a pdf"); return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 }); }
+    if (req.file.size > limits.sizeMB * 1024 * 1024) { console.log("[pdf-compress] file too large"); return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 }); }
     const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    console.log("[pdf-compress] limitCheck:", limitCheck);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     const quality = req.body.quality || "medium";
     const preset = GS_QUALITY_MAP[quality] || GS_QUALITY_MAP.medium;
+    console.log("[pdf-compress] quality:", quality, "preset:", preset);
     try {
       const outputBuffer = await ghostscriptCompress(req.file.buffer, preset);
+      console.log("[pdf-compress] outputBuffer size:", outputBuffer.length);
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
       await incrementUsage(user?.user_id, ip, tier, "pdf-compress", "pdf", "pdf", fileSizeKb, "success");
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}_compressed.pdf"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(outputBuffer);
     } catch (err) {
-      console.error("PDF compress error:", err.message);
+      console.error("[pdf-compress] error:", err.message, err.stack);
       await incrementUsage(user?.user_id, ip, tier, "pdf-compress", "pdf", "pdf", fileSizeKb, "failed");
       return res.status(500).json({ resStatus: false, resMessage: "Compression failed.", resErrorCode: 99 });
     }
   }
 );
-
 // ── MERGE PDF ──────────────────────────────────────────────────────────────
 router.post("/api/post/filebeef/pdf/merge", optionalAuth, pdfMultiUpload.array("files", 20), async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
