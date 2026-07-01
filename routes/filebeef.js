@@ -4,6 +4,8 @@ const crypto = require("crypto");
 const bcrypt = require("bcrypt");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { execFile } = require("child_process");
+const os = require("os");
+const path = require("path");
 
 const sharp = require("sharp");
 const multer = require("multer");
