@@ -4,8 +4,10 @@ const crypto = require("crypto");
 const bcrypt = require("bcrypt");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { execFile } = require("child_process");
+const ffmpeg = require("fluent-ffmpeg");
 const os = require("os");
 const path = require("path");
+
 
 const sharp = require("sharp");
 const multer = require("multer");
@@ -1479,15 +1481,24 @@ async function ghostscriptCompress(inputBuffer, preset) {
 }
 
 router.post("/api/post/filebeef/pdf/compress", optionalAuth, (req, res, next) => {
+  console.log("[pdf-compress] =================== REQUEST RECEIVED ===================");
+  console.log("[pdf-compress] method:", req.method);
+  console.log("[pdf-compress] url:", req.url);
+  console.log("[pdf-compress] origin:", req.headers.origin);
+  console.log("[pdf-compress] content-type:", req.headers['content-type']);
   console.log("[pdf-compress] multer start");
   pdfUpload.single("file")(req, res, (err) => {
     if (err?.code === "LIMIT_FILE_SIZE") { console.log("[pdf-compress] multer LIMIT_FILE_SIZE"); return res.status(413).json({ resStatus: false, resMessage: "File too large for upload.", resErrorCode: 3 }); }
     if (err) { console.log("[pdf-compress] multer error:", err.message); return res.status(500).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 98 }); }
-    console.log("[pdf-compress] multer ok, file:", req.file?.originalname, "size:", req.file?.size);
+console.log("[pdf-compress] multer ok, file:", req.file?.originalname, "size:", req.file?.size);
+    console.log("[pdf-compress] req.body after multer:", req.body);
+    console.log("[pdf-compress] calling next()");
     next();
   });
 }, async (req, res) => {
-    console.log("[pdf-compress] route handler entered");
+        console.log("[pdf-compress] =================== HANDLER ENTERED ===================");
+    console.log("[pdf-compress] req.file exists:", !!req.file);
+    console.log("[pdf-compress] req.body:", req.body);
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user); const limits = getPdfLimits(tier);
     console.log("[pdf-compress] tier:", tier, "limits:", limits);
@@ -2952,9 +2963,6 @@ router.post("/api/post/filebeef/data/markdown-to-pdf", optionalAuth, async (req,
 //  VIDEO & GIF ENDPOINTS
 // ══════════════════════════════════════════════════════════════════════════
 
-const ffmpeg = require("fluent-ffmpeg");
-const os = require("os");
-const path = require("path");
 
 // ── VIDEO/AUDIO LIMITS ─────────────────────────────────────────────────────
 const VIDEO_LIMITS = {
