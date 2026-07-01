@@ -1,7 +1,7 @@
 const express = require("express");
 const app = express();
 const path = require('path');
-
+const os = require("os");
 //crypto and cookieParser are for masters email and google login/register endpoints
 const crypto = require("crypto");
 const bcrypt = require("bcrypt");
@@ -121,12 +121,7 @@ app.set('trust proxy', 1);
 // Stripe webhook needs raw body — must come before express.json()
 app.use('/api/post/filebeef/payments/webhook', express.raw({ type: 'application/json' }))
 //we need this as we use req.body to send data from frontend to backend
-app.use((req, res, next) => {
-  if (req.headers['content-type'] && req.headers['content-type'].startsWith('multipart/form-data')) {
-    return next();
-  }
-  express.json()(req, res, next);
-});
+app.use(express.json());
 
 //Then go to server.js file and make sure you serve static files from build directory:
 app.use(express.static(path.join(__dirname, 'client/build')));

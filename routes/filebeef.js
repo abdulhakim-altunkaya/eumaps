@@ -5,8 +5,6 @@ const bcrypt = require("bcrypt");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { execFile } = require("child_process");
 const ffmpeg = require("fluent-ffmpeg");
-const os = require("os");
-const path = require("path");
 
 
 const sharp = require("sharp");
@@ -685,7 +683,8 @@ router.post("/api/post/filebeef/payments/webhook", express.raw({ type: "applicat
         const price = firstItem.price || firstItem.plan || {};
         const recurring = price.recurring || {};
         const interval = recurring.interval || price.interval || "month";
-        const expiresAt = sub.current_period_end ? new Date(sub.current_period_end * 1000 + 2 * 24 * 60 * 60 * 1000) : null;
+        const periodEnd = sub.current_period_end || sub.items?.data?.[0]?.current_period_end || null;
+        const expiresAt = periodEnd ? new Date(periodEnd * 1000 + 2 * 24 * 60 * 60 * 1000) : null;
         const plan = status === "active" ? "pro" : "free";
         const planInterval = interval === "year" ? "year" : "month";
 
