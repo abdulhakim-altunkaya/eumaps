@@ -1443,9 +1443,9 @@ function getPdfLimits(tier) {
 
 // ── COMPRESS PDF ───────────────────────────────────────────────────────────
 const GS_QUALITY_MAP = {
-  low: "/printer",   // 300dpi, best quality, least size reduction
-  medium: "/ebook",  // 150dpi, balanced
-  high: "/screen"    // 72dpi, smallest file, most quality loss
+  low: "/prepress",  // 300dpi, maximum quality, minimal size reduction
+  medium: "/printer", // 300dpi, good quality, moderate size reduction
+  high: "/ebook"     // 150dpi, smaller file, some quality loss
 };
 
 async function ghostscriptCompress(inputBuffer, preset) {
@@ -1464,6 +1464,9 @@ async function ghostscriptCompress(inputBuffer, preset) {
         "-dCompatibilityLevel=1.4",
         `-dPDFSETTINGS=${preset}`,
         "-dNOPAUSE", "-dBATCH", "-dQUIET",
+        "-dPrinted=false",
+        "-dPreserveMarks=true",
+        "-dCannotEmbedFontPolicy=/Warning",
         `-sOutputFile=${tmpOut}`,
         tmpIn
       ], { timeout: 60000 }, (err) => {
