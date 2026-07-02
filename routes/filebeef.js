@@ -1461,12 +1461,22 @@ async function ghostscriptCompress(inputBuffer, preset) {
     await new Promise((resolve, reject) => {
       execFile("gs", [
         "-sDEVICE=pdfwrite",
-        "-dCompatibilityLevel=1.4",
+        "-dCompatibilityLevel=1.7",
         `-dPDFSETTINGS=${preset}`,
-        "-dNOPAUSE", "-dBATCH", "-dQUIET",
-        "-dPrinted=false",
-        "-dPreserveMarks=true",
-        "-dCannotEmbedFontPolicy=/Warning",
+        "-dNOPAUSE",
+        "-dBATCH",
+        "-dQUIET",
+        "-dSAFER",
+        "-dAutoRotatePages=/None",
+        "-dFIXEDMEDIA",
+        "-dPDFFitPage",
+        "-dUseCropBox=false",
+        "-dUseTrimBox=false",
+        "-dUseBleedBox=false",
+        "-dUseArtBox=false",
+        "-dDetectDuplicateImages=true",
+        "-dCompressFonts=true",
+        "-dSubsetFonts=true",
         `-sOutputFile=${tmpOut}`,
         tmpIn
       ], { timeout: 60000 }, (err) => {
