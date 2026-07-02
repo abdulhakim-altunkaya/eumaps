@@ -1457,9 +1457,9 @@ function getPdfLimits(tier) {
 
 // ── COMPRESS PDF ───────────────────────────────────────────────────────────
 const GS_QUALITY_MAP = {
-  low: "/prepress",  // 300dpi, maximum quality, minimal size reduction
-  medium: "/printer", // 300dpi, good quality, moderate size reduction
-  high: "/ebook"     // 150dpi, smaller file, some quality loss
+  low: "/printer",  // 300dpi, good quality, moderate size reduction
+  medium: "/ebook", // 150dpi, balanced
+  high: "/screen"   // 72dpi, smallest file, most quality loss
 };
 
 async function ghostscriptCompress(inputBuffer, preset) {
@@ -1474,23 +1474,12 @@ async function ghostscriptCompress(inputBuffer, preset) {
   try {
     await new Promise((resolve, reject) => {
       execFile("gs", [
-"-sDEVICE=pdfwrite",
-"-dCompatibilityLevel=1.7",
-`-dPDFSETTINGS=${preset}`,
-
-"-dNOPAUSE",
-"-dBATCH",
-"-dQUIET",
-"-dSAFER",
-
-"-dAutoRotatePages=/None",
-"-dUseCropBox",
-
-"-dDetectDuplicateImages=true",
-"-dCompressFonts=true",
-"-dSubsetFonts=true",
-
-`-sOutputFile=${tmpOut}`,
+        "-sDEVICE=pdfwrite",
+        "-dCompatibilityLevel=1.4",
+        `-dPDFSETTINGS=${preset}`,
+        "-dNOPAUSE", "-dBATCH", "-dQUIET",
+        "-dPrinted=false",
+        `-sOutputFile=${tmpOut}`,
         tmpIn
       ], { timeout: 60000 }, (err) => {
         if (err) { console.log("[pdf-compress] gs error:", err.message); reject(err); }
