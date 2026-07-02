@@ -1468,8 +1468,6 @@ async function ghostscriptCompress(inputBuffer, preset) {
         "-dQUIET",
         "-dSAFER",
         "-dAutoRotatePages=/None",
-        "-dFIXEDMEDIA",
-        "-dPDFFitPage",
         "-dUseCropBox=false",
         "-dUseTrimBox=false",
         "-dUseBleedBox=false",
