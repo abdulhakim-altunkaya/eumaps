@@ -1460,22 +1460,23 @@ async function ghostscriptCompress(inputBuffer, preset) {
   try {
     await new Promise((resolve, reject) => {
       execFile("gs", [
-        "-sDEVICE=pdfwrite",
-        "-dCompatibilityLevel=1.7",
-        `-dPDFSETTINGS=${preset}`,
-        "-dNOPAUSE",
-        "-dBATCH",
-        "-dQUIET",
-        "-dSAFER",
-        "-dAutoRotatePages=/None",
-        "-dUseCropBox=false",
-        "-dUseTrimBox=false",
-        "-dUseBleedBox=false",
-        "-dUseArtBox=false",
-        "-dDetectDuplicateImages=true",
-        "-dCompressFonts=true",
-        "-dSubsetFonts=true",
-        `-sOutputFile=${tmpOut}`,
+"-sDEVICE=pdfwrite",
+"-dCompatibilityLevel=1.7",
+`-dPDFSETTINGS=${preset}`,
+
+"-dNOPAUSE",
+"-dBATCH",
+"-dQUIET",
+"-dSAFER",
+
+"-dAutoRotatePages=/None",
+"-dUseCropBox",
+
+"-dDetectDuplicateImages=true",
+"-dCompressFonts=true",
+"-dSubsetFonts=true",
+
+`-sOutputFile=${tmpOut}`,
         tmpIn
       ], { timeout: 60000 }, (err) => {
         if (err) { console.log("[pdf-compress] gs error:", err.message); reject(err); }
