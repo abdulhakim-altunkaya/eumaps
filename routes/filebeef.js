@@ -1457,20 +1457,20 @@ function getPdfLimits(tier) {
 
 // ── COMPRESS PDF ───────────────────────────────────────────────────────────
 const GS_QUALITY_MAP = {
-  low: "/printer",  // 300dpi, good quality, moderate size reduction
   medium: "/ebook", // 150dpi, balanced
   high: "/screen"   // 72dpi, smallest file, most quality loss
 };
 
+async function pdfLibCompress(inputBuffer) {
+  const pdfDoc = await PDFDocument.load(inputBuffer, { updateMetadata: false });
+  const outputBuffer = await pdfDoc.save({ useObjectStreams: true, addDefaultPage: false, compress: true });
+  return Buffer.from(outputBuffer);
+}
+
 async function ghostscriptCompress(inputBuffer, preset) {
   const tmpIn = path.join(os.tmpdir(), `fb_pdfc_in_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`);
   const tmpOut = path.join(os.tmpdir(), `fb_pdfc_out_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`);
-  console.log("[pdf-compress] starting ghostscript, preset:", preset);
-  console.log("[pdf-compress] tmpIn:", tmpIn, "tmpOut:", tmpOut);
-  console.log("[pdf-compress] inputBuffer size:", inputBuffer.length);
   fs.writeFileSync(tmpIn, inputBuffer);
-  console.log("[pdf-compress] wrote tmpIn");
-
   try {
     await new Promise((resolve, reject) => {
       execFile("gs", [
@@ -1487,7 +1487,6 @@ async function ghostscriptCompress(inputBuffer, preset) {
       });
     });
     const result = fs.readFileSync(tmpOut);
-    console.log("[pdf-compress] output size:", result.length);
     return result;
   } finally {
     if (fs.existsSync(tmpIn)) fs.unlinkSync(tmpIn);
@@ -1504,26 +1503,23 @@ router.post("/api/post/filebeef/pdf/compress", optionalAuth, (req, res, next) =>
 }, async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user); const limits = getPdfLimits(tier);
-    console.log("[pdf-compress] tier:", tier, "limits:", limits);
     if (!req.file) { console.log("[pdf-compress] no file"); return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 }); }
     if (!isPdf(req.file)) { console.log("[pdf-compress] not a pdf"); return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 }); }
     if (req.file.size > limits.sizeMB * 1024 * 1024) { console.log("[pdf-compress] file too large"); return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 }); }
     const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
-    console.log("[pdf-compress] limitCheck:", limitCheck);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     const quality = req.body.quality || "medium";
-    const preset = GS_QUALITY_MAP[quality] || GS_QUALITY_MAP.medium;
-    console.log("[pdf-compress] quality:", quality, "preset:", preset);
+    console.log("[pdf-compress] quality:", quality);
     try {
-      const outputBuffer = await ghostscriptCompress(req.file.buffer, preset);
-      console.log("[pdf-compress] outputBuffer size:", outputBuffer.length);
+      const outputBuffer = quality === "low"
+        ? await pdfLibCompress(req.file.buffer)
+        : await ghostscriptCompress(req.file.buffer, GS_QUALITY_MAP[quality] || GS_QUALITY_MAP.medium);
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
       await incrementUsage(user?.user_id, ip, tier, "pdf-compress", "pdf", "pdf", fileSizeKb, "success");
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}_compressed.pdf"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(outputBuffer);
     } catch (err) {
-      console.error("[pdf-compress] error:", err.message, err.stack);
       await incrementUsage(user?.user_id, ip, tier, "pdf-compress", "pdf", "pdf", fileSizeKb, "failed");
       return res.status(500).json({ resStatus: false, resMessage: "Compression failed.", resErrorCode: 99 });
     }
