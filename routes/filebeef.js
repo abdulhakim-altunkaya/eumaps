@@ -1713,7 +1713,12 @@ router.post("/api/post/filebeef/pdf/page-numbers", optionalAuth, pdfUpload.singl
     try {
       const pdfDoc = await PDFDocument.load(req.file.buffer);
       pdfDoc.registerFontkit(fontkit);
-      const fontBytes = fs.readFileSync("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");
+      const requestedFont = (req.body.font || "default").toLowerCase();
+      let fontPath = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+      if (EDITOR_FONT_FILES[requestedFont] && fs.existsSync(EDITOR_FONT_FILES[requestedFont].regular)) {
+        fontPath = EDITOR_FONT_FILES[requestedFont].regular;
+      }
+      const fontBytes = fs.readFileSync(fontPath);
       const font = await pdfDoc.embedFont(fontBytes, { subset: true });
       const pages = pdfDoc.getPages();
       const fontSize = 10;
