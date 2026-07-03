@@ -1703,7 +1703,9 @@ router.post("/api/post/filebeef/pdf/page-numbers", optionalAuth, pdfUpload.singl
     const fileSizeKb = Math.round(req.file.size / 1024);
     try {
       const pdfDoc = await PDFDocument.load(req.file.buffer);
-      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      pdfDoc.registerFontkit(fontkit);
+      const fontBytes = fs.readFileSync("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");
+      const font = await pdfDoc.embedFont(fontBytes, { subset: true });
       const pages = pdfDoc.getPages();
       const fontSize = 10;
       const margin = 20;
@@ -2292,9 +2294,11 @@ router.post("/api/post/filebeef/pdf/txt-to-pdf", optionalAuth, async (req, res) 
       if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
       const fileSizeKb = Math.round(req.file.size / 1024);
       try {
-        const text = req.file.buffer.toString("utf8");
+        const text = req.file.buffer.toString("utf8").replace(/\r/g, "").replace(/\t/g, "    ");
         const pdfDoc = await PDFDocument.create();
-        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        pdfDoc.registerFontkit(fontkit);
+        const fontBytes = fs.readFileSync("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");
+        const font = await pdfDoc.embedFont(fontBytes, { subset: true });
         const fontSize = 12; const margin = 50; const lineHeight = fontSize * 1.4;
         const pageWidth = 595; const pageHeight = 842;
         const maxWidth = pageWidth - margin * 2;
@@ -2348,8 +2352,11 @@ router.post("/api/post/filebeef/pdf/excel-to-pdf", optionalAuth, async (req, res
         const XLSX = require("xlsx");
         const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
         const pdfDoc = await PDFDocument.create();
-        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-        const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+        pdfDoc.registerFontkit(fontkit);
+        const fontBytes = fs.readFileSync("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");
+        const boldFontBytes = fs.readFileSync("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf");
+        const font = await pdfDoc.embedFont(fontBytes, { subset: true });
+        const boldFont = await pdfDoc.embedFont(boldFontBytes, { subset: true });
         for (const sheetName of workbook.SheetNames) {
           const sheet = workbook.Sheets[sheetName];
           const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
