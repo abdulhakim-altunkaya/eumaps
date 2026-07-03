@@ -2384,7 +2384,7 @@ router.post("/api/post/filebeef/pdf/excel-to-pdf", optionalAuth, async (req, res
 );
 
 // ── PDF OCR ────────────────────────────────────────────────────────────────
-// Makes scanned PDFs searchable by extracting text with tesseract
+// Makes scanned PDFs searchable by adding an invisible text layer (ocrmypdf)
 router.post("/api/post/filebeef/pdf/ocr", optionalAuth, pdfUpload.single("file"), async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user); const limits = getPdfLimits(tier);
@@ -2395,53 +2395,47 @@ router.post("/api/post/filebeef/pdf/ocr", optionalAuth, pdfUpload.single("file")
     const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
+    const jobId = `ocr_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const inputPath = path.join(os.tmpdir(), `${jobId}_in.pdf`);
+    const outputPath = path.join(os.tmpdir(), `${jobId}_out.pdf`);
     try {
-      // render each PDF page as image then OCR it, rebuild as searchable PDF
-      const puppeteer = require("puppeteer");
-      const Tesseract = require("tesseract.js");
-      const pdfDoc = await PDFDocument.load(req.file.buffer);
-      const totalPages = pdfDoc.getPageCount();
-      const maxPages = 10; // limit for performance
-      const base64 = req.file.buffer.toString("base64");
-      const browser = await puppeteer.launch({ args: ["--no-sandbox", "--disable-setuid-sandbox"] });
-      const newDoc = await PDFDocument.create();
-      const font = await newDoc.embedFont(StandardFonts.Helvetica);
-      for (let i = 0; i < Math.min(totalPages, maxPages); i++) {
-        // render page to image
-        const singleDoc = await PDFDocument.create();
-        const [p] = await singleDoc.copyPages(pdfDoc, [i]);
-        singleDoc.addPage(p);
-        const singleBuf = Buffer.from(await singleDoc.save());
-        const b64 = singleBuf.toString("base64");
-        const bpage = await browser.newPage();
-        await bpage.setViewport({ width: 800, height: 1131, deviceScaleFactor: 1 });
-        await bpage.setContent(`<!DOCTYPE html><html><head><style>*{margin:0;padding:0;}html,body{width:800px;height:1131px;overflow:hidden;background:#fff;}embed{display:block;width:800px;height:1131px;}</style></head><body><embed src="data:application/pdf;base64,${b64}" type="application/pdf" width="800" height="1131" /></body></html>`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        const imgBuf = await bpage.screenshot({ type: "png" });
-        await bpage.close();
-        // OCR the image
-        const { data: { text } } = await Tesseract.recognize(imgBuf, "eng");
-        // add page with extracted text
-        const newPage = newDoc.addPage([595, 842]);
-        const lines = text.split("\n").filter(l => l.trim());
-        let y = 820;
-        for (const line of lines) {
-          if (y < 20) break;
-          const safeText = line.replace(/[^\x20-\x7E]/g, "").substring(0, 100);
-          if (safeText) newPage.drawText(safeText, { x: 20, y, size: 10, font, color: rgb(0, 0, 0) });
-          y -= 14;
-        }
-      }
-      await browser.close();
-      const outputBuffer = await newDoc.save();
+      fs.writeFileSync(inputPath, req.file.buffer);
+      // --skip-text: leaves pages that already contain text untouched
+      // --optimize 1: light lossless optimization, keeps output size sane
+      await new Promise((resolve, reject) => {
+        execFile(
+          "ocrmypdf",
+          ["--skip-text", "--optimize", "1", "--language", "eng", inputPath, outputPath],
+          { timeout: 180000, maxBuffer: 10 * 1024 * 1024 },
+          (err, stdout, stderr) => {
+            if (err) {
+              // exit code 6 = every page already has text (nothing to OCR)
+              if (err.code === 6) return reject(new Error("ALREADY_HAS_TEXT"));
+              console.error("ocrmypdf stderr:", stderr);
+              return reject(err);
+            }
+            resolve();
+          }
+        );
+      });
+      const outputBuffer = fs.readFileSync(outputPath);
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
       await incrementUsage(user?.user_id, ip, tier, "pdf-ocr", "pdf", "pdf", fileSizeKb, "success");
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}_ocr.pdf"`, "Content-Length": outputBuffer.length });
-      return res.status(200).send(Buffer.from(outputBuffer));
+      return res.status(200).send(outputBuffer);
     } catch (err) {
       console.error("PDF OCR error:", err.message);
       await incrementUsage(user?.user_id, ip, tier, "pdf-ocr", "pdf", "pdf", fileSizeKb, "failed");
+      if (err.message === "ALREADY_HAS_TEXT") {
+        return res.status(400).json({ resStatus: false, resMessage: "This PDF already contains searchable text — no OCR needed.", resErrorCode: 6 });
+      }
+      if (err.killed || err.signal === "SIGTERM") {
+        return res.status(400).json({ resStatus: false, resMessage: "OCR timed out. Try a smaller PDF.", resErrorCode: 7 });
+      }
       return res.status(500).json({ resStatus: false, resMessage: "OCR failed.", resErrorCode: 99 });
+    } finally {
+      try { fs.unlinkSync(inputPath); } catch (e) {}
+      try { fs.unlinkSync(outputPath); } catch (e) {}
     }
   }
 );
