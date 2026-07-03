@@ -2266,7 +2266,12 @@ router.post("/api/post/filebeef/pdf/crop", optionalAuth, pdfUpload.single("file"
       const pages = pdfDoc.getPages();
       for (const page of pages) {
         const { width, height } = page.getSize();
-        page.setCropBox(left, bottom, width - left - right, height - top - bottom);
+        const cropW = width - left - right;
+        const cropH = height - top - bottom;
+        if (cropW < 36 || cropH < 36) {
+          return res.status(400).json({ resStatus: false, resMessage: "Crop values too large — nothing would be left of the page.", resErrorCode: 6 });
+        }
+        page.setCropBox(left, bottom, cropW, cropH);
       }
       const outputBuffer = await pdfDoc.save();
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
