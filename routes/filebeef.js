@@ -1656,7 +1656,7 @@ router.post("/api/post/filebeef/pdf/watermark", optionalAuth, pdfUpload.single("
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
     const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
-    const text = (req.body.text || "CONFIDENTIAL").substring(0, 50);
+    const text = (req.body.text || "CONFIDENTIAL").substring(0, 25);
     const opacity = Math.min(1, Math.max(0.05, parseFloat(req.body.opacity) || 0.3));
     const fileSizeKb = Math.round(req.file.size / 1024);
     try {
@@ -1708,6 +1708,7 @@ router.post("/api/post/filebeef/pdf/page-numbers", optionalAuth, pdfUpload.singl
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const position = req.body.position || "bottom-center";
     const startNumber = parseInt(req.body.startNumber) || 1;
+    const style = req.body.style === "of-total" ? "of-total" : "simple";
     const fileSizeKb = Math.round(req.file.size / 1024);
     try {
       const pdfDoc = await PDFDocument.load(req.file.buffer);
@@ -1717,9 +1718,10 @@ router.post("/api/post/filebeef/pdf/page-numbers", optionalAuth, pdfUpload.singl
       const pages = pdfDoc.getPages();
       const fontSize = 10;
       const margin = 20;
+      const lastNumber = startNumber + pages.length - 1;
       pages.forEach((page, idx) => {
         const { width, height } = page.getSize();
-        const text = String(startNumber + idx);
+        const text = style === "of-total" ? `${startNumber + idx}/${lastNumber}` : String(startNumber + idx);
         const textWidth = font.widthOfTextAtSize(text, fontSize);
         let x, y;
         if (position === "bottom-center") { x = (width - textWidth) / 2; y = margin; }
