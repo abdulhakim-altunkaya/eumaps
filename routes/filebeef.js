@@ -1748,12 +1748,24 @@ router.post("/api/post/filebeef/pdf/protect", optionalAuth, pdfUpload.single("fi
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     try {
-      const pdfDoc = await PDFDocument.load(req.file.buffer);
-      const outputBuffer = await pdfDoc.save({
-        userPassword: password,
-        ownerPassword: password + "_owner",
-        permissions: { printing: "highResolution", copying: false, modifying: false }
-      });
+      const jobId = `protect_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const inputPath = path.join(os.tmpdir(), `${jobId}_in.pdf`);
+      const outputPath = path.join(os.tmpdir(), `${jobId}_out.pdf`);
+      fs.writeFileSync(inputPath, req.file.buffer);
+      try {
+        await new Promise((resolve, reject) => {
+          execFile(
+            "qpdf",
+            ["--encrypt", password, password + "_owner", "256", "--print=full", "--modify=none", "--extract=n", "--", inputPath, outputPath],
+            { timeout: 60000 },
+            (err) => err ? reject(err) : resolve()
+          );
+        });
+        var outputBuffer = fs.readFileSync(outputPath);
+      } finally {
+        try { fs.unlinkSync(inputPath); } catch (e) {}
+        try { fs.unlinkSync(outputPath); } catch (e) {}
+      }
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
       await incrementUsage(user?.user_id, ip, tier, "pdf-protect", "pdf", "pdf", fileSizeKb, "success");
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}_protected.pdf"`, "Content-Length": outputBuffer.length });
