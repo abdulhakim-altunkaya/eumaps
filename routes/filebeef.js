@@ -1796,6 +1796,14 @@ router.post("/api/post/filebeef/pdf/unlock", ipDailyLimit("unlock", 30), optiona
       const outputPath = path.join(os.tmpdir(), `${jobId}_out.pdf`);
       fs.writeFileSync(inputPath, req.file.buffer);
       try {
+        const isEncrypted = await new Promise((resolve) => {
+          execFile("qpdf", ["--is-encrypted", inputPath], { timeout: 15000 }, (err) => {
+            resolve(!err); // exit 0 = encrypted, exit 2 = not encrypted
+          });
+        });
+        if (!isEncrypted) {
+          return res.status(400).json({ resStatus: false, resMessage: "This PDF is not password protected — nothing to unlock.", resErrorCode: 8 });
+        }
         await new Promise((resolve, reject) => {
           execFile(
             "qpdf",
