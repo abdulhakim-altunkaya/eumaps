@@ -1868,10 +1868,12 @@ router.post("/api/post/filebeef/pdf/to-text", optionalAuth, pdfUpload.single("fi
     const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
+    let parser = null;
     try {
-      const pdfParse = require("pdf-parse");
-      const data = await pdfParse(req.file.buffer);
-      const textBuffer = Buffer.from(data.text, "utf8");
+      const { PDFParse } = require("pdf-parse");
+      parser = new PDFParse({ data: new Uint8Array(req.file.buffer) });
+      const result = await parser.getText();
+      const textBuffer = Buffer.from(result.text, "utf8");
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
       await incrementUsage(user?.user_id, ip, tier, "pdf-to-text", "pdf", "txt", fileSizeKb, "success");
       res.set({ "Content-Type": "text/plain; charset=utf-8", "Content-Disposition": `attachment; filename="${originalName}.txt"`, "Content-Length": textBuffer.length });
@@ -1880,6 +1882,8 @@ router.post("/api/post/filebeef/pdf/to-text", optionalAuth, pdfUpload.single("fi
       console.error("PDF to text error:", err.message);
       await incrementUsage(user?.user_id, ip, tier, "pdf-to-text", "pdf", "txt", fileSizeKb, "failed");
       return res.status(500).json({ resStatus: false, resMessage: "Text extraction failed.", resErrorCode: 99 });
+    } finally {
+      if (parser) { try { await parser.destroy(); } catch (e) {} }
     }
   }
 );
