@@ -1667,14 +1667,21 @@ router.post("/api/post/filebeef/pdf/watermark", optionalAuth, pdfUpload.single("
         const { width, height } = page.getSize();
         const fontSize = Math.min(60, Math.max(20, width / 10));
         const textWidth = font.widthOfTextAtSize(text, fontSize);
+        const textHeight = font.heightAtSize(fontSize);
+        // angle of the bottom-left → top-right page diagonal
+        const angleRad = Math.atan2(height, width);
+        const angleDeg = angleRad * (180 / Math.PI);
+        const cos = Math.cos(angleRad); const sin = Math.sin(angleRad);
+        // place start point so the rotated text's center lands on the page center
+        const x = width / 2 - (textWidth / 2) * cos + (textHeight / 2) * sin;
+        const y = height / 2 - (textWidth / 2) * sin - (textHeight / 2) * cos;
         page.drawText(text, {
-          x: (width - textWidth) / 2,
-          y: height / 2,
+          x, y,
           size: fontSize,
           font,
           color: rgb(0.5, 0.5, 0.5),
           opacity,
-          rotate: degrees(45)
+          rotate: degrees(angleDeg)
         });
       }
       const outputBuffer = await pdfDoc.save();
