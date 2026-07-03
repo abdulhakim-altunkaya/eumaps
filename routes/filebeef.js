@@ -22,6 +22,7 @@ const jwt = require("jsonwebtoken");
 const { pool, upload } = require("../db");
 const sendEmailBrevo = require("../utils/sendEmailBrevo");
 const { OAuth2Client } = require("google-auth-library");
+const { ipDailyLimit } = require("../middleware/filebeef_MW");
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -1779,7 +1780,7 @@ router.post("/api/post/filebeef/pdf/protect", optionalAuth, pdfUpload.single("fi
 );
 
 // ── UNLOCK PDF ─────────────────────────────────────────────────────────────
-router.post("/api/post/filebeef/pdf/unlock", optionalAuth, pdfUpload.single("file"), async (req, res) => {
+router.post("/api/post/filebeef/pdf/unlock", ipDailyLimit("unlock", 30), optionalAuth, pdfUpload.single("file"), async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user); const limits = getPdfLimits(tier);
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
@@ -1790,15 +1791,38 @@ router.post("/api/post/filebeef/pdf/unlock", optionalAuth, pdfUpload.single("fil
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     try {
-      const pdfDoc = await PDFDocument.load(req.file.buffer, { password });
-      const outputBuffer = await pdfDoc.save();
+      const jobId = `unlock_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const inputPath = path.join(os.tmpdir(), `${jobId}_in.pdf`);
+      const outputPath = path.join(os.tmpdir(), `${jobId}_out.pdf`);
+      fs.writeFileSync(inputPath, req.file.buffer);
+      try {
+        await new Promise((resolve, reject) => {
+          execFile(
+            "qpdf",
+            [`--password=${password}`, "--decrypt", inputPath, outputPath],
+            { timeout: 60000 },
+            (err, stdout, stderr) => {
+              if (err) {
+                if ((stderr || "").includes("invalid password")) return reject(new Error("WRONG_PASSWORD"));
+                if (err.code === 3) return resolve(); // qpdf: succeeded with warnings
+                return reject(err);
+              }
+              resolve();
+            }
+          );
+        });
+        var outputBuffer = fs.readFileSync(outputPath);
+      } finally {
+        try { fs.unlinkSync(inputPath); } catch (e) {}
+        try { fs.unlinkSync(outputPath); } catch (e) {}
+      }
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
       await incrementUsage(user?.user_id, ip, tier, "pdf-unlock", "pdf", "pdf", fileSizeKb, "success");
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}_unlocked.pdf"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(Buffer.from(outputBuffer));
     } catch (err) {
-      if (err.message?.includes("password") || err.message?.includes("encrypt")) {
-        return res.status(400).json({ resStatus: false, resMessage: "Incorrect password or PDF cannot be unlocked.", resErrorCode: 6 });
+      if (err.message === "WRONG_PASSWORD") {
+        return res.status(400).json({ resStatus: false, resMessage: "Incorrect password.", resErrorCode: 6 });
       }
       console.error("PDF unlock error:", err.message);
       await incrementUsage(user?.user_id, ip, tier, "pdf-unlock", "pdf", "pdf", fileSizeKb, "failed");
