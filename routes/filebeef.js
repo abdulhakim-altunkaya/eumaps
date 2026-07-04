@@ -1893,19 +1893,23 @@ router.post("/api/post/filebeef/pdf/grayscale", optionalAuth, pdfUpload.single("
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     try {
-      // Use puppeteer to render pages then convert to grayscale with sharp
-      const puppeteer = require("puppeteer");
-      const browser = await puppeteer.launch({ args: ["--no-sandbox", "--disable-setuid-sandbox"] });
-      const page = await browser.newPage();
-      const base64 = req.file.buffer.toString("base64");
-      await page.setContent(`<html><body style="margin:0;padding:0;background:#fff;"><embed src="data:application/pdf;base64,${base64}" width="100%" height="100%" /></body></html>`);
-      // fallback: just re-save the pdf (grayscale via puppeteer print)
-      const pdfBuffer = await page.pdf({ format: "A4", printBackground: true });
-      await browser.close();
-      // convert to grayscale using sharp on the PDF is not directly possible
-      // so we just re-save as-is with a note — full grayscale needs ghostscript
-      const pdfDoc = await PDFDocument.load(req.file.buffer);
-      const outputBuffer = await pdfDoc.save();
+      const tmpIn = path.join(os.tmpdir(), `fb_gray_in_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`);
+      const tmpOut = path.join(os.tmpdir(), `fb_gray_out_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`);
+      await fs.promises.writeFile(tmpIn, req.file.buffer);
+      await new Promise((resolve, reject) => {
+        execFile("gs", [
+          "-sDEVICE=pdfwrite",
+          "-sColorConversionStrategy=Gray",
+          "-dProcessColorModel=/DeviceGray",
+          "-dCompatibilityLevel=1.4",
+          "-dNOPAUSE", "-dBATCH", "-dQUIET",
+          `-sOutputFile=${tmpOut}`,
+          tmpIn
+        ], { timeout: 120000 }, (err) => err ? reject(err) : resolve());
+      });
+      const outputBuffer = await fs.promises.readFile(tmpOut);
+      await fs.promises.unlink(tmpIn).catch(() => {});
+      await fs.promises.unlink(tmpOut).catch(() => {});
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
       await incrementUsage(user?.user_id, ip, tier, "pdf-grayscale", "pdf", "pdf", fileSizeKb, "success");
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}_grayscale.pdf"`, "Content-Length": outputBuffer.length });
