@@ -2048,8 +2048,9 @@ router.post("/api/post/filebeef/pdf/image-to-pdf", optionalAuth, ipDailyLimit("i
     const files = req.files;
     if (!files || !files.length) return res.status(400).json({ resStatus: false, resMessage: "No files uploaded.", resErrorCode: 1 });
     const allowedImageTypes = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"];
+    const heicExt = (name) => /\.(heic|heif)$/i.test(name || "");
     for (const f of files) {
-      if (!allowedImageTypes.includes(f.mimetype)) return res.status(400).json({ resStatus: false, resMessage: `${f.originalname} is not a supported image.`, resErrorCode: 2 });
+      if (!allowedImageTypes.includes(f.mimetype) && !heicExt(f.originalname)) return res.status(400).json({ resStatus: false, resMessage: `${f.originalname} is not a supported image.`, resErrorCode: 2 });
       if (f.size > 7 * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `${f.originalname} is too large.`, resErrorCode: 3 });
     }
     const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
