@@ -1967,7 +1967,10 @@ router.post("/api/post/filebeef/pdf/metadata", optionalAuth, pdfUpload.single("f
       if (req.body.title !== undefined) pdfDoc.setTitle(req.body.title);
       if (req.body.author !== undefined) pdfDoc.setAuthor(req.body.author);
       if (req.body.subject !== undefined) pdfDoc.setSubject(req.body.subject);
-      if (req.body.keywords !== undefined) pdfDoc.setKeywords([req.body.keywords]);
+      if (req.body.keywords !== undefined) pdfDoc.setKeywords(req.body.keywords.split(",").map(k => k.trim()).filter(Boolean));
+      if (req.body.creator !== undefined) pdfDoc.setCreator(req.body.creator);
+      if (req.body.producer !== undefined) pdfDoc.setProducer(req.body.producer);
+      if (req.body.creationDate) { const cd = new Date(req.body.creationDate); if (!isNaN(cd)) pdfDoc.setCreationDate(cd); }
       pdfDoc.setModificationDate(new Date());
       const outputBuffer = await pdfDoc.save();
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
@@ -2196,7 +2199,12 @@ router.post("/api/post/filebeef/pdf/info", optionalAuth, pdfUpload.single("file"
     if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
     try {
       const pdfDoc = await PDFDocument.load(req.file.buffer);
-      return res.status(200).json({ resStatus: true, resOkCode: 1, pageCount: pdfDoc.getPageCount(), title: pdfDoc.getTitle() || null, author: pdfDoc.getAuthor() || null, subject: pdfDoc.getSubject() || null });
+      const headerMatch = req.file.buffer.slice(0, 20).toString("latin1").match(/%PDF-(\d\.\d)/);
+      const firstPage = pdfDoc.getPageCount() > 0 ? pdfDoc.getPage(0) : null;
+      const pageSize = firstPage ? `${(firstPage.getWidth() / 72).toFixed(2)} x ${(firstPage.getHeight() / 72).toFixed(2)} in` : null;
+      let creationDate = null;
+      try { const cd = pdfDoc.getCreationDate(); if (cd) creationDate = cd.toISOString(); } catch (e) {}
+      return res.status(200).json({ resStatus: true, resOkCode: 1, pageCount: pdfDoc.getPageCount(), title: pdfDoc.getTitle() || null, author: pdfDoc.getAuthor() || null, subject: pdfDoc.getSubject() || null, keywords: pdfDoc.getKeywords() || null, creator: pdfDoc.getCreator() || null, producer: pdfDoc.getProducer() || null, creationDate, pdfVersion: headerMatch ? headerMatch[1] : null, pageSize });  
     } catch (err) {
       return res.status(500).json({ resStatus: false, resMessage: "Could not read PDF.", resErrorCode: 99 });
     }
