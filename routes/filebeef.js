@@ -2015,7 +2015,16 @@ const outputOk = async () => {
         await fs.promises.unlink(tmpOut).catch(() => {});
         await runRepair("gs", ["-o", tmpOut, "-sDEVICE=pdfwrite", "-dPDFSTOPONERROR=false", "-dNOPAUSE", "-dBATCH", "-dQUIET", tmpIn]).catch(() => {});
       }
-      if (!(await outputOk())) throw new Error("Repair failed — file too corrupted");
+      if (!(await outputOk())) {
+        await fs.promises.unlink(tmpOut).catch(() => {});
+        let mutoolExitOk = true;
+        await runRepair("mutool", ["clean", tmpIn, tmpOut]).catch(() => { mutoolExitOk = false; });
+        if (mutoolExitOk) {
+          const st = await fs.promises.stat(tmpOut).catch(() => null);
+          if (!st || st.size < 100) mutoolExitOk = false;
+        }
+        if (!mutoolExitOk) throw new Error("Repair failed — file too corrupted");
+      }
       const outputBuffer = await fs.promises.readFile(tmpOut);
       await fs.promises.unlink(tmpIn).catch(() => {});
       await fs.promises.unlink(tmpOut).catch(() => {});
