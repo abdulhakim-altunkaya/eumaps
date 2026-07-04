@@ -164,7 +164,7 @@ const AUDIO_LIMITS = {
 };
 // ── PDF EDITOR ─────────────────────────────────────────────────────────────
 const EDITOR_LIMITS = {
-  guest: {
+  anon: {
     sizeMB: 3,
     maxAnnotations: 2,
     allowedTypes: ['highlight', 'text'],
@@ -2041,15 +2041,16 @@ const outputOk = async () => {
 );
 
 // ── IMAGE TO PDF ───────────────────────────────────────────────────────────
-router.post("/api/post/filebeef/pdf/image-to-pdf", optionalAuth, pdfMultiUpload.array("files", 20), async (req, res) => {
+router.post("/api/post/filebeef/pdf/image-to-pdf", optionalAuth, ipDailyLimit("image-to-pdf", 7), pdfMultiUpload.array("files", 20), async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user); const limits = getPdfLimits(tier);
+    if (tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "Image to PDF is a Pro feature. Upgrade to use this tool.", resErrorCode: 7, proRequired: true });
     const files = req.files;
     if (!files || !files.length) return res.status(400).json({ resStatus: false, resMessage: "No files uploaded.", resErrorCode: 1 });
     const allowedImageTypes = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"];
     for (const f of files) {
       if (!allowedImageTypes.includes(f.mimetype)) return res.status(400).json({ resStatus: false, resMessage: `${f.originalname} is not a supported image.`, resErrorCode: 2 });
-      if (f.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `${f.originalname} is too large.`, resErrorCode: 3 });
+      if (f.size > 7 * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `${f.originalname} is too large.`, resErrorCode: 3 });
     }
     const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
@@ -2058,7 +2059,7 @@ router.post("/api/post/filebeef/pdf/image-to-pdf", optionalAuth, pdfMultiUpload.
       const pdfDoc = await PDFDocument.create();
       for (const file of files) {
         // convert all to jpeg first for consistency
-        const jpegBuffer = await sharp(file.buffer).jpeg({ quality: 90 }).toBuffer();
+        const jpegBuffer = await sharp(file.buffer).rotate().resize(2400, 2400, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
         const image = await pdfDoc.embedJpg(jpegBuffer);
         const { width, height } = image.scale(1);
         // fit to A4 if larger
@@ -3682,7 +3683,7 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
   const user = req.filebeefUser
   const ip = getClientIp(req)
   const tier = getTier(user)
-  const limits = EDITOR_LIMITS[tier] || EDITOR_LIMITS.guest
+  const limits = EDITOR_LIMITS[tier] || EDITOR_LIMITS.anon
 
   // ── FILE CHECKS ──
   if (!req.file) return res.status(400).json({ resStatus: false, resMessage: 'No file uploaded.', resErrorCode: 1 })
@@ -4173,7 +4174,7 @@ pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
       await browser.close()
     }
 
-    // ── WATERMARK FOR GUEST ──
+    // ── WATERMARK FOR anon ──
     if (limits.watermark) {
       const watermarkFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
       const pages = pdfDoc.getPages()
