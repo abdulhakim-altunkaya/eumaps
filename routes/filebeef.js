@@ -2002,13 +2002,16 @@ router.post("/api/post/filebeef/pdf/repair", optionalAuth, pdfUpload.single("fil
       const runRepair = (cmd, args) => new Promise((resolve, reject) => {
         execFile(cmd, args, { timeout: 120000 }, (err) => err ? reject(err) : resolve());
       });
-      try {
-        await runRepair("qpdf", ["--recover", tmpIn, tmpOut]);
-      } catch (qpdfErr) {
-        await runRepair("gs", ["-o", tmpOut, "-sDEVICE=pdfwrite", "-dPDFSTOPONERROR=false", "-dNOPAUSE", "-dBATCH", "-dQUIET", tmpIn]);
+      const outputOk = async () => {
+        try { const st = await fs.promises.stat(tmpOut); return st.size > 100; } catch (e) { return false; }
+      };
+      await runRepair("qpdf", ["--recover", tmpIn, tmpOut]).catch(() => {});
+      if (!(await outputOk())) {
+        await fs.promises.unlink(tmpOut).catch(() => {});
+        await runRepair("gs", ["-o", tmpOut, "-sDEVICE=pdfwrite", "-dPDFSTOPONERROR=false", "-dNOPAUSE", "-dBATCH", "-dQUIET", tmpIn]).catch(() => {});
       }
+      if (!(await outputOk())) throw new Error("Repair failed — file too corrupted");
       const outputBuffer = await fs.promises.readFile(tmpOut);
-      if (outputBuffer.length === 0) throw new Error("Repair produced empty file");
       await fs.promises.unlink(tmpIn).catch(() => {});
       await fs.promises.unlink(tmpOut).catch(() => {});
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
