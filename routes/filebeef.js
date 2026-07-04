@@ -2058,9 +2058,21 @@ router.post("/api/post/filebeef/pdf/image-to-pdf", optionalAuth, ipDailyLimit("i
     const totalKb = Math.round(files.reduce((s, f) => s + f.size, 0) / 1024);
     try {
       const pdfDoc = await PDFDocument.create();
+      const isHeic = (f) => /\.(heic|heif)$/i.test(f.originalname || "") || ["image/heic", "image/heif"].includes(f.mimetype);
       for (const file of files) {
+        let srcBuffer = file.buffer;
+        if (isHeic(file)) {
+          const tmpH = path.join(os.tmpdir(), `fb_heic_${Date.now()}_${Math.random().toString(36).slice(2)}`);
+          await fs.promises.writeFile(tmpH + ".heic", file.buffer);
+          await new Promise((resolve, reject) => {
+            execFile("heif-convert", [tmpH + ".heic", tmpH + ".jpg"], { timeout: 60000 }, (err) => err ? reject(err) : resolve());
+          });
+          srcBuffer = await fs.promises.readFile(tmpH + ".jpg");
+          await fs.promises.unlink(tmpH + ".heic").catch(() => {});
+          await fs.promises.unlink(tmpH + ".jpg").catch(() => {});
+        }
         // convert all to jpeg first for consistency
-        const jpegBuffer = await sharp(file.buffer).rotate().resize(2400, 2400, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+        const jpegBuffer = await sharp(srcBuffer).rotate().resize(2400, 2400, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
         const image = await pdfDoc.embedJpg(jpegBuffer);
         const { width, height } = image.scale(1);
         // fit to A4 if larger
