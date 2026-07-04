@@ -1996,9 +1996,21 @@ router.post("/api/post/filebeef/pdf/repair", optionalAuth, pdfUpload.single("fil
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     try {
-      // pdf-lib will attempt to load and re-save, fixing minor corruption
-      const pdfDoc = await PDFDocument.load(req.file.buffer, { ignoreEncryption: true, throwOnInvalidObject: false });
-      const outputBuffer = await pdfDoc.save();
+      const tmpIn = path.join(os.tmpdir(), `fb_repair_in_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`);
+      const tmpOut = path.join(os.tmpdir(), `fb_repair_out_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`);
+      await fs.promises.writeFile(tmpIn, req.file.buffer);
+      const runRepair = (cmd, args) => new Promise((resolve, reject) => {
+        execFile(cmd, args, { timeout: 120000 }, (err) => err ? reject(err) : resolve());
+      });
+      try {
+        await runRepair("qpdf", ["--recover", tmpIn, tmpOut]);
+      } catch (qpdfErr) {
+        await runRepair("gs", ["-o", tmpOut, "-sDEVICE=pdfwrite", "-dPDFSTOPONERROR=false", "-dNOPAUSE", "-dBATCH", "-dQUIET", tmpIn]);
+      }
+      const outputBuffer = await fs.promises.readFile(tmpOut);
+      if (outputBuffer.length === 0) throw new Error("Repair produced empty file");
+      await fs.promises.unlink(tmpIn).catch(() => {});
+      await fs.promises.unlink(tmpOut).catch(() => {});
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
       await incrementUsage(user?.user_id, ip, tier, "pdf-repair", "pdf", "pdf", fileSizeKb, "success");
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}_repaired.pdf"`, "Content-Length": outputBuffer.length });
