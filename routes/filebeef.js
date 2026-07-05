@@ -2096,43 +2096,6 @@ router.post("/api/post/filebeef/pdf/image-to-pdf", optionalAuth, ipDailyLimit("i
   }
 );
 
-// ── WORD TO PDF ────────────────────────────────────────────────────────────
-// Uses mammoth (docx→html) + puppeteer (html→pdf)
-router.post("/api/post/filebeef/pdf/word-to-pdf", optionalAuth, async (req, res) => {
-    const user = req.filebeefUser; const ip = getClientIp(req);
-    const tier = getTier(user); const limits = getPdfLimits(tier);
-    const wordUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: limits.sizeMB * 1024 * 1024, files: 1 } }).single("file");
-    wordUpload(req, res, async (err) => {
-      if (err) return res.status(400).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 1 });
-      if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
-      const validExt = req.file.originalname.match(/\.(docx|doc)$/i);
-      if (!validExt) return res.status(400).json({ resStatus: false, resMessage: "Please upload a .docx file.", resErrorCode: 2 });
-      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
-      if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
-      const fileSizeKb = Math.round(req.file.size / 1024);
-      try {
-        const mammoth = require("mammoth");
-        const puppeteer = require("puppeteer");
-        const result = await mammoth.convertToHtml({ buffer: req.file.buffer });
-        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;font-size:12px;line-height:1.6;margin:40px;color:#000;}h1,h2,h3{margin-top:16px;}table{border-collapse:collapse;width:100%;}td,th{border:1px solid #ccc;padding:4px 8px;}</style></head><body>${result.value}</body></html>`;
-        const browser = await puppeteer.launch({ args: ["--no-sandbox", "--disable-setuid-sandbox"] });
-        const page = await browser.newPage();
-        await page.setContent(html, { waitUntil: "networkidle0" });
-        const pdfBuffer = await page.pdf({ format: "A4", margin: { top: "20mm", bottom: "20mm", left: "15mm", right: "15mm" } });
-        await browser.close();
-        const originalName = req.file.originalname.replace(/\.(docx|doc)$/i, "");
-        await incrementUsage(user?.user_id, ip, tier, "word-to-pdf", "docx", "pdf", fileSizeKb, "success");
-        res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}.pdf"`, "Content-Length": pdfBuffer.length });
-        return res.status(200).send(pdfBuffer);
-      } catch (err) {
-        console.error("Word to PDF error:", err.message);
-        await incrementUsage(user?.user_id, ip, tier, "word-to-pdf", "docx", "pdf", fileSizeKb, "failed");
-        return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
-      }
-    });
-  }
-);
-
 // ── HTML TO PDF ────────────────────────────────────────────────────────────
 router.post("/api/post/filebeef/pdf/html-to-pdf", optionalAuth, async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
