@@ -3552,10 +3552,11 @@ router.post("/api/post/filebeef/pdf/pptx-to-pdf", optionalAuth, ipDailyLimit("pp
 
           if (mode === "image") {
             // flatten each page to an image, rebuild PDF
-            await execFileAsync("mutool", ["draw", "-r", "96", "-o", path.join(tmpDir, "page_%d.jpg"), tmpOut]);
+            await execFileAsync("mutool", ["draw", "-r", "96", "-o", path.join(tmpDir, "page_%d.png"), tmpOut]);
             const flat = await PDFDocument.create();
             for (let i = 1; i <= check.getPageCount(); i++) {
-              const jpg = await flat.embedJpg(fs.readFileSync(path.join(tmpDir, `page_${i}.jpg`)));
+              const pngBuf = await sharp(path.join(tmpDir, `page_${i}.png`)).jpeg({ quality: 80 }).toBuffer();
+              const jpg = await flat.embedJpg(pngBuf);
               const page = flat.addPage([jpg.width, jpg.height]);
               page.drawImage(jpg, { x: 0, y: 0, width: jpg.width, height: jpg.height });
             }
