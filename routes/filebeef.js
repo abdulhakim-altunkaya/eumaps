@@ -3645,10 +3645,24 @@ router.post("/api/post/filebeef/pdf/to-pptx", optionalAuth, pdfUpload.single("fi
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     try {
-      const pdfParse = require("pdf-parse");
       const pptx = require("pptxgenjs");
-      const data = await pdfParse(req.file.buffer);
-      const pages = data.text.split(/\f/).filter(p => p.trim()); // \f = form feed = page break
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-pdf2pptx-"));
+      let raw;
+      try {
+        const inPath = path.join(tmpDir, "in.pdf");
+        const txtPath = path.join(tmpDir, "out.txt");
+        fs.writeFileSync(inPath, req.file.buffer);
+        await execFileAsync("mutool", ["draw", "-F", "text", "-o", txtPath, inPath]);
+        raw = fs.readFileSync(txtPath, "utf8");
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+      const pages = raw.split(/\f/).filter(p => p.trim()); // \f = form feed = page break
+
+      if (!pages.length) {
+        await incrementUsage(user?.user_id, ip, tier, "pdf-to-pptx", "pdf", "pptx", fileSizeKb, "failed");
+        return res.status(400).json({ resStatus: false, resMessage: "No text found in this PDF. It may be scanned — try the OCR tool first.", resErrorCode: 7 });
+      }
       const prs = new pptx();
       for (const pageText of pages) {
         const slide = prs.addSlide();
