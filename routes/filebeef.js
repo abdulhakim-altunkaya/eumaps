@@ -3634,18 +3634,24 @@ router.post("/api/post/filebeef/pdf/odt-to-pdf", optionalAuth, async (req, res) 
 
 // ── PDF TO POWERPOINT ──────────────────────────────────────────────────────
 // Extracts text per page and builds a .pptx — basic, not layout-preserving
-router.post("/api/post/filebeef/pdf/to-pptx", optionalAuth, pdfUpload.single("file"), async (req, res) => {
+router.post("/api/post/filebeef/pdf/to-pptx", optionalAuth, ipDailyLimit("pdf-to-pptx", 3), pdfUpload.single("file"), async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user); const limits = getPdfLimits(tier);
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
-    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
+    const MAX_MB = 10;
+    if (req.file.size > MAX_MB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${MAX_MB}MB.`, resErrorCode: 3 });
     if (tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "PDF to PowerPoint is a Pro feature.", resErrorCode: 4, proOnly: true });
     const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     try {
       const pptx = require("pptxgenjs");
+      const MAX_PAGES = 50;
+      const pdfDocCheck = await PDFDocument.load(req.file.buffer);
+      if (pdfDocCheck.getPageCount() > MAX_PAGES) {
+        return res.status(400).json({ resStatus: false, resMessage: `PDF has too many pages. Max ${MAX_PAGES} pages.`, resErrorCode: 8 });
+      }
       const mode = req.body.mode === "image" ? "image" : "text";
       const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-pdf2pptx-"));
       let pptxBuffer;
@@ -3656,9 +3662,8 @@ router.post("/api/post/filebeef/pdf/to-pptx", optionalAuth, pdfUpload.single("fi
 
         if (mode === "image") {
           // exact appearance — each page rendered as a full-slide image
-          const pdfDoc = await PDFDocument.load(req.file.buffer);
-          const pagesToRender = Math.min(pdfDoc.getPageCount(), 50);
-          await execFileAsync("mutool", ["draw", "-r", "120", "-o", path.join(tmpDir, "page_%d.jpg"), inPath, `1-${pagesToRender}`]);
+          const pagesToRender = pdfDocCheck.getPageCount();
+          await execFileAsync("mutool", ["draw", "-r", "96", "-o", path.join(tmpDir, "page_%d.jpg"), inPath, `1-${pagesToRender}`]);
           const meta = await sharp(path.join(tmpDir, "page_1.jpg")).metadata();
           const W = 10; const H = Math.round((W * meta.height / meta.width) * 100) / 100;
           prs.defineLayout({ name: "pdfpage", width: W, height: H });
