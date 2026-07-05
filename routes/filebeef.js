@@ -2548,16 +2548,49 @@ router.post("/api/post/filebeef/pdf/to-excel", optionalAuth, pdfUpload.single("f
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     try {
-      const pdfParse = require("pdf-parse");
-      const XLSX = require("xlsx");
-      const data = await pdfParse(req.file.buffer);
-      const lines = data.text.split("\n").filter(l => l.trim());
-      // split each line by whitespace into columns
+      const JSZip = require("jszip");
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-pdf2xls-"));
+      let raw;
+      try {
+        const inPath = path.join(tmpDir, "in.pdf");
+        const txtPath = path.join(tmpDir, "out.txt");
+        fs.writeFileSync(inPath, req.file.buffer);
+        await execFileAsync("mutool", ["draw", "-F", "text", "-o", txtPath, inPath]);
+        raw = fs.readFileSync(txtPath, "utf8");
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+
+      if (!raw.trim()) {
+        await incrementUsage(user?.user_id, ip, tier, "pdf-to-excel", "pdf", "xlsx", fileSizeKb, "failed");
+        return res.status(400).json({ resStatus: false, resMessage: "No text found in this PDF. It may be scanned — try the OCR tool first.", resErrorCode: 7 });
+      }
+
+      const lines = raw.replace(/\f/g, "\n").split(/\r?\n/).filter(l => l.trim());
       const rows = lines.map(line => line.split(/\s{2,}/).map(cell => cell.trim()));
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
-      const xlsxBuffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+      const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const colLetter = n => { let s = ""; n++; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
+      const sheetRows = rows.map((cells, r) =>
+        `<row r="${r + 1}">` + cells.map((cell, c) =>
+          `<c r="${colLetter(c)}${r + 1}" t="inlineStr"><is><t xml:space="preserve">${esc(cell)}</t></is></c>`
+        ).join("") + `</row>`
+      ).join("");
+
+      const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${sheetRows}</sheetData></worksheet>`;
+      const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>`;
+      const workbookRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`;
+      const rootRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`;
+      const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>`;
+
+      const zip = new JSZip();
+      zip.file("[Content_Types].xml", contentTypes);
+      zip.file("_rels/.rels", rootRels);
+      zip.file("xl/workbook.xml", workbookXml);
+      zip.file("xl/_rels/workbook.xml.rels", workbookRels);
+      zip.file("xl/worksheets/sheet1.xml", sheetXml);
+      const xlsxBuffer = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
       await incrementUsage(user?.user_id, ip, tier, "pdf-to-excel", "pdf", "xlsx", fileSizeKb, "success");
       res.set({ "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": `attachment; filename="${originalName}.xlsx"`, "Content-Length": xlsxBuffer.length });
