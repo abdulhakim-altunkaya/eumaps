@@ -2196,7 +2196,7 @@ router.post("/api/post/filebeef/pdf/to-jpg", optionalAuth, ipDailyLimit("pdf-to-
     try {
       const inPath = path.join(tmpDir, "in.pdf");
       fs.writeFileSync(inPath, req.file.buffer);
-      await execFileAsync("mutool", ["draw", "-r", "150", "-o", path.join(tmpDir, "page_%d.jpg"), inPath, `1-${pagesToRender}`]);
+      await execFileAsync("mutool", ["draw", "-r", "110", "-o", path.join(tmpDir, "page_%d.jpg"), inPath, `1-${pagesToRender}`]);
 
       if (pagesToRender === 1) {
         const jpg = fs.readFileSync(path.join(tmpDir, "page_1.jpg"));
