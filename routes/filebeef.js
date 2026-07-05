@@ -5,6 +5,7 @@ const bcrypt = require("bcrypt");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const ffmpeg = require("fluent-ffmpeg");
 const { execFile } = require("child_process");
+const execFileAsync = require("util").promisify(execFile);
 const os = require("os");
 const path = require("path");
 
@@ -2173,61 +2174,47 @@ router.post("/api/post/filebeef/pdf/html-to-pdf", optionalAuth, async (req, res)
 // ── PDF TO JPG ─────────────────────────────────────────────────────────────
 // Uses puppeteer to render pages as images
 // ── PDF TO JPG (fixed — uses jszip instead of archiver) ───────────────────
-router.post("/api/post/filebeef/pdf/to-jpg", optionalAuth, pdfUpload.single("file"), async (req, res) => {
+router.post("/api/post/filebeef/pdf/to-jpg", optionalAuth, ipDailyLimit("pdf-to-jpg", 7), pdfUpload.single("file"), async (req, res) => {
   const user = req.filebeefUser; const ip = getClientIp(req);
   const tier = getTier(user); const limits = getPdfLimits(tier);
   if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
   if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
   if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
+  if (tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "PDF to JPG is a Pro feature. Upgrade to unlock.", resErrorCode: 6, proRequired: true, tier });
   const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
   if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
   const fileSizeKb = Math.round(req.file.size / 1024);
   try {
-    const puppeteer = require("puppeteer");
     const JSZip = require("jszip");
     const pdfDoc = await PDFDocument.load(req.file.buffer);
     const totalPages = pdfDoc.getPageCount();
-    const base64 = req.file.buffer.toString("base64");
-    const browser = await puppeteer.launch({ args: ["--no-sandbox", "--disable-setuid-sandbox"] });
     const originalName = req.file.originalname.replace(/\.pdf$/i, "");
+    const maxPages = tier === "pro" ? 50 : tier === "free" ? 10 : 3;
+    const pagesToRender = Math.min(totalPages, maxPages);
 
-    if (totalPages === 1) {
-      // single page — return jpg directly
-      const page = await browser.newPage();
-      await page.setContent(`<html><body style="margin:0;padding:0;"><embed src="data:application/pdf;base64,${base64}" width="800" height="1131" /></body></html>`);
-      await page.waitForTimeout(500);
-      const screenshot = await page.screenshot({ type: "jpeg", quality: 90, fullPage: false, clip: { x: 0, y: 0, width: 800, height: 1131 } });
-      await browser.close();
-      await incrementUsage(user?.user_id, ip, tier, "pdf-to-jpg", "pdf", "jpg", fileSizeKb, "success");
-      res.set({ "Content-Type": "image/jpeg", "Content-Disposition": `attachment; filename="${originalName}.jpg"`, "Content-Length": screenshot.length });
-      return res.status(200).send(screenshot);
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-pdf2jpg-"));
+    try {
+      const inPath = path.join(tmpDir, "in.pdf");
+      fs.writeFileSync(inPath, req.file.buffer);
+      await execFileAsync("mutool", ["draw", "-r", "150", "-o", path.join(tmpDir, "page_%d.jpg"), inPath, `1-${pagesToRender}`]);
 
-    } else {
-      // multiple pages — build zip in memory with jszip
-      const maxPages = tier === "pro" ? 50 : tier === "free" ? 10 : 3;
-      const zip = new JSZip();
-
-      for (let i = 0; i < Math.min(totalPages, maxPages); i++) {
-        const newDoc = await PDFDocument.create();
-        const [p] = await newDoc.copyPages(pdfDoc, [i]);
-        newDoc.addPage(p);
-        const singleBuf = Buffer.from(await newDoc.save());
-        const b64 = singleBuf.toString("base64");
-        const bpage = await browser.newPage();
-        await bpage.setViewport({ width: 800, height: 1131, deviceScaleFactor: 1 });
-        await bpage.setContent(`<!DOCTYPE html><html><head><style>*{margin:0;padding:0;}html,body{width:800px;height:1131px;overflow:hidden;background:#fff;}embed{display:block;width:800px;height:1131px;}</style></head><body><embed src="data:application/pdf;base64,${b64}" type="application/pdf" width="800" height="1131" /></body></html>`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        const shot = await bpage.screenshot({ type: "jpeg", quality: 85, clip: { x: 0, y: 0, width: 800, height: 1131 } });
-        await bpage.close();
-        zip.file(`${originalName}_page_${i + 1}.jpg`, shot);
+      if (pagesToRender === 1) {
+        const jpg = fs.readFileSync(path.join(tmpDir, "page_1.jpg"));
+        await incrementUsage(user?.user_id, ip, tier, "pdf-to-jpg", "pdf", "jpg", fileSizeKb, "success");
+        res.set({ "Content-Type": "image/jpeg", "Content-Disposition": `attachment; filename="${originalName}.jpg"`, "Content-Length": jpg.length });
+        return res.status(200).send(jpg);
+      } else {
+        const zip = new JSZip();
+        for (let i = 1; i <= pagesToRender; i++) {
+          zip.file(`${originalName}_page_${i}.jpg`, fs.readFileSync(path.join(tmpDir, `page_${i}.jpg`)));
+        }
+        const zipBuffer = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE", compressionOptions: { level: 6 } });
+        await incrementUsage(user?.user_id, ip, tier, "pdf-to-jpg", "pdf", "jpg", fileSizeKb, "success");
+        res.set({ "Content-Type": "application/zip", "Content-Disposition": `attachment; filename="${originalName}_pages.zip"`, "Content-Length": zipBuffer.length });
+        return res.status(200).send(zipBuffer);
       }
-
-      await browser.close();
-
-      const zipBuffer = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE", compressionOptions: { level: 6 } });
-      await incrementUsage(user?.user_id, ip, tier, "pdf-to-jpg", "pdf", "jpg", fileSizeKb, "success");
-      res.set({ "Content-Type": "application/zip", "Content-Disposition": `attachment; filename="${originalName}_pages.zip"`, "Content-Length": zipBuffer.length });
-      return res.status(200).send(zipBuffer);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
     }
 
   } catch (err) {
