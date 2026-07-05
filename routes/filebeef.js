@@ -3646,33 +3646,50 @@ router.post("/api/post/filebeef/pdf/to-pptx", optionalAuth, pdfUpload.single("fi
     const fileSizeKb = Math.round(req.file.size / 1024);
     try {
       const pptx = require("pptxgenjs");
+      const mode = req.body.mode === "image" ? "image" : "text";
       const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-pdf2pptx-"));
-      let raw;
+      let pptxBuffer;
       try {
         const inPath = path.join(tmpDir, "in.pdf");
-        const txtPath = path.join(tmpDir, "out.txt");
         fs.writeFileSync(inPath, req.file.buffer);
-        await execFileAsync("mutool", ["draw", "-F", "text", "-o", txtPath, inPath]);
-        raw = fs.readFileSync(txtPath, "utf8");
+        const prs = new pptx();
+
+        if (mode === "image") {
+          // exact appearance — each page rendered as a full-slide image
+          const pdfDoc = await PDFDocument.load(req.file.buffer);
+          const pagesToRender = Math.min(pdfDoc.getPageCount(), 50);
+          await execFileAsync("mutool", ["draw", "-r", "120", "-o", path.join(tmpDir, "page_%d.jpg"), inPath, `1-${pagesToRender}`]);
+          const meta = await sharp(path.join(tmpDir, "page_1.jpg")).metadata();
+          const W = 10; const H = Math.round((W * meta.height / meta.width) * 100) / 100;
+          prs.defineLayout({ name: "pdfpage", width: W, height: H });
+          prs.layout = "pdfpage";
+          for (let i = 1; i <= pagesToRender; i++) {
+            const slide = prs.addSlide();
+            slide.addImage({ path: path.join(tmpDir, `page_${i}.jpg`), x: 0, y: 0, w: W, h: H });
+          }
+        } else {
+          // editable text
+          const txtPath = path.join(tmpDir, "out.txt");
+          await execFileAsync("mutool", ["draw", "-F", "text", "-o", txtPath, inPath]);
+          const raw = fs.readFileSync(txtPath, "utf8");
+          const pages = raw.split(/\f/).filter(p => p.trim());
+          if (!pages.length) {
+            await incrementUsage(user?.user_id, ip, tier, "pdf-to-pptx", "pdf", "pptx", fileSizeKb, "failed");
+            return res.status(400).json({ resStatus: false, resMessage: "No text found in this PDF. It may be scanned — try Exact appearance mode or the OCR tool.", resErrorCode: 7 });
+          }
+          for (const pageText of pages) {
+            const slide = prs.addSlide();
+            slide.addText(pageText.trim().substring(0, 1000), {
+              x: 0.5, y: 0.5, w: "90%", h: "90%",
+              fontSize: 12, fontFace: "Arial", color: "1a1a1a",
+              wrap: true, valign: "top"
+            });
+          }
+        }
+        pptxBuffer = await prs.write({ outputType: "nodebuffer" });
       } finally {
         fs.rmSync(tmpDir, { recursive: true, force: true });
       }
-      const pages = raw.split(/\f/).filter(p => p.trim()); // \f = form feed = page break
-
-      if (!pages.length) {
-        await incrementUsage(user?.user_id, ip, tier, "pdf-to-pptx", "pdf", "pptx", fileSizeKb, "failed");
-        return res.status(400).json({ resStatus: false, resMessage: "No text found in this PDF. It may be scanned — try the OCR tool first.", resErrorCode: 7 });
-      }
-      const prs = new pptx();
-      for (const pageText of pages) {
-        const slide = prs.addSlide();
-        slide.addText(pageText.trim().substring(0, 1000), {
-          x: 0.5, y: 0.5, w: "90%", h: "90%",
-          fontSize: 12, fontFace: "Arial", color: "1a1a1a",
-          wrap: true, valign: "top"
-        });
-      }
-      const pptxBuffer = await prs.write({ outputType: "nodebuffer" });
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
       await incrementUsage(user?.user_id, ip, tier, "pdf-to-pptx", "pdf", "pptx", fileSizeKb, "success");
       res.set({
