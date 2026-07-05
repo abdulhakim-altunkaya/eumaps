@@ -3534,6 +3534,7 @@ router.post("/api/post/filebeef/pdf/pptx-to-pdf", optionalAuth, ipDailyLimit("pp
       const fileSizeKb = Math.round(req.file.size / 1024);
       try {
         const mode = req.body.mode === "image" ? "image" : "text";
+        console.log("pptx-to-pdf mode:", req.body.mode, "→", mode);
         const MAX_PAGES = 50;
         const ext = req.file.originalname.match(/\.ppt$/i) ? "ppt" : "pptx";
         const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-pptx2pdf-"));
