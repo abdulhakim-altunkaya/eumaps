@@ -3519,30 +3519,53 @@ router.post("/api/post/filebeef/audio/merge", optionalAuth, audioMultiUpload.arr
 
 
 // ── POWERPOINT TO PDF ──────────────────────────────────────────────────────
-router.post("/api/post/filebeef/pdf/pptx-to-pdf", optionalAuth, async (req, res) => {
+router.post("/api/post/filebeef/pdf/pptx-to-pdf", optionalAuth, ipDailyLimit("pptx-to-pdf", 3), async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
-    const tier = getTier(user); const limits = getPdfLimits(tier);
-    const pptxUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: limits.sizeMB * 1024 * 1024, files: 1 } }).single("file");
+    const tier = getTier(user);
+    const MAX_MB = 20;
+    const pptxUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_MB * 1024 * 1024, files: 1 } }).single("file");
     pptxUpload(req, res, async (err) => {
-      if (err) return res.status(400).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 1 });
+      if (err) return res.status(400).json({ resStatus: false, resMessage: `Upload error. Max ${MAX_MB}MB.`, resErrorCode: 1 });
       if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
       if (!req.file.originalname.match(/\.(pptx|ppt)$/i)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a .pptx or .ppt file.", resErrorCode: 2 });
+      if (tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "PowerPoint to PDF is a Pro feature.", resErrorCode: 4, proOnly: true });
       const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
       if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
       const fileSizeKb = Math.round(req.file.size / 1024);
       try {
-        const { execFile } = require("child_process");
-        const tmpIn = path.join(os.tmpdir(), `fb_pptx_${Date.now()}.pptx`);
-        fs.writeFileSync(tmpIn, req.file.buffer);
-        await new Promise((resolve, reject) => {
-          execFile("libreoffice", ["--headless", "--convert-to", "pdf", "--outdir", os.tmpdir(), tmpIn], (err) => {
-            if (err) reject(err); else resolve();
-          });
-        });
-        const tmpOut = tmpIn.replace(/\.pptx$/i, ".pdf");
-        const outputBuffer = fs.readFileSync(tmpOut);
-        fs.unlinkSync(tmpIn);
-        fs.unlinkSync(tmpOut);
+        const mode = req.body.mode === "image" ? "image" : "text";
+        const MAX_PAGES = 50;
+        const ext = req.file.originalname.match(/\.ppt$/i) ? "ppt" : "pptx";
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-pptx2pdf-"));
+        let outputBuffer;
+        try {
+          const tmpIn = path.join(tmpDir, `in.${ext}`);
+          fs.writeFileSync(tmpIn, req.file.buffer);
+          await execFileAsync("libreoffice", ["--headless", "--convert-to", "pdf", "--outdir", tmpDir, tmpIn]);
+          const tmpOut = path.join(tmpDir, "in.pdf");
+          const pdfBuf = fs.readFileSync(tmpOut);
+
+          const check = await PDFDocument.load(pdfBuf);
+          if (check.getPageCount() > MAX_PAGES) {
+            return res.status(400).json({ resStatus: false, resMessage: `Presentation has too many slides. Max ${MAX_PAGES}.`, resErrorCode: 8 });
+          }
+
+          if (mode === "image") {
+            // flatten each page to an image, rebuild PDF
+            await execFileAsync("mutool", ["draw", "-r", "96", "-o", path.join(tmpDir, "page_%d.jpg"), tmpOut]);
+            const flat = await PDFDocument.create();
+            for (let i = 1; i <= check.getPageCount(); i++) {
+              const jpg = await flat.embedJpg(fs.readFileSync(path.join(tmpDir, `page_${i}.jpg`)));
+              const page = flat.addPage([jpg.width, jpg.height]);
+              page.drawImage(jpg, { x: 0, y: 0, width: jpg.width, height: jpg.height });
+            }
+            outputBuffer = Buffer.from(await flat.save());
+          } else {
+            outputBuffer = pdfBuf;
+          }
+        } finally {
+          fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
         const originalName = req.file.originalname.replace(/\.(pptx|ppt)$/i, "");
         await incrementUsage(user?.user_id, ip, tier, "pptx-to-pdf", "pptx", "pdf", fileSizeKb, "success");
         res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}.pdf"`, "Content-Length": outputBuffer.length });
