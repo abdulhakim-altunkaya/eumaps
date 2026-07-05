@@ -2593,7 +2593,64 @@ router.post("/api/post/filebeef/pdf/to-excel", optionalAuth, pdfUpload.single("f
     }
   }
 );
+// ── PDF TO WORD ────────────────────────────────────────────────────────────
+// Extracts text with mutool, builds a minimal .docx with jszip. Pro only.
+router.post("/api/post/filebeef/pdf/to-word", optionalAuth, pdfUpload.single("file"), async (req, res) => {
+  const user = req.filebeefUser; const ip = getClientIp(req);
+  const tier = getTier(user); const limits = getPdfLimits(tier);
+  if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
+  if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
+  if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
+  if (tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "PDF to Word is a Pro feature. Upgrade to unlock.", resErrorCode: 6, proRequired: true, tier });
+  const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+  if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+  const fileSizeKb = Math.round(req.file.size / 1024);
+  try {
+    const JSZip = require("jszip");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-pdf2word-"));
+    try {
+      const inPath = path.join(tmpDir, "in.pdf");
+      const txtPath = path.join(tmpDir, "out.txt");
+      fs.writeFileSync(inPath, req.file.buffer);
+      await execFileAsync("mutool", ["draw", "-F", "text", "-o", txtPath, inPath]);
+      const raw = fs.readFileSync(txtPath, "utf8");
 
+      if (!raw.trim()) {
+        await incrementUsage(user?.user_id, ip, tier, "pdf-to-word", "pdf", "docx", fileSizeKb, "failed");
+        return res.status(400).json({ resStatus: false, resMessage: "No text found in this PDF. It may be scanned — try the OCR tool first.", resErrorCode: 7 });
+      }
+
+      const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const pageBreak = `<w:p><w:r><w:br w:type="page"/></w:r></w:p>`;
+      const bodyXml = raw.split("\f").map(pageText =>
+        pageText.split(/\r?\n/).map(line =>
+          `<w:p><w:r><w:t xml:space="preserve">${esc(line)}</w:t></w:r></w:p>`
+        ).join("")
+      ).join(pageBreak);
+
+      const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${bodyXml}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:bottom="1134" w:left="1134" w:right="1134"/></w:sectPr></w:body></w:document>`;
+      const contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`;
+      const relsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+
+      const zip = new JSZip();
+      zip.file("[Content_Types].xml", contentTypesXml);
+      zip.file("_rels/.rels", relsXml);
+      zip.file("word/document.xml", documentXml);
+      const docxBuffer = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+
+      const originalName = req.file.originalname.replace(/\.pdf$/i, "");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-to-word", "pdf", "docx", fileSizeKb, "success");
+      res.set({ "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "Content-Disposition": `attachment; filename="${originalName}.docx"`, "Content-Length": docxBuffer.length });
+      return res.status(200).send(docxBuffer);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  } catch (err) {
+    console.error("PDF to Word error:", err.message);
+    await incrementUsage(user?.user_id, ip, tier, "pdf-to-word", "pdf", "docx", fileSizeKb, "failed");
+    if (!res.headersSent) return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
+  }
+});
 
 // ══════════════════════════════════════════════════════════════════════════
 //  FONT TOOL ENDPOINTS
