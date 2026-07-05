@@ -2174,7 +2174,7 @@ router.post("/api/post/filebeef/pdf/html-to-pdf", optionalAuth, async (req, res)
 // ── PDF TO JPG ─────────────────────────────────────────────────────────────
 // Uses puppeteer to render pages as images
 // ── PDF TO JPG (fixed — uses jszip instead of archiver) ───────────────────
-router.post("/api/post/filebeef/pdf/to-jpg", optionalAuth, ipDailyLimit("pdf-to-jpg", 7), pdfUpload.single("file"), async (req, res) => {
+router.post("/api/post/filebeef/pdf/to-jpg", optionalAuth, ipDailyLimit("pdf-to-jpg", 3), pdfUpload.single("file"), async (req, res) => {
   const user = req.filebeefUser; const ip = getClientIp(req);
   const tier = getTier(user); const limits = getPdfLimits(tier);
   if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
@@ -2189,14 +2189,12 @@ router.post("/api/post/filebeef/pdf/to-jpg", optionalAuth, ipDailyLimit("pdf-to-
     const pdfDoc = await PDFDocument.load(req.file.buffer);
     const totalPages = pdfDoc.getPageCount();
     const originalName = req.file.originalname.replace(/\.pdf$/i, "");
-    const maxPages = tier === "pro" ? 50 : tier === "free" ? 10 : 3;
-    const pagesToRender = Math.min(totalPages, maxPages);
-
+    const pagesToRender = Math.min(totalPages, 50);
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-pdf2jpg-"));
     try {
       const inPath = path.join(tmpDir, "in.pdf");
       fs.writeFileSync(inPath, req.file.buffer);
-      await execFileAsync("mutool", ["draw", "-r", "110", "-o", path.join(tmpDir, "page_%d.jpg"), inPath, `1-${pagesToRender}`]);
+      await execFileAsync("mutool", ["draw", "-r", "100", "-o", path.join(tmpDir, "page_%d.jpg"), inPath, `1-${pagesToRender}`]);
 
       if (pagesToRender === 1) {
         const jpg = fs.readFileSync(path.join(tmpDir, "page_1.jpg"));
@@ -2247,7 +2245,8 @@ router.post("/api/post/filebeef/pdf/delete-pages", optionalAuth, pdfUpload.singl
     const tier = getTier(user); const limits = getPdfLimits(tier);
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
-    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
+    const MAX_MB = 10;
+    if (req.file.size > MAX_MB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${MAX_MB}MB.`, resErrorCode: 3 });
     const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const pagesToDelete = (req.body.pages || "").split(",").map(p => parseInt(p.trim())).filter(p => !isNaN(p) && p > 0);
