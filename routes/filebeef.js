@@ -2416,42 +2416,18 @@ router.post("/api/post/filebeef/pdf/excel-to-pdf", optionalAuth, async (req, res
       if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
       const fileSizeKb = Math.round(req.file.size / 1024);
       try {
-        const XLSX = require("xlsx");
-        const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
-        const pdfDoc = await PDFDocument.create();
-        pdfDoc.registerFontkit(fontkit);
-        const fontBytes = fs.readFileSync("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");
-        const boldFontBytes = fs.readFileSync("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf");
-        const font = await pdfDoc.embedFont(fontBytes, { subset: true });
-        const boldFont = await pdfDoc.embedFont(boldFontBytes, { subset: true });
-        for (const sheetName of workbook.SheetNames) {
-          const sheet = workbook.Sheets[sheetName];
-          const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-          if (!rows.length) continue;
-          const fontSize = 9; const lineHeight = fontSize * 1.6; const margin = 40;
-          const pageWidth = 841; const pageHeight = 595;
-          const maxLinesPerPage = Math.floor((pageHeight - margin * 2 - 30) / lineHeight);
-          let page = pdfDoc.addPage([pageWidth, pageHeight]);
-          let y = pageHeight - margin - 20; let lineCount = 0;
-          page.drawText(`Sheet: ${sheetName}`, { x: margin, y: pageHeight - margin, size: 11, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
-          for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
-            if (lineCount >= maxLinesPerPage) { page = pdfDoc.addPage([pageWidth, pageHeight]); y = pageHeight - margin - 20; lineCount = 0; }
-            const row = rows[rowIdx];
-            const colWidth = Math.min(120, (pageWidth - margin * 2) / Math.max(row.length, 1));
-            for (let colIdx = 0; colIdx < row.length; colIdx++) {
-              const cellText = String(row[colIdx] ?? "").substring(0, 20);
-              const x = margin + colIdx * colWidth;
-              if (x + colWidth > pageWidth - margin) break;
-              page.drawText(cellText, { x, y, size: fontSize, font: rowIdx === 0 ? boldFont : font, color: rgb(0, 0, 0) });
-            }
-            y -= lineHeight; lineCount++;
-          }
-        }
-        const outputBuffer = await pdfDoc.save();
+        const ext = req.file.originalname.match(/\.xls$/i) ? "xls" : "xlsx";
+        const tmpIn = path.join(os.tmpdir(), `fb_excel_${Date.now()}.${ext}`);
+        fs.writeFileSync(tmpIn, req.file.buffer);
+        await execFileAsync("libreoffice", ["--headless", "--convert-to", "pdf", "--outdir", os.tmpdir(), tmpIn]);
+        const tmpOut = tmpIn.replace(/\.(xlsx|xls)$/i, ".pdf");
+        const outputBuffer = fs.readFileSync(tmpOut);
+        fs.unlinkSync(tmpIn);
+        fs.unlinkSync(tmpOut);
         const originalName = req.file.originalname.replace(/\.(xlsx|xls)$/i, "");
         await incrementUsage(user?.user_id, ip, tier, "excel-to-pdf", "xlsx", "pdf", fileSizeKb, "success");
         res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}.pdf"`, "Content-Length": outputBuffer.length });
-        return res.status(200).send(Buffer.from(outputBuffer));
+        return res.status(200).send(outputBuffer);
       } catch (err) {
         console.error("Excel to PDF error:", err.message);
         await incrementUsage(user?.user_id, ip, tier, "excel-to-pdf", "xlsx", "pdf", fileSizeKb, "failed");
