@@ -962,7 +962,7 @@ router.post("/api/post/filebeef/image/convert", optionalAuth, imageUpload.single
     // format check
     const format = req.body.format || "jpeg";
     const quality = Math.min(100, Math.max(1, parseInt(req.body.quality) || 75));
-    const allowedFormats = ["jpeg", "png", "webp", "avif", "heic", "heif"];
+    const allowedFormats = ["jpeg", "png", "webp", "avif", "heic", "heif", "gif"];
     if (!allowedFormats.includes(format)) {
       return res.status(400).json({
         resStatus: false,
@@ -1013,6 +1013,9 @@ router.post("/api/post/filebeef/image/convert", optionalAuth, imageUpload.single
           break;
         case "avif":
           sharpInstance = sharpInstance.avif({ quality });
+          break;
+        case "gif":
+          sharpInstance = sharpInstance.gif();
           break;
       }
 
