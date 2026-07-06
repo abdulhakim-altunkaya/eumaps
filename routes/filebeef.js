@@ -2119,7 +2119,7 @@ router.post("/api/post/filebeef/pdf/html-to-pdf", optionalAuth, async (req, res)
         } else {
           await page.goto(url, { waitUntil: "networkidle0", timeout: 15000 });
         }
-        const pdfBuffer = await page.pdf({ format: "A4", margin: { top: "15mm", bottom: "15mm", left: "15mm", right: "15mm" }, printBackground: true });
+        const pdfBuffer = Buffer.from(await page.pdf({ format: "A4", margin: { top: "15mm", bottom: "15mm", left: "15mm", right: "15mm" }, printBackground: true }));
         await browser.close();
         const filename = req.file ? req.file.originalname.replace(/\.html?$/i, "") + ".pdf" : "webpage.pdf";
         await incrementUsage(user?.user_id, ip, tier, "html-to-pdf", "html", "pdf", fileSizeKb, "success");
