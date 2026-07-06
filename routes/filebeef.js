@@ -933,7 +933,7 @@ router.post("/api/post/filebeef/image/convert", optionalAuth, imageUpload.single
     const user = req.filebeefUser;
     const ip = getClientIp(req);
     const tier = getTier(user);
-    const limits = LIMITS[tier];
+    const limits = IMAGE_LIMITS[tier];
 
     if (!req.file) {
       return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
@@ -949,11 +949,12 @@ router.post("/api/post/filebeef/image/convert", optionalAuth, imageUpload.single
       });
     }
 
-    // mime type check
-    if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype)) {
+    // mime type check (HEIC often arrives as octet-stream, so check extension too)
+    const isHeicInput = /\.hei[cf]$/i.test(req.file.originalname) || ["image/heic", "image/heif"].includes(req.file.mimetype);
+    if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype) && !isHeicInput) {
       return res.status(400).json({
         resStatus: false,
-        resMessage: "Unsupported file type. Allowed: PNG, JPG, WEBP, AVIF, GIF.",
+        resMessage: "Unsupported file type. Allowed: PNG, JPG, WEBP, AVIF, GIF, HEIC.",
         resErrorCode: 3
       });
     }
@@ -986,8 +987,20 @@ router.post("/api/post/filebeef/image/convert", optionalAuth, imageUpload.single
     const fileSizeKb = Math.round(req.file.size / 1024);
 
     try {
-      let sharpInstance = sharp(req.file.buffer);
-
+      let convertInputBuffer = req.file.buffer;
+      if (isHeicInput) {
+        const heicTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-heic-conv-"));
+        try {
+          const heicInPath = path.join(heicTmpDir, "input.heic");
+          const heicOutPath = path.join(heicTmpDir, "input.jpg");
+          fs.writeFileSync(heicInPath, req.file.buffer);
+          await execFileAsync("heif-convert", [heicInPath, heicOutPath]);
+          convertInputBuffer = fs.readFileSync(heicOutPath);
+        } finally {
+          fs.rmSync(heicTmpDir, { recursive: true, force: true });
+        }
+      }
+      let sharpInstance = sharp(convertInputBuffer);
       switch (format) {
         case "jpeg":
           sharpInstance = sharpInstance.jpeg({ quality });
