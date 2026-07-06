@@ -962,7 +962,7 @@ router.post("/api/post/filebeef/image/convert", optionalAuth, imageUpload.single
     // format check
     const format = req.body.format || "jpeg";
     const quality = Math.min(100, Math.max(1, parseInt(req.body.quality) || 75));
-    const allowedFormats = ["jpeg", "png", "webp", "avif"];
+    const allowedFormats = ["jpeg", "png", "webp", "avif", "heic", "heif"];
     if (!allowedFormats.includes(format)) {
       return res.status(400).json({
         resStatus: false,
@@ -1016,9 +1016,25 @@ router.post("/api/post/filebeef/image/convert", optionalAuth, imageUpload.single
           break;
       }
 
-      const outputBuffer = await sharpInstance.toBuffer();
+      let outputBuffer;
+      if (format === "heic" || format === "heif") {
+        // sharp can't encode HEIC — go through heif-enc: normalize to JPG first, then encode
+        const heicEncTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-heic-enc-"));
+        try {
+          const heicEncInPath = path.join(heicEncTmpDir, "input.jpg");
+          const heicEncOutPath = path.join(heicEncTmpDir, "output.heic");
+          const jpgBuffer = await sharp(convertInputBuffer).jpeg({ quality: 95 }).toBuffer();
+          fs.writeFileSync(heicEncInPath, jpgBuffer);
+          await execFileAsync("heif-enc", ["-q", String(quality), "-o", heicEncOutPath, heicEncInPath]);
+          outputBuffer = fs.readFileSync(heicEncOutPath);
+        } finally {
+          fs.rmSync(heicEncTmpDir, { recursive: true, force: true });
+        }
+      } else {
+        outputBuffer = await sharpInstance.toBuffer();
+      }
       const ext = format === "jpeg" ? "jpg" : format;
-      const mimeType = format === "jpeg" ? "image/jpeg" : `image/${format}`;
+      const mimeType = format === "jpeg" ? "image/jpeg" : format === "heic" ? "image/heic" : format === "heif" ? "image/heif" : `image/${format}`;
       const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
       const outputFilename = `${originalName}.${ext}`;
 
