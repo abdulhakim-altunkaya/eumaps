@@ -1098,9 +1098,15 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
       }
       // output in same format as input, default jpeg
       const outputFormat = inputFormat === "png" ? "png" : inputFormat === "webp" ? "webp" : "jpeg";
-      if (outputFormat === "png") sharpInstance = sharpInstance.png({ quality, palette: true, compressionLevel: 9 });
+      if (outputFormat === "png") sharpInstance = sharpInstance.png({ quality: Math.min(100, quality + 15), palette: true, compressionLevel: 9 });
       else if (outputFormat === "webp") sharpInstance = sharpInstance.webp({ quality });
-      else sharpInstance = sharpInstance.jpeg({ quality, mozjpeg: true });
+      else {
+        // remap UI quality to encoder settings: mozjpeg is aggressive, so lift the mid/high tiers
+        if (quality >= 90) sharpInstance = sharpInstance.jpeg({ quality: 95, chromaSubsampling: "4:4:4", mozjpeg: true });
+        else if (quality >= 75) sharpInstance = sharpInstance.jpeg({ quality: 85, mozjpeg: true });
+        else if (quality >= 50) sharpInstance = sharpInstance.jpeg({ quality: 70, mozjpeg: true });
+        else sharpInstance = sharpInstance.jpeg({ quality, mozjpeg: true });
+      }
       let outputBuffer = await sharpInstance.toBuffer();
       // never return a file bigger than the original (unless a resize was requested)
       if (!width && !height && outputBuffer.length >= req.file.size) {
