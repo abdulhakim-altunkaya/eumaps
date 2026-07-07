@@ -1087,8 +1087,6 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
       return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     }
     const quality = Math.min(100, Math.max(1, parseInt(req.body.quality) || 75));
-    const width = req.body.width ? parseInt(req.body.width) : null;
-    const height = req.body.height ? parseInt(req.body.height) : null;
     let inputFormat = req.file.mimetype.split("/")[1] || "unknown";
     if (isHeicUpload) inputFormat = nameExt === "heif" ? "heif" : "heic";
     const fileSizeKb = Math.round(req.file.size / 1024);
@@ -1107,9 +1105,6 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
         inputBuffer = fs.readFileSync(outPath);
       }
       let sharpInstance = sharp(inputBuffer, isGif ? { animated: true } : {});
-      if (width || height) {
-        sharpInstance = sharpInstance.resize(width || null, height || null, { withoutEnlargement: true, fit: "inside" });
-      }
       // output in same format as input, default jpeg
       const outputFormat =
         inputFormat === "png" ? "png" :
@@ -1172,8 +1167,8 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
         console.log(`heic optimize q${quality}: final heif-enc q${heicQ}, ${Math.round(encoded.length/1024)}kb from ${fileSizeKb}kb`);
         outputBuffer = encoded;
       }
-      // never return a file bigger than the original (unless a resize was requested)
-      if (!width && !height && outputBuffer.length >= req.file.size) {
+      // never return a file bigger than the original
+      if (outputBuffer.length >= req.file.size) {
         console.log(`optimize ${inputFormat} q${quality}: result ${Math.round(outputBuffer.length/1024)}kb >= original ${fileSizeKb}kb, returning original`);
         outputBuffer = req.file.buffer;
       }
