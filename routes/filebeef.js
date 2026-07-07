@@ -1103,7 +1103,7 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
         const inPath = path.join(tmpDir, "input.heic");
         const outPath = path.join(tmpDir, "output.jpg");
         fs.writeFileSync(inPath, inputBuffer);
-        execSync(`heif-convert -q 100 "${inPath}" "${outPath}"`);
+        await execFileAsync("heif-convert", ["-q", "100", inPath, outPath]);
         inputBuffer = fs.readFileSync(outPath);
       }
       let sharpInstance = sharp(inputBuffer, isGif ? { animated: true } : {});
@@ -1117,7 +1117,7 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
         inputFormat === "gif" ? "gif" :
         isHeic ? inputFormat : // "heic" or "heif"
         "jpeg";
-      if (outputFormat === "png") sharpInstance = sharpInstance.png({ quality: Math.min(100, quality + 15), palette: true, compressionLevel: 9 });
+      if (outputFormat === "png") sharpInstance = sharpInstance.png({ compressionLevel: 9 });
       else if (outputFormat === "webp") sharpInstance = sharpInstance.webp({ quality });
       else if (outputFormat === "gif") {
         if (quality >= 90) sharpInstance = sharpInstance.gif({ colours: 256 });
@@ -1138,13 +1138,28 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
       }
       let outputBuffer = await sharpInstance.toBuffer();
 
+      // PNG: lossy quantization via pngquant (High = lossless, skip)
+      if (outputFormat === "png" && quality < 90) {
+        if (!tmpDir) tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-optimize-"));
+        const pngIn = path.join(tmpDir, "in.png");
+        const pngOut = path.join(tmpDir, "out.png");
+        fs.writeFileSync(pngIn, outputBuffer);
+        const qMax = quality >= 75 ? 95 : quality >= 50 ? 80 : 60;
+        try {
+          await execFileAsync("pngquant", [`--quality=0-${qMax}`, "--speed", "1", "--force", "--output", pngOut, pngIn]);
+          outputBuffer = fs.readFileSync(pngOut);
+        } catch (e) {
+          console.error("pngquant failed, keeping lossless PNG:", e.message);
+        }
+      }
+
       // HEIC/HEIF output: re-encode the processed intermediate with heif-enc
       if (isHeic) {
         const midPath = path.join(tmpDir, "processed.jpg");
         const heicOutPath = path.join(tmpDir, "final.heic");
         fs.writeFileSync(midPath, outputBuffer);
         const heicQ = quality >= 90 ? 90 : quality >= 75 ? 75 : quality >= 50 ? 55 : 35;
-        execSync(`heif-enc -q ${heicQ} -o "${heicOutPath}" "${midPath}"`);
+        await execFileAsync("heif-enc", ["-q", String(heicQ), "-o", heicOutPath, midPath]);
         outputBuffer = fs.readFileSync(heicOutPath);
       }
       // never return a file bigger than the original (unless a resize was requested)
