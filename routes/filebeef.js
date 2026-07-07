@@ -1068,7 +1068,7 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
     const user = req.filebeefUser;
     const ip = getClientIp(req);
     const tier = getTier(user);
-    const limits = LIMITS[tier];
+    const limits = IMAGE_LIMITS[tier];
 
     if (!req.file) {
       return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
@@ -1130,7 +1130,7 @@ router.post("/api/post/filebeef/image/flip-rotate", optionalAuth, imageUpload.si
     const user = req.filebeefUser;
     const ip = getClientIp(req);
     const tier = getTier(user);
-    const limits = LIMITS[tier];
+    const limits = IMAGE_LIMITS[tier];
 
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
@@ -1182,7 +1182,7 @@ router.post("/api/post/filebeef/image/exif-remove", optionalAuth, imageUpload.si
     const user = req.filebeefUser;
     const ip = getClientIp(req);
     const tier = getTier(user);
-    const limits = LIMITS[tier];
+    const limits = IMAGE_LIMITS[tier];
 
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
@@ -1229,7 +1229,7 @@ router.post("/api/post/filebeef/image/heic-to-jpg", optionalAuth, imageUpload.si
     const user = req.filebeefUser;
     const ip = getClientIp(req);
     const tier = getTier(user);
-    const limits = LIMITS[tier];
+    const limits = IMAGE_LIMITS[tier];
 
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
@@ -1335,7 +1335,7 @@ router.post("/api/post/filebeef/image/color-palette", optionalAuth, imageUpload.
     const user = req.filebeefUser;
     const ip = getClientIp(req);
     const tier = getTier(user);
-    const limits = LIMITS[tier];
+    const limits = IMAGE_LIMITS[tier];
 
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
@@ -1401,7 +1401,7 @@ router.post("/api/post/filebeef/image/watermark", optionalAuth, imageUpload.sing
     const user = req.filebeefUser;
     const ip = getClientIp(req);
     const tier = getTier(user);
-    const limits = LIMITS[tier];
+    const limits = IMAGE_LIMITS[tier];
 
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
