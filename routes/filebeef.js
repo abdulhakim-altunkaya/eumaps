@@ -1126,8 +1126,8 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
         else sharpInstance = sharpInstance.gif({ colours: 32 });
       }
       else if (isHeic) {
-        // process as high-quality JPEG intermediate, re-encode to HEIC below
-        sharpInstance = sharpInstance.jpeg({ quality: 98, chromaSubsampling: "4:4:4" });
+        // lossless PNG intermediate — all compression happens in heif-enc
+        sharpInstance = sharpInstance.png({ compressionLevel: 1 });
       }
       else {
         // remap UI quality to encoder settings: mozjpeg is aggressive, so lift the mid/high tiers
@@ -1155,15 +1155,16 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
 
       // HEIC/HEIF output: re-encode the processed intermediate with heif-enc
       if (isHeic) {
-        const midPath = path.join(tmpDir, "processed.jpg");
+        const midPath = path.join(tmpDir, "processed.png");
         const heicOutPath = path.join(tmpDir, "final.heic");
         fs.writeFileSync(midPath, outputBuffer);
-        const heicQ = quality >= 90 ? 90 : quality >= 75 ? 75 : quality >= 50 ? 55 : 35;
+        const heicQ = quality >= 90 ? 80 : quality >= 75 ? 62 : quality >= 50 ? 45 : 30;
         await execFileAsync("heif-enc", ["-q", String(heicQ), "-o", heicOutPath, midPath]);
         outputBuffer = fs.readFileSync(heicOutPath);
       }
       // never return a file bigger than the original (unless a resize was requested)
       if (!width && !height && outputBuffer.length >= req.file.size) {
+        console.log(`optimize ${inputFormat} q${quality}: result ${Math.round(outputBuffer.length/1024)}kb >= original ${fileSizeKb}kb, returning original`);
         outputBuffer = req.file.buffer;
       }
       const ext = outputFormat === "jpeg" ? "jpg" : outputFormat;
