@@ -1093,30 +1093,28 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
 
     try {
       let sharpInstance = sharp(req.file.buffer);
-
       if (width || height) {
         sharpInstance = sharpInstance.resize(width || null, height || null, { withoutEnlargement: true, fit: "inside" });
       }
-
       // output in same format as input, default jpeg
       const outputFormat = inputFormat === "png" ? "png" : inputFormat === "webp" ? "webp" : "jpeg";
-      if (outputFormat === "png") sharpInstance = sharpInstance.png({ compressionLevel: Math.round((100 - quality) / 11) });
+      if (outputFormat === "png") sharpInstance = sharpInstance.png({ quality, palette: true, compressionLevel: 9 });
       else if (outputFormat === "webp") sharpInstance = sharpInstance.webp({ quality });
-      else sharpInstance = sharpInstance.jpeg({ quality });
-
-      const outputBuffer = await sharpInstance.toBuffer();
+      else sharpInstance = sharpInstance.jpeg({ quality, mozjpeg: true });
+      let outputBuffer = await sharpInstance.toBuffer();
+      // never return a file bigger than the original (unless a resize was requested)
+      if (!width && !height && outputBuffer.length >= req.file.size) {
+        outputBuffer = req.file.buffer;
+      }
       const ext = outputFormat === "jpeg" ? "jpg" : outputFormat;
       const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
-
       await incrementUsage(user?.user_id, ip, tier, "image-optimize", inputFormat, outputFormat, fileSizeKb, "success");
-
       res.set({
         "Content-Type": outputFormat === "jpeg" ? "image/jpeg" : `image/${outputFormat}`,
         "Content-Disposition": `attachment; filename="${originalName}_optimized.${ext}"`,
         "Content-Length": outputBuffer.length
       });
       return res.status(200).send(outputBuffer);
-
     } catch (err) {
       console.error("Image optimize error:", err.message);
       await incrementUsage(user?.user_id, ip, tier, "image-optimize", inputFormat, null, fileSizeKb, "failed");
