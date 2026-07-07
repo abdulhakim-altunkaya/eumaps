@@ -1158,9 +1158,19 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
         const midPath = path.join(tmpDir, "processed.png");
         const heicOutPath = path.join(tmpDir, "final.heic");
         fs.writeFileSync(midPath, outputBuffer);
-        const heicQ = quality >= 90 ? 68 : quality >= 75 ? 55 : quality >= 50 ? 42 : 30;
-        await execFileAsync("heif-enc", ["-q", String(heicQ), "-o", heicOutPath, midPath]);
-        outputBuffer = fs.readFileSync(heicOutPath);
+        // adaptive: start at ladder q, step down until smaller than original (or floor)
+        let heicQ = quality >= 90 ? 68 : quality >= 75 ? 55 : quality >= 50 ? 42 : 30;
+        const qFloor = quality >= 90 ? 50 : quality >= 75 ? 40 : quality >= 50 ? 32 : 22;
+        let encoded = null;
+        while (true) {
+          await execFileAsync("heif-enc", ["-q", String(heicQ), "-o", heicOutPath, midPath]);
+          encoded = fs.readFileSync(heicOutPath);
+          if (encoded.length < req.file.size * 0.95 || heicQ <= qFloor) break;
+          heicQ -= 8;
+          if (heicQ < qFloor) heicQ = qFloor;
+        }
+        console.log(`heic optimize q${quality}: final heif-enc q${heicQ}, ${Math.round(encoded.length/1024)}kb from ${fileSizeKb}kb`);
+        outputBuffer = encoded;
       }
       // never return a file bigger than the original (unless a resize was requested)
       if (!width && !height && outputBuffer.length >= req.file.size) {
