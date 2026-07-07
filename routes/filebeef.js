@@ -1158,7 +1158,7 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
         const midPath = path.join(tmpDir, "processed.png");
         const heicOutPath = path.join(tmpDir, "final.heic");
         fs.writeFileSync(midPath, outputBuffer);
-        const heicQ = quality >= 90 ? 80 : quality >= 75 ? 62 : quality >= 50 ? 45 : 30;
+        const heicQ = quality >= 90 ? 68 : quality >= 75 ? 55 : quality >= 50 ? 42 : 30;
         await execFileAsync("heif-enc", ["-q", String(heicQ), "-o", heicOutPath, midPath]);
         outputBuffer = fs.readFileSync(heicOutPath);
       }
