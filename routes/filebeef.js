@@ -1076,7 +1076,9 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
     if (req.file.size > limits.sizeMB * 1024 * 1024) {
       return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB on your plan.`, resErrorCode: 2 });
     }
-    if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype)) {
+    const nameExt = (req.file.originalname.split(".").pop() || "").toLowerCase();
+    const isHeicUpload = ["heic", "heif"].includes(nameExt) || ["image/heic", "image/heif"].includes(req.file.mimetype);
+    if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype) && !isHeicUpload) {
       return res.status(400).json({ resStatus: false, resMessage: "Unsupported file type.", resErrorCode: 3 });
     }
 
@@ -1084,22 +1086,49 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
     if (!limitCheck.allowed) {
       return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     }
-
     const quality = Math.min(100, Math.max(1, parseInt(req.body.quality) || 75));
     const width = req.body.width ? parseInt(req.body.width) : null;
     const height = req.body.height ? parseInt(req.body.height) : null;
-    const inputFormat = req.file.mimetype.split("/")[1] || "unknown";
+    let inputFormat = req.file.mimetype.split("/")[1] || "unknown";
+    if (isHeicUpload) inputFormat = nameExt === "heif" ? "heif" : "heic";
     const fileSizeKb = Math.round(req.file.size / 1024);
-
+    let tmpDir = null;
     try {
-      let sharpInstance = sharp(req.file.buffer);
+      const isGif = inputFormat === "gif";
+      const isHeic = inputFormat === "heic" || inputFormat === "heif";
+      let inputBuffer = req.file.buffer;
+      // HEIC/HEIF: decode to JPEG first, output will be optimized JPEG
+      if (isHeic) {
+        tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-optimize-heic-"));
+        const inPath = path.join(tmpDir, "input.heic");
+        const outPath = path.join(tmpDir, "output.jpg");
+        fs.writeFileSync(inPath, inputBuffer);
+        execSync(`heif-convert -q 100 "${inPath}" "${outPath}"`);
+        inputBuffer = fs.readFileSync(outPath);
+      }
+      let sharpInstance = sharp(inputBuffer, isGif ? { animated: true } : {});
       if (width || height) {
         sharpInstance = sharpInstance.resize(width || null, height || null, { withoutEnlargement: true, fit: "inside" });
       }
       // output in same format as input, default jpeg
-      const outputFormat = inputFormat === "png" ? "png" : inputFormat === "webp" ? "webp" : "jpeg";
+      const outputFormat =
+        inputFormat === "png" ? "png" :
+        inputFormat === "webp" ? "webp" :
+        inputFormat === "gif" ? "gif" :
+        isHeic ? inputFormat : // "heic" or "heif"
+        "jpeg";
       if (outputFormat === "png") sharpInstance = sharpInstance.png({ quality: Math.min(100, quality + 15), palette: true, compressionLevel: 9 });
       else if (outputFormat === "webp") sharpInstance = sharpInstance.webp({ quality });
+      else if (outputFormat === "gif") {
+        if (quality >= 90) sharpInstance = sharpInstance.gif({ colours: 256 });
+        else if (quality >= 75) sharpInstance = sharpInstance.gif({ colours: 128 });
+        else if (quality >= 50) sharpInstance = sharpInstance.gif({ colours: 64 });
+        else sharpInstance = sharpInstance.gif({ colours: 32 });
+      }
+      else if (isHeic) {
+        // process as high-quality JPEG intermediate, re-encode to HEIC below
+        sharpInstance = sharpInstance.jpeg({ quality: 98, chromaSubsampling: "4:4:4" });
+      }
       else {
         // remap UI quality to encoder settings: mozjpeg is aggressive, so lift the mid/high tiers
         if (quality >= 90) sharpInstance = sharpInstance.jpeg({ quality: 95, chromaSubsampling: "4:4:4", mozjpeg: true });
@@ -1108,6 +1137,16 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
         else sharpInstance = sharpInstance.jpeg({ quality, mozjpeg: true });
       }
       let outputBuffer = await sharpInstance.toBuffer();
+
+      // HEIC/HEIF output: re-encode the processed intermediate with heif-enc
+      if (isHeic) {
+        const midPath = path.join(tmpDir, "processed.jpg");
+        const heicOutPath = path.join(tmpDir, "final.heic");
+        fs.writeFileSync(midPath, outputBuffer);
+        const heicQ = quality >= 90 ? 90 : quality >= 75 ? 75 : quality >= 50 ? 55 : 35;
+        execSync(`heif-enc -q ${heicQ} -o "${heicOutPath}" "${midPath}"`);
+        outputBuffer = fs.readFileSync(heicOutPath);
+      }
       // never return a file bigger than the original (unless a resize was requested)
       if (!width && !height && outputBuffer.length >= req.file.size) {
         outputBuffer = req.file.buffer;
@@ -1116,7 +1155,7 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
       const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
       await incrementUsage(user?.user_id, ip, tier, "image-optimize", inputFormat, outputFormat, fileSizeKb, "success");
       res.set({
-        "Content-Type": outputFormat === "jpeg" ? "image/jpeg" : `image/${outputFormat}`,
+        "Content-Type": outputFormat === "jpeg" ? "image/jpeg" : isHeic ? `image/${outputFormat}` : `image/${outputFormat}`,
         "Content-Disposition": `attachment; filename="${originalName}_optimized.${ext}"`,
         "Content-Length": outputBuffer.length
       });
@@ -1125,6 +1164,8 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
       console.error("Image optimize error:", err.message);
       await incrementUsage(user?.user_id, ip, tier, "image-optimize", inputFormat, null, fileSizeKb, "failed");
       return res.status(500).json({ resStatus: false, resMessage: "Optimization failed.", resErrorCode: 99 });
+    } finally {
+      if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   }
 );
