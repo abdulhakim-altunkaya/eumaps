@@ -1379,7 +1379,7 @@ router.post("/api/post/filebeef/image/svg-optimize", optionalAuth, async (req, r
 
     const svgUpload = multer({
       storage: multer.memoryStorage(),
-      limits: { fileSize: svgLimits.pro * 1024 * 1024, files: 1 }
+      limits: { fileSize: SVG_LIMITS.pro.sizeMB * 1024 * 1024, files: 1 }
     }).single("file");
 
     svgUpload(req, res, async (err) => {
@@ -1396,7 +1396,7 @@ router.post("/api/post/filebeef/image/svg-optimize", optionalAuth, async (req, r
       const fileSizeKb = Math.round(req.file.size / 1024);
 
       try {
-        const { optimize } = require("svgo");
+        const { optimize } = await import("svgo");
         const svgString = req.file.buffer.toString("utf8");
         const result = optimize(svgString, {
           plugins: [
