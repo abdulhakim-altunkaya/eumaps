@@ -984,8 +984,7 @@ router.post("/api/post/filebeef/image/convert", optionalAuth, imageUpload.single
     }
 
     let inputFormat = req.file.mimetype.split("/")[1] || "unknown";
-    if (isHeicUpload) inputFormat = nameExt === "heif" ? "heif" : "heic";
-    if (isAvifUpload) inputFormat = "avif";
+    if (isHeicInput) inputFormat = /\.heif$/i.test(req.file.originalname) ? "heif" : "heic";
     const fileSizeKb = Math.round(req.file.size / 1024);
 
     try {
@@ -1078,9 +1077,9 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
     if (req.file.size > limits.sizeMB * 1024 * 1024) {
       return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB on your plan.`, resErrorCode: 2 });
     }
-    const nameExt = (req.file.originalname.split(".").pop() || "").toLowerCase();
-    const isHeicUpload = ["heic", "heif"].includes(nameExt) || ["image/heic", "image/heif"].includes(req.file.mimetype);
-    if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype) && !isHeicUpload) {
+    const optNameExt = (req.file.originalname.split(".").pop() || "").toLowerCase();
+    const optIsHeicUpload = ["heic", "heif"].includes(optNameExt) || ["image/heic", "image/heif"].includes(req.file.mimetype);
+    if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype) && !optIsHeicUpload) {
       return res.status(400).json({ resStatus: false, resMessage: "Unsupported file type.", resErrorCode: 3 });
     }
 
@@ -1090,14 +1089,14 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
     }
     const quality = Math.min(100, Math.max(1, parseInt(req.body.quality) || 75));
     let inputFormat = req.file.mimetype.split("/")[1] || "unknown";
-    if (isHeicUpload) inputFormat = nameExt === "heif" ? "heif" : "heic";
+    if (optIsHeicUpload) inputFormat = optNameExt === "heif" ? "heif" : "heic";
     const fileSizeKb = Math.round(req.file.size / 1024);
     let tmpDir = null;
     try {
       const isGif = inputFormat === "gif";
       const isHeic = inputFormat === "heic" || inputFormat === "heif";
       let inputBuffer = req.file.buffer;
-      // HEIC/HEIF: decode to JPEG first, output will be optimized JPEG
+      // HEIC/HEIF: decode first, re-encode with heif-enc after processing
       if (isHeic) {
         tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-optimize-heic-"));
         const inPath = path.join(tmpDir, "input.heic");
@@ -1155,15 +1154,16 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
         const midPath = path.join(tmpDir, "processed.png");
         const heicOutPath = path.join(tmpDir, "final.heic");
         fs.writeFileSync(midPath, outputBuffer);
-        // adaptive: start at ladder q, step down until smaller than original (or floor)
+        // adaptive: each tier must hit its own size target, not just "any reduction"
         let heicQ = quality >= 90 ? 68 : quality >= 75 ? 55 : quality >= 50 ? 42 : 30;
-        const qFloor = quality >= 90 ? 50 : quality >= 75 ? 40 : quality >= 50 ? 32 : 22;
+        const qFloor = quality >= 90 ? 50 : quality >= 75 ? 40 : quality >= 50 ? 30 : 22;
+        const targetRatio = quality >= 90 ? 0.95 : quality >= 75 ? 0.82 : quality >= 50 ? 0.65 : 0.50;
         let encoded = null;
         while (true) {
-          await execFileAsync("heif-enc", ["-q", String(heicQ), "-o", heicOutPath, midPath]);
+          await execFileAsync("heif-enc", ["-q", String(heicQ), "-o", heicOutPath, midPath], { timeout: 30000 });
           encoded = fs.readFileSync(heicOutPath);
-          if (encoded.length < req.file.size * 0.95 || heicQ <= qFloor) break;
-          heicQ -= 8;
+          if (encoded.length < req.file.size * targetRatio || heicQ <= qFloor) break;
+          heicQ -= 6;
           if (heicQ < qFloor) heicQ = qFloor;
         }
         console.log(`heic optimize q${quality}: final heif-enc q${heicQ}, ${Math.round(encoded.length/1024)}kb from ${fileSizeKb}kb`);
@@ -1178,7 +1178,7 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
       const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
       await incrementUsage(user?.user_id, ip, tier, "image-optimize", inputFormat, outputFormat, fileSizeKb, "success");
       res.set({
-        "Content-Type": outputFormat === "jpeg" ? "image/jpeg" : isHeic ? `image/${outputFormat}` : `image/${outputFormat}`,
+        "Content-Type": outputFormat === "jpeg" ? "image/jpeg" : `image/${outputFormat}`,
         "Content-Disposition": `attachment; filename="${originalName}_optimized.${ext}"`,
         "Content-Length": outputBuffer.length
       });
@@ -1192,7 +1192,6 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
     }
   }
 );
-
 // ── FLIP & ROTATE ──────────────────────────────────────────────────────────
 router.post("/api/post/filebeef/image/flip-rotate", optionalAuth, imageUpload.single("file"), async (req, res) => {
     const user = req.filebeefUser;
@@ -1202,7 +1201,10 @@ router.post("/api/post/filebeef/image/flip-rotate", optionalAuth, imageUpload.si
 
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
-    if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype)) return res.status(400).json({ resStatus: false, resMessage: "Unsupported file type.", resErrorCode: 3 });
+    const frNameExt = (req.file.originalname.split(".").pop() || "").toLowerCase();
+    const frIsHeicUpload = ["heic", "heif"].includes(frNameExt) || ["image/heic", "image/heif"].includes(req.file.mimetype);
+    const frIsAvifUpload = frNameExt === "avif" || req.file.mimetype === "image/avif";
+    if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype) && !frIsHeicUpload && !frIsAvifUpload) return res.status(400).json({ resStatus: false, resMessage: "Unsupported file type.", resErrorCode: 3 });
 
     const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
@@ -1210,7 +1212,9 @@ router.post("/api/post/filebeef/image/flip-rotate", optionalAuth, imageUpload.si
     const rotate = parseInt(req.body.rotate) || 0;       // 0, 90, 180, 270
     const flipH = req.body.flipH === "true";              // horizontal flip
     const flipV = req.body.flipV === "true";              // vertical flip
-    const inputFormat = req.file.mimetype.split("/")[1] || "unknown";
+    let inputFormat = req.file.mimetype.split("/")[1] || "unknown";
+    if (frIsHeicUpload) inputFormat = frNameExt === "heif" ? "heif" : "heic";
+    if (frIsAvifUpload) inputFormat = "avif";
     const fileSizeKb = Math.round(req.file.size / 1024);
 
     let tmpDir = null;
@@ -1235,7 +1239,7 @@ router.post("/api/post/filebeef/image/flip-rotate", optionalAuth, imageUpload.si
         inputBuffer = fs.readFileSync(decodedPath);
       }
 
-    // GIF: sharp cannot rotate multi-page images — use gifsicle (lossless, keeps animation)
+      // GIF: sharp cannot rotate multi-page images — use gifsicle (lossless, keeps animation)
       if (isGif) {
         tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-fliprotate-gif-"));
         const gifIn = path.join(tmpDir, "in.gif");
@@ -1308,7 +1312,6 @@ router.post("/api/post/filebeef/image/flip-rotate", optionalAuth, imageUpload.si
     }
   }
 );
-
 // ── EXIF REMOVER ───────────────────────────────────────────────────────────
 router.post("/api/post/filebeef/image/exif-remove", optionalAuth, imageUpload.single("file"), async (req, res) => {
     const user = req.filebeefUser;
