@@ -1211,18 +1211,51 @@ router.post("/api/post/filebeef/image/flip-rotate", optionalAuth, imageUpload.si
     const inputFormat = req.file.mimetype.split("/")[1] || "unknown";
     const fileSizeKb = Math.round(req.file.size / 1024);
 
+    let tmpDir = null;
     try {
-      let sharpInstance = sharp(req.file.buffer);
+      const isGif = inputFormat === "gif";
+      const isHeic = inputFormat === "heic" || inputFormat === "heif";
+      let inputBuffer = req.file.buffer;
+
+      // HEIC/HEIF: decode first, re-encode after transform
+      if (isHeic) {
+        tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-fliprotate-heic-"));
+        const inPath = path.join(tmpDir, "input.heic");
+        const outPath = path.join(tmpDir, "decoded.png");
+        fs.writeFileSync(inPath, inputBuffer);
+        await execFileAsync("heif-convert", [inPath, outPath]);
+        inputBuffer = fs.readFileSync(outPath);
+      }
+
+      let sharpInstance = sharp(inputBuffer, isGif ? { animated: true } : {});
       if (rotate) sharpInstance = sharpInstance.rotate(rotate);
       if (flipH) sharpInstance = sharpInstance.flop();
       if (flipV) sharpInstance = sharpInstance.flip();
 
-      const outputFormat = inputFormat === "png" ? "png" : inputFormat === "webp" ? "webp" : "jpeg";
+      const outputFormat =
+        inputFormat === "png" ? "png" :
+        inputFormat === "webp" ? "webp" :
+        inputFormat === "gif" ? "gif" :
+        inputFormat === "avif" ? "avif" :
+        isHeic ? inputFormat : // "heic" or "heif"
+        "jpeg";
       if (outputFormat === "png") sharpInstance = sharpInstance.png();
       else if (outputFormat === "webp") sharpInstance = sharpInstance.webp();
+      else if (outputFormat === "gif") sharpInstance = sharpInstance.gif();
+      else if (outputFormat === "avif") sharpInstance = sharpInstance.avif({ quality: 75 });
+      else if (isHeic) sharpInstance = sharpInstance.png({ compressionLevel: 1 }); // intermediate, re-encoded below
       else sharpInstance = sharpInstance.jpeg({ quality: 90 });
 
-      const outputBuffer = await sharpInstance.toBuffer();
+      let outputBuffer = await sharpInstance.toBuffer();
+
+      // HEIC/HEIF: re-encode transformed image
+      if (isHeic) {
+        const midPath = path.join(tmpDir, "transformed.png");
+        const heicOutPath = path.join(tmpDir, "final.heic");
+        fs.writeFileSync(midPath, outputBuffer);
+        await execFileAsync("heif-enc", ["-q", "80", "-o", heicOutPath, midPath], { timeout: 30000 });
+        outputBuffer = fs.readFileSync(heicOutPath);
+      }
       const ext = outputFormat === "jpeg" ? "jpg" : outputFormat;
       const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
 
@@ -1239,6 +1272,8 @@ router.post("/api/post/filebeef/image/flip-rotate", optionalAuth, imageUpload.si
       console.error("Flip/rotate error:", err.message);
       await incrementUsage(user?.user_id, ip, tier, "image-flip-rotate", inputFormat, null, fileSizeKb, "failed");
       return res.status(500).json({ resStatus: false, resMessage: "Operation failed.", resErrorCode: 99 });
+    } finally {
+      if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   }
 );
@@ -1252,12 +1287,17 @@ router.post("/api/post/filebeef/image/exif-remove", optionalAuth, imageUpload.si
 
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
-    if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype)) return res.status(400).json({ resStatus: false, resMessage: "Unsupported file type.", resErrorCode: 3 });
+    const nameExt = (req.file.originalname.split(".").pop() || "").toLowerCase();
+    const isHeicUpload = ["heic", "heif"].includes(nameExt) || ["image/heic", "image/heif"].includes(req.file.mimetype);
+    const isAvifUpload = nameExt === "avif" || req.file.mimetype === "image/avif";
+    if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype) && !isHeicUpload && !isAvifUpload) return res.status(400).json({ resStatus: false, resMessage: "Unsupported file type.", resErrorCode: 3 });
 
     const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
 
-    const inputFormat = req.file.mimetype.split("/")[1] || "unknown";
+    let inputFormat = req.file.mimetype.split("/")[1] || "unknown";
+    if (isHeicUpload) inputFormat = nameExt === "heif" ? "heif" : "heic";
+    if (isAvifUpload) inputFormat = "avif";
     const fileSizeKb = Math.round(req.file.size / 1024);
 
     try {
@@ -1286,53 +1326,6 @@ router.post("/api/post/filebeef/image/exif-remove", optionalAuth, imageUpload.si
       console.error("EXIF remove error:", err.message);
       await incrementUsage(user?.user_id, ip, tier, "image-exif-remove", inputFormat, null, fileSizeKb, "failed");
       return res.status(500).json({ resStatus: false, resMessage: "EXIF removal failed.", resErrorCode: 99 });
-    }
-  }
-);
-
-// ── HEIC TO JPG ────────────────────────────────────────────────────────────
-router.post("/api/post/filebeef/image/heic-to-jpg", optionalAuth, imageUpload.single("file"), async (req, res) => {
-    const user = req.filebeefUser;
-    const ip = getClientIp(req);
-    const tier = getTier(user);
-    const limits = IMAGE_LIMITS[tier];
-
-    if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
-    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
-
-    const allowedHeic = ["image/heic", "image/heif"];
-    if (!allowedHeic.includes(req.file.mimetype)) {
-      return res.status(400).json({ resStatus: false, resMessage: "Please upload a HEIC or HEIF file.", resErrorCode: 3 });
-    }
-
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
-    if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
-
-    const quality = Math.min(100, Math.max(1, parseInt(req.body.quality) || 90));
-    const fileSizeKb = Math.round(req.file.size / 1024);
-
-    try {
-      const heicConvert = require("heic-convert");
-      const outputBuffer = await heicConvert({
-        buffer: req.file.buffer,
-        format: "JPEG",
-        quality: quality / 100
-      });
-
-      const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
-      await incrementUsage(user?.user_id, ip, tier, "heic-to-jpg", "heic", "jpeg", fileSizeKb, "success");
-
-      res.set({
-        "Content-Type": "image/jpeg",
-        "Content-Disposition": `attachment; filename="${originalName}.jpg"`,
-        "Content-Length": outputBuffer.length
-      });
-      return res.status(200).send(Buffer.from(outputBuffer));
-
-    } catch (err) {
-      console.error("HEIC convert error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "heic-to-jpg", "heic", "jpeg", fileSizeKb, "failed");
-      return res.status(500).json({ resStatus: false, resMessage: "HEIC conversion failed.", resErrorCode: 99 });
     }
   }
 );
