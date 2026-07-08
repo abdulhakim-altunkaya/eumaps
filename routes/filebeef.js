@@ -958,11 +958,10 @@ router.post("/api/post/filebeef/image/convert", optionalAuth, imageUpload.single
         resErrorCode: 3
       });
     }
-
-
     // format check — fixed high quality, this is a converter not a compressor
+    // HEIC/HEIF input is already lossy at ~q85 visual level, so q92 would waste bytes re-encoding it
     const format = req.body.format || "jpeg";
-    const quality = 92;
+    const quality = isHeicInput ? 85 : 92;
     const allowedFormats = ["jpeg", "png", "webp", "avif", "heic", "heif", "gif"];
     if (!allowedFormats.includes(format)) {
       return res.status(400).json({
@@ -1003,12 +1002,18 @@ router.post("/api/post/filebeef/image/convert", optionalAuth, imageUpload.single
         }
       }
       let sharpInstance = sharp(convertInputBuffer);
+      // HEIC/HEIF photos → PNG/GIF: lossless/palette formats explode at 12MP.
+      // Cap longest edge at 2560px — visually identical on screens, ~4x fewer pixels.
+      if (isHeicInput && (format === "png" || format === "gif")) {
+        sharpInstance = sharpInstance.resize(2048, 2048, { fit: "inside", withoutEnlargement: true });
+      }
       switch (format) {
         case "jpeg":
           sharpInstance = sharpInstance.jpeg({ quality });
           break;
         case "png":
-          sharpInstance = sharpInstance.png({ compressionLevel: Math.round((100 - quality) / 11) });
+          if (isHeicInput) sharpInstance = sharpInstance.png({ compressionLevel: 9 });
+          else sharpInstance = sharpInstance.png({ compressionLevel: Math.round((100 - quality) / 11) });
           break;
         case "webp":
           sharpInstance = sharpInstance.webp({ quality });
