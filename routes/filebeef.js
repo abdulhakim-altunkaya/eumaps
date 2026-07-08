@@ -959,9 +959,10 @@ router.post("/api/post/filebeef/image/convert", optionalAuth, imageUpload.single
       });
     }
 
-    // format check
+
+    // format check — fixed high quality, this is a converter not a compressor
     const format = req.body.format || "jpeg";
-    const quality = Math.min(100, Math.max(1, parseInt(req.body.quality) || 75));
+    const quality = 92;
     const allowedFormats = ["jpeg", "png", "webp", "avif", "heic", "heif", "gif"];
     if (!allowedFormats.includes(format)) {
       return res.status(400).json({
@@ -1029,7 +1030,7 @@ router.post("/api/post/filebeef/image/convert", optionalAuth, imageUpload.single
           const heicEncOutPath = path.join(heicEncTmpDir, "output.heic");
           const jpgBuffer = await sharp(convertInputBuffer).jpeg({ quality: 95 }).toBuffer();
           fs.writeFileSync(heicEncInPath, jpgBuffer);
-          await execFileAsync("heif-enc", ["-q", String(quality), "-o", heicEncOutPath, heicEncInPath]);
+          await execFileAsync("heif-enc", ["-q", "80", "-o", heicEncOutPath, heicEncInPath], { timeout: 30000 });
           outputBuffer = fs.readFileSync(heicEncOutPath);
         } finally {
           fs.rmSync(heicEncTmpDir, { recursive: true, force: true });
