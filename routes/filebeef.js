@@ -1224,10 +1224,41 @@ router.post("/api/post/filebeef/image/flip-rotate", optionalAuth, imageUpload.si
         const outPath = path.join(tmpDir, "decoded.png");
         fs.writeFileSync(inPath, inputBuffer);
         await execFileAsync("heif-convert", [inPath, outPath]);
-        inputBuffer = fs.readFileSync(outPath);
+        let decodedPath = outPath;
+        if (!fs.existsSync(decodedPath)) {
+          const candidate = fs.readdirSync(tmpDir).find(f => f.startsWith("decoded") && f.endsWith(".png"));
+          if (!candidate) throw new Error("heif-convert produced no output");
+          decodedPath = path.join(tmpDir, candidate);
+        }
+        inputBuffer = fs.readFileSync(decodedPath);
       }
 
-      let sharpInstance = sharp(inputBuffer, isGif ? { animated: true } : {});
+    // GIF: sharp cannot rotate multi-page images — use gifsicle (lossless, keeps animation)
+      if (isGif) {
+        tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-fliprotate-gif-"));
+        const gifIn = path.join(tmpDir, "in.gif");
+        const gifOut = path.join(tmpDir, "out.gif");
+        fs.writeFileSync(gifIn, inputBuffer);
+        const gifArgs = [];
+        if (rotate === 90) gifArgs.push("--rotate-90");
+        else if (rotate === 180) gifArgs.push("--rotate-180");
+        else if (rotate === 270) gifArgs.push("--rotate-270");
+        if (flipH) gifArgs.push("--flip-horizontal");
+        if (flipV) gifArgs.push("--flip-vertical");
+        await execFileAsync("gifsicle", [...gifArgs, "-o", gifOut, gifIn], { timeout: 30000 });
+        const gifBuffer = fs.readFileSync(gifOut);
+
+        await incrementUsage(user?.user_id, ip, tier, "image-flip-rotate", inputFormat, "gif", fileSizeKb, "success");
+        const gifName = req.file.originalname.replace(/\.[^.]+$/, "");
+        res.set({
+          "Content-Type": "image/gif",
+          "Content-Disposition": `attachment; filename="${gifName}_rotated.gif"`,
+          "Content-Length": gifBuffer.length
+        });
+        return res.status(200).send(gifBuffer);
+      }
+
+      let sharpInstance = sharp(inputBuffer);
       if (rotate) sharpInstance = sharpInstance.rotate(rotate);
       if (flipH) sharpInstance = sharpInstance.flop();
       if (flipV) sharpInstance = sharpInstance.flip();
@@ -1235,13 +1266,11 @@ router.post("/api/post/filebeef/image/flip-rotate", optionalAuth, imageUpload.si
       const outputFormat =
         inputFormat === "png" ? "png" :
         inputFormat === "webp" ? "webp" :
-        inputFormat === "gif" ? "gif" :
         inputFormat === "avif" ? "avif" :
         isHeic ? inputFormat : // "heic" or "heif"
         "jpeg";
       if (outputFormat === "png") sharpInstance = sharpInstance.png();
       else if (outputFormat === "webp") sharpInstance = sharpInstance.webp();
-      else if (outputFormat === "gif") sharpInstance = sharpInstance.gif();
       else if (outputFormat === "avif") sharpInstance = sharpInstance.avif({ quality: 75 });
       else if (isHeic) sharpInstance = sharpInstance.png({ compressionLevel: 1 }); // intermediate, re-encoded below
       else sharpInstance = sharpInstance.jpeg({ quality: 90 });
@@ -1269,7 +1298,7 @@ router.post("/api/post/filebeef/image/flip-rotate", optionalAuth, imageUpload.si
       return res.status(200).send(outputBuffer);
 
     } catch (err) {
-      console.error("Flip/rotate error:", err.message);
+      console.error("Flip/rotate error:", err.message, err.stderr ? err.stderr.toString() : "");
       await incrementUsage(user?.user_id, ip, tier, "image-flip-rotate", inputFormat, null, fileSizeKb, "failed");
       return res.status(500).json({ resStatus: false, resMessage: "Operation failed.", resErrorCode: 99 });
     } finally {
@@ -1398,8 +1427,10 @@ router.post("/api/post/filebeef/image/color-palette", optionalAuth, imageUpload.
 
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
-    if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype)) return res.status(400).json({ resStatus: false, resMessage: "Unsupported file type.", resErrorCode: 3 });
-
+    const nameExt = (req.file.originalname.split(".").pop() || "").toLowerCase();
+    const isHeicUpload = ["heic", "heif"].includes(nameExt) || ["image/heic", "image/heif"].includes(req.file.mimetype);
+    const isAvifUpload = nameExt === "avif" || req.file.mimetype === "image/avif";
+    if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype) && !isHeicUpload && !isAvifUpload) return res.status(400).json({ resStatus: false, resMessage: "Unsupported file type.", resErrorCode: 3 });
     const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
 
@@ -1472,7 +1503,9 @@ router.post("/api/post/filebeef/image/watermark", optionalAuth, imageUpload.sing
     const text = (req.body.text || "FileBeef").substring(0, 50);
     const opacity = Math.min(1, Math.max(0.1, parseFloat(req.body.opacity) || 0.4));
     const position = req.body.position || "bottom-right";
-    const inputFormat = req.file.mimetype.split("/")[1] || "unknown";
+    let inputFormat = req.file.mimetype.split("/")[1] || "unknown";
+    if (isHeicUpload) inputFormat = nameExt === "heif" ? "heif" : "heic";
+    if (isAvifUpload) inputFormat = "avif";
     const fileSizeKb = Math.round(req.file.size / 1024);
 
     try {
