@@ -983,7 +983,9 @@ router.post("/api/post/filebeef/image/convert", optionalAuth, imageUpload.single
       });
     }
 
-    const inputFormat = req.file.mimetype.split("/")[1] || "unknown";
+    let inputFormat = req.file.mimetype.split("/")[1] || "unknown";
+    if (isHeicUpload) inputFormat = nameExt === "heif" ? "heif" : "heic";
+    if (isAvifUpload) inputFormat = "avif";
     const fileSizeKb = Math.round(req.file.size / 1024);
 
     try {
@@ -1495,7 +1497,10 @@ router.post("/api/post/filebeef/image/watermark", optionalAuth, imageUpload.sing
 
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
-    if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype)) return res.status(400).json({ resStatus: false, resMessage: "Unsupported file type.", resErrorCode: 3 });
+    const nameExt = (req.file.originalname.split(".").pop() || "").toLowerCase();
+    const isHeicUpload = ["heic", "heif"].includes(nameExt) || ["image/heic", "image/heif"].includes(req.file.mimetype);
+    const isAvifUpload = nameExt === "avif" || req.file.mimetype === "image/avif";
+    if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype) && !isHeicUpload && !isAvifUpload) return res.status(400).json({ resStatus: false, resMessage: "Unsupported file type.", resErrorCode: 3 });
 
     const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
