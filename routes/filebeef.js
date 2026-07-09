@@ -1416,7 +1416,10 @@ router.post("/api/post/filebeef/image/exif-read", optionalAuth, imageUpload.sing
         "-ImageDescription", "-GPSLatitude", "-GPSLongitude",
         inPath
       ]);
+      console.log("EXIF-READ file:", req.file.originalname, "| size:", req.file.size, "| mimetype:", req.file.mimetype);
+      console.log("EXIF-READ raw exiftool output:", stdout);
       const data = JSON.parse(stdout)[0] || {};
+      console.log("EXIF-READ parsed:", JSON.stringify(data));
       return res.status(200).json({
         resStatus: true,
         metadata: {
@@ -1431,7 +1434,7 @@ router.post("/api/post/filebeef/image/exif-read", optionalAuth, imageUpload.sing
         }
       });
     } catch (err) {
-      console.error("EXIF read error:", err.message);
+      console.error("EXIF read error:", err.message, "| stderr:", err.stderr || "none", "| stdout:", err.stdout || "none");
       return res.status(500).json({ resStatus: false, resMessage: "Could not read metadata.", resErrorCode: 99 });
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
