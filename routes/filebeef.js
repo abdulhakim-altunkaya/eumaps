@@ -1468,12 +1468,30 @@ router.post("/api/post/filebeef/image/color-palette", optionalAuth, imageUpload.
     const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
 
+    let inputFormat = req.file.mimetype.split("/")[1] || "unknown";
+    if (isHeicUpload) inputFormat = nameExt === "heif" ? "heif" : "heic";
+    if (isAvifUpload) inputFormat = "avif";
     const fileSizeKb = Math.round(req.file.size / 1024);
     const colorCount = Math.min(10, Math.max(3, parseInt(req.body.colorCount) || 6));
 
     try {
+      let workBuffer = req.file.buffer;
+      if (isHeicUpload) {
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-pal-"));
+        const inPath = path.join(tmpDir, "in." + (nameExt === "heif" ? "heif" : "heic"));
+        const outPath = path.join(tmpDir, "out.jpg");
+        try {
+          fs.writeFileSync(inPath, req.file.buffer);
+          await execFileAsync("heif-convert", ["-q", "95", inPath, outPath]);
+          const altPath = path.join(tmpDir, "out-1.jpg");
+          workBuffer = fs.readFileSync(fs.existsSync(outPath) ? outPath : altPath);
+        } finally {
+          fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+      }
+
       // resize to small thumbnail for fast color extraction
-      const { data, info } = await sharp(req.file.buffer)
+      const { data, info } = await sharp(workBuffer)
         .resize(150, 150, { fit: "cover" })
         .raw()
         .toBuffer({ resolveWithObject: true });
@@ -1491,7 +1509,7 @@ router.post("/api/post/filebeef/image/color-palette", optionalAuth, imageUpload.
       // quantize into buckets by rounding to nearest 32
       const colorMap = {};
       for (const [r, g, b] of sampled) {
-        const key = `${Math.round(r / 32) * 32},${Math.round(g / 32) * 32},${Math.round(b / 32) * 32}`;
+        const key = `${Math.min(255, Math.round(r / 32) * 32)},${Math.min(255, Math.round(g / 32) * 32)},${Math.min(255, Math.round(b / 32) * 32)}`;
         colorMap[key] = (colorMap[key] || 0) + 1;
       }
 
@@ -1504,8 +1522,7 @@ router.post("/api/post/filebeef/image/color-palette", optionalAuth, imageUpload.
           return { r, g, b, hex };
         });
 
-      await incrementUsage(user?.user_id, ip, tier, "color-palette", req.file.mimetype.split("/")[1], null, fileSizeKb, "success");
-
+      await incrementUsage(user?.user_id, ip, tier, "color-palette", inputFormat, null, fileSizeKb, "success");
       return res.status(200).json({
         resStatus: true,
         resOkCode: 1,
@@ -1514,7 +1531,7 @@ router.post("/api/post/filebeef/image/color-palette", optionalAuth, imageUpload.
 
     } catch (err) {
       console.error("Color palette error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "color-palette", req.file.mimetype.split("/")[1], null, fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "color-palette", inputFormat, null, fileSizeKb, "failed");
       return res.status(500).json({ resStatus: false, resMessage: "Color extraction failed.", resErrorCode: 99 });
     }
   }
