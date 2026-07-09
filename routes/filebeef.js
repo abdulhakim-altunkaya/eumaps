@@ -1523,14 +1523,27 @@ router.post("/api/post/filebeef/image/watermark", optionalAuth, imageUpload.sing
     const fileSizeKb = Math.round(req.file.size / 1024);
 
     try {
-      const image = sharp(req.file.buffer);
+      let workBuffer = req.file.buffer;
+      if (isHeicUpload) {
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-wm-"));
+        const inPath = path.join(tmpDir, "in." + (nameExt === "heif" ? "heif" : "heic"));
+        const outPath = path.join(tmpDir, "out.jpg");
+        try {
+          fs.writeFileSync(inPath, req.file.buffer);
+          await execFileAsync("heif-convert", ["-q", "95", inPath, outPath]);
+          const altPath = path.join(tmpDir, "out-1.jpg");
+          workBuffer = fs.readFileSync(fs.existsSync(outPath) ? outPath : altPath);
+        } finally {
+          fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+      }
+      const isGif = inputFormat === "gif";
+      const image = sharp(workBuffer, isGif ? { animated: true } : {});
       const meta = await image.metadata();
       const width = meta.width || 800;
-      const height = meta.height || 600;
-
+      const height = (isGif ? meta.pageHeight : meta.height) || meta.height || 600;
       const fontSize = Math.max(16, Math.round(Math.min(width, height) * 0.05));
       const opacityHex = Math.round(opacity * 255).toString(16).padStart(2, "0");
-
       const svgText = `
         <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
           <style>
@@ -1545,11 +1558,22 @@ router.post("/api/post/filebeef/image/watermark", optionalAuth, imageUpload.sing
         </svg>
       `;
 
-      const outputFormat = inputFormat === "png" ? "png" : inputFormat === "webp" ? "webp" : "jpeg";
-      let sharpInstance = sharp(req.file.buffer).composite([{ input: Buffer.from(svgText), top: 0, left: 0 }]);
+      const outputFormat =
+        inputFormat === "png" ? "png"
+        : inputFormat === "webp" ? "webp"
+        : inputFormat === "gif" ? "gif"
+        : inputFormat === "avif" ? "avif"
+        : "jpeg";
+      let sharpInstance = sharp(workBuffer, isGif ? { animated: true } : {}).composite([
+        isGif
+          ? { input: Buffer.from(svgText), tile: true, gravity: "northwest" }
+          : { input: Buffer.from(svgText), top: 0, left: 0 }
+      ]);
 
       if (outputFormat === "png") sharpInstance = sharpInstance.png();
       else if (outputFormat === "webp") sharpInstance = sharpInstance.webp({ quality: 90 });
+      else if (outputFormat === "gif") sharpInstance = sharpInstance.gif();
+      else if (outputFormat === "avif") sharpInstance = sharpInstance.avif({ quality: 60 });
       else sharpInstance = sharpInstance.jpeg({ quality: 90 });
 
       const outputBuffer = await sharpInstance.toBuffer();
