@@ -1517,6 +1517,20 @@ router.post("/api/post/filebeef/image/watermark", optionalAuth, imageUpload.sing
     const text = (req.body.text || "FileBeef").substring(0, 50);
     const opacity = Math.min(1, Math.max(0.1, parseFloat(req.body.opacity) || 0.4));
     const position = req.body.position || "bottom-right";
+    const color = req.body.color === "black" ? "#000000" : "#ffffff";
+    const WM_FONTS = {
+      "arial":      "Arial",
+      "times":      "Times New Roman",
+      "impact":     "Impact",
+      "pacifico":   "Pacifico",
+      "dancing":    "Dancing Script",
+      "greatvibes": "Great Vibes",
+      "allura":     "Allura",
+      "sacramento": "Sacramento",
+      "caveat":     "Caveat Brush",
+      "zendots":    "Zen Dots"
+    };
+    const fontFamily = WM_FONTS[(req.body.font || "").toLowerCase()] || "Arial";
     let inputFormat = req.file.mimetype.split("/")[1] || "unknown";
     if (isHeicUpload) inputFormat = nameExt === "heif" ? "heif" : "heic";
     if (isAvifUpload) inputFormat = "avif";
@@ -1543,18 +1557,19 @@ router.post("/api/post/filebeef/image/watermark", optionalAuth, imageUpload.sing
       const width = meta.width || 800;
       const height = (isGif ? meta.pageHeight : meta.height) || meta.height || 600;
       const fontSize = Math.max(16, Math.round(Math.min(width, height) * 0.05));
+      const safeText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       const opacityHex = Math.round(opacity * 255).toString(16).padStart(2, "0");
       const svgText = `
         <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
           <style>
-            .wm { font-family: Arial, sans-serif; font-size: ${fontSize}px; fill: #ffffff; fill-opacity: ${opacity}; }
+            .wm { font-family: '${fontFamily}'; font-size: ${fontSize}px; fill: ${color}; fill-opacity: ${opacity}; }
           </style>
           <text
             class="wm"
             x="${position.includes("right") ? width - 20 : position.includes("center") ? width / 2 : 20}"
             y="${position.includes("bottom") ? height - 20 : position.includes("middle") ? height / 2 : 40}"
             text-anchor="${position.includes("right") ? "end" : position.includes("center") ? "middle" : "start"}"
-          >${text}</text>
+          >${safeText}</text>
         </svg>
       `;
 
