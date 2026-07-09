@@ -1513,7 +1513,10 @@ router.post("/api/post/filebeef/image/color-palette", optionalAuth, imageUpload.
         colorMap[key] = (colorMap[key] || 0) + 1;
       }
 
+      // frequency floor: drop buckets under 1% of sampled pixels
+      const minCount = Math.max(2, Math.floor(sampled.length * 0.01));
       const sorted = Object.entries(colorMap)
+        .filter(([, count]) => count >= minCount)
         .sort((a, b) => b[1] - a[1])
         .slice(0, colorCount)
         .map(([key]) => {
