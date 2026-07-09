@@ -1341,12 +1341,35 @@ router.post("/api/post/filebeef/image/exif-remove", optionalAuth, imageUpload.si
     const fileSizeKb = Math.round(req.file.size / 1024);
 
     try {
+      let workBuffer = req.file.buffer;
+      if (isHeicUpload) {
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-exif-"));
+        const inPath = path.join(tmpDir, "in." + (nameExt === "heif" ? "heif" : "heic"));
+        const outPath = path.join(tmpDir, "out.jpg");
+        try {
+          fs.writeFileSync(inPath, req.file.buffer);
+          await execFileAsync("heif-convert", ["-q", "95", inPath, outPath]);
+          const altPath = path.join(tmpDir, "out-1.jpg");
+          workBuffer = fs.readFileSync(fs.existsSync(outPath) ? outPath : altPath);
+        } finally {
+          fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+      }
+      const isGif = inputFormat === "gif";
+
       // sharp strips EXIF by default when converting
-      const outputFormat = inputFormat === "png" ? "png" : inputFormat === "webp" ? "webp" : "jpeg";
-      let sharpInstance = sharp(req.file.buffer).withMetadata(false);
+      const outputFormat =
+        inputFormat === "png" ? "png"
+        : inputFormat === "webp" ? "webp"
+        : inputFormat === "gif" ? "gif"
+        : inputFormat === "avif" ? "avif"
+        : "jpeg";
+      let sharpInstance = sharp(workBuffer, isGif ? { animated: true } : {}).withMetadata(false);
 
       if (outputFormat === "png") sharpInstance = sharpInstance.png();
       else if (outputFormat === "webp") sharpInstance = sharpInstance.webp();
+      else if (outputFormat === "gif") sharpInstance = sharpInstance.gif();
+      else if (outputFormat === "avif") sharpInstance = sharpInstance.avif({ quality: 60 });
       else sharpInstance = sharpInstance.jpeg({ quality: 95 });
 
       const outputBuffer = await sharpInstance.toBuffer();
