@@ -1513,18 +1513,28 @@ router.post("/api/post/filebeef/image/color-palette", optionalAuth, imageUpload.
         colorMap[key] = (colorMap[key] || 0) + 1;
       }
 
-      // frequency floor: drop buckets under 1% of sampled pixels
-      const minCount = Math.max(2, Math.floor(sampled.length * 0.01));
-      const sorted = Object.entries(colorMap)
+      // frequency floor: drop buckets under 2% of sampled pixels
+      const minCount = Math.max(2, Math.floor(sampled.length * 0.02));
+      const ranked = Object.entries(colorMap)
         .filter(([, count]) => count >= minCount)
         .sort((a, b) => b[1] - a[1])
-        .slice(0, colorCount)
-        .map(([key]) => {
-          const [r, g, b] = key.split(",").map(Number);
-          const hex = "#" + [r, g, b].map(v => v.toString(16).padStart(2, "0")).join("");
-          return { r, g, b, hex };
-        });
+        .map(([key]) => key.split(",").map(Number));
 
+      // near-duplicate merge: skip colors too close to an already-picked one
+      const MERGE_DIST = 120;
+      const picked = [];
+      for (const [r, g, b] of ranked) {
+        const isDupe = picked.some(([pr, pg, pb]) =>
+          Math.sqrt((r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2) < MERGE_DIST
+        );
+        if (!isDupe) picked.push([r, g, b]);
+        if (picked.length >= colorCount) break;
+      }
+
+      const sorted = picked.map(([r, g, b]) => {
+        const hex = "#" + [r, g, b].map(v => v.toString(16).padStart(2, "0")).join("");
+        return { r, g, b, hex };
+      });
       await incrementUsage(user?.user_id, ip, tier, "color-palette", inputFormat, null, fileSizeKb, "success");
       return res.status(200).json({
         resStatus: true,
