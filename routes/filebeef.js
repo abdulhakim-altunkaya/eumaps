@@ -1392,7 +1392,128 @@ router.post("/api/post/filebeef/image/exif-remove", optionalAuth, imageUpload.si
     }
   }
 );
+// ── EXIF EDITOR ────────────────────────────────────────────────────────────
+const EXIF_EDIT_TYPES = ["image/jpeg", "image/png", "image/webp", "image/tiff", "image/heic", "image/heif"];
+const EXIF_EDIT_EXTS = ["jpg", "jpeg", "png", "webp", "tif", "tiff", "heic", "heif"];
 
+router.post("/api/post/filebeef/image/exif-read", optionalAuth, imageUpload.single("file"), async (req, res) => {
+    const user = req.filebeefUser;
+    const tier = getTier(user);
+    const limits = IMAGE_LIMITS[tier];
+
+    if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
+    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
+    const nameExt = (req.file.originalname.split(".").pop() || "").toLowerCase();
+    if (!EXIF_EDIT_TYPES.includes(req.file.mimetype) && !EXIF_EDIT_EXTS.includes(nameExt)) return res.status(400).json({ resStatus: false, resMessage: "Unsupported file type. Use JPG, PNG, WEBP, TIFF or HEIC.", resErrorCode: 3 });
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-exifr-"));
+    const inPath = path.join(tmpDir, "in." + nameExt);
+    try {
+      fs.writeFileSync(inPath, req.file.buffer);
+      const { stdout } = await execFileAsync("exiftool", [
+        "-json", "-n",
+        "-DateTimeOriginal", "-Make", "-Model", "-Artist", "-Copyright",
+        "-ImageDescription", "-GPSLatitude", "-GPSLongitude",
+        inPath
+      ]);
+      const data = JSON.parse(stdout)[0] || {};
+      return res.status(200).json({
+        resStatus: true,
+        metadata: {
+          dateTimeOriginal: data.DateTimeOriginal || "",
+          make: data.Make || "",
+          model: data.Model || "",
+          artist: data.Artist || "",
+          copyright: data.Copyright || "",
+          description: data.ImageDescription || "",
+          gpsLatitude: data.GPSLatitude !== undefined ? data.GPSLatitude : "",
+          gpsLongitude: data.GPSLongitude !== undefined ? data.GPSLongitude : ""
+        }
+      });
+    } catch (err) {
+      console.error("EXIF read error:", err.message);
+      return res.status(500).json({ resStatus: false, resMessage: "Could not read metadata.", resErrorCode: 99 });
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  }
+);
+
+router.post("/api/post/filebeef/image/exif-write", optionalAuth, imageUpload.single("file"), async (req, res) => {
+    const user = req.filebeefUser;
+    const ip = getClientIp(req);
+    const tier = getTier(user);
+    const limits = IMAGE_LIMITS[tier];
+
+    if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
+    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
+    const nameExt = (req.file.originalname.split(".").pop() || "").toLowerCase();
+    if (!EXIF_EDIT_TYPES.includes(req.file.mimetype) && !EXIF_EDIT_EXTS.includes(nameExt)) return res.status(400).json({ resStatus: false, resMessage: "Unsupported file type. Use JPG, PNG, WEBP, TIFF or HEIC.", resErrorCode: 3 });
+
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
+
+    const inputFormat = nameExt === "jpeg" ? "jpg" : nameExt;
+    const fileSizeKb = Math.round(req.file.size / 1024);
+
+    const str = (v) => (typeof v === "string" ? v.substring(0, 200) : "");
+    const dateTimeOriginal = str(req.body.dateTimeOriginal);
+    const make = str(req.body.make);
+    const model = str(req.body.model);
+    const artist = str(req.body.artist);
+    const copyrightVal = str(req.body.copyright);
+    const description = str(req.body.description);
+    const removeGps = req.body.removeGps === "true";
+    const lat = req.body.gpsLatitude === "" || req.body.gpsLatitude === undefined ? null : parseFloat(req.body.gpsLatitude);
+    const lon = req.body.gpsLongitude === "" || req.body.gpsLongitude === undefined ? null : parseFloat(req.body.gpsLongitude);
+    if (lat !== null && (isNaN(lat) || lat < -90 || lat > 90)) return res.status(400).json({ resStatus: false, resMessage: "Latitude must be between -90 and 90.", resErrorCode: 4 });
+    if (lon !== null && (isNaN(lon) || lon < -180 || lon > 180)) return res.status(400).json({ resStatus: false, resMessage: "Longitude must be between -180 and 180.", resErrorCode: 4 });
+    if (dateTimeOriginal && !/^\d{4}:\d{2}:\d{2} \d{2}:\d{2}:\d{2}$/.test(dateTimeOriginal)) return res.status(400).json({ resStatus: false, resMessage: "Date must be in YYYY:MM:DD HH:MM:SS format.", resErrorCode: 4 });
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-exifw-"));
+    const inPath = path.join(tmpDir, "in." + nameExt);
+    try {
+      fs.writeFileSync(inPath, req.file.buffer);
+
+      const args = ["-overwrite_original", "-n"];
+      args.push(`-DateTimeOriginal=${dateTimeOriginal}`);
+      args.push(`-Make=${make}`);
+      args.push(`-Model=${model}`);
+      args.push(`-Artist=${artist}`);
+      args.push(`-Copyright=${copyrightVal}`);
+      args.push(`-ImageDescription=${description}`);
+      if (removeGps) {
+        args.push("-gps:all=");
+      } else if (lat !== null && lon !== null) {
+        args.push(`-GPSLatitude=${Math.abs(lat)}`);
+        args.push(`-GPSLatitudeRef=${lat >= 0 ? "N" : "S"}`);
+        args.push(`-GPSLongitude=${Math.abs(lon)}`);
+        args.push(`-GPSLongitudeRef=${lon >= 0 ? "E" : "W"}`);
+      }
+      args.push(inPath);
+
+      await execFileAsync("exiftool", args);
+      const outputBuffer = fs.readFileSync(inPath);
+      const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
+
+      await incrementUsage(user?.user_id, ip, tier, "image-exif-edit", inputFormat, inputFormat, fileSizeKb, "success");
+
+      res.set({
+        "Content-Type": req.file.mimetype || "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${originalName}_edited.${nameExt}"`,
+        "Content-Length": outputBuffer.length
+      });
+      return res.status(200).send(outputBuffer);
+
+    } catch (err) {
+      console.error("EXIF write error:", err.message);
+      await incrementUsage(user?.user_id, ip, tier, "image-exif-edit", inputFormat, null, fileSizeKb, "failed");
+      return res.status(500).json({ resStatus: false, resMessage: "Metadata update failed.", resErrorCode: 99 });
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  }
+);
 // ── SVG OPTIMIZER ──────────────────────────────────────────────────────────
 router.post("/api/post/filebeef/image/svg-optimize", optionalAuth, async (req, res) => {
     const user = req.filebeefUser;
