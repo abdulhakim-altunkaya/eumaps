@@ -1489,52 +1489,208 @@ router.post("/api/post/filebeef/image/color-palette", optionalAuth, imageUpload.
           fs.rmSync(tmpDir, { recursive: true, force: true });
         }
       }
-
-      // resize to small thumbnail for fast color extraction
+      // Resize without cropping. Flatten transparency onto white so white backgrounds
+      // are correctly detected.
       const { data, info } = await sharp(workBuffer)
-        .resize(150, 150, { fit: "cover" })
+        .rotate()
+        .resize({
+          width: 240,
+          height: 240,
+          fit: "inside",
+          withoutEnlargement: true
+        })
+        .flatten({ background: { r: 255, g: 255, b: 255 } })
+        .removeAlpha()
         .raw()
         .toBuffer({ resolveWithObject: true });
 
-      // sample pixels and cluster into dominant colors
-      const pixels = [];
-      for (let i = 0; i < data.length; i += info.channels) {
-        pixels.push([data[i], data[i + 1], data[i + 2]]);
+      const totalPixels = info.width * info.height;
+
+      // Use up to about 20,000 pixels instead of only 500.
+      const sampleStep = Math.max(1, Math.floor(totalPixels / 20000));
+
+      const buckets = new Map();
+      const BUCKET_SIZE = 20;
+      let sampledCount = 0;
+
+      for (
+        let pixelIndex = 0;
+        pixelIndex < totalPixels;
+        pixelIndex += sampleStep
+      ) {
+        const offset = pixelIndex * info.channels;
+
+        const r = data[offset];
+        const g = data[offset + 1];
+        const b = data[offset + 2];
+
+        sampledCount++;
+
+        // Quantize only for grouping. The final displayed color uses the real
+        // average of all pixels in the bucket.
+        const qr = Math.min(255, Math.floor(r / BUCKET_SIZE) * BUCKET_SIZE);
+        const qg = Math.min(255, Math.floor(g / BUCKET_SIZE) * BUCKET_SIZE);
+        const qb = Math.min(255, Math.floor(b / BUCKET_SIZE) * BUCKET_SIZE);
+
+        const key = `${qr},${qg},${qb}`;
+
+        let bucket = buckets.get(key);
+
+        if (!bucket) {
+          bucket = {
+            count: 0,
+            sumR: 0,
+            sumG: 0,
+            sumB: 0
+          };
+
+          buckets.set(key, bucket);
+        }
+
+        bucket.count++;
+        bucket.sumR += r;
+        bucket.sumG += g;
+        bucket.sumB += b;
       }
 
-      // simple median cut — sample every Nth pixel for speed
-      const step = Math.max(1, Math.floor(pixels.length / 500));
-      const sampled = pixels.filter((_, idx) => idx % step === 0);
+      // A lower floor keeps meaningful colors while removing tiny transition/noise
+      // buckets. 0.35% of sampled pixels is normally enough to be visible.
+      const minimumCount = Math.max(
+        3,
+        Math.floor(sampledCount * 0.0035)
+      );
 
-      // quantize into buckets by rounding to nearest 32
-      const colorMap = {};
-      for (const [r, g, b] of sampled) {
-        const key = `${Math.min(255, Math.round(r / 32) * 32)},${Math.min(255, Math.round(g / 32) * 32)},${Math.min(255, Math.round(b / 32) * 32)}`;
-        colorMap[key] = (colorMap[key] || 0) + 1;
+      let ranked = Array.from(buckets.values())
+        .filter(bucket => bucket.count >= minimumCount)
+        .map(bucket => ({
+          r: Math.round(bucket.sumR / bucket.count),
+          g: Math.round(bucket.sumG / bucket.count),
+          b: Math.round(bucket.sumB / bucket.count),
+          count: bucket.count
+        }))
+        .sort((a, b) => b.count - a.count);
+
+      // Fall back to all meaningful buckets when an image contains only a few
+      // repeated colors.
+      if (ranked.length < colorCount) {
+        ranked = Array.from(buckets.values())
+          .filter(bucket => bucket.count >= 2)
+          .map(bucket => ({
+            r: Math.round(bucket.sumR / bucket.count),
+            g: Math.round(bucket.sumG / bucket.count),
+            b: Math.round(bucket.sumB / bucket.count),
+            count: bucket.count
+          }))
+          .sort((a, b) => b.count - a.count);
       }
 
-      // frequency floor: drop buckets under 2% of sampled pixels
-      const minCount = Math.max(2, Math.floor(sampled.length * 0.02));
-      const ranked = Object.entries(colorMap)
-        .filter(([, count]) => count >= minCount)
-        .sort((a, b) => b[1] - a[1])
-        .map(([key]) => key.split(",").map(Number));
-
-      // near-duplicate merge: skip colors too close to an already-picked one
-      const MERGE_DIST = 120;
-      const picked = [];
-      for (const [r, g, b] of ranked) {
-        const isDupe = picked.some(([pr, pg, pb]) =>
-          Math.sqrt((r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2) < MERGE_DIST
+      function isNearWhite(color) {
+        return (
+          color.r >= 235 &&
+          color.g >= 235 &&
+          color.b >= 235
         );
-        if (!isDupe) picked.push([r, g, b]);
+      }
+
+      function isNearBlack(color) {
+        return (
+          color.r <= 25 &&
+          color.g <= 25 &&
+          color.b <= 25
+        );
+      }
+
+      function colorDistance(a, b) {
+        const redMean = (a.r + b.r) / 2;
+        const redDiff = a.r - b.r;
+        const greenDiff = a.g - b.g;
+        const blueDiff = a.b - b.b;
+
+        // Weighted RGB distance. This behaves better than plain Euclidean RGB.
+        return Math.sqrt(
+          (2 + redMean / 256) * redDiff * redDiff +
+          4 * greenDiff * greenDiff +
+          (2 + (255 - redMean) / 256) * blueDiff * blueDiff
+        );
+      }
+
+      const picked = [];
+
+      // Explicitly preserve a meaningful white bucket.
+      // Without this, white can still lose against several similar pale buckets.
+      const whiteCandidate = ranked.find(color => isNearWhite(color));
+
+      if (whiteCandidate) {
+        picked.push(whiteCandidate);
+      }
+
+      // Also preserve black when it is genuinely present.
+      const blackCandidate = ranked.find(color => isNearBlack(color));
+
+      if (
+        blackCandidate &&
+        !picked.some(color => colorDistance(color, blackCandidate) < 30)
+      ) {
+        picked.push(blackCandidate);
+      }
+
+      // Add dominant colors while rejecting near-duplicates and gradient transitions.
+      for (const candidate of ranked) {
+        if (picked.includes(candidate)) continue;
+
+        const duplicate = picked.some(existing => {
+          // Do not merge white into beige/light colors unless both are near-white.
+          if (
+            isNearWhite(existing) !== isNearWhite(candidate)
+          ) {
+            return false;
+          }
+
+          // Same rule for black and very dark colors.
+          if (
+            isNearBlack(existing) !== isNearBlack(candidate)
+          ) {
+            return false;
+          }
+
+          return colorDistance(existing, candidate) < 55;
+        });
+
+        if (!duplicate) {
+          picked.push(candidate);
+        }
+
         if (picked.length >= colorCount) break;
       }
 
-      const sorted = picked.map(([r, g, b]) => {
-        const hex = "#" + [r, g, b].map(v => v.toString(16).padStart(2, "0")).join("");
-        return { r, g, b, hex };
-      });
+      // Keep the result ordered by actual dominance.
+      picked.sort((a, b) => b.count - a.count);
+
+      const sorted = picked
+        .slice(0, colorCount)
+        .map(({ r, g, b, count }) => {
+          const hex =
+            "#" +
+            [r, g, b]
+              .map(value =>
+                Math.max(0, Math.min(255, value))
+                  .toString(16)
+                  .padStart(2, "0")
+              )
+              .join("")
+              .toUpperCase();
+
+          return {
+            r,
+            g,
+            b,
+            hex,
+            percentage: Number(
+              ((count / sampledCount) * 100).toFixed(1)
+            )
+          };
+        });
+
       await incrementUsage(user?.user_id, ip, tier, "color-palette", inputFormat, null, fileSizeKb, "success");
       return res.status(200).json({
         resStatus: true,
