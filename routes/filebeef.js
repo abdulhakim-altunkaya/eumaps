@@ -1489,234 +1489,246 @@ router.post("/api/post/filebeef/image/color-palette", optionalAuth, imageUpload.
           fs.rmSync(tmpDir, { recursive: true, force: true });
         }
       }
-      // Resize without cropping. Flatten transparency onto white so white backgrounds
-      // are correctly detected.
       const { data, info } = await sharp(workBuffer)
-        .rotate()
-        .resize({
-          width: 240,
-          height: 240,
-          fit: "inside",
-          withoutEnlargement: true
-        })
-        .flatten({ background: { r: 255, g: 255, b: 255 } })
-        .removeAlpha()
-        .raw()
-        .toBuffer({ resolveWithObject: true });
+  .rotate()
+  .resize({ width: 240, height: 240, fit: "inside", withoutEnlargement: true })
+  .flatten({ background: { r: 255, g: 255, b: 255 } })
+  .removeAlpha()
+  .raw()
+  .toBuffer({ resolveWithObject: true });
 
-      const totalPixels = info.width * info.height;
+const totalPixels = info.width * info.height;
+const sampleStep = Math.max(1, Math.floor(totalPixels / 20000));
+const pixels = [];
 
-      // Use up to about 20,000 pixels instead of only 500.
-      const sampleStep = Math.max(1, Math.floor(totalPixels / 20000));
+for (let pixelIndex = 0; pixelIndex < totalPixels; pixelIndex += sampleStep) {
+  const offset = pixelIndex * info.channels;
+  pixels.push({
+    r: data[offset],
+    g: data[offset + 1],
+    b: data[offset + 2]
+  });
+}
 
-      const buckets = new Map();
-      const BUCKET_SIZE = 20;
-      let sampledCount = 0;
+function colorDistance(a, b) {
+  const redMean = (a.r + b.r) / 2;
+  const redDiff = a.r - b.r;
+  const greenDiff = a.g - b.g;
+  const blueDiff = a.b - b.b;
 
-      for (
-        let pixelIndex = 0;
-        pixelIndex < totalPixels;
-        pixelIndex += sampleStep
-      ) {
-        const offset = pixelIndex * info.channels;
+  return Math.sqrt(
+    (2 + redMean / 256) * redDiff * redDiff +
+    4 * greenDiff * greenDiff +
+    (2 + (255 - redMean) / 256) * blueDiff * blueDiff
+  );
+}
 
-        const r = data[offset];
-        const g = data[offset + 1];
-        const b = data[offset + 2];
+function averageColors(colors) {
+  if (!colors.length) return { r: 0, g: 0, b: 0 };
 
-        sampledCount++;
+  let sumR = 0;
+  let sumG = 0;
+  let sumB = 0;
 
-        // Quantize only for grouping. The final displayed color uses the real
-        // average of all pixels in the bucket.
-        const qr = Math.min(255, Math.floor(r / BUCKET_SIZE) * BUCKET_SIZE);
-        const qg = Math.min(255, Math.floor(g / BUCKET_SIZE) * BUCKET_SIZE);
-        const qb = Math.min(255, Math.floor(b / BUCKET_SIZE) * BUCKET_SIZE);
+  for (const color of colors) {
+    sumR += color.r;
+    sumG += color.g;
+    sumB += color.b;
+  }
 
-        const key = `${qr},${qg},${qb}`;
+  return {
+    r: Math.round(sumR / colors.length),
+    g: Math.round(sumG / colors.length),
+    b: Math.round(sumB / colors.length)
+  };
+}
 
-        let bucket = buckets.get(key);
+function initializeCentroids(sourcePixels, count) {
+  const centroids = [];
 
-        if (!bucket) {
-          bucket = {
-            count: 0,
-            sumR: 0,
-            sumG: 0,
-            sumB: 0
-          };
+  if (!sourcePixels.length) return centroids;
 
-          buckets.set(key, bucket);
-        }
+  const first = sourcePixels.reduce((darkest, pixel) => {
+    const value = pixel.r + pixel.g + pixel.b;
+    const darkestValue = darkest.r + darkest.g + darkest.b;
+    return value < darkestValue ? pixel : darkest;
+  }, sourcePixels[0]);
 
-        bucket.count++;
-        bucket.sumR += r;
-        bucket.sumG += g;
-        bucket.sumB += b;
-      }
+  centroids.push({ ...first });
 
-      // A lower floor keeps meaningful colors while removing tiny transition/noise
-      // buckets. 0.35% of sampled pixels is normally enough to be visible.
-      const minimumCount = Math.max(
-        3,
-        Math.floor(sampledCount * 0.0035)
+  while (centroids.length < count) {
+    let bestPixel = null;
+    let bestScore = -1;
+
+    for (const pixel of sourcePixels) {
+      const nearestDistance = Math.min(
+        ...centroids.map(centroid => colorDistance(pixel, centroid))
       );
 
-      let ranked = Array.from(buckets.values())
-        .filter(bucket => bucket.count >= minimumCount)
-        .map(bucket => ({
-          r: Math.round(bucket.sumR / bucket.count),
-          g: Math.round(bucket.sumG / bucket.count),
-          b: Math.round(bucket.sumB / bucket.count),
-          count: bucket.count
-        }))
-        .sort((a, b) => b.count - a.count);
-
-      // Fall back to all meaningful buckets when an image contains only a few
-      // repeated colors.
-      if (ranked.length < colorCount) {
-        ranked = Array.from(buckets.values())
-          .filter(bucket => bucket.count >= 2)
-          .map(bucket => ({
-            r: Math.round(bucket.sumR / bucket.count),
-            g: Math.round(bucket.sumG / bucket.count),
-            b: Math.round(bucket.sumB / bucket.count),
-            count: bucket.count
-          }))
-          .sort((a, b) => b.count - a.count);
+      if (nearestDistance > bestScore) {
+        bestScore = nearestDistance;
+        bestPixel = pixel;
       }
+    }
 
-      function isNearWhite(color) {
-        const max = Math.max(color.r, color.g, color.b);
-        const min = Math.min(color.r, color.g, color.b);
-        const brightness = (color.r + color.g + color.b) / 3;
+    if (!bestPixel || bestScore < 20) break;
+    centroids.push({ ...bestPixel });
+  }
 
-        return (
-          brightness >= 195 &&
-          max - min <= 18
-        );
+  return centroids;
+}
+
+const clusterTarget = Math.min(Math.max(colorCount * 3, 8), 30);
+let centroids = initializeCentroids(pixels, clusterTarget);
+
+for (let iteration = 0; iteration < 12; iteration++) {
+  const groups = centroids.map(() => []);
+
+  for (const pixel of pixels) {
+    let nearestIndex = 0;
+    let nearestDistance = Infinity;
+
+    for (let i = 0; i < centroids.length; i++) {
+      const distance = colorDistance(pixel, centroids[i]);
+
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestIndex = i;
       }
+    }
 
-      function isNearBlack(color) {
-        return (
-          color.r <= 25 &&
-          color.g <= 25 &&
-          color.b <= 25
-        );
-      }
+    groups[nearestIndex].push(pixel);
+  }
 
-      function colorDistance(a, b) {
-        const redMean = (a.r + b.r) / 2;
-        const redDiff = a.r - b.r;
-        const greenDiff = a.g - b.g;
-        const blueDiff = a.b - b.b;
+  let changed = false;
 
-        // Weighted RGB distance. This behaves better than plain Euclidean RGB.
-        return Math.sqrt(
-          (2 + redMean / 256) * redDiff * redDiff +
-          4 * greenDiff * greenDiff +
-          (2 + (255 - redMean) / 256) * blueDiff * blueDiff
-        );
-      }
+  centroids = centroids.map((centroid, index) => {
+    if (!groups[index].length) return centroid;
 
-      const picked = [];
+    const next = averageColors(groups[index]);
 
-      // Explicitly preserve a meaningful white bucket.
-      // Without this, white can still lose against several similar pale buckets.
-      const whiteCandidates = ranked.filter(color => isNearWhite(color));
-      if (whiteCandidates.length) {
-        const totalWhiteCount = whiteCandidates.reduce(
-          (sum, color) => sum + color.count,
-          0
-        );
-        const whiteCandidate = {
-          r: Math.round(
-            whiteCandidates.reduce(
-              (sum, color) => sum + color.r * color.count,
-              0
-            ) / totalWhiteCount
-          ),
-          g: Math.round(
-            whiteCandidates.reduce(
-              (sum, color) => sum + color.g * color.count,
-              0
-            ) / totalWhiteCount
-          ),
-          b: Math.round(
-            whiteCandidates.reduce(
-              (sum, color) => sum + color.b * color.count,
-              0
-            ) / totalWhiteCount
-          ),
-          count: totalWhiteCount
-        };
-        picked.push(whiteCandidate);
-      }
+    if (colorDistance(centroid, next) > 1) changed = true;
 
-      // Also preserve black when it is genuinely present.
-      const blackCandidate = ranked.find(color => isNearBlack(color));
+    return next;
+  });
 
-      if (
-        blackCandidate &&
-        !picked.some(color => colorDistance(color, blackCandidate) < 30)
-      ) {
-        picked.push(blackCandidate);
-      }
+  if (!changed) break;
+}
 
-      // Add dominant colors while rejecting near-duplicates and gradient transitions.
-      for (const candidate of ranked) {
-        if (picked.includes(candidate)) continue;
+let clusters = centroids.map(centroid => ({
+  ...centroid,
+  count: 0,
+  pixels: []
+}));
 
-        const duplicate = picked.some(existing => {
-          // Do not merge white into beige/light colors unless both are near-white.
-          if (
-            isNearWhite(existing) !== isNearWhite(candidate)
-          ) {
-            return false;
-          }
+for (const pixel of pixels) {
+  let nearestIndex = 0;
+  let nearestDistance = Infinity;
 
-          // Same rule for black and very dark colors.
-          if (
-            isNearBlack(existing) !== isNearBlack(candidate)
-          ) {
-            return false;
-          }
+  for (let i = 0; i < clusters.length; i++) {
+    const distance = colorDistance(pixel, clusters[i]);
 
-          return colorDistance(existing, candidate) < 55;
-        });
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestIndex = i;
+    }
+  }
 
-        if (!duplicate) {
-          picked.push(candidate);
-        }
+  clusters[nearestIndex].count++;
+  clusters[nearestIndex].pixels.push(pixel);
+}
 
-        if (picked.length >= colorCount) break;
-      }
+const minimumClusterCount = Math.max(4, Math.floor(pixels.length * 0.005));
 
-      // Keep the result ordered by actual dominance.
-      picked.sort((a, b) => b.count - a.count);
+clusters = clusters
+  .filter(cluster => cluster.count >= minimumClusterCount)
+  .sort((a, b) => b.count - a.count);
 
-      const sorted = picked
-        .slice(0, colorCount)
-        .map(({ r, g, b, count }) => {
-          const hex =
-            "#" +
-            [r, g, b]
-              .map(value =>
-                Math.max(0, Math.min(255, value))
-                  .toString(16)
-                  .padStart(2, "0")
-              )
-              .join("")
-              .toUpperCase();
+const merged = [];
 
-          return {
-            r,
-            g,
-            b,
-            hex,
-            percentage: Number(
-              ((count / sampledCount) * 100).toFixed(1)
-            )
-          };
-        });
+for (const cluster of clusters) {
+  const existing = merged.find(item => colorDistance(item, cluster) < 38);
+
+  if (existing) {
+    existing.pixels.push(...cluster.pixels);
+    existing.count += cluster.count;
+
+    const average = averageColors(existing.pixels);
+    existing.r = average.r;
+    existing.g = average.g;
+    existing.b = average.b;
+  } else {
+    merged.push({
+      r: cluster.r,
+      g: cluster.g,
+      b: cluster.b,
+      count: cluster.count,
+      pixels: [...cluster.pixels]
+    });
+  }
+}
+
+merged.sort((a, b) => b.count - a.count);
+
+const mainClusters = [];
+
+for (const candidate of merged) {
+  const duplicate = mainClusters.some(existing =>
+    colorDistance(existing, candidate) < 55
+  );
+
+  if (!duplicate) mainClusters.push(candidate);
+  if (mainClusters.length >= colorCount) break;
+}
+
+const finalClusters = mainClusters.map(cluster => ({
+  r: cluster.r,
+  g: cluster.g,
+  b: cluster.b,
+  count: 0,
+  pixels: []
+}));
+
+for (const pixel of pixels) {
+  let nearestIndex = 0;
+  let nearestDistance = Infinity;
+
+  for (let i = 0; i < finalClusters.length; i++) {
+    const distance = colorDistance(pixel, finalClusters[i]);
+
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestIndex = i;
+    }
+  }
+
+  finalClusters[nearestIndex].pixels.push(pixel);
+  finalClusters[nearestIndex].count++;
+}
+
+for (const cluster of finalClusters) {
+  const average = averageColors(cluster.pixels);
+  cluster.r = average.r;
+  cluster.g = average.g;
+  cluster.b = average.b;
+}
+
+finalClusters.sort((a, b) => b.count - a.count);
+
+const sorted = finalClusters.map(({ r, g, b, count }) => {
+  const hex = "#" + [r, g, b]
+    .map(value => Math.max(0, Math.min(255, value)).toString(16).padStart(2, "0"))
+    .join("")
+    .toUpperCase();
+
+  return {
+    r,
+    g,
+    b,
+    hex,
+    percentage: Number(((count / pixels.length) * 100).toFixed(1))
+  };
+});
 
       await incrementUsage(user?.user_id, ip, tier, "color-palette", inputFormat, null, fileSizeKb, "success");
       return res.status(200).json({
