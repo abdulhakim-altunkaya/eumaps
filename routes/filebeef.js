@@ -1585,10 +1585,13 @@ router.post("/api/post/filebeef/image/color-palette", optionalAuth, imageUpload.
       }
 
       function isNearWhite(color) {
+        const max = Math.max(color.r, color.g, color.b);
+        const min = Math.min(color.r, color.g, color.b);
+        const brightness = (color.r + color.g + color.b) / 3;
+
         return (
-          color.r >= 235 &&
-          color.g >= 235 &&
-          color.b >= 235
+          brightness >= 195 &&
+          max - min <= 18
         );
       }
 
@@ -1618,9 +1621,33 @@ router.post("/api/post/filebeef/image/color-palette", optionalAuth, imageUpload.
 
       // Explicitly preserve a meaningful white bucket.
       // Without this, white can still lose against several similar pale buckets.
-      const whiteCandidate = ranked.find(color => isNearWhite(color));
-
-      if (whiteCandidate) {
+      const whiteCandidates = ranked.filter(color => isNearWhite(color));
+      if (whiteCandidates.length) {
+        const totalWhiteCount = whiteCandidates.reduce(
+          (sum, color) => sum + color.count,
+          0
+        );
+        const whiteCandidate = {
+          r: Math.round(
+            whiteCandidates.reduce(
+              (sum, color) => sum + color.r * color.count,
+              0
+            ) / totalWhiteCount
+          ),
+          g: Math.round(
+            whiteCandidates.reduce(
+              (sum, color) => sum + color.g * color.count,
+              0
+            ) / totalWhiteCount
+          ),
+          b: Math.round(
+            whiteCandidates.reduce(
+              (sum, color) => sum + color.b * color.count,
+              0
+            ) / totalWhiteCount
+          ),
+          count: totalWhiteCount
+        };
         picked.push(whiteCandidate);
       }
 
