@@ -3307,15 +3307,26 @@ router.post("/api/post/filebeef/video/gif-optimize", optionalAuth, videoUpload.s
     const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
-    const fps = Math.min(15, Math.max(3, parseInt(req.body.fps) || 10));
     try {
-      // re-encode gif with optimized palette and reduced fps
-      const outputBuffer = await runFfmpeg(req.file.buffer, "gif", "gif", (cmd, out) =>
+      // Pass 1 — 128-color palette with dithering (keeps every frame)
+      let best = await runFfmpeg(req.file.buffer, "gif", "gif", (cmd, out) =>
         cmd.outputOptions([
-          `-vf`, `fps=${fps},split[s0][s1];[s0]palettegen=max_colors=128[p];[s1][p]paletteuse=dither=bayer`,
+          `-vf`, `split[s0][s1];[s0]palettegen=max_colors=128[p];[s1][p]paletteuse=dither=bayer`,
           `-loop`, `0`
         ])
       );
+      // If it didn't beat the original, try a more aggressive 64-color pass
+      if (best.length >= req.file.size) {
+        const aggressive = await runFfmpeg(req.file.buffer, "gif", "gif", (cmd, out) =>
+          cmd.outputOptions([
+            `-vf`, `split[s0][s1];[s0]palettegen=max_colors=64[p];[s1][p]paletteuse=dither=bayer`,
+            `-loop`, `0`
+          ])
+        );
+        if (aggressive.length < best.length) best = aggressive;
+      }
+      // Never return a file larger than what came in
+      const outputBuffer = best.length < req.file.size ? best : req.file.buffer;
       const originalName = req.file.originalname.replace(/\.gif$/i, "");
       await incrementUsage(user?.user_id, ip, tier, "gif-optimize", "gif", "gif", fileSizeKb, "success");
       res.set({ "Content-Type": "image/gif", "Content-Disposition": `attachment; filename="${originalName}_optimized.gif"`, "Content-Length": outputBuffer.length });
