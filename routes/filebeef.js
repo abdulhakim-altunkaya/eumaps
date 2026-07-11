@@ -3416,9 +3416,9 @@ router.post("/api/post/filebeef/video/trim", optionalAuth, videoUpload.single("f
         cmd.seekInput(start);
         if (end && end > start) cmd.duration(end - start);
         return cmd
-          .videoCodec("copy")
-          .audioCodec("copy")
-          .outputOptions([`-movflags`, `+faststart`]);
+          .videoCodec("libx264")
+          .audioCodec("aac")
+          .outputOptions([`-crf`, `20`, `-preset`, `veryfast`, `-pix_fmt`, `yuv420p`, `-movflags`, `+faststart`]);
       });
       const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
       await incrementUsage(user?.user_id, ip, tier, "video-trim", inputExt, "mp4", fileSizeKb, "success");
