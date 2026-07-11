@@ -3528,7 +3528,7 @@ router.post("/api/post/filebeef/audio/convert", optionalAuth, audioUpload.single
     const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const format = req.body.format || "mp3";
-    const allowedFormats = ["mp3", "wav", "ogg", "flac", "aac", "m4a"];
+    const allowedFormats = ["mp3", "ogg", "aac", "m4a"];
     if (!allowedFormats.includes(format)) return res.status(400).json({ resStatus: false, resMessage: "Invalid output format.", resErrorCode: 4 });
     const inputExt = (req.file.originalname.split(".").pop() || "mp3").toLowerCase();
     const fileSizeKb = Math.round(req.file.size / 1024);
