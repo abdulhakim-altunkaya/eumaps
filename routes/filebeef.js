@@ -3490,11 +3490,9 @@ router.post("/api/post/filebeef/video/extract-audio", optionalAuth, videoUpload.
     }
   }
 );
-
 // ══════════════════════════════════════════════════════════════════════════
 //  AUDIO ENDPOINTS
 // ══════════════════════════════════════════════════════════════════════════
-
 function getAudioLimits(tier) { return AUDIO_LIMITS[tier] || AUDIO_LIMITS.anon; }
 
 const audioUpload = multer({
@@ -3517,7 +3515,6 @@ function isAudio(file) {
   return ALLOWED_AUDIO_TYPES.includes(file.mimetype) ||
     file.originalname.match(/\.(mp3|wav|ogg|flac|aac|m4a|wma|webm)$/i);
 }
-
 // ── AUDIO CONVERTER ────────────────────────────────────────────────────────
 router.post("/api/post/filebeef/audio/convert", optionalAuth, audioUpload.single("file"), async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
@@ -3549,7 +3546,6 @@ router.post("/api/post/filebeef/audio/convert", optionalAuth, audioUpload.single
     }
   }
 );
-
 // ── AUDIO COMPRESSOR ───────────────────────────────────────────────────────
 router.post("/api/post/filebeef/audio/compress", optionalAuth, audioUpload.single("file"), async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
@@ -3560,13 +3556,37 @@ router.post("/api/post/filebeef/audio/compress", optionalAuth, audioUpload.singl
     const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
-    const quality = req.body.quality || "medium";
-    const bitrateMap = { low: "64k", medium: "128k", high: "192k" };
-    const bitrate = bitrateMap[quality] || "128k";
+    const acRatioMap = { light: 0.7, balanced: 0.5, max: 0.3 };
+    const acQuality = req.body.quality || "balanced";
+    const acRatio = acRatioMap[acQuality] || 0.5;
     const inputExt = (req.file.originalname.split(".").pop() || "mp3").toLowerCase();
+    let acTmpDir = null;
     try {
+      // Probe the source bitrate so the target is always a reduction, never a bump.
+      acTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-audiocomp-"));
+      const acSrcPath = path.join(acTmpDir, `src.${inputExt}`);
+      fs.writeFileSync(acSrcPath, req.file.buffer);
+      const { stdout: acProbeOut } = await execFileAsync("ffprobe", [
+        "-v", "error",
+        "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        acSrcPath
+      ]);
+      const acDuration = parseFloat((acProbeOut || "").trim());
+      if (!acDuration || !isFinite(acDuration) || acDuration <= 0) throw new Error("Could not read audio duration");
+
+      const acSourceKbps = (req.file.size * 8) / 1000 / acDuration;
+      const acCeilingKbps = Math.floor(acSourceKbps * 0.9); // never encode at or above the source
+      if (acCeilingKbps < 32) {
+        fs.rmSync(acTmpDir, { recursive: true, force: true });
+        return res.status(400).json({ resStatus: false, resMessage: "This file is already heavily compressed — it cannot be made meaningfully smaller.", resErrorCode: 6 });
+      }
+      let acTargetKbps = Math.round(acSourceKbps * acRatio);
+      if (acTargetKbps > acCeilingKbps) acTargetKbps = acCeilingKbps;
+      if (acTargetKbps < 32) acTargetKbps = 32;
+
       const outputBuffer = await runFfmpeg(req.file.buffer, inputExt, "mp3", (cmd, out) =>
-        cmd.audioCodec("libmp3lame").audioBitrate(bitrate).noVideo()
+        cmd.audioCodec("libmp3lame").audioBitrate(`${acTargetKbps}k`).noVideo()
       );
       const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
       await incrementUsage(user?.user_id, ip, tier, "audio-compress", inputExt, "mp3", fileSizeKb, "success");
@@ -3576,10 +3596,11 @@ router.post("/api/post/filebeef/audio/compress", optionalAuth, audioUpload.singl
       console.error("Audio compress error:", err.message);
       await incrementUsage(user?.user_id, ip, tier, "audio-compress", inputExt, "mp3", fileSizeKb, "failed");
       return res.status(500).json({ resStatus: false, resMessage: "Compression failed.", resErrorCode: 99 });
+    } finally {
+      if (acTmpDir) fs.rmSync(acTmpDir, { recursive: true, force: true });
     }
   }
 );
-
 // ── AUDIO TRIMMER (Pro only) ───────────────────────────────────────────────
 router.post("/api/post/filebeef/audio/trim", optionalAuth, audioUpload.single("file"), async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
@@ -3612,7 +3633,6 @@ router.post("/api/post/filebeef/audio/trim", optionalAuth, audioUpload.single("f
     }
   }
 );
-
 // ── AUDIO MERGER (Pro only) ────────────────────────────────────────────────
 router.post("/api/post/filebeef/audio/merge", optionalAuth, audioMultiUpload.array("files", 10), async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
@@ -3657,10 +3677,6 @@ router.post("/api/post/filebeef/audio/merge", optionalAuth, audioMultiUpload.arr
     }
   }
 );
-
-
-
-
 // ── POWERPOINT TO PDF ──────────────────────────────────────────────────────
 router.post("/api/post/filebeef/pdf/pptx-to-pdf", optionalAuth, ipDailyLimit("pptx-to-pdf", 3), async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
@@ -3723,7 +3739,6 @@ router.post("/api/post/filebeef/pdf/pptx-to-pdf", optionalAuth, ipDailyLimit("pp
     });
   }
 );
-
 // ── RTF TO PDF ─────────────────────────────────────────────────────────────
 router.post("/api/post/filebeef/pdf/rtf-to-pdf", optionalAuth, async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
