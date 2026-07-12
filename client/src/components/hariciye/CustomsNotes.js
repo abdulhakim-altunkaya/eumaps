@@ -108,7 +108,6 @@ function CustomsNotes() {
 
           </div>
         </div>
-        <div> <CommentDisplay pageId={8}/></div>
         <div> <br/><br/><br/> <Footer /> </div>
     </>
 

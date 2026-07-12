@@ -30,7 +30,7 @@ function CustomsHybridPlugin() {
   const [currencyName, setCurrencyName] = useState("");
   const [resultArea, setResultArea] = useState("");
 
-  const exchangeDollar = 45.90;
+  const exchangeDollar = 46.72;
   const exchangeEuro = 53.42;
 
   // Handle radio button changes
@@ -134,21 +134,23 @@ function CustomsHybridPlugin() {
     let basePriceLira = basePrice * currency;
 
     let percentage;
-    if (engineCapacityOil3<1601 && basePriceLira<1350001) {
-      percentage = 45/100;
-    } else if (engineCapacityOil3<1601 && basePriceLira>1350000) {
-      percentage = 75/100;
-    } else if (engineCapacityOil3<1801 && basePriceLira<1350001) {
-      percentage = 85/100;
-    } else if (engineCapacityOil3 < 2001 && basePriceLira<1650001) {
-      alert("Motor silindir hacmi 1800'ü geçen plug-in hibrit araçların ÖTV matrahı belli olmayıp, benzinli araç olarak hesaplayabilirsiniz.")
-      percentage = 150/100;
-    } else if (engineCapacityOil3 < 2001 && basePriceLira>1650000) {
-      alert("Motor silindir hacmi 1800'ü geçen plug-in hibrit araçların ÖTV matrahı belli olmayıp, benzinli araç olarak hesaplayabilirsiniz.")
-      percentage = 170/100;
-    } else if (engineCapacityOil3 > 2000) {
-      alert("Motor silindir hacmi 1800'ü geçen plug-in hibrit araçların ÖTV matrahı belli olmayıp, benzinli araç olarak hesaplayabilirsiniz.")
-      percentage = 220/100;
+    if (engineCapacityOil3 < 1601 && basePriceLira < 1350001) {
+      percentage = 45 / 100;
+    } else if (engineCapacityOil3 < 1601 && basePriceLira > 1350000) {
+      percentage = 75 / 100;
+    } else if (engineCapacityOil3 < 1801 && basePriceLira < 1350001) {
+      percentage = 85 / 100;
+    } else if (engineCapacityOil3 < 1801 && basePriceLira > 1350000) {
+      percentage = 100 / 100; // Verify this percentage
+    } else if (engineCapacityOil3 < 2001 && basePriceLira < 1650001) {
+      alert("Motor silindir hacmi 1800'ü geçen plug-in hibrit araçların ÖTV matrahı belli olmayıp, benzinli araç olarak hesaplayabilirsiniz.");
+      percentage = 150 / 100;
+    } else if (engineCapacityOil3 < 2001 && basePriceLira > 1650000) {
+      alert("Motor silindir hacmi 1800'ü geçen plug-in hibrit araçların ÖTV matrahı belli olmayıp, benzinli araç olarak hesaplayabilirsiniz.");
+      percentage = 170 / 100;
+    } else {
+      alert("Motor silindir hacmi 1800'ü geçen plug-in hibrit araçların ÖTV matrahı belli olmayıp, benzinli araç olarak hesaplayabilirsiniz.");
+      percentage = 220 / 100;
     }
 
     let amountNavlun = Math.round(basePrice*0.02);
@@ -275,8 +277,6 @@ function CustomsHybridPlugin() {
             )}
         </div>
       </div>
-      <div> <br/><br/><br/><br/><br/><br/><br/> </div>
-      <div> <CommentDisplay pageId={6}/></div>
       <div> <br/><br/><br/> <Footer /> </div>
     </>
   )

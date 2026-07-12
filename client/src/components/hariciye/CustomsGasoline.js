@@ -29,7 +29,7 @@ function CustomsGasoline() {
   const [currencyName, setCurrencyName] = useState("");
   const [resultArea, setResultArea] = useState("");
 
-  const exchangeDollar = 45.90;
+  const exchangeDollar = 46.72;
   const exchangeEuro = 53.42;
 
   // Handle radio button changes
@@ -126,7 +126,7 @@ function CustomsGasoline() {
     let basePriceLira = basePrice * currency;
     let percentage;
     
-    if (engineCapacity3 <1401 && basePriceLira<650001) {
+    if (engineCapacity3 <1401 && basePriceLira<650001) { 
       percentage = 70/100;
     } else if (engineCapacity3 < 1401 && basePriceLira<900001) {
       percentage = 75/100;
@@ -280,7 +280,6 @@ function CustomsGasoline() {
         </div>
       </div>
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
-      
       <div> <br/><br/><br/> <Footer /> </div>
     </>
   )

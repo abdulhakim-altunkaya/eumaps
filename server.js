@@ -384,7 +384,9 @@ app.get("/servergetcomments/:pageId", async (req, res) => {
   try {
     client = await pool.connect(); 
     const result = await client.query(
-      `SELECT * FROM eumaps_comments WHERE sectionid = $1`, [pageId]
+      `SELECT * FROM eumaps_comments 
+      WHERE sectionid = $1
+      ORDER BY id DESC`, [pageId]
     );
     const allComments = await result.rows;
     if(!allComments) {

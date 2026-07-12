@@ -29,7 +29,7 @@ function CustomsHybrid() {
   const [currencyName, setCurrencyName] = useState("");
   const [resultArea, setResultArea] = useState("");
 
-  const exchangeDollar = 45.90;
+  const exchangeDollar = 46.72;
   const exchangeEuro = 53.42;
 
   // Handle radio button changes
@@ -128,39 +128,64 @@ function CustomsHybrid() {
     let basePriceLira = basePrice * currency;
  
     let percentage;
-    if (engineCapacityElectric3>50 && engineCapacityOil3<1801 && basePriceLira<1250001) {
-      percentage = 70/100;
-    } else if (engineCapacityElectric3 > 50 && engineCapacityOil3 < 1801 && basePriceLira>1250000) {
-      percentage = 80/100;
-    } else if (engineCapacityElectric3 < 100 && engineCapacityOil3 < 2501 && basePriceLira<1650001) {
-      percentage = 150/100;
-    } else if (engineCapacityElectric3 > 100 && engineCapacityOil3 < 2501 && basePriceLira<1650001) {
-      percentage = 150/100;
-    } else if (engineCapacityElectric3 > 100 && engineCapacityOil3 < 2501 && basePriceLira>1650000) {
-      percentage = 170/100;
-    } else if (engineCapacityElectric3 < 51 && engineCapacityOil3 < 1401 && basePriceLira<650001) {
-      percentage = 70/100;
-    } else if (engineCapacityElectric3 < 51 && engineCapacityOil3 < 1401 && basePriceLira<900001) {
-      percentage = 75/100;
-    } else if (engineCapacityElectric3<51 && engineCapacityOil3 < 1401 && basePriceLira<1100001) {
-      percentage = 80/100;
-    } else if (engineCapacityElectric3<51 && engineCapacityOil3 < 1401 && basePriceLira>1100000) {
-      percentage = 90/100;
-    } else if (engineCapacityElectric3<51 && engineCapacityOil3 < 1601 && basePriceLira<850001) {
-      percentage = 75/100;
-    } else if (engineCapacityElectric3<51 && engineCapacityOil3 < 1601 && basePriceLira<1100001) {
-      percentage = 80/100;
-    } else if (engineCapacityElectric3<51 && engineCapacityOil3 < 1601 && basePriceLira<1650001) {
-      percentage = 90/100;
-    } else if (engineCapacityElectric3<51 && engineCapacityOil3 < 1601 && basePriceLira>1650000) {
-      percentage = 100/100;
-    } else if (engineCapacityElectric3<51 && engineCapacityOil3<2001 && basePriceLira<1650001) {
-      percentage = 150/100;
-    } else if (engineCapacityElectric3<51 && engineCapacityOil3<2001 && basePriceLira>1650000) {
-      percentage = 170/100;
-    } else {
-      percentage = 220/100;
-    }
+if (engineCapacityElectric3 < 51) {
+  // Below 51 kW: use the same percentages as petrol cars
+  if (engineCapacityOil3 < 1401 && basePriceLira < 650001) {
+    percentage = 70 / 100;
+  } else if (engineCapacityOil3 < 1401 && basePriceLira < 900001) {
+    percentage = 75 / 100;
+  } else if (engineCapacityOil3 < 1401 && basePriceLira < 1100001) {
+    percentage = 80 / 100;
+  } else if (engineCapacityOil3 < 1401 && basePriceLira > 1100000) {
+    percentage = 90 / 100;
+  } else if (engineCapacityOil3 < 1601 && basePriceLira < 850001) {
+    percentage = 75 / 100;
+  } else if (engineCapacityOil3 < 1601 && basePriceLira < 1100001) {
+    percentage = 80 / 100;
+  } else if (engineCapacityOil3 < 1601 && basePriceLira < 1650001) {
+    percentage = 90 / 100;
+  } else if (engineCapacityOil3 < 1601 && basePriceLira > 1650000) {
+    percentage = 100 / 100;
+  } else if (engineCapacityOil3 < 2001 && basePriceLira < 1650001) {
+    percentage = 150 / 100;
+  } else if (engineCapacityOil3 < 2001 && basePriceLira > 1650000) {
+    percentage = 170 / 100;
+  } else {
+    percentage = 220 / 100;
+  }
+} else if (
+  engineCapacityElectric3 >= 51 &&
+  engineCapacityOil3 < 1801 &&
+  basePriceLira < 1250001
+) {
+  percentage = 70 / 100;
+} else if (
+  engineCapacityElectric3 >= 51 &&
+  engineCapacityOil3 < 1801 &&
+  basePriceLira > 1250000
+) {
+  percentage = 80 / 100;
+} else if (
+  engineCapacityElectric3 <= 100 &&
+  engineCapacityOil3 < 2501 &&
+  basePriceLira < 1650001
+) {
+  percentage = 150 / 100;
+} else if (
+  engineCapacityElectric3 > 100 &&
+  engineCapacityOil3 < 2501 &&
+  basePriceLira < 1650001
+) {
+  percentage = 150 / 100;
+} else if (
+  engineCapacityElectric3 > 100 &&
+  engineCapacityOil3 < 2501 &&
+  basePriceLira > 1650000
+) {
+  percentage = 170 / 100;
+} else {
+  percentage = 220 / 100;
+}
 
     let amountNavlun = Math.round(basePrice*0.02);
     let taxYurticiGider = 200;
@@ -291,8 +316,6 @@ function CustomsHybrid() {
             )}
         </div>
       </div>  
-      <div> <br/><br/><br/><br/><br/><br/><br/> </div>
-      <div> <CommentDisplay pageId={4}/></div>
       <div> <br/><br/><br/> <Footer /> </div>
     </>
 

@@ -116,7 +116,6 @@ function Rent() {
         </div>
       </div>
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
-      <div> <CommentDisplay pageId={1}/></div>
       <div> <br/><br/><br/> <Footer /> </div>
     </>
   )
