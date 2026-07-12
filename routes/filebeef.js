@@ -3663,23 +3663,30 @@ router.post("/api/post/filebeef/audio/merge", optionalAuth, audioMultiUpload.arr
       });
       amTmpOut = path.join(os.tmpdir(), `fb_merged_${Date.now()}.mp3`);
 
-      // Probe each input so the merged output never encodes above the source bitrate.
-      let amMaxKbps = 0;
+      // Encode at the duration-weighted average bitrate of the inputs, so the merged
+      // output lands at roughly the combined input size — never above it.
+      let amTotalDuration = 0;
       for (const f of amTmpFiles) {
         try {
           const { stdout } = await execFileAsync("ffprobe", [
             "-v", "error",
-            "-show_entries", "format=bit_rate",
+            "-show_entries", "format=duration",
             "-of", "default=noprint_wrappers=1:nokey=1",
             f
           ]);
-          const kbps = parseInt((stdout || "").trim(), 10) / 1000;
-          if (isFinite(kbps) && kbps > amMaxKbps) amMaxKbps = kbps;
+          const secs = parseFloat((stdout || "").trim());
+          if (isFinite(secs) && secs > 0) amTotalDuration += secs;
         } catch (_) {}
       }
-      let amBitrate = Math.round(amMaxKbps);
-      if (!amBitrate || amBitrate > 192) amBitrate = 192; // cap; also covers lossless inputs
-      if (amBitrate < 64) amBitrate = 64;
+      let amBitrate;
+      if (amTotalDuration > 0) {
+        amBitrate = Math.round((amTotalBytes * 8) / 1000 / amTotalDuration);
+      } else {
+        amBitrate = 128; // fallback if every probe failed
+      }
+      if (amBitrate > 192) amBitrate = 192; // cap — lossless inputs probe enormous
+      if (amBitrate < 48) amBitrate = 48;   // floor — keep it listenable
+      console.log(`Audio merge: ${amTmpFiles.length} files, ${amTotalDuration.toFixed(1)}s, ${(amTotalBytes/1024).toFixed(0)}KB in → ${amBitrate}kbps`);
 
       await new Promise((resolve, reject) => {
         const cmd = ffmpeg();
