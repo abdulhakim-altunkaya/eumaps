@@ -3143,20 +3143,27 @@ function woffToTtf(woffBuffer) {
 // ── MARKDOWN TO PDF ────────────────────────────────────────────────────────
 router.post("/api/post/filebeef/data/markdown-to-pdf", optionalAuth, async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
-    const tier = getTier(user);
+    const tier = getTier(user); const mdLimits = getPdfLimits(tier);
 
-    const mdUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024, files: 1 } }).single("file");
+    const mdUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: mdLimits.sizeMB * 1024 * 1024, files: 1 } }).single("file");
     mdUpload(req, res, async (err) => {
-      if (err) return res.status(400).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 1 });
+      if (err) {
+        if (err.code === "LIMIT_FILE_SIZE") return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${mdLimits.sizeMB}MB.`, resErrorCode: 3 });
+        return res.status(400).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 1 });
+      }
       if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
       if (!req.file.originalname.match(/\.(md|markdown|txt)$/i)) {
         return res.status(400).json({ resStatus: false, resMessage: "Please upload a .md or .markdown file.", resErrorCode: 2 });
+      }
+      if (req.file.size > mdLimits.sizeMB * 1024 * 1024) {
+        return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${mdLimits.sizeMB}MB.`, resErrorCode: 3 });
       }
 
       const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
       if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
 
       const fileSizeKb = Math.round(req.file.size / 1024);
+      let mdBrowser = null;
       try {
         const { marked } = require("marked");
         const puppeteer = require("puppeteer");
@@ -3192,15 +3199,20 @@ router.post("/api/post/filebeef/data/markdown-to-pdf", optionalAuth, async (req,
 <body>${htmlContent}</body>
 </html>`;
 
-        const browser = await puppeteer.launch({ args: ["--no-sandbox", "--disable-setuid-sandbox"] });
-        const page = await browser.newPage();
+        mdBrowser = await puppeteer.launch({ args: ["--no-sandbox", "--disable-setuid-sandbox"] });
+        const page = await mdBrowser.newPage();
         await page.setContent(html, { waitUntil: "networkidle0" });
-        const pdfBuffer = await page.pdf({
+
+        // Puppeteer v22+ returns a Uint8Array, not a Buffer. Without Buffer.from(),
+        // Express JSON-serializes it and the .pdf downloads as unreadable text.
+        const pdfBuffer = Buffer.from(await page.pdf({
           format: "A4",
           margin: { top: "20mm", bottom: "20mm", left: "18mm", right: "18mm" },
           printBackground: true
-        });
-        await browser.close();
+        }));
+
+        await mdBrowser.close();
+        mdBrowser = null;
 
         const originalName = req.file.originalname.replace(/\.(md|markdown|txt)$/i, "");
         await incrementUsage(user?.user_id, ip, tier, "markdown-to-pdf", "md", "pdf", fileSizeKb, "success");
@@ -3216,6 +3228,8 @@ router.post("/api/post/filebeef/data/markdown-to-pdf", optionalAuth, async (req,
         console.error("Markdown to PDF error:", err.message);
         await incrementUsage(user?.user_id, ip, tier, "markdown-to-pdf", "md", "pdf", fileSizeKb, "failed");
         return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
+      } finally {
+        if (mdBrowser) { try { await mdBrowser.close(); } catch (_) {} }
       }
     });
   }
