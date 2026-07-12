@@ -3499,7 +3499,7 @@ const audioUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: AUDIO_LIMITS.pro.sizeMB * 1024 * 1024, files: 1 }
 });
-
+ 
 const audioMultiUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: AUDIO_LIMITS.pro.sizeMB * 1024 * 1024, files: 10 }
@@ -3638,35 +3638,61 @@ router.post("/api/post/filebeef/audio/merge", optionalAuth, audioMultiUpload.arr
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user); const limits = getAudioLimits(tier);
     const files = req.files;
+    const AM_MAX_FILES = 10;
     if (!files || files.length < 2) return res.status(400).json({ resStatus: false, resMessage: "Please upload at least 2 audio files.", resErrorCode: 1 });
     if (tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "Audio Merger is a Pro feature.", resErrorCode: 4, proOnly: true });
+    if (files.length > AM_MAX_FILES) return res.status(400).json({ resStatus: false, resMessage: `Too many files. Maximum ${AM_MAX_FILES}.`, resErrorCode: 6 });
     for (const f of files) {
       if (!isAudio(f)) return res.status(400).json({ resStatus: false, resMessage: `${f.originalname} is not a supported audio file.`, resErrorCode: 2 });
-      if (f.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `${f.originalname} is too large. Max ${limits.sizeMB}MB per file.`, resErrorCode: 3 });
+    }
+    const amTotalBytes = files.reduce((s, f) => s + f.size, 0);
+    if (amTotalBytes > limits.sizeMB * 1024 * 1024) {
+      const amTotalMB = (amTotalBytes / 1024 / 1024).toFixed(1);
+      return res.status(400).json({ resStatus: false, resMessage: `Combined size is too large (${amTotalMB}MB). Max ${limits.sizeMB}MB total.`, resErrorCode: 7 });
     }
     const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
-    const totalKb = Math.round(files.reduce((s, f) => s + f.size, 0) / 1024);
+    const totalKb = Math.round(amTotalBytes / 1024);
+    let amTmpFiles = []; let amTmpOut = null;
     try {
-      // write all input files to temp
-      const tmpFiles = files.map((f, i) => {
+      amTmpFiles = files.map((f, i) => {
         const ext = (f.originalname.split(".").pop() || "mp3").toLowerCase();
         const tmp = path.join(os.tmpdir(), `fb_merge_${Date.now()}_${i}.${ext}`);
         fs.writeFileSync(tmp, f.buffer);
         return tmp;
       });
-      const tmpOut = path.join(os.tmpdir(), `fb_merged_${Date.now()}.mp3`);
+      amTmpOut = path.join(os.tmpdir(), `fb_merged_${Date.now()}.mp3`);
+
+      // Probe each input so the merged output never encodes above the source bitrate.
+      let amMaxKbps = 0;
+      for (const f of amTmpFiles) {
+        try {
+          const { stdout } = await execFileAsync("ffprobe", [
+            "-v", "error",
+            "-show_entries", "format=bit_rate",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            f
+          ]);
+          const kbps = parseInt((stdout || "").trim(), 10) / 1000;
+          if (isFinite(kbps) && kbps > amMaxKbps) amMaxKbps = kbps;
+        } catch (_) {}
+      }
+      let amBitrate = Math.round(amMaxKbps);
+      if (!amBitrate || amBitrate > 192) amBitrate = 192; // cap; also covers lossless inputs
+      if (amBitrate < 64) amBitrate = 64;
+
       await new Promise((resolve, reject) => {
         const cmd = ffmpeg();
-        tmpFiles.forEach(f => cmd.input(f));
+        amTmpFiles.forEach(f => cmd.input(f));
         cmd
+          .audioCodec("libmp3lame")
+          .audioBitrate(`${amBitrate}k`)
           .on("end", resolve)
           .on("error", reject)
-          .mergeToFile(tmpOut, os.tmpdir());
+          .mergeToFile(amTmpOut, os.tmpdir());
       });
-      const outputBuffer = fs.readFileSync(tmpOut);
-      tmpFiles.forEach(f => { try { fs.unlinkSync(f); } catch (_) {} });
-      try { fs.unlinkSync(tmpOut); } catch (_) {}
+
+      const outputBuffer = fs.readFileSync(amTmpOut);
       await incrementUsage(user?.user_id, ip, tier, "audio-merge", "multiple", "mp3", totalKb, "success");
       res.set({ "Content-Type": "audio/mpeg", "Content-Disposition": `attachment; filename="merged.mp3"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(outputBuffer);
@@ -3674,6 +3700,9 @@ router.post("/api/post/filebeef/audio/merge", optionalAuth, audioMultiUpload.arr
       console.error("Audio merge error:", err.message);
       await incrementUsage(user?.user_id, ip, tier, "audio-merge", "multiple", "mp3", totalKb, "failed");
       return res.status(500).json({ resStatus: false, resMessage: "Merge failed.", resErrorCode: 99 });
+    } finally {
+      amTmpFiles.forEach(f => { try { fs.unlinkSync(f); } catch (_) {} });
+      if (amTmpOut) { try { fs.unlinkSync(amTmpOut); } catch (_) {} }
     }
   }
 );
