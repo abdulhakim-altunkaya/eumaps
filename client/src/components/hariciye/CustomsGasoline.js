@@ -2,7 +2,7 @@ import React, { useState, useEffect  } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import "../../styles/car.css"; 
-import CommentDisplay from '../CommentDisplay';
+
 import Footer from "../Footer"; 
 
 function CustomsGasoline() {
@@ -280,7 +280,7 @@ function CustomsGasoline() {
         </div>
       </div>
       <div> <br/><br/><br/><br/><br/><br/><br/> </div>
-      <div> <CommentDisplay pageId={5}/></div>
+      
       <div> <br/><br/><br/> <Footer /> </div>
     </>
   )

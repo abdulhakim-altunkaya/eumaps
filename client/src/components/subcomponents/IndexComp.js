@@ -1,10 +1,12 @@
 import React from 'react'
+import CommentDisplay from '../CommentDisplay';
 
 function IndexComp() {
   return (
     <div className='homepageArea'>
-        <h1>WELCOME TO EUMAPS</h1>
-        <p>Platform of Useful Applications and Calculators</p>
+        <h1>EUMAPS.ORG</h1>
+        <h3>Gümrük Hesap Platformu</h3>
+        <div> <CommentDisplay pageId={5}/></div>
     </div> 
   )
 }
