@@ -43,6 +43,7 @@ const FB_BOT_AGENTS = [
   "YandexRenderResourcesBot"
 ];
 const FB_TOOL_RE = /^[a-z0-9-]{1,60}$/;
+const FB_NON_TOOL_PAGES = ["index", "home", "pricing", "login", "register", "about", "contact", "privacy", "terms", "blog", "faq"];
 
 // ── HELPERS ────────────────────────────────────────────────────────────────
 function getClientIp(req) {
@@ -204,28 +205,44 @@ const EDITOR_LIMITS = {
 //  AUTH ROUTES
 // ══════════════════════════════════════════════════════════════════════════
 // ── VISITOR LOGGING ────────────────────────────────────────────────────────
+// ── VISITOR LOGGING ────────────────────────────────────────────────────────
 router.post("/post/filebeef/save-visitor", fbVisitCooldown(30 * 60 * 1000), async (req, res) => {
+  console.log("[VISITOR] route hit | body:", JSON.stringify(req.body));
+
   const fbVisitUA = req.get("User-Agent") || "";
+  console.log("[VISITOR] UA:", fbVisitUA);
 
   // silently skip bots (they are not blocked, just not logged)
   const fbVisitUALower = fbVisitUA.toLowerCase();
-  if (FB_BOT_AGENTS.some(b => fbVisitUALower.includes(b.toLowerCase()))) {
+  const fbVisitBotHit = FB_BOT_AGENTS.find(b => fbVisitUALower.includes(b.toLowerCase()));
+  if (fbVisitBotHit) {
+    console.log("[VISITOR] skipped - bot:", fbVisitBotHit);
     return res.status(200).json({ resStatus: false, resMessage: "skipped", resErrorCode: 3 });
   }
 
   // silently skip if within cooldown for this ip+tool
   if (!req.fbShouldLogVisit) {
+    console.log("[VISITOR] skipped - cooldown active");
     return res.status(200).json({ resStatus: false, resMessage: "skipped", resErrorCode: 1 });
   }
 
   const fbVisitToolRaw = String(req.body?.tool || "").trim().toLowerCase();
   const fbVisitTool = FB_TOOL_RE.test(fbVisitToolRaw) ? fbVisitToolRaw : "unknown";
+  console.log("[VISITOR] toolRaw:", fbVisitToolRaw, "| toolFinal:", fbVisitTool);
+
+  // only tool pages are logged - reject anything the frontend shouldn't have sent
+  if (fbVisitTool === "unknown" || FB_NON_TOOL_PAGES.includes(fbVisitTool)) {
+    console.log("[VISITOR] skipped - not a tool page:", fbVisitTool);
+    return res.status(200).json({ resStatus: false, resMessage: "skipped", resErrorCode: 4 });
+  }
 
   const fbVisitAgent = useragent.parse(fbVisitUA);
+  console.log("[VISITOR] os:", fbVisitAgent.os.toString(), "| browser:", fbVisitAgent.toAgent());
 
   let fbVisitClient;
   try {
     fbVisitClient = await pool.connect();
+    console.log("[VISITOR] db connected, inserting...");
     await fbVisitClient.query(
       `INSERT INTO visitors_filebeef (ip, op, browser, tool, date)
        VALUES ($1, $2, $3, $4, $5)`,
@@ -237,9 +254,10 @@ router.post("/post/filebeef/save-visitor", fbVisitCooldown(30 * 60 * 1000), asyn
         new Date().toLocaleDateString("en-GB")
       ]
     );
+    console.log("[VISITOR] INSERT OK | ip:", getClientIp(req), "| tool:", fbVisitTool);
     return res.status(200).json({ resStatus: true, resMessage: "logged", resOkCode: 1 });
   } catch (err) {
-    console.error("Visitor log error (FileBeef):", err);
+    console.error("[VISITOR] INSERT FAILED:", err);
     return res.status(200).json({ resStatus: false, resMessage: "log failed", resErrorCode: 2 });
   } finally {
     if (fbVisitClient) fbVisitClient.release();
