@@ -5,7 +5,7 @@ function IndexComp() {
   return (
     <div className='homepageArea'>
         <h1>EUMAPS.ORG</h1>
-        <h3>Gümrük Hesap Platformu</h3>
+        <h3>Gümrük Hesaplama Platformu</h3>
         <div> <CommentDisplay pageId={5}/></div>
     </div> 
   )

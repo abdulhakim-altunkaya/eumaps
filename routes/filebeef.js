@@ -23,7 +23,8 @@ const jwt = require("jsonwebtoken");
 const { pool, upload } = require("../db");
 const sendEmailBrevo = require("../utils/sendEmailBrevo");
 const { OAuth2Client } = require("google-auth-library");
-const { ipDailyLimit } = require("../middleware/filebeef_MW");
+const { ipDailyLimit, fbVisitCooldown } = require("../middleware/filebeef_MW");
+const useragent = require("useragent");
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -33,6 +34,15 @@ const JWT_EMAIL       = process.env.JWT_SECRET_FILEBEEF_EMAIL_VERIFY;
 const JWT_SECRET      = process.env.JWT_SECRET;
 const SALT_ROUNDS     = 10;
 const SESSION_MAX_AGE = 1000 * 60 * 60 * 24 * 365; // 1 year in ms
+
+// Bots we let through but never log. Version numbers ignored (substring match).
+const FB_BOT_AGENTS = [
+  "HeadlessChrome",
+  "Applebot",
+  "AdsBot-Google",
+  "YandexRenderResourcesBot"
+];
+const FB_TOOL_RE = /^[a-z0-9-]{1,60}$/;
 
 // ── HELPERS ────────────────────────────────────────────────────────────────
 function getClientIp(req) {
@@ -193,7 +203,48 @@ const EDITOR_LIMITS = {
 // ══════════════════════════════════════════════════════════════════════════
 //  AUTH ROUTES
 // ══════════════════════════════════════════════════════════════════════════
+// ── VISITOR LOGGING ────────────────────────────────────────────────────────
+router.post("/post/filebeef/save-visitor", fbVisitCooldown(30 * 60 * 1000), async (req, res) => {
+  const fbVisitUA = req.get("User-Agent") || "";
 
+  // silently skip bots (they are not blocked, just not logged)
+  const fbVisitUALower = fbVisitUA.toLowerCase();
+  if (FB_BOT_AGENTS.some(b => fbVisitUALower.includes(b.toLowerCase()))) {
+    return res.status(200).json({ resStatus: false, resMessage: "skipped", resErrorCode: 3 });
+  }
+
+  // silently skip if within cooldown for this ip+tool
+  if (!req.fbShouldLogVisit) {
+    return res.status(200).json({ resStatus: false, resMessage: "skipped", resErrorCode: 1 });
+  }
+
+  const fbVisitToolRaw = String(req.body?.tool || "").trim().toLowerCase();
+  const fbVisitTool = FB_TOOL_RE.test(fbVisitToolRaw) ? fbVisitToolRaw : "unknown";
+
+  const fbVisitAgent = useragent.parse(fbVisitUA);
+
+  let fbVisitClient;
+  try {
+    fbVisitClient = await pool.connect();
+    await fbVisitClient.query(
+      `INSERT INTO visitors_filebeef (ip, op, browser, tool, date)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        getClientIp(req),
+        fbVisitAgent.os.toString(),
+        fbVisitAgent.toAgent(),
+        fbVisitTool,
+        new Date().toLocaleDateString("en-GB")
+      ]
+    );
+    return res.status(200).json({ resStatus: true, resMessage: "logged", resOkCode: 1 });
+  } catch (err) {
+    console.error("Visitor log error (FileBeef):", err);
+    return res.status(200).json({ resStatus: false, resMessage: "log failed", resErrorCode: 2 });
+  } finally {
+    if (fbVisitClient) fbVisitClient.release();
+  }
+});
 // ── REGISTER ──────────────────────────────────────────────────────────────
 router.post("/api/post/filebeef/auth/register", filebeefWriteLimit, async (req, res) => {
   const { email, password } = req.body;
@@ -1172,12 +1223,10 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
           heicQ -= 6;
           if (heicQ < qFloor) heicQ = qFloor;
         }
-        console.log(`heic optimize q${quality}: final heif-enc q${heicQ}, ${Math.round(encoded.length/1024)}kb from ${fileSizeKb}kb`);
         outputBuffer = encoded;
       }
       // never return a file bigger than the original
       if (outputBuffer.length >= req.file.size) {
-        console.log(`optimize ${inputFormat} q${quality}: result ${Math.round(outputBuffer.length/1024)}kb >= original ${fileSizeKb}kb, returning original`);
         outputBuffer = req.file.buffer;
       }
       const ext = outputFormat === "jpeg" ? "jpg" : outputFormat;
@@ -1617,7 +1666,7 @@ async function ghostscriptCompress(inputBuffer, preset) {
         tmpIn
       ], { timeout: 60000 }, (err) => {
         if (err) { console.log("[pdf-compress] gs error:", err.message); reject(err); }
-        else { console.log("[pdf-compress] gs completed"); resolve(); }
+        else { resolve(); }
       });
     });
     const result = fs.readFileSync(tmpOut);
@@ -1630,21 +1679,20 @@ async function ghostscriptCompress(inputBuffer, preset) {
 
 router.post("/api/post/filebeef/pdf/compress", optionalAuth, (req, res, next) => {
    pdfUpload.single("file")(req, res, (err) => {
-    if (err?.code === "LIMIT_FILE_SIZE") { console.log("[pdf-compress] multer LIMIT_FILE_SIZE"); return res.status(413).json({ resStatus: false, resMessage: "File too large for upload.", resErrorCode: 3 }); }
+    if (err?.code === "LIMIT_FILE_SIZE") { return res.status(413).json({ resStatus: false, resMessage: "File too large for upload.", resErrorCode: 3 }); }
     if (err) { console.log("[pdf-compress] multer error:", err.message); return res.status(500).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 98 }); }
     next();
   });
 }, async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
     const tier = getTier(user); const limits = getPdfLimits(tier);
-    if (!req.file) { console.log("[pdf-compress] no file"); return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 }); }
-    if (!isPdf(req.file)) { console.log("[pdf-compress] not a pdf"); return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 }); }
-    if (req.file.size > limits.sizeMB * 1024 * 1024) { console.log("[pdf-compress] file too large"); return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 }); }
+    if (!req.file) { return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 }); }
+    if (!isPdf(req.file)) { return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 }); }
+    if (req.file.size > limits.sizeMB * 1024 * 1024) { return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 }); }
     const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     const quality = req.body.quality || "medium";
-    console.log("[pdf-compress] quality:", quality);
     try {
       const outputBuffer = quality === "low"
         ? await pdfLibCompress(req.file.buffer)
@@ -3700,8 +3748,6 @@ router.post("/api/post/filebeef/audio/merge", optionalAuth, audioMultiUpload.arr
       }
       if (amBitrate > 192) amBitrate = 192; // cap — lossless inputs probe enormous
       if (amBitrate < 48) amBitrate = 48;   // floor — keep it listenable
-      console.log(`Audio merge: ${amTmpFiles.length} files, ${amTotalDuration.toFixed(1)}s, ${(amTotalBytes/1024).toFixed(0)}KB in → ${amBitrate}kbps`);
-
       await new Promise((resolve, reject) => {
         const cmd = ffmpeg();
         amTmpFiles.forEach(f => cmd.input(f));
@@ -3743,7 +3789,6 @@ router.post("/api/post/filebeef/pdf/pptx-to-pdf", optionalAuth, ipDailyLimit("pp
       const fileSizeKb = Math.round(req.file.size / 1024);
       try {
         const mode = req.body.mode === "image" ? "image" : "text";
-        console.log("pptx-to-pdf mode:", req.body.mode, "→", mode);
         const MAX_PAGES = 50;
         const ext = req.file.originalname.match(/\.ppt$/i) ? "ppt" : "pptx";
         const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fb-pptx2pdf-"));
@@ -4392,13 +4437,6 @@ pdfjsLib.getDocument({ data: arr }).promise.then(function(pdf) {
 
         // paint text annotations
         const textAnns = textByPage[pageNum] || []
-        console.log(`[PDF Editor] Page ${pageNum}: ${textAnns.length} text ann(s)`, textAnns.map(a => ({
-          x: a.x, y: a.y,
-          fontSize: a.fontSize,
-          preWrapped: a.preWrapped || false,
-          lines: a.text?.split('\n').length,
-          textPreview: a.text?.slice(0, 60)
-        })))
         if (textAnns.length > 0) {
           const textZoom = parseFloat(req.body.zoom) || 1
           const textDpr = parseFloat(req.body.dpr) || 1

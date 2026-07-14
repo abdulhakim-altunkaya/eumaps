@@ -35,4 +35,28 @@ setInterval(() => {
   for (const [key, e] of attemptStore) if (e.day !== today) attemptStore.delete(key);
 }, 6 * 60 * 60 * 1000).unref();
 
-module.exports = { ipDailyLimit };
+// ── VISITOR LOG COOLDOWN (keyed by IP + tool) ────────────────────────────────
+// Same IP visiting a DIFFERENT tool is logged immediately. Same IP + same tool
+// within the cooldown window is skipped. This keeps tool-hopping visible.
+const visitStore = new Map(); // "ip:tool" -> timestamp(ms)
+
+function fbVisitCooldown(windowMs = 30 * 60 * 1000) {
+  return (req, res, next) => {
+    const ip = getClientIp(req) || "unknown";
+    const tool = String(req.body?.tool || "unknown").slice(0, 60);
+    const key = `${ip}:${tool}`;
+    const now = Date.now();
+    const last = visitStore.get(key);
+    req.fbShouldLogVisit = !last || now - last > windowMs;
+    if (req.fbShouldLogVisit) visitStore.set(key, now);
+    return next();
+  };
+}
+
+// Sweep visit entries older than 24h
+setInterval(() => {
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  for (const [key, ts] of visitStore) if (ts < cutoff) visitStore.delete(key);
+}, 6 * 60 * 60 * 1000).unref();
+
+module.exports = { ipDailyLimit, fbVisitCooldown };
