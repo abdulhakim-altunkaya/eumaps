@@ -205,8 +205,8 @@ const EDITOR_LIMITS = {
 //  AUTH ROUTES
 // ══════════════════════════════════════════════════════════════════════════
 // ── VISITOR LOGGING ────────────────────────────────────────────────────────
-// ── VISITOR LOGGING ────────────────────────────────────────────────────────
-router.post("/post/filebeef/save-visitor", fbVisitCooldown(30 * 60 * 1000), async (req, res) => {
+
+router.post("/api/post/filebeef/save-visitor", fbVisitCooldown(30 * 60 * 1000), async (req, res) => {
   console.log("[VISITOR] route hit | body:", JSON.stringify(req.body));
 
   const fbVisitUA = req.get("User-Agent") || "";
