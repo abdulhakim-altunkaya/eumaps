@@ -4609,7 +4609,7 @@ router.post("/api/post/filebeef/comments", optionalAuth, async (req, res) => {
 
   const ip   = getClientIp(req);
   const name = fbSanitizeText(req.body?.name, 30);
-  const body = fbSanitizeText(req.body?.body, 1000);
+  const body = fbSanitizeText(req.body?.body, 400);
   if (name.length < 1) return res.status(400).json({ resStatus: false, resMessage: "Please enter a name.", resErrorCode: 3 });
   if (body.length < 1) return res.status(400).json({ resStatus: false, resMessage: "Comment cannot be empty.", resErrorCode: 4 });
 
@@ -4641,7 +4641,7 @@ router.post("/api/post/filebeef/comments/reply", optionalAuth, async (req, res) 
   const ip       = getClientIp(req);
   const parentId = parseInt(req.body?.parentId);
   const name     = fbSanitizeText(req.body?.name, 30);
-  const body     = fbSanitizeText(req.body?.body, 1000);
+  const body     = fbSanitizeText(req.body?.body, 150);
   if (!parentId)       return res.status(400).json({ resStatus: false, resMessage: "Missing parent comment.", resErrorCode: 3 });
   if (name.length < 1) return res.status(400).json({ resStatus: false, resMessage: "Please enter a name.", resErrorCode: 4 });
   if (body.length < 1) return res.status(400).json({ resStatus: false, resMessage: "Reply cannot be empty.", resErrorCode: 5 });

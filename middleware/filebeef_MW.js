@@ -61,10 +61,10 @@ setInterval(() => {
 
 
 
-// ── COMMENT COOLDOWN (30 min per USER and per IP) ────────────────────────────
+// ── COMMENT COOLDOWN (10 min per USER and per IP) ────────────────────────────
 const commentUserStore = new Map(); // userId -> ts(ms)
 const commentIpStore   = new Map(); // ip -> ts(ms)
-const COMMENT_WINDOW_MS = 30 * 60 * 1000;
+const COMMENT_WINDOW_MS = 10 * 60 * 1000;
 
 function fbCommentCheck(userId, ip) {
   const now = Date.now();
