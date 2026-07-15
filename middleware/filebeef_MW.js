@@ -59,4 +59,37 @@ setInterval(() => {
   for (const [key, ts] of visitStore) if (ts < cutoff) visitStore.delete(key);
 }, 6 * 60 * 60 * 1000).unref();
 
-module.exports = { ipDailyLimit, fbVisitCooldown };
+
+
+// ── COMMENT COOLDOWN (30 min per USER and per IP) ────────────────────────────
+const commentUserStore = new Map(); // userId -> ts(ms)
+const commentIpStore   = new Map(); // ip -> ts(ms)
+const COMMENT_WINDOW_MS = 30 * 60 * 1000;
+
+function fbCommentCheck(userId, ip) {
+  const now = Date.now();
+  const uLast = commentUserStore.get(String(userId));
+  if (uLast && now - uLast < COMMENT_WINDOW_MS) {
+    return { allowed: false, retryAfterMin: Math.ceil((COMMENT_WINDOW_MS - (now - uLast)) / 60000) };
+  }
+  const ipLast = commentIpStore.get(ip);
+  if (ipLast && now - ipLast < COMMENT_WINDOW_MS) {
+    return { allowed: false, retryAfterMin: Math.ceil((COMMENT_WINDOW_MS - (now - ipLast)) / 60000) };
+  }
+  return { allowed: true };
+}
+
+// Only called AFTER a successful insert, so failed validations never lock a user out.
+function fbCommentMark(userId, ip) {
+  const now = Date.now();
+  commentUserStore.set(String(userId), now);
+  if (ip) commentIpStore.set(ip, now);
+}
+
+setInterval(() => {
+  const cutoff = Date.now() - COMMENT_WINDOW_MS;
+  for (const [k, ts] of commentUserStore) if (ts < cutoff) commentUserStore.delete(k);
+  for (const [k, ts] of commentIpStore)   if (ts < cutoff) commentIpStore.delete(k);
+}, 30 * 60 * 1000).unref();
+
+module.exports = { ipDailyLimit, fbVisitCooldown, fbCommentCheck, fbCommentMark };

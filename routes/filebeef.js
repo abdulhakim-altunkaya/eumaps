@@ -23,7 +23,7 @@ const jwt = require("jsonwebtoken");
 const { pool, upload } = require("../db");
 const sendEmailBrevo = require("../utils/sendEmailBrevo");
 const { OAuth2Client } = require("google-auth-library");
-const { ipDailyLimit, fbVisitCooldown } = require("../middleware/filebeef_MW");
+const { ipDailyLimit, fbVisitCooldown, fbCommentCheck, fbCommentMark } = require("../middleware/filebeef_MW");
 const useragent = require("useragent");
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -207,42 +207,27 @@ const EDITOR_LIMITS = {
 // ── VISITOR LOGGING ────────────────────────────────────────────────────────
 
 router.post("/api/post/filebeef/save-visitor", fbVisitCooldown(30 * 60 * 1000), async (req, res) => {
-  console.log("[VISITOR] route hit | body:", JSON.stringify(req.body));
-
   const fbVisitUA = req.get("User-Agent") || "";
-  console.log("[VISITOR] UA:", fbVisitUA);
-
   // silently skip bots (they are not blocked, just not logged)
   const fbVisitUALower = fbVisitUA.toLowerCase();
   const fbVisitBotHit = FB_BOT_AGENTS.find(b => fbVisitUALower.includes(b.toLowerCase()));
   if (fbVisitBotHit) {
-    console.log("[VISITOR] skipped - bot:", fbVisitBotHit);
     return res.status(200).json({ resStatus: false, resMessage: "skipped", resErrorCode: 3 });
   }
-
   // silently skip if within cooldown for this ip+tool
   if (!req.fbShouldLogVisit) {
-    console.log("[VISITOR] skipped - cooldown active");
     return res.status(200).json({ resStatus: false, resMessage: "skipped", resErrorCode: 1 });
   }
-
   const fbVisitToolRaw = String(req.body?.tool || "").trim().toLowerCase();
   const fbVisitTool = FB_TOOL_RE.test(fbVisitToolRaw) ? fbVisitToolRaw : "unknown";
-  console.log("[VISITOR] toolRaw:", fbVisitToolRaw, "| toolFinal:", fbVisitTool);
-
   // only tool pages are logged - reject anything the frontend shouldn't have sent
   if (fbVisitTool === "unknown" || FB_NON_TOOL_PAGES.includes(fbVisitTool)) {
-    console.log("[VISITOR] skipped - not a tool page:", fbVisitTool);
     return res.status(200).json({ resStatus: false, resMessage: "skipped", resErrorCode: 4 });
   }
-
   const fbVisitAgent = useragent.parse(fbVisitUA);
-  console.log("[VISITOR] os:", fbVisitAgent.os.toString(), "| browser:", fbVisitAgent.toAgent());
-
   let fbVisitClient;
   try {
     fbVisitClient = await pool.connect();
-    console.log("[VISITOR] db connected, inserting...");
     await fbVisitClient.query(
       `INSERT INTO visitors_filebeef (ip, op, browser, tool, date)
        VALUES ($1, $2, $3, $4, $5)`,
@@ -254,10 +239,8 @@ router.post("/api/post/filebeef/save-visitor", fbVisitCooldown(30 * 60 * 1000), 
         new Date().toLocaleDateString("en-GB")
       ]
     );
-    console.log("[VISITOR] INSERT OK | ip:", getClientIp(req), "| tool:", fbVisitTool);
     return res.status(200).json({ resStatus: true, resMessage: "logged", resOkCode: 1 });
   } catch (err) {
-    console.error("[VISITOR] INSERT FAILED:", err);
     return res.status(200).json({ resStatus: false, resMessage: "log failed", resErrorCode: 2 });
   } finally {
     if (fbVisitClient) fbVisitClient.release();
@@ -4574,6 +4557,121 @@ function hexToRgb(hex) {
   const b = parseInt(clean.substring(4, 6), 16) / 255
   return { r: isNaN(r) ? 0 : r, g: isNaN(g) ? 0 : g, b: isNaN(b) ? 0 : b }
 }
+
+
+// ── COMMENTS ────────────────────────────────────────────────────────────────
+function fbSanitizeText(s, max) {
+  return String(s || "").replace(/<[^>]*>/g, "").replace(/[<>]/g, "").trim().slice(0, max);
+}
+
+// READ — anyone (guest/anon included). Newest comments first, replies oldest first.
+router.get("/api/get/filebeef/comments", async (req, res) => {
+  const offset = Math.max(0, parseInt(req.query.offset) || 0);
+  const limit  = 20;
+  try {
+    const top = await pool.query(
+      `SELECT id, author_name, body, created_at
+       FROM filebeef_comments
+       WHERE parent_id IS NULL
+       ORDER BY created_at DESC
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+    let replies = [];
+    if (top.rows.length) {
+      const ids = top.rows.map(c => c.id);
+      const rep = await pool.query(
+        `SELECT id, parent_id, author_name, body, created_at
+         FROM filebeef_comments
+         WHERE parent_id = ANY($1)
+         ORDER BY created_at ASC`,
+        [ids]
+      );
+      replies = rep.rows;
+    }
+    const byParent = {};
+    for (const r of replies) (byParent[r.parent_id] ||= []).push(r);
+    const comments = top.rows.map(c => ({ ...c, replies: byParent[c.id] || [] }));
+    const count = await pool.query(`SELECT COUNT(*)::int AS n FROM filebeef_comments WHERE parent_id IS NULL`);
+    return res.status(200).json({ resStatus: true, comments, total: count.rows[0].n, offset, limit });
+  } catch (err) {
+    console.error("Comments fetch error:", err.message);
+    return res.status(500).json({ resStatus: false, resMessage: "Could not load comments.", resErrorCode: 99 });
+  }
+});
+
+// POST COMMENT — logged-in free/pro only.
+router.post("/api/post/filebeef/comments", optionalAuth, async (req, res) => {
+  const user = req.filebeefUser;
+  if (!user) return res.status(401).json({ resStatus: false, resMessage: "You must be logged in to comment.", resErrorCode: 1 });
+  const tier = getTier(user);
+  if (tier !== "free" && tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "Not allowed.", resErrorCode: 2 });
+
+  const ip   = getClientIp(req);
+  const name = fbSanitizeText(req.body?.name, 30);
+  const body = fbSanitizeText(req.body?.body, 1000);
+  if (name.length < 1) return res.status(400).json({ resStatus: false, resMessage: "Please enter a name.", resErrorCode: 3 });
+  if (body.length < 1) return res.status(400).json({ resStatus: false, resMessage: "Comment cannot be empty.", resErrorCode: 4 });
+
+  const cd = fbCommentCheck(user.user_id, ip);
+  if (!cd.allowed) return res.status(429).json({ resStatus: false, resMessage: `Please wait ${cd.retryAfterMin} min before posting again.`, resErrorCode: 5, rateLimited: true });
+
+  try {
+    const ins = await pool.query(
+      `INSERT INTO filebeef_comments (parent_id, user_id, author_name, body, ip)
+       VALUES (NULL, $1, $2, $3, $4)
+       RETURNING id, author_name, body, created_at`,
+      [user.user_id, name, body, ip]
+    );
+    fbCommentMark(user.user_id, ip);
+    return res.status(200).json({ resStatus: true, comment: { ...ins.rows[0], replies: [] } });
+  } catch (err) {
+    console.error("Comment insert error:", err.message);
+    return res.status(500).json({ resStatus: false, resMessage: "Could not post comment.", resErrorCode: 99 });
+  }
+});
+
+// POST REPLY — logged-in free/pro only. Single level, max 10 per comment.
+router.post("/api/post/filebeef/comments/reply", optionalAuth, async (req, res) => {
+  const user = req.filebeefUser;
+  if (!user) return res.status(401).json({ resStatus: false, resMessage: "You must be logged in to reply.", resErrorCode: 1 });
+  const tier = getTier(user);
+  if (tier !== "free" && tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "Not allowed.", resErrorCode: 2 });
+
+  const ip       = getClientIp(req);
+  const parentId = parseInt(req.body?.parentId);
+  const name     = fbSanitizeText(req.body?.name, 30);
+  const body     = fbSanitizeText(req.body?.body, 1000);
+  if (!parentId)       return res.status(400).json({ resStatus: false, resMessage: "Missing parent comment.", resErrorCode: 3 });
+  if (name.length < 1) return res.status(400).json({ resStatus: false, resMessage: "Please enter a name.", resErrorCode: 4 });
+  if (body.length < 1) return res.status(400).json({ resStatus: false, resMessage: "Reply cannot be empty.", resErrorCode: 5 });
+
+  const cd = fbCommentCheck(user.user_id, ip);
+  if (!cd.allowed) return res.status(429).json({ resStatus: false, resMessage: `Please wait ${cd.retryAfterMin} min before posting again.`, resErrorCode: 6, rateLimited: true });
+
+  try {
+    const parent = await pool.query(`SELECT id, parent_id FROM filebeef_comments WHERE id = $1 LIMIT 1`, [parentId]);
+    if (!parent.rowCount)                return res.status(404).json({ resStatus: false, resMessage: "Comment not found.", resErrorCode: 7 });
+    if (parent.rows[0].parent_id !== null) return res.status(400).json({ resStatus: false, resMessage: "Cannot reply to a reply.", resErrorCode: 8 });
+
+    const cnt = await pool.query(`SELECT COUNT(*)::int AS n FROM filebeef_comments WHERE parent_id = $1`, [parentId]);
+    if (cnt.rows[0].n >= 10) return res.status(403).json({ resStatus: false, resMessage: "This comment has reached the maximum of 10 replies.", resErrorCode: 9, replyLimit: true });
+
+    const ins = await pool.query(
+      `INSERT INTO filebeef_comments (parent_id, user_id, author_name, body, ip)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, parent_id, author_name, body, created_at`,
+      [parentId, user.user_id, name, body, ip]
+    );
+    fbCommentMark(user.user_id, ip);
+    return res.status(200).json({ resStatus: true, reply: ins.rows[0] });
+  } catch (err) {
+    console.error("Reply insert error:", err.message);
+    return res.status(500).json({ resStatus: false, resMessage: "Could not post reply.", resErrorCode: 99 });
+  }
+});
+
+
 module.exports = router;
 
 
