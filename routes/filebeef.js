@@ -3553,6 +3553,119 @@ router.post("/api/post/filebeef/video/extract-audio", optionalAuth, videoUpload.
     }
   }
 );
+// ── VIDEO REPAIR ───────────────────────────────────────────────────────────
+router.post("/api/post/filebeef/video/repair", optionalAuth, videoUpload.single("file"), async (req, res) => {
+  const vrepUser = req.filebeefUser; const vrepIp = getClientIp(req);
+  const vrepTier = getTier(vrepUser); const vrepLimits = getVideoLimits(vrepTier);
+  if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
+  if (req.file.size > vrepLimits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${vrepLimits.sizeMB}MB.`, resErrorCode: 2 });
+  const vrepLimitCheck = await checkConversionLimit(vrepUser?.user_id, vrepIp, vrepTier);
+  if (!vrepLimitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${vrepLimitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier: vrepTier });
+
+  const vrepFileSizeKb = Math.round(req.file.size / 1024);
+  const vrepInputSize  = req.file.size;
+  const vrepInputExt   = (req.file.originalname.split(".").pop() || "mp4").toLowerCase();
+  const vrepDir        = fs.mkdtempSync(path.join(os.tmpdir(), "fb_vrep_"));
+  const vrepInPath     = path.join(vrepDir, `in.${vrepInputExt}`);
+  const vrepRemuxPath  = path.join(vrepDir, "remux.mp4");
+  const vrepReencPath  = path.join(vrepDir, "reenc.mp4");
+
+  // probe a file -> { ok, hasVideo, durationSec, isVfr }
+  async function vrepProbe(p) {
+    try {
+      const { stdout } = await execFileAsync("ffprobe", [
+        "-v", "error",
+        "-select_streams", "v:0",
+        "-show_entries", "stream=r_frame_rate,avg_frame_rate:format=duration",
+        "-of", "json", p
+      ], { maxBuffer: 1024 * 1024 * 4 });
+      const info = JSON.parse(stdout);
+      const stream = (info.streams && info.streams[0]) || null;
+      const durationSec = parseFloat(info.format && info.format.duration) || 0;
+      if (!stream) return { ok: false, hasVideo: false, durationSec: 0, isVfr: false };
+      const frac = (s) => { if (!s || s === "0/0") return 0; const parts = s.split("/").map(Number); return parts[1] ? parts[0] / parts[1] : 0; };
+      const rFps = frac(stream.r_frame_rate);
+      const aFps = frac(stream.avg_frame_rate);
+      const isVfr = rFps > 0 && aFps > 0 && Math.abs(rFps - aFps) / rFps > 0.10;
+      return { ok: true, hasVideo: true, durationSec, isVfr };
+    } catch (_) {
+      return { ok: false, hasVideo: false, durationSec: 0, isVfr: false };
+    }
+  }
+
+  try {
+    fs.writeFileSync(vrepInPath, req.file.buffer);
+    const vrepInputProbe = await vrepProbe(vrepInPath);
+
+    let vrepOutPath = null;
+
+    // ── Attempt 1: lossless remux (moov / faststart / interleaving / metadata) ──
+    let vrepRemuxOk = false;
+    try {
+      await execFileAsync("ffmpeg", [
+        "-y", "-err_detect", "ignore_err",
+        "-i", vrepInPath,
+        "-map", "0:v:0?", "-map", "0:a:0?",
+        "-c", "copy", "-movflags", "+faststart",
+        vrepRemuxPath
+      ], { maxBuffer: 1024 * 1024 * 16 });
+      const rp = await vrepProbe(vrepRemuxPath);
+      const rsize = fs.existsSync(vrepRemuxPath) ? fs.statSync(vrepRemuxPath).size : 0;
+      if (rp.ok && rp.hasVideo && rp.durationSec > 0 && !vrepInputProbe.isVfr && rsize > 0 && rsize <= vrepInputSize * 1.10) {
+        vrepRemuxOk = true;
+        vrepOutPath = vrepRemuxPath;
+      }
+    } catch (_) { /* remux failed - fall through to re-encode */ }
+
+    // ── Attempt 2: re-encode fallback (VFR normalize, damaged frames, incompatible container) ──
+    if (!vrepRemuxOk) {
+      const vrepReencode = async (crf) => {
+        try { if (fs.existsSync(vrepReencPath)) fs.unlinkSync(vrepReencPath); } catch (_) {}
+        await execFileAsync("ffmpeg", [
+          "-y", "-err_detect", "ignore_err", "-fflags", "+genpts",
+          "-i", vrepInPath,
+          "-map", "0:v:0?", "-map", "0:a:0?",
+          "-c:v", "libx264", "-preset", "veryfast", "-crf", String(crf),
+          "-vsync", "cfr",
+          "-c:a", "aac", "-b:a", "128k",
+          "-movflags", "+faststart",
+          vrepReencPath
+        ], { maxBuffer: 1024 * 1024 * 16 });
+        const pp = await vrepProbe(vrepReencPath);
+        const psize = fs.existsSync(vrepReencPath) ? fs.statSync(vrepReencPath).size : 0;
+        return { ok: pp.ok && pp.hasVideo && pp.durationSec > 0 && psize > 0, size: psize };
+      };
+
+      let r = await vrepReencode(23);
+      if (!r.ok) throw new Error("re-encode produced invalid output");
+      if (r.size > vrepInputSize * 1.10) {
+        r = await vrepReencode(28);
+        if (!r.ok) throw new Error("re-encode produced invalid output");
+        if (r.size > vrepInputSize * 1.10) {
+          await incrementUsage(vrepUser?.user_id, vrepIp, vrepTier, "video-repair", vrepInputExt, "mp4", vrepFileSizeKb, "failed");
+          return res.status(422).json({ resStatus: false, resMessage: "Repaired, but could not stay within the size limit. Try the Video Compressor instead.", resErrorCode: 6, tooLarge: true });
+        }
+      }
+      vrepOutPath = vrepReencPath;
+    }
+
+    const vrepOutBuffer = fs.readFileSync(vrepOutPath);
+    const vrepOriginalName = req.file.originalname.replace(/\.[^.]+$/, "");
+    await incrementUsage(vrepUser?.user_id, vrepIp, vrepTier, "video-repair", vrepInputExt, "mp4", vrepFileSizeKb, "success");
+    res.set({
+      "Content-Type": "video/mp4",
+      "Content-Disposition": `attachment; filename="${vrepOriginalName}-repaired.mp4"`,
+      "Content-Length": vrepOutBuffer.length
+    });
+    return res.status(200).send(vrepOutBuffer);
+  } catch (err) {
+    console.error("Video repair error:", err.message);
+    await incrementUsage(vrepUser?.user_id, vrepIp, vrepTier, "video-repair", vrepInputExt, "mp4", vrepFileSizeKb, "failed");
+    return res.status(500).json({ resStatus: false, resMessage: "Could not repair this video. The file may be too badly damaged.", resErrorCode: 99 });
+  } finally {
+    try { fs.rmSync(vrepDir, { recursive: true, force: true }); } catch (_) {}
+  }
+});
 // ══════════════════════════════════════════════════════════════════════════
 //  AUDIO ENDPOINTS
 // ══════════════════════════════════════════════════════════════════════════
