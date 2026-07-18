@@ -59,8 +59,6 @@ setInterval(() => {
   for (const [key, ts] of visitStore) if (ts < cutoff) visitStore.delete(key);
 }, 6 * 60 * 60 * 1000).unref();
 
-
-
 // ── COMMENT COOLDOWN (10 min per USER and per IP) ────────────────────────────
 const commentUserStore = new Map(); // userId -> ts(ms)
 const commentIpStore   = new Map(); // ip -> ts(ms)
