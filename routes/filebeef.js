@@ -130,7 +130,7 @@ function filebeefWriteLimit(req, res, next) {
 const DAILY_LIMITS = {
   anon: 1,
   free: 3,
-  pro:  50
+  pro:  20
 };
 
 // ── IMAGE SIZE LIMITS ──────────────────────────────────────────────────────
