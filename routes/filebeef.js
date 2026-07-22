@@ -37,14 +37,29 @@ const SESSION_MAX_AGE = 1000 * 60 * 60 * 24 * 365; // 1 year in ms
 
 // Bots we let through but never log. Version numbers ignored (substring match).
 const FB_BOT_AGENTS = [
+  "AdsBot-Google", "AhrefsBot", "Amazonbot", "anthropic-ai", "Applebot",
+  "Baiduspider", "bingbot", "BLEXBot", "bot/", "Bytespider",
+  "CCBot", "ChatGPT-User", "Claude-User", "ClaudeBot", "crawler",
+  "DataForSeoBot", "Discordbot", "DotBot", "DuckDuckBot",
+  "Exabot",
+  "facebookcatalog", "facebookexternalhit",
+  "Google-InspectionTool", "Googlebot", "GoogleOther", "GPTBot",
   "HeadlessChrome",
-  "Applebot",
-  "AdsBot-Google",
-  "YandexRenderResourcesBot"
+  "LinkedInBot",
+  "meta-externalagent", "MJ12bot",
+  "OAI-SearchBot",
+  "PerplexityBot", "PetalBot",
+  "SemrushBot", "Slackbot", "Sogou", "spider",
+  "TelegramBot", "Twitterbot",
+  "WhatsApp",
+  "YandexBot", "YandexRenderResourcesBot"
 ];
 const FB_TOOL_RE = /^[a-z0-9-]{1,60}$/;
 const FB_NON_TOOL_PAGES = ["index", "home", "pricing", "login", "register", "about", "contact", "privacy", "terms", "blog", "faq"];
-
+const FB_SKIP_IPS = [
+  "80.89.74.71", "80.89.72.92", "80.89.72.211", "80.89.73.115", "80.89.73.203",
+  "212.3.195.47", "212.3.194.225"
+];
 // ── HELPERS ────────────────────────────────────────────────────────────────
 function getClientIp(req) {
   const xf = req.headers["x-forwarded-for"];
@@ -207,6 +222,10 @@ const EDITOR_LIMITS = {
 // ── VISITOR LOGGING ────────────────────────────────────────────────────────
 
 router.post("/api/post/filebeef/save-visitor", fbVisitCooldown(30 * 60 * 1000), async (req, res) => {
+  // silently skip some IPs
+  if (FB_SKIP_IPS.includes(getClientIp(req))) {
+    return res.status(200).json({ resStatus: false, resMessage: "skipped", resErrorCode: 5 });
+  }
   const fbVisitUA = req.get("User-Agent") || "";
   // silently skip bots (they are not blocked, just not logged)
   const fbVisitUALower = fbVisitUA.toLowerCase();
