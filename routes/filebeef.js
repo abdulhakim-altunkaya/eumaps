@@ -1824,18 +1824,49 @@ router.post("/api/post/filebeef/pdf/split", optionalAuth, pdfUpload.single("file
           zip.file(`${originalName}_page_${i + 1}.pdf`, Buffer.from(buf));
         }
       } else {
-        const ranges = rangeInput.split(",").map(r => r.trim()).filter(Boolean);
-        for (const range of ranges) {
-          const parts = range.split("-");
-          const start = Math.max(1, parseInt(parts[0])) - 1;
-          const end = Math.min(totalPages, parseInt(parts[1] || parts[0])) - 1;
+        const splitRaw = rangeInput.split(",").map(r => r.trim()).filter(Boolean);
+        if (!splitRaw.length) return res.status(400).json({ resStatus: false, resMessage: "Please specify at least one page range.", resErrorCode: 6 });
+
+        const splitRequested = [];
+        for (const part of splitRaw) {
+          const m = part.match(/^(\d+)(?:\s*-\s*(\d+))?$/);
+          if (!m) return res.status(400).json({ resStatus: false, resMessage: `Invalid range: "${part}".`, resErrorCode: 6 });
+          const rStart = parseInt(m[1]);
+          const rEnd = m[2] ? parseInt(m[2]) : rStart;
+          if (rStart < 1 || rEnd > totalPages || rStart > rEnd) {
+            return res.status(400).json({ resStatus: false, resMessage: `Range "${part}" is outside 1-${totalPages}.`, resErrorCode: 6 });
+          }
+          splitRequested.push({ start: rStart, end: rEnd });
+        }
+
+        splitRequested.sort((a, b) => a.start - b.start);
+        for (let i = 1; i < splitRequested.length; i++) {
+          if (splitRequested[i].start <= splitRequested[i - 1].end) {
+            return res.status(400).json({ resStatus: false, resMessage: "Ranges must not overlap.", resErrorCode: 6 });
+          }
+        }
+
+        // full partition: the requested ranges PLUS the gaps before, between and after them
+        const splitSegments = [];
+        let splitCursor = 1;
+        for (const r of splitRequested) {
+          if (r.start > splitCursor) splitSegments.push({ start: splitCursor, end: r.start - 1 });
+          splitSegments.push({ start: r.start, end: r.end });
+          splitCursor = r.end + 1;
+        }
+        if (splitCursor <= totalPages) splitSegments.push({ start: splitCursor, end: totalPages });
+
+        let splitPartNo = 0;
+        for (const seg of splitSegments) {
+          splitPartNo++;
           const newDoc = await PDFDocument.create();
           const indices = [];
-          for (let i = start; i <= end; i++) indices.push(i);
+          for (let i = seg.start; i <= seg.end; i++) indices.push(i - 1);
           const pages = await newDoc.copyPages(pdfDoc, indices);
           pages.forEach(p => newDoc.addPage(p));
           const buf = await newDoc.save();
-          zip.file(`${originalName}_${range}.pdf`, Buffer.from(buf));
+          const label = seg.start === seg.end ? `page_${seg.start}` : `pages_${seg.start}-${seg.end}`;
+          zip.file(`${originalName}_part${splitPartNo}_${label}.pdf`, Buffer.from(buf));
         }
       }
       const zipBuffer = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE", compressionOptions: { level: 6 } });
