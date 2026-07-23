@@ -564,6 +564,35 @@ router.get("/api/get/filebeef/auth/me", requireAuth, async (req, res) => {
   }
 });
 
+// ── LIMITS (public — works for anon too) ───────────────────────────────────
+router.get("/api/get/filebeef/limits", optionalAuth, async (req, res) => {
+  const fbLimUser = req.filebeefUser;
+  const fbLimIp = getClientIp(req);
+  const fbLimTier = getTier(fbLimUser);
+  try {
+    const fbLimCheck = await checkConversionLimit(fbLimUser?.user_id, fbLimIp, fbLimTier);
+    return res.status(200).json({
+      resStatus: true,
+      tier: fbLimTier,
+      sizeMB: {
+        pdf:    PDF_LIMITS[fbLimTier].sizeMB,
+        image:  IMAGE_LIMITS[fbLimTier].sizeMB,
+        font:   FONT_LIMITS[fbLimTier].sizeMB,
+        svg:    SVG_LIMITS[fbLimTier].sizeMB,
+        video:  VIDEO_LIMITS[fbLimTier].sizeMB,
+        audio:  AUDIO_LIMITS[fbLimTier].sizeMB,
+        editor: EDITOR_LIMITS[fbLimTier].sizeMB
+      },
+      used: fbLimCheck.used,
+      limit: fbLimCheck.limit,
+      allowed: fbLimCheck.allowed
+    });
+  } catch (err) {
+    console.error("Limits fetch error:", err.message);
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
 // ── FORGOT PASSWORD ───────────────────────────────────────────────────────
 router.post("/api/post/filebeef/auth/forgot-password", filebeefWriteLimit, async (req, res) => {
   const { email, forceReset } = req.body;
