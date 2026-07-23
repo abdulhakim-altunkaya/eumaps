@@ -34,6 +34,8 @@ const JWT_EMAIL       = process.env.JWT_SECRET_FILEBEEF_EMAIL_VERIFY;
 const JWT_SECRET      = process.env.JWT_SECRET;
 const SALT_ROUNDS     = 10;
 const SESSION_MAX_AGE = 1000 * 60 * 60 * 24 * 365; // 1 year in ms
+const FB_DEVICE_MAX_AGE = 1000 * 60 * 60 * 24 * 730; // 2 years — outlives the session cookie
+const FB_MAX_DEVICES = 3;
 
 // Bots we let through but never log. Version numbers ignored (substring match).
 const FB_BOT_AGENTS = [
@@ -57,7 +59,7 @@ const FB_BOT_AGENTS = [
 const FB_TOOL_RE = /^[a-z0-9-]{1,60}$/;
 const FB_NON_TOOL_PAGES = ["index", "home", "pricing", "login", "register", "about", "contact", "privacy", "terms", "blog", "faq"];
 const FB_SKIP_IPS = [
-  "80.89.74.71", "80.89.72.92", "80.89.72.211", "80.89.73.115", "80.89.73.203",
+  "80.89.74.71", "80.89.72.92", "80.89.72.211", "80.89.73.115", "80.89.73.203", "80.89.73.255",
   "212.3.195.47", "212.3.194.225"
 ];
 // ── HELPERS ────────────────────────────────────────────────────────────────
@@ -66,6 +68,23 @@ function getClientIp(req) {
   let ip = xf ? xf.split(",")[0].trim() : req.socket?.remoteAddress || req.ip;
   if (ip?.startsWith("::ffff:")) ip = ip.slice(7);
   return ip || "unknown";
+}
+
+// Long-lived per-browser id so a returning device reuses its own slot
+// instead of consuming a new one on every fresh login.
+function fbGetDeviceId(req, res) {
+  let deviceId = req.cookies?.filebeef_device;
+  if (!deviceId || !/^[a-f0-9]{32}$/.test(deviceId)) {
+    deviceId = crypto.randomBytes(16).toString("hex");
+    res.cookie("filebeef_device", deviceId, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+      path: "/",
+      maxAge: FB_DEVICE_MAX_AGE
+    });
+  }
+  return deviceId;
 }
 
 function setSessionCookie(res, token) {
@@ -78,13 +97,30 @@ function setSessionCookie(res, token) {
   });
 }
 
-async function createSession(userId, ip, userAgent) {
+async function createSession(req, res, userId) {
+  const ip = getClientIp(req);
+  const userAgent = req.headers["user-agent"] || null;
+  const deviceId = fbGetDeviceId(req, res);
+
+  // drop expired rows so dead sessions never occupy a device slot
+  await pool.query(`DELETE FROM filebeef_sessions WHERE user_id = $1 AND expires_at < NOW()`, [userId]);
+
+  // this browser logging in again replaces its own row, not a new slot
+  await pool.query(`DELETE FROM filebeef_sessions WHERE user_id = $1 AND device_id = $2`, [userId, deviceId]);
+  const active = await pool.query(
+    `SELECT COUNT(*)::int AS n FROM filebeef_sessions WHERE user_id = $1`,
+    [userId]
+  );
+  // device limit reached by an unknown device -> force logout everywhere
+  if (active.rows[0].n >= FB_MAX_DEVICES) {
+    await pool.query(`DELETE FROM filebeef_sessions WHERE user_id = $1`, [userId]);
+  }
   const token = crypto.randomBytes(64).toString("hex");
   const expiresAt = new Date(Date.now() + SESSION_MAX_AGE);
   await pool.query(
-    `INSERT INTO filebeef_sessions (user_id, token, ip, user_agent, expires_at)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [userId, token, ip, userAgent || null, expiresAt]
+    `INSERT INTO filebeef_sessions (user_id, token, ip, user_agent, device_id, expires_at)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [userId, token, ip, userAgent || null, deviceId, expiresAt]
   );
   return token;
 }
@@ -409,7 +445,7 @@ router.post("/api/post/filebeef/auth/login", filebeefWriteLimit, async (req, res
       return res.status(401).json({ resStatus: false, resMessage: "Invalid email or password", resErrorCode: 5 });
     }
 
-    const token = await createSession(user.id, ip, userAgent);
+    const token = await createSession(req, res, user.id);
     setSessionCookie(res, token);
 
     return res.status(200).json({
@@ -466,7 +502,7 @@ router.post("/api/post/filebeef/auth/google", filebeefWriteLimit, async (req, re
     );
     const user = result.rows[0];
 
-    const token = await createSession(user.id, ip, userAgent);
+    const token = await createSession(req, res, user.id);
     setSessionCookie(res, token);
 
     return res.status(200).json({
@@ -2299,13 +2335,14 @@ router.post("/api/post/filebeef/pdf/image-to-pdf", optionalAuth, ipDailyLimit("i
 // ── HTML TO PDF ────────────────────────────────────────────────────────────
 router.post("/api/post/filebeef/pdf/html-to-pdf", optionalAuth, async (req, res) => {
     const user = req.filebeefUser; const ip = getClientIp(req);
-    const tier = getTier(user);
+    const tier = getTier(user); const limits = getPdfLimits(tier);
     // accepts either a file upload or a URL
-    const htmlUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024, files: 1 } }).single("file");
+    const htmlUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: limits.sizeMB * 1024 * 1024, files: 1 } }).single("file");
     htmlUpload(req, res, async (err) => {
-      if (err) return res.status(400).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 1 });
+      if (err) return res.status(400).json({ resStatus: false, resMessage: `Upload error. Max ${limits.sizeMB}MB.`, resErrorCode: 1 });
       const url = req.body.url;
       if (!req.file && !url) return res.status(400).json({ resStatus: false, resMessage: "Please upload an HTML file or provide a URL.", resErrorCode: 1 });
+      if (req.file && req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
       const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
       if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
       const fileSizeKb = req.file ? Math.round(req.file.size / 1024) : 0;
@@ -2408,8 +2445,8 @@ router.post("/api/post/filebeef/pdf/delete-pages", optionalAuth, pdfUpload.singl
     const tier = getTier(user); const limits = getPdfLimits(tier);
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
-    const MAX_MB = 10;
-    if (req.file.size > MAX_MB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${MAX_MB}MB.`, resErrorCode: 3 });
+    if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, 
+      resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
     const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const pagesToDelete = (req.body.pages || "").split(",").map(p => parseInt(p.trim())).filter(p => !isNaN(p) && p > 0);
