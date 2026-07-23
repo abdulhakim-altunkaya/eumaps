@@ -583,6 +583,11 @@ router.get("/api/get/filebeef/limits", optionalAuth, async (req, res) => {
         audio:  AUDIO_LIMITS[fbLimTier].sizeMB,
         editor: EDITOR_LIMITS[fbLimTier].sizeMB
       },
+      maxFiles: {
+        merge:      fbLimTier === "pro" ? 20 : fbLimTier === "free" ? 10 : 3,
+        imageToPdf: 20,
+        audioMerge: 10
+      },
       used: fbLimCheck.used,
       limit: fbLimCheck.limit,
       allowed: fbLimCheck.allowed
