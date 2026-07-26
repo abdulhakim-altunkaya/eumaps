@@ -59,11 +59,13 @@ const FB_BOT_AGENTS = [
 const FB_TOOL_RE = /^[a-z0-9-]{1,60}$/;
 const FB_NON_TOOL_PAGES = ["index", "home", "pricing", "login", "register", "about", "contact", "privacy", "terms", "blog", "faq"];
 const FB_SKIP_IPS = [
-  "80.89.74.71", "80.89.72.92", "80.89.72.211", "80.89.73.115", "80.89.73.203", "80.89.73.255",
-  "212.3.195.47", "212.3.194.225"
+  "80.89.72.92", "80.89.72.211", "80.89.72.30", "80.89.73.115", "80.89.73.203", "80.89.73.255", "80.89.74.71", 
+  "212.3.195.47", "212.3.194.225", "212.3.199.215"
 ];
 // ── HELPERS ────────────────────────────────────────────────────────────────
 function getClientIp(req) {
+  const cf = req.headers["cf-connecting-ip"];
+  if (cf) return cf.trim();
   const xf = req.headers["x-forwarded-for"];
   let ip = xf ? xf.split(",")[0].trim() : req.socket?.remoteAddress || req.ip;
   if (ip?.startsWith("::ffff:")) ip = ip.slice(7);
