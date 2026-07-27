@@ -38,8 +38,9 @@ router.use((req, res, next) => {
     res.cookie("fb_anon_id", id, {
       maxAge: 1000 * 60 * 60 * 24 * 730, // 2 years
       httpOnly: true,
-      sameSite: "lax",
-      secure: true
+      sameSite: "none",
+      secure: true,
+      path: "/"
     });
     req.cookies.fb_anon_id = id; // available immediately on this request too
   }
