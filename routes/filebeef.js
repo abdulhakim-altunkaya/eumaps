@@ -28,6 +28,25 @@ const useragent = require("useragent");
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+// ── ANON DEVICE COOKIE ──────────────────────────────────────────────────
+// Issues a random ID to every FileBeef visitor (logged in or not) so anon
+// usage limits can be tracked per-device instead of per-IP, since mobile
+// carrier CGNAT means many unrelated phones share one public IP.
+router.use((req, res, next) => {
+  if (!req.cookies?.fb_anon_id) {
+    const id = crypto.randomBytes(16).toString("hex");
+    res.cookie("fb_anon_id", id, {
+      maxAge: 1000 * 60 * 60 * 24 * 730, // 2 years
+      httpOnly: true,
+      sameSite: "lax",
+      secure: true
+    });
+    req.cookies.fb_anon_id = id; // available immediately on this request too
+  }
+  next();
+});
+
+
 // ── CONSTANTS ──────────────────────────────────────────────────────────────
 const FRONTEND_URL    = process.env.FRONTEND_URL_FILEBEEF || "https://filebeef.com";
 const JWT_EMAIL       = process.env.JWT_SECRET_FILEBEEF_EMAIL_VERIFY;
@@ -572,7 +591,7 @@ router.get("/api/get/filebeef/limits", optionalAuth, async (req, res) => {
   const fbLimIp = getClientIp(req);
   const fbLimTier = getTier(fbLimUser);
   try {
-    const fbLimCheck = await checkConversionLimit(fbLimUser?.user_id, fbLimIp, fbLimTier);
+    const fbLimCheck = await checkConversionLimit(fbLimUser?.user_id, fbLimIp, fbLimTier, req.cookies?.fb_anon_id);
     return res.status(200).json({
       resStatus: true,
       tier: fbLimTier,
@@ -1023,14 +1042,15 @@ function getTier(user) {
 }
 
 // ── DAILY LIMIT CHECK (all tiers) ─────────────────────────────────────────
-async function checkConversionLimit(userId, ip, tier) {
+async function checkConversionLimit(userId, ip, tier, deviceId) {
   const limit = DAILY_LIMITS[tier];
   const today = new Date().toISOString().slice(0, 10);
 
   if (tier === "anon") {
+    const devId = deviceId || "no-cookie";
     const result = await pool.query(
-      `SELECT count FROM filebeef_anon_usage WHERE ip = $1 AND date = $2`,
-      [ip, today]
+      `SELECT count FROM filebeef_anon_usage WHERE ip = $1 AND date = $2 AND device_id = $3`,
+      [ip, today, devId]
     );
     const used = result.rows[0]?.count || 0;
     return { allowed: used < limit, used, limit };
@@ -1045,15 +1065,16 @@ async function checkConversionLimit(userId, ip, tier) {
 }
 
 // ── INCREMENT USAGE ────────────────────────────────────────────────────────
-async function incrementUsage(userId, ip, tier, tool, inputFormat, outputFormat, fileSizeKb, status) {
+async function incrementUsage(userId, ip, tier, tool, inputFormat, outputFormat, fileSizeKb, status, deviceId) {
   const today = new Date().toISOString().slice(0, 10);
   try {
     if (tier === "anon") {
+      const devId = deviceId || "no-cookie";
       await pool.query(
-        `INSERT INTO filebeef_anon_usage (ip, date, count)
-         VALUES ($1, $2, 1)
-         ON CONFLICT (ip, date) DO UPDATE SET count = filebeef_anon_usage.count + 1`,
-        [ip, today]
+        `INSERT INTO filebeef_anon_usage (ip, date, count, device_id)
+         VALUES ($1, $2, 1, $3)
+         ON CONFLICT (ip, date, device_id) DO UPDATE SET count = filebeef_anon_usage.count + 1`,
+        [ip, today, devId]
       );
     } else {
       await pool.query(
@@ -1115,7 +1136,7 @@ router.post("/api/post/filebeef/image/convert", optionalAuth, imageUpload.single
     }
 
     // daily limit check
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) {
       return res.status(403).json({
         resStatus: false,
@@ -1191,7 +1212,7 @@ router.post("/api/post/filebeef/image/convert", optionalAuth, imageUpload.single
       const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
       const outputFilename = `${originalName}.${ext}`;
 
-      await incrementUsage(user?.user_id, ip, tier, "image-convert", inputFormat, format, fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "image-convert", inputFormat, format, fileSizeKb, "success", req.cookies?.fb_anon_id);
 
       res.set({
         "Content-Type": mimeType,
@@ -1203,7 +1224,7 @@ router.post("/api/post/filebeef/image/convert", optionalAuth, imageUpload.single
 
     } catch (err) {
       console.error("Image convert error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "image-convert", inputFormat, format, fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "image-convert", inputFormat, format, fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({
         resStatus: false,
         resMessage: "Conversion failed. Please check the file and try again.",
@@ -1232,7 +1253,7 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
       return res.status(400).json({ resStatus: false, resMessage: "Unsupported file type.", resErrorCode: 3 });
     }
 
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) {
       return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     }
@@ -1323,7 +1344,7 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
       }
       const ext = outputFormat === "jpeg" ? "jpg" : outputFormat;
       const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
-      await incrementUsage(user?.user_id, ip, tier, "image-optimize", inputFormat, outputFormat, fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "image-optimize", inputFormat, outputFormat, fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({
         "Content-Type": outputFormat === "jpeg" ? "image/jpeg" : `image/${outputFormat}`,
         "Content-Disposition": `attachment; filename="${originalName}_optimized.${ext}"`,
@@ -1332,7 +1353,7 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
       return res.status(200).send(outputBuffer);
     } catch (err) {
       console.error("Image optimize error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "image-optimize", inputFormat, null, fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "image-optimize", inputFormat, null, fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Optimization failed.", resErrorCode: 99 });
     } finally {
       if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -1353,7 +1374,7 @@ router.post("/api/post/filebeef/image/flip-rotate", optionalAuth, imageUpload.si
     const frIsAvifUpload = frNameExt === "avif" || req.file.mimetype === "image/avif";
     if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype) && !frIsHeicUpload && !frIsAvifUpload) return res.status(400).json({ resStatus: false, resMessage: "Unsupported file type.", resErrorCode: 3 });
 
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
 
     const rotate = parseInt(req.body.rotate) || 0;       // 0, 90, 180, 270
@@ -1401,7 +1422,7 @@ router.post("/api/post/filebeef/image/flip-rotate", optionalAuth, imageUpload.si
         await execFileAsync("gifsicle", [...gifArgs, "-o", gifOut, gifIn], { timeout: 30000 });
         const gifBuffer = fs.readFileSync(gifOut);
 
-        await incrementUsage(user?.user_id, ip, tier, "image-flip-rotate", inputFormat, "gif", fileSizeKb, "success");
+        await incrementUsage(user?.user_id, ip, tier, "image-flip-rotate", inputFormat, "gif", fileSizeKb, "success", req.cookies?.fb_anon_id);
         const gifName = req.file.originalname.replace(/\.[^.]+$/, "");
         res.set({
           "Content-Type": "image/gif",
@@ -1441,7 +1462,7 @@ router.post("/api/post/filebeef/image/flip-rotate", optionalAuth, imageUpload.si
       const ext = outputFormat === "jpeg" ? "jpg" : outputFormat;
       const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
 
-      await incrementUsage(user?.user_id, ip, tier, "image-flip-rotate", inputFormat, outputFormat, fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "image-flip-rotate", inputFormat, outputFormat, fileSizeKb, "success", req.cookies?.fb_anon_id);
 
       res.set({
         "Content-Type": outputFormat === "jpeg" ? "image/jpeg" : `image/${outputFormat}`,
@@ -1452,7 +1473,7 @@ router.post("/api/post/filebeef/image/flip-rotate", optionalAuth, imageUpload.si
 
     } catch (err) {
       console.error("Flip/rotate error:", err.message, err.stderr ? err.stderr.toString() : "");
-      await incrementUsage(user?.user_id, ip, tier, "image-flip-rotate", inputFormat, null, fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "image-flip-rotate", inputFormat, null, fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Operation failed.", resErrorCode: 99 });
     } finally {
       if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -1473,7 +1494,7 @@ router.post("/api/post/filebeef/image/exif-remove", optionalAuth, imageUpload.si
     const isAvifUpload = nameExt === "avif" || req.file.mimetype === "image/avif";
     if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype) && !isHeicUpload && !isAvifUpload) return res.status(400).json({ resStatus: false, resMessage: "Unsupported file type.", resErrorCode: 3 });
 
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
 
     let inputFormat = req.file.mimetype.split("/")[1] || "unknown";
@@ -1517,7 +1538,7 @@ router.post("/api/post/filebeef/image/exif-remove", optionalAuth, imageUpload.si
       const ext = outputFormat === "jpeg" ? "jpg" : outputFormat;
       const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
 
-      await incrementUsage(user?.user_id, ip, tier, "image-exif-remove", inputFormat, outputFormat, fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "image-exif-remove", inputFormat, outputFormat, fileSizeKb, "success", req.cookies?.fb_anon_id);
 
       res.set({
         "Content-Type": outputFormat === "jpeg" ? "image/jpeg" : `image/${outputFormat}`,
@@ -1528,7 +1549,7 @@ router.post("/api/post/filebeef/image/exif-remove", optionalAuth, imageUpload.si
 
     } catch (err) {
       console.error("EXIF remove error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "image-exif-remove", inputFormat, null, fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "image-exif-remove", inputFormat, null, fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "EXIF removal failed.", resErrorCode: 99 });
     }
   }
@@ -1554,7 +1575,7 @@ router.post("/api/post/filebeef/image/svg-optimize", optionalAuth, async (req, r
         return res.status(400).json({ resStatus: false, resMessage: "Please upload an SVG file.", resErrorCode: 3 });
       }
 
-      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
       if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
 
       const fileSizeKb = Math.round(req.file.size / 1024);
@@ -1575,7 +1596,7 @@ router.post("/api/post/filebeef/image/svg-optimize", optionalAuth, async (req, r
         const outputBuffer = Buffer.from(result.data, "utf8");
         const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
 
-        await incrementUsage(user?.user_id, ip, tier, "svg-optimize", "svg", "svg", fileSizeKb, "success");
+        await incrementUsage(user?.user_id, ip, tier, "svg-optimize", "svg", "svg", fileSizeKb, "success", req.cookies?.fb_anon_id);
 
         res.set({
           "Content-Type": "image/svg+xml",
@@ -1586,7 +1607,7 @@ router.post("/api/post/filebeef/image/svg-optimize", optionalAuth, async (req, r
 
       } catch (err) {
         console.error("SVG optimize error:", err.message);
-        await incrementUsage(user?.user_id, ip, tier, "svg-optimize", "svg", "svg", fileSizeKb, "failed");
+        await incrementUsage(user?.user_id, ip, tier, "svg-optimize", "svg", "svg", fileSizeKb, "failed", req.cookies?.fb_anon_id);
         return res.status(500).json({ resStatus: false, resMessage: "SVG optimization failed.", resErrorCode: 99 });
       }
     });
@@ -1607,7 +1628,7 @@ router.post("/api/post/filebeef/image/watermark", optionalAuth, imageUpload.sing
     const isAvifUpload = nameExt === "avif" || req.file.mimetype === "image/avif";
     if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype) && !isHeicUpload && !isAvifUpload) return res.status(400).json({ resStatus: false, resMessage: "Unsupported file type.", resErrorCode: 3 });
 
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
 
     const text = (req.body.text || "FileBeef").substring(0, 50);
@@ -1691,7 +1712,7 @@ router.post("/api/post/filebeef/image/watermark", optionalAuth, imageUpload.sing
       const ext = outputFormat === "jpeg" ? "jpg" : outputFormat;
       const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
 
-      await incrementUsage(user?.user_id, ip, tier, "image-watermark", inputFormat, outputFormat, fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "image-watermark", inputFormat, outputFormat, fileSizeKb, "success", req.cookies?.fb_anon_id);
 
       res.set({
         "Content-Type": outputFormat === "jpeg" ? "image/jpeg" : `image/${outputFormat}`,
@@ -1702,7 +1723,7 @@ router.post("/api/post/filebeef/image/watermark", optionalAuth, imageUpload.sing
 
     } catch (err) {
       console.error("Watermark error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "image-watermark", inputFormat, null, fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "image-watermark", inputFormat, null, fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Watermark failed.", resErrorCode: 99 });
     }
   }
@@ -1781,7 +1802,7 @@ router.post("/api/post/filebeef/pdf/compress", optionalAuth, (req, res, next) =>
     if (!req.file) { return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 }); }
     if (!isPdf(req.file)) { return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 }); }
     if (req.file.size > limits.sizeMB * 1024 * 1024) { return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 }); }
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     const quality = req.body.quality || "medium";
@@ -1790,11 +1811,11 @@ router.post("/api/post/filebeef/pdf/compress", optionalAuth, (req, res, next) =>
         ? await pdfLibCompress(req.file.buffer)
         : await ghostscriptCompress(req.file.buffer, GS_QUALITY_MAP[quality] || GS_QUALITY_MAP.medium);
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
-      await incrementUsage(user?.user_id, ip, tier, "pdf-compress", "pdf", "pdf", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-compress", "pdf", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}_compressed.pdf"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(outputBuffer);
     } catch (err) {
-      await incrementUsage(user?.user_id, ip, tier, "pdf-compress", "pdf", "pdf", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-compress", "pdf", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Compression failed.", resErrorCode: 99 });
     }
   }
@@ -1811,7 +1832,7 @@ router.post("/api/post/filebeef/pdf/merge", optionalAuth, pdfMultiUpload.array("
       if (!isPdf(f)) return res.status(400).json({ resStatus: false, resMessage: `${f.originalname} is not a PDF.`, resErrorCode: 3 });
       if (f.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `${f.originalname} is too large.`, resErrorCode: 4 });
     }
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const totalKb = Math.round(files.reduce((s, f) => s + f.size, 0) / 1024);
     try {
@@ -1822,12 +1843,12 @@ router.post("/api/post/filebeef/pdf/merge", optionalAuth, pdfMultiUpload.array("
         pages.forEach(p => mergedDoc.addPage(p));
       }
       const outputBuffer = await mergedDoc.save();
-      await incrementUsage(user?.user_id, ip, tier, "pdf-merge", "pdf", "pdf", totalKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-merge", "pdf", "pdf", totalKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="merged.pdf"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(Buffer.from(outputBuffer));
     } catch (err) {
       console.error("PDF merge error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "pdf-merge", "pdf", "pdf", totalKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-merge", "pdf", "pdf", totalKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Merge failed.", resErrorCode: 99 });
     }
   }
@@ -1840,7 +1861,7 @@ router.post("/api/post/filebeef/pdf/split", optionalAuth, pdfUpload.single("file
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     const mode = req.body.mode || "pages";
@@ -1906,7 +1927,7 @@ router.post("/api/post/filebeef/pdf/split", optionalAuth, pdfUpload.single("file
         }
       }
       const zipBuffer = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE", compressionOptions: { level: 6 } });
-      await incrementUsage(user?.user_id, ip, tier, "pdf-split", "pdf", "pdf", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-split", "pdf", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({
         "Content-Type": "application/zip",
         "Content-Disposition": `attachment; filename="${originalName}_split.zip"`,
@@ -1915,7 +1936,7 @@ router.post("/api/post/filebeef/pdf/split", optionalAuth, pdfUpload.single("file
       return res.status(200).send(zipBuffer);
     } catch (err) {
       console.error("PDF split error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "pdf-split", "pdf", "pdf", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-split", "pdf", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Split failed.", resErrorCode: 99 });
     }
   }
@@ -1928,7 +1949,7 @@ router.post("/api/post/filebeef/pdf/rotate", optionalAuth, pdfUpload.single("fil
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const angle = parseInt(req.body.angle) || 90;
     const validAngles = [90, 180, 270];
@@ -1940,12 +1961,12 @@ router.post("/api/post/filebeef/pdf/rotate", optionalAuth, pdfUpload.single("fil
       for (const page of pages) page.setRotation(degrees(angle));
       const outputBuffer = await pdfDoc.save();
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
-      await incrementUsage(user?.user_id, ip, tier, "pdf-rotate", "pdf", "pdf", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-rotate", "pdf", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}_rotated.pdf"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(Buffer.from(outputBuffer));
     } catch (err) {
       console.error("PDF rotate error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "pdf-rotate", "pdf", "pdf", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-rotate", "pdf", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Rotation failed.", resErrorCode: 99 });
     }
   }
@@ -1958,7 +1979,7 @@ router.post("/api/post/filebeef/pdf/watermark", optionalAuth, pdfUpload.single("
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const text = (req.body.text || "CONFIDENTIAL").substring(0, 25);
     const opacity = Math.min(1, Math.max(0.05, parseFloat(req.body.opacity) || 0.3));
@@ -1990,12 +2011,12 @@ router.post("/api/post/filebeef/pdf/watermark", optionalAuth, pdfUpload.single("
       }
       const outputBuffer = await pdfDoc.save();
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
-      await incrementUsage(user?.user_id, ip, tier, "pdf-watermark", "pdf", "pdf", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-watermark", "pdf", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}_watermarked.pdf"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(Buffer.from(outputBuffer));
     } catch (err) {
       console.error("PDF watermark error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "pdf-watermark", "pdf", "pdf", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-watermark", "pdf", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Watermark failed.", resErrorCode: 99 });
     }
   }
@@ -2008,7 +2029,7 @@ router.post("/api/post/filebeef/pdf/page-numbers", optionalAuth, pdfUpload.singl
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const position = req.body.position || "bottom-center";
     const startNumber = parseInt(req.body.startNumber) || 1;
@@ -2043,12 +2064,12 @@ router.post("/api/post/filebeef/pdf/page-numbers", optionalAuth, pdfUpload.singl
       });
       const outputBuffer = await pdfDoc.save();
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
-      await incrementUsage(user?.user_id, ip, tier, "pdf-page-numbers", "pdf", "pdf", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-page-numbers", "pdf", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}_numbered.pdf"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(Buffer.from(outputBuffer));
     } catch (err) {
       console.error("PDF page numbers error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "pdf-page-numbers", "pdf", "pdf", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-page-numbers", "pdf", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Failed to add page numbers.", resErrorCode: 99 });
     }
   }
@@ -2063,7 +2084,7 @@ router.post("/api/post/filebeef/pdf/protect", optionalAuth, pdfUpload.single("fi
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
     const password = req.body.password;
     if (!password || password.length < 4) return res.status(400).json({ resStatus: false, resMessage: "Password must be at least 4 characters.", resErrorCode: 4 });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     try {
@@ -2086,12 +2107,12 @@ router.post("/api/post/filebeef/pdf/protect", optionalAuth, pdfUpload.single("fi
         try { fs.unlinkSync(outputPath); } catch (e) {}
       }
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
-      await incrementUsage(user?.user_id, ip, tier, "pdf-protect", "pdf", "pdf", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-protect", "pdf", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}_protected.pdf"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(Buffer.from(outputBuffer));
     } catch (err) {
       console.error("PDF protect error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "pdf-protect", "pdf", "pdf", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-protect", "pdf", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Protection failed.", resErrorCode: 99 });
     }
   }
@@ -2105,7 +2126,7 @@ router.post("/api/post/filebeef/pdf/unlock", ipDailyLimit("unlock", 30), optiona
     if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
     const password = req.body.password || "";
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     try {
@@ -2143,7 +2164,7 @@ router.post("/api/post/filebeef/pdf/unlock", ipDailyLimit("unlock", 30), optiona
         try { fs.unlinkSync(outputPath); } catch (e) {}
       }
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
-      await incrementUsage(user?.user_id, ip, tier, "pdf-unlock", "pdf", "pdf", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-unlock", "pdf", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}_unlocked.pdf"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(Buffer.from(outputBuffer));
     } catch (err) {
@@ -2151,7 +2172,7 @@ router.post("/api/post/filebeef/pdf/unlock", ipDailyLimit("unlock", 30), optiona
         return res.status(400).json({ resStatus: false, resMessage: "Incorrect password.", resErrorCode: 6 });
       }
       console.error("PDF unlock error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "pdf-unlock", "pdf", "pdf", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-unlock", "pdf", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Unlock failed.", resErrorCode: 99 });
     }
   }
@@ -2164,7 +2185,7 @@ router.post("/api/post/filebeef/pdf/flatten", optionalAuth, pdfUpload.single("fi
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     try {
@@ -2173,12 +2194,12 @@ router.post("/api/post/filebeef/pdf/flatten", optionalAuth, pdfUpload.single("fi
       try { form.flatten(); } catch (_) { /* no form fields — still valid */ }
       const outputBuffer = await pdfDoc.save();
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
-      await incrementUsage(user?.user_id, ip, tier, "pdf-flatten", "pdf", "pdf", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-flatten", "pdf", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}_flattened.pdf"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(Buffer.from(outputBuffer));
     } catch (err) {
       console.error("PDF flatten error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "pdf-flatten", "pdf", "pdf", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-flatten", "pdf", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Flatten failed.", resErrorCode: 99 });
     }
   }
@@ -2193,7 +2214,7 @@ router.post("/api/post/filebeef/pdf/grayscale", optionalAuth, pdfUpload.single("
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     try {
@@ -2215,12 +2236,12 @@ router.post("/api/post/filebeef/pdf/grayscale", optionalAuth, pdfUpload.single("
       await fs.promises.unlink(tmpIn).catch(() => {});
       await fs.promises.unlink(tmpOut).catch(() => {});
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
-      await incrementUsage(user?.user_id, ip, tier, "pdf-grayscale", "pdf", "pdf", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-grayscale", "pdf", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}_grayscale.pdf"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(Buffer.from(outputBuffer));
     } catch (err) {
       console.error("PDF grayscale error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "pdf-grayscale", "pdf", "pdf", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-grayscale", "pdf", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Grayscale conversion failed.", resErrorCode: 99 });
     }
   }
@@ -2233,7 +2254,7 @@ router.post("/api/post/filebeef/pdf/to-text", optionalAuth, pdfUpload.single("fi
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     let parser = null;
@@ -2243,12 +2264,12 @@ router.post("/api/post/filebeef/pdf/to-text", optionalAuth, pdfUpload.single("fi
       const result = await parser.getText();
       const textBuffer = Buffer.from(result.text, "utf8");
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
-      await incrementUsage(user?.user_id, ip, tier, "pdf-to-text", "pdf", "txt", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-to-text", "pdf", "txt", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "text/plain; charset=utf-8", "Content-Disposition": `attachment; filename="${originalName}.txt"`, "Content-Length": textBuffer.length });
       return res.status(200).send(textBuffer);
     } catch (err) {
       console.error("PDF to text error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "pdf-to-text", "pdf", "txt", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-to-text", "pdf", "txt", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Text extraction failed.", resErrorCode: 99 });
     } finally {
       if (parser) { try { await parser.destroy(); } catch (e) {} }
@@ -2263,7 +2284,7 @@ router.post("/api/post/filebeef/pdf/metadata", optionalAuth, pdfUpload.single("f
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     try {
@@ -2278,12 +2299,12 @@ router.post("/api/post/filebeef/pdf/metadata", optionalAuth, pdfUpload.single("f
       pdfDoc.setModificationDate(new Date());
       const outputBuffer = await pdfDoc.save();
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
-      await incrementUsage(user?.user_id, ip, tier, "pdf-metadata", "pdf", "pdf", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-metadata", "pdf", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}_updated.pdf"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(Buffer.from(outputBuffer));
     } catch (err) {
       console.error("PDF metadata error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "pdf-metadata", "pdf", "pdf", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-metadata", "pdf", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Metadata update failed.", resErrorCode: 99 });
     }
   }
@@ -2296,7 +2317,7 @@ router.post("/api/post/filebeef/pdf/repair", optionalAuth, pdfUpload.single("fil
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     try {
@@ -2333,12 +2354,12 @@ const outputOk = async () => {
       await fs.promises.unlink(tmpIn).catch(() => {});
       await fs.promises.unlink(tmpOut).catch(() => {});
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
-      await incrementUsage(user?.user_id, ip, tier, "pdf-repair", "pdf", "pdf", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-repair", "pdf", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}_repaired.pdf"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(Buffer.from(outputBuffer));
     } catch (err) {
       console.error("PDF repair error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "pdf-repair", "pdf", "pdf", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-repair", "pdf", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Could not repair this PDF. The file may be too corrupted.", resErrorCode: 99 });
     }
   }
@@ -2357,7 +2378,7 @@ router.post("/api/post/filebeef/pdf/image-to-pdf", optionalAuth, ipDailyLimit("i
       if (!allowedImageTypes.includes(f.mimetype) && !heicExt(f.originalname)) return res.status(400).json({ resStatus: false, resMessage: `${f.originalname} is not a supported image.`, resErrorCode: 2 });
       if (f.size > 7 * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `${f.originalname} is too large.`, resErrorCode: 3 });
     }
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const totalKb = Math.round(files.reduce((s, f) => s + f.size, 0) / 1024);
     try {
@@ -2388,12 +2409,12 @@ router.post("/api/post/filebeef/pdf/image-to-pdf", optionalAuth, ipDailyLimit("i
         page.drawImage(image, { x: 0, y: 0, width: scaledW, height: scaledH });
       }
       const outputBuffer = await pdfDoc.save();
-      await incrementUsage(user?.user_id, ip, tier, "image-to-pdf", "image", "pdf", totalKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "image-to-pdf", "image", "pdf", totalKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="images.pdf"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(Buffer.from(outputBuffer));
     } catch (err) {
       console.error("Image to PDF error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "image-to-pdf", "image", "pdf", totalKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "image-to-pdf", "image", "pdf", totalKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
     }
   }
@@ -2410,7 +2431,7 @@ router.post("/api/post/filebeef/pdf/html-to-pdf", optionalAuth, async (req, res)
       const url = req.body.url;
       if (!req.file && !url) return res.status(400).json({ resStatus: false, resMessage: "Please upload an HTML file or provide a URL.", resErrorCode: 1 });
       if (req.file && req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
-      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
       if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
       const fileSizeKb = req.file ? Math.round(req.file.size / 1024) : 0;
       try {
@@ -2426,12 +2447,12 @@ router.post("/api/post/filebeef/pdf/html-to-pdf", optionalAuth, async (req, res)
         const pdfBuffer = Buffer.from(await page.pdf({ format: "A4", margin: { top: "15mm", bottom: "15mm", left: "15mm", right: "15mm" }, printBackground: true }));
         await browser.close();
         const filename = req.file ? req.file.originalname.replace(/\.html?$/i, "") + ".pdf" : "webpage.pdf";
-        await incrementUsage(user?.user_id, ip, tier, "html-to-pdf", "html", "pdf", fileSizeKb, "success");
+        await incrementUsage(user?.user_id, ip, tier, "html-to-pdf", "html", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
         res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${filename}"`, "Content-Length": pdfBuffer.length });
         return res.status(200).send(pdfBuffer);
       } catch (err) {
         console.error("HTML to PDF error:", err.message);
-        await incrementUsage(user?.user_id, ip, tier, "html-to-pdf", "html", "pdf", fileSizeKb, "failed");
+        await incrementUsage(user?.user_id, ip, tier, "html-to-pdf", "html", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
         return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
       }
     });
@@ -2448,7 +2469,7 @@ router.post("/api/post/filebeef/pdf/to-jpg", optionalAuth, ipDailyLimit("pdf-to-
   if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
   if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
   if (tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "PDF to JPG is a Pro feature. Upgrade to unlock.", resErrorCode: 6, proRequired: true, tier });
-  const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+  const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
   if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
   const fileSizeKb = Math.round(req.file.size / 1024);
   try {
@@ -2465,7 +2486,7 @@ router.post("/api/post/filebeef/pdf/to-jpg", optionalAuth, ipDailyLimit("pdf-to-
 
       if (pagesToRender === 1) {
         const jpg = fs.readFileSync(path.join(tmpDir, "page_1.jpg"));
-        await incrementUsage(user?.user_id, ip, tier, "pdf-to-jpg", "pdf", "jpg", fileSizeKb, "success");
+        await incrementUsage(user?.user_id, ip, tier, "pdf-to-jpg", "pdf", "jpg", fileSizeKb, "success", req.cookies?.fb_anon_id);
         res.set({ "Content-Type": "image/jpeg", "Content-Disposition": `attachment; filename="${originalName}.jpg"`, "Content-Length": jpg.length });
         return res.status(200).send(jpg);
       } else {
@@ -2474,7 +2495,7 @@ router.post("/api/post/filebeef/pdf/to-jpg", optionalAuth, ipDailyLimit("pdf-to-
           zip.file(`${originalName}_page_${i}.jpg`, fs.readFileSync(path.join(tmpDir, `page_${i}.jpg`)));
         }
         const zipBuffer = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE", compressionOptions: { level: 6 } });
-        await incrementUsage(user?.user_id, ip, tier, "pdf-to-jpg", "pdf", "jpg", fileSizeKb, "success");
+        await incrementUsage(user?.user_id, ip, tier, "pdf-to-jpg", "pdf", "jpg", fileSizeKb, "success", req.cookies?.fb_anon_id);
         res.set({ "Content-Type": "application/zip", "Content-Disposition": `attachment; filename="${originalName}_pages.zip"`, "Content-Length": zipBuffer.length });
         return res.status(200).send(zipBuffer);
       }
@@ -2484,7 +2505,7 @@ router.post("/api/post/filebeef/pdf/to-jpg", optionalAuth, ipDailyLimit("pdf-to-
 
   } catch (err) {
     console.error("PDF to JPG error:", err.message);
-    await incrementUsage(user?.user_id, ip, tier, "pdf-to-jpg", "pdf", "jpg", fileSizeKb, "failed");
+    await incrementUsage(user?.user_id, ip, tier, "pdf-to-jpg", "pdf", "jpg", fileSizeKb, "failed", req.cookies?.fb_anon_id);
     if (!res.headersSent) return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
   }
 });
@@ -2514,7 +2535,7 @@ router.post("/api/post/filebeef/pdf/delete-pages", optionalAuth, pdfUpload.singl
     if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, 
       resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const pagesToDelete = (req.body.pages || "").split(",").map(p => parseInt(p.trim())).filter(p => !isNaN(p) && p > 0);
     if (!pagesToDelete.length) return res.status(400).json({ resStatus: false, resMessage: "Please specify pages to delete.", resErrorCode: 4 });
@@ -2528,12 +2549,12 @@ router.post("/api/post/filebeef/pdf/delete-pages", optionalAuth, pdfUpload.singl
       for (const page of sortedDesc) pdfDoc.removePage(page - 1);
       const outputBuffer = await pdfDoc.save();
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
-      await incrementUsage(user?.user_id, ip, tier, "pdf-delete-pages", "pdf", "pdf", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-delete-pages", "pdf", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}_deleted.pdf"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(Buffer.from(outputBuffer));
     } catch (err) {
       console.error("PDF delete pages error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "pdf-delete-pages", "pdf", "pdf", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-delete-pages", "pdf", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Failed to delete pages.", resErrorCode: 99 });
     }
   }
@@ -2546,7 +2567,7 @@ router.post("/api/post/filebeef/pdf/extract-pages", optionalAuth, pdfUpload.sing
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const pagesInput = req.body.pages || "";
     if (!pagesInput) return res.status(400).json({ resStatus: false, resMessage: "Please specify pages to extract.", resErrorCode: 4 });
@@ -2569,12 +2590,12 @@ router.post("/api/post/filebeef/pdf/extract-pages", optionalAuth, pdfUpload.sing
       copiedPages.forEach(page => newDoc.addPage(page));
       const outputBuffer = await newDoc.save();
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
-      await incrementUsage(user?.user_id, ip, tier, "pdf-extract-pages", "pdf", "pdf", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-extract-pages", "pdf", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}_extracted.pdf"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(Buffer.from(outputBuffer));
     } catch (err) {
       console.error("PDF extract pages error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "pdf-extract-pages", "pdf", "pdf", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-extract-pages", "pdf", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Failed to extract pages.", resErrorCode: 99 });
     }
   }
@@ -2587,7 +2608,7 @@ router.post("/api/post/filebeef/pdf/organize", optionalAuth, pdfUpload.single("f
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const orderInput = req.body.order || "";
     if (!orderInput) return res.status(400).json({ resStatus: false, resMessage: "Please specify page order.", resErrorCode: 4 });
@@ -2602,12 +2623,12 @@ router.post("/api/post/filebeef/pdf/organize", optionalAuth, pdfUpload.single("f
       copiedPages.forEach(page => newDoc.addPage(page));
       const outputBuffer = await newDoc.save();
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
-      await incrementUsage(user?.user_id, ip, tier, "pdf-organize", "pdf", "pdf", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-organize", "pdf", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}_organized.pdf"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(Buffer.from(outputBuffer));
     } catch (err) {
       console.error("PDF organize error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "pdf-organize", "pdf", "pdf", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-organize", "pdf", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Failed to organize PDF.", resErrorCode: 99 });
     }
   }
@@ -2620,7 +2641,7 @@ router.post("/api/post/filebeef/pdf/crop", optionalAuth, pdfUpload.single("file"
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const top = parseFloat(req.body.top) || 0;
     const bottom = parseFloat(req.body.bottom) || 0;
@@ -2641,12 +2662,12 @@ router.post("/api/post/filebeef/pdf/crop", optionalAuth, pdfUpload.single("file"
       }
       const outputBuffer = await pdfDoc.save();
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
-      await incrementUsage(user?.user_id, ip, tier, "pdf-crop", "pdf", "pdf", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-crop", "pdf", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}_cropped.pdf"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(Buffer.from(outputBuffer));
     } catch (err) {
       console.error("PDF crop error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "pdf-crop", "pdf", "pdf", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-crop", "pdf", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Crop failed.", resErrorCode: 99 });
     }
   }
@@ -2661,7 +2682,7 @@ router.post("/api/post/filebeef/pdf/txt-to-pdf", optionalAuth, async (req, res) 
       if (err) return res.status(400).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 1 });
       if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
       if (!req.file.originalname.match(/\.txt$/i)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a .txt file.", resErrorCode: 2 });
-      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
       if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
       const fileSizeKb = Math.round(req.file.size / 1024);
       try {
@@ -2695,12 +2716,12 @@ router.post("/api/post/filebeef/pdf/txt-to-pdf", optionalAuth, async (req, res) 
         }
         const outputBuffer = await pdfDoc.save();
         const originalName = req.file.originalname.replace(/\.txt$/i, "");
-        await incrementUsage(user?.user_id, ip, tier, "txt-to-pdf", "txt", "pdf", fileSizeKb, "success");
+        await incrementUsage(user?.user_id, ip, tier, "txt-to-pdf", "txt", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
         res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}.pdf"`, "Content-Length": outputBuffer.length });
         return res.status(200).send(Buffer.from(outputBuffer));
       } catch (err) {
         console.error("TXT to PDF error:", err.message);
-        await incrementUsage(user?.user_id, ip, tier, "txt-to-pdf", "txt", "pdf", fileSizeKb, "failed");
+        await incrementUsage(user?.user_id, ip, tier, "txt-to-pdf", "txt", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
         return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
       }
     });
@@ -2716,7 +2737,7 @@ router.post("/api/post/filebeef/pdf/excel-to-pdf", optionalAuth, async (req, res
       if (err) return res.status(400).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 1 });
       if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
       if (!req.file.originalname.match(/\.(xlsx|xls)$/i)) return res.status(400).json({ resStatus: false, resMessage: "Please upload an Excel file.", resErrorCode: 2 });
-      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
       if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
       const fileSizeKb = Math.round(req.file.size / 1024);
       try {
@@ -2729,12 +2750,12 @@ router.post("/api/post/filebeef/pdf/excel-to-pdf", optionalAuth, async (req, res
         fs.unlinkSync(tmpIn);
         fs.unlinkSync(tmpOut);
         const originalName = req.file.originalname.replace(/\.(xlsx|xls)$/i, "");
-        await incrementUsage(user?.user_id, ip, tier, "excel-to-pdf", "xlsx", "pdf", fileSizeKb, "success");
+        await incrementUsage(user?.user_id, ip, tier, "excel-to-pdf", "xlsx", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
         res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}.pdf"`, "Content-Length": outputBuffer.length });
         return res.status(200).send(outputBuffer);
       } catch (err) {
         console.error("Excel to PDF error:", err.message);
-        await incrementUsage(user?.user_id, ip, tier, "excel-to-pdf", "xlsx", "pdf", fileSizeKb, "failed");
+        await incrementUsage(user?.user_id, ip, tier, "excel-to-pdf", "xlsx", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
         return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
       }
     });
@@ -2750,7 +2771,7 @@ router.post("/api/post/filebeef/pdf/ocr", optionalAuth, pdfUpload.single("file")
     if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
     if (tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "OCR is a Pro feature. Upgrade to Pro to use it.", resErrorCode: 4, limitReached: false, proOnly: true });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     const jobId = `ocr_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -2778,12 +2799,12 @@ router.post("/api/post/filebeef/pdf/ocr", optionalAuth, pdfUpload.single("file")
       });
       const outputBuffer = fs.readFileSync(outputPath);
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
-      await incrementUsage(user?.user_id, ip, tier, "pdf-ocr", "pdf", "pdf", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-ocr", "pdf", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}_ocr.pdf"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(outputBuffer);
     } catch (err) {
       console.error("PDF OCR error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "pdf-ocr", "pdf", "pdf", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-ocr", "pdf", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       if (err.message === "ALREADY_HAS_TEXT") {
         return res.status(400).json({ resStatus: false, resMessage: "This PDF already contains searchable text — no OCR needed.", resErrorCode: 6 });
       }
@@ -2809,7 +2830,7 @@ router.post("/api/post/filebeef/pdf/word-to-pdf", optionalAuth, async (req, res)
       if (err) return res.status(400).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 1 });
       if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
       if (!req.file.originalname.match(/\.(docx|doc)$/i)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a .docx or .doc file.", resErrorCode: 2 });
-      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
       if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
       const fileSizeKb = Math.round(req.file.size / 1024);
       try {
@@ -2827,12 +2848,12 @@ router.post("/api/post/filebeef/pdf/word-to-pdf", optionalAuth, async (req, res)
         fs.unlinkSync(tmpIn);
         fs.unlinkSync(tmpOut);
         const originalName = req.file.originalname.replace(/\.(docx|doc)$/i, "");
-        await incrementUsage(user?.user_id, ip, tier, "word-to-pdf", "docx", "pdf", fileSizeKb, "success");
+        await incrementUsage(user?.user_id, ip, tier, "word-to-pdf", "docx", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
         res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}.pdf"`, "Content-Length": outputBuffer.length });
         return res.status(200).send(outputBuffer);
       } catch (err) {
         console.error("Word to PDF error:", err.message);
-        await incrementUsage(user?.user_id, ip, tier, "word-to-pdf", "docx", "pdf", fileSizeKb, "failed");
+        await incrementUsage(user?.user_id, ip, tier, "word-to-pdf", "docx", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
         return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
       }
     });
@@ -2848,7 +2869,7 @@ router.post("/api/post/filebeef/pdf/to-excel", optionalAuth, pdfUpload.single("f
     if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
     if (tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "PDF to Excel is a Pro feature.", resErrorCode: 4, proOnly: true });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     try {
@@ -2866,7 +2887,7 @@ router.post("/api/post/filebeef/pdf/to-excel", optionalAuth, pdfUpload.single("f
       }
 
       if (!raw.trim()) {
-        await incrementUsage(user?.user_id, ip, tier, "pdf-to-excel", "pdf", "xlsx", fileSizeKb, "failed");
+        await incrementUsage(user?.user_id, ip, tier, "pdf-to-excel", "pdf", "xlsx", fileSizeKb, "failed", req.cookies?.fb_anon_id);
         return res.status(400).json({ resStatus: false, resMessage: "No text found in this PDF. It may be scanned — try the OCR tool first.", resErrorCode: 7 });
       }
 
@@ -2896,12 +2917,12 @@ router.post("/api/post/filebeef/pdf/to-excel", optionalAuth, pdfUpload.single("f
       const xlsxBuffer = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
 
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
-      await incrementUsage(user?.user_id, ip, tier, "pdf-to-excel", "pdf", "xlsx", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-to-excel", "pdf", "xlsx", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": `attachment; filename="${originalName}.xlsx"`, "Content-Length": xlsxBuffer.length });
       return res.status(200).send(xlsxBuffer);
     } catch (err) {
       console.error("PDF to Excel error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "pdf-to-excel", "pdf", "xlsx", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-to-excel", "pdf", "xlsx", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
     }
   }
@@ -2915,7 +2936,7 @@ router.post("/api/post/filebeef/pdf/to-word", optionalAuth, pdfUpload.single("fi
   if (!isPdf(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a PDF.", resErrorCode: 2 });
   if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
   if (tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "PDF to Word is a Pro feature. Upgrade to unlock.", resErrorCode: 6, proRequired: true, tier });
-  const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+  const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
   if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
   const fileSizeKb = Math.round(req.file.size / 1024);
   try {
@@ -2929,7 +2950,7 @@ router.post("/api/post/filebeef/pdf/to-word", optionalAuth, pdfUpload.single("fi
       const raw = fs.readFileSync(txtPath, "utf8");
 
       if (!raw.trim()) {
-        await incrementUsage(user?.user_id, ip, tier, "pdf-to-word", "pdf", "docx", fileSizeKb, "failed");
+        await incrementUsage(user?.user_id, ip, tier, "pdf-to-word", "pdf", "docx", fileSizeKb, "failed", req.cookies?.fb_anon_id);
         return res.status(400).json({ resStatus: false, resMessage: "No text found in this PDF. It may be scanned — try the OCR tool first.", resErrorCode: 7 });
       }
 
@@ -2952,7 +2973,7 @@ router.post("/api/post/filebeef/pdf/to-word", optionalAuth, pdfUpload.single("fi
       const docxBuffer = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
 
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
-      await incrementUsage(user?.user_id, ip, tier, "pdf-to-word", "pdf", "docx", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-to-word", "pdf", "docx", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "Content-Disposition": `attachment; filename="${originalName}.docx"`, "Content-Length": docxBuffer.length });
       return res.status(200).send(docxBuffer);
     } finally {
@@ -2960,7 +2981,7 @@ router.post("/api/post/filebeef/pdf/to-word", optionalAuth, pdfUpload.single("fi
     }
   } catch (err) {
     console.error("PDF to Word error:", err.message);
-    await incrementUsage(user?.user_id, ip, tier, "pdf-to-word", "pdf", "docx", fileSizeKb, "failed");
+    await incrementUsage(user?.user_id, ip, tier, "pdf-to-word", "pdf", "docx", fileSizeKb, "failed", req.cookies?.fb_anon_id);
     if (!res.headersSent) return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
   }
 });
@@ -2989,7 +3010,7 @@ router.post("/api/post/filebeef/font/ttf-to-woff", optionalAuth, async (req, res
       if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
       if (!req.file.originalname.match(/\.(ttf|otf)$/i)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a TTF or OTF file.", resErrorCode: 2 });
 
-      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
       if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
 
       const fileSizeKb = Math.round(req.file.size / 1024);
@@ -3000,12 +3021,12 @@ router.post("/api/post/filebeef/font/ttf-to-woff", optionalAuth, async (req, res
         const woffBuffer = ttfToWoff(ttfBuffer);
         const originalName = req.file.originalname.replace(/\.(ttf|otf)$/i, "");
 
-        await incrementUsage(user?.user_id, ip, tier, "ttf-to-woff", "ttf", "woff", fileSizeKb, "success");
+        await incrementUsage(user?.user_id, ip, tier, "ttf-to-woff", "ttf", "woff", fileSizeKb, "success", req.cookies?.fb_anon_id);
         res.set({ "Content-Type": "font/woff", "Content-Disposition": `attachment; filename="${originalName}.woff"`, "Content-Length": woffBuffer.length });
         return res.status(200).send(woffBuffer);
       } catch (err) {
         console.error("TTF to WOFF error:", err.message);
-        await incrementUsage(user?.user_id, ip, tier, "ttf-to-woff", "ttf", "woff", fileSizeKb, "failed");
+        await incrementUsage(user?.user_id, ip, tier, "ttf-to-woff", "ttf", "woff", fileSizeKb, "failed", req.cookies?.fb_anon_id);
         return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
       }
     });
@@ -3023,7 +3044,7 @@ router.post("/api/post/filebeef/font/ttf-to-woff2", optionalAuth, async (req, re
       if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
       if (!req.file.originalname.match(/\.(ttf|otf)$/i)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a TTF or OTF file.", resErrorCode: 2 });
 
-      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
       if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
 
       const fileSizeKb = Math.round(req.file.size / 1024);
@@ -3039,12 +3060,12 @@ router.post("/api/post/filebeef/font/ttf-to-woff2", optionalAuth, async (req, re
         }
 
         const originalName = req.file.originalname.replace(/\.(ttf|otf)$/i, "");
-        await incrementUsage(user?.user_id, ip, tier, "ttf-to-woff2", "ttf", "woff2", fileSizeKb, "success");
+        await incrementUsage(user?.user_id, ip, tier, "ttf-to-woff2", "ttf", "woff2", fileSizeKb, "success", req.cookies?.fb_anon_id);
         res.set({ "Content-Type": "font/woff2", "Content-Disposition": `attachment; filename="${originalName}.woff2"`, "Content-Length": woff2Buffer.length });
         return res.status(200).send(woff2Buffer);
       } catch (err) {
         console.error("TTF to WOFF2 error:", err.message);
-        await incrementUsage(user?.user_id, ip, tier, "ttf-to-woff2", "ttf", "woff2", fileSizeKb, "failed");
+        await incrementUsage(user?.user_id, ip, tier, "ttf-to-woff2", "ttf", "woff2", fileSizeKb, "failed", req.cookies?.fb_anon_id);
         return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
       }
     });
@@ -3062,7 +3083,7 @@ router.post("/api/post/filebeef/font/woff-to-ttf", optionalAuth, async (req, res
       if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
       if (!req.file.originalname.match(/\.(woff|woff2)$/i)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a WOFF or WOFF2 file.", resErrorCode: 2 });
 
-      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
       if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
 
       const fileSizeKb = Math.round(req.file.size / 1024);
@@ -3070,12 +3091,12 @@ router.post("/api/post/filebeef/font/woff-to-ttf", optionalAuth, async (req, res
         const ttfBuffer = woffToTtf(req.file.buffer);
         const originalName = req.file.originalname.replace(/\.(woff|woff2)$/i, "");
 
-        await incrementUsage(user?.user_id, ip, tier, "woff-to-ttf", "woff", "ttf", fileSizeKb, "success");
+        await incrementUsage(user?.user_id, ip, tier, "woff-to-ttf", "woff", "ttf", fileSizeKb, "success", req.cookies?.fb_anon_id);
         res.set({ "Content-Type": "font/ttf", "Content-Disposition": `attachment; filename="${originalName}.ttf"`, "Content-Length": ttfBuffer.length });
         return res.status(200).send(ttfBuffer);
       } catch (err) {
         console.error("WOFF to TTF error:", err.message);
-        await incrementUsage(user?.user_id, ip, tier, "woff-to-ttf", "woff", "ttf", fileSizeKb, "failed");
+        await incrementUsage(user?.user_id, ip, tier, "woff-to-ttf", "woff", "ttf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
         return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
       }
     });
@@ -3093,7 +3114,7 @@ router.post("/api/post/filebeef/font/woff2-to-ttf", optionalAuth, async (req, re
       if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
       if (!req.file.originalname.match(/\.woff2$/i)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a WOFF2 file.", resErrorCode: 2 });
 
-      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
       if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
 
       const fileSizeKb = Math.round(req.file.size / 1024);
@@ -3108,12 +3129,12 @@ router.post("/api/post/filebeef/font/woff2-to-ttf", optionalAuth, async (req, re
         }
         const originalName = req.file.originalname.replace(/\.woff2$/i, "");
 
-        await incrementUsage(user?.user_id, ip, tier, "woff2-to-ttf", "woff2", "ttf", fileSizeKb, "success");
+        await incrementUsage(user?.user_id, ip, tier, "woff2-to-ttf", "woff2", "ttf", fileSizeKb, "success", req.cookies?.fb_anon_id);
         res.set({ "Content-Type": "font/ttf", "Content-Disposition": `attachment; filename="${originalName}.ttf"`, "Content-Length": ttfBuffer.length });
         return res.status(200).send(ttfBuffer);
       } catch (err) {
         console.error("WOFF2 to TTF error:", err.message);
-        await incrementUsage(user?.user_id, ip, tier, "woff2-to-ttf", "woff2", "ttf", fileSizeKb, "failed");
+        await incrementUsage(user?.user_id, ip, tier, "woff2-to-ttf", "woff2", "ttf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
         return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
       }
     });
@@ -3131,7 +3152,7 @@ router.post("/api/post/filebeef/font/info", optionalAuth,  async (req, res) => {
       if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
       if (!req.file.originalname.match(/\.(ttf|otf|woff|woff2)$/i)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a TTF, OTF, WOFF or WOFF2 file.", resErrorCode: 2 });
 
-      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
       if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
 
       const fileSizeKb = Math.round(req.file.size / 1024);
@@ -3160,11 +3181,11 @@ router.post("/api/post/filebeef/font/info", optionalAuth,  async (req, res) => {
           format: req.file.originalname.split(".").pop().toLowerCase()
         };
 
-        await incrementUsage(user?.user_id, ip, tier, "font-info", req.file.originalname.split(".").pop(), null, fileSizeKb, "success");
+        await incrementUsage(user?.user_id, ip, tier, "font-info", req.file.originalname.split(".").pop(), null, fileSizeKb, "success", req.cookies?.fb_anon_id);
         return res.status(200).json({ resStatus: true, resOkCode: 1, info });
       } catch (err) {
         console.error("Font info error:", err.message);
-        await incrementUsage(user?.user_id, ip, tier, "font-info", req.file.originalname.split(".").pop(), null, fileSizeKb, "failed");
+        await incrementUsage(user?.user_id, ip, tier, "font-info", req.file.originalname.split(".").pop(), null, fileSizeKb, "failed", req.cookies?.fb_anon_id);
         return res.status(500).json({ resStatus: false, resMessage: "Could not read font metadata.", resErrorCode: 99 });
       }
     });
@@ -3331,7 +3352,7 @@ router.post("/api/post/filebeef/data/markdown-to-pdf", optionalAuth, async (req,
         return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${mdLimits.sizeMB}MB.`, resErrorCode: 3 });
       }
 
-      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
       if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
 
       const fileSizeKb = Math.round(req.file.size / 1024);
@@ -3387,7 +3408,7 @@ router.post("/api/post/filebeef/data/markdown-to-pdf", optionalAuth, async (req,
         mdBrowser = null;
 
         const originalName = req.file.originalname.replace(/\.(md|markdown|txt)$/i, "");
-        await incrementUsage(user?.user_id, ip, tier, "markdown-to-pdf", "md", "pdf", fileSizeKb, "success");
+        await incrementUsage(user?.user_id, ip, tier, "markdown-to-pdf", "md", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
 
         res.set({
           "Content-Type": "application/pdf",
@@ -3398,7 +3419,7 @@ router.post("/api/post/filebeef/data/markdown-to-pdf", optionalAuth, async (req,
 
       } catch (err) {
         console.error("Markdown to PDF error:", err.message);
-        await incrementUsage(user?.user_id, ip, tier, "markdown-to-pdf", "md", "pdf", fileSizeKb, "failed");
+        await incrementUsage(user?.user_id, ip, tier, "markdown-to-pdf", "md", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
         return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
       } finally {
         if (mdBrowser) { try { await mdBrowser.close(); } catch (_) {} }
@@ -3454,7 +3475,7 @@ router.post("/api/post/filebeef/video/to-gif", optionalAuth, videoUpload.single(
     const tier = getTier(user); const limits = getVideoLimits(tier);
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     const fps = Math.min(15, Math.max(5, parseInt(req.body.fps) || 10));
@@ -3473,12 +3494,12 @@ router.post("/api/post/filebeef/video/to-gif", optionalAuth, videoUpload.single(
           ])
       );
       const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
-      await incrementUsage(user?.user_id, ip, tier, "video-to-gif", inputExt, "gif", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "video-to-gif", inputExt, "gif", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "image/gif", "Content-Disposition": `attachment; filename="${originalName}.gif"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(outputBuffer);
     } catch (err) {
       console.error("Video to GIF error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "video-to-gif", inputExt, "gif", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "video-to-gif", inputExt, "gif", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
     }
   }
@@ -3490,7 +3511,7 @@ router.post("/api/post/filebeef/video/gif-optimize", optionalAuth, videoUpload.s
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (!req.file.originalname.match(/\.gif$/i) && req.file.mimetype !== "image/gif") return res.status(400).json({ resStatus: false, resMessage: "Please upload a GIF file.", resErrorCode: 2 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     try {
@@ -3514,12 +3535,12 @@ router.post("/api/post/filebeef/video/gif-optimize", optionalAuth, videoUpload.s
       // Never return a file larger than what came in
       const outputBuffer = best.length < req.file.size ? best : req.file.buffer;
       const originalName = req.file.originalname.replace(/\.gif$/i, "");
-      await incrementUsage(user?.user_id, ip, tier, "gif-optimize", "gif", "gif", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "gif-optimize", "gif", "gif", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "image/gif", "Content-Disposition": `attachment; filename="${originalName}_optimized.gif"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(outputBuffer);
     } catch (err) {
       console.error("GIF optimize error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "gif-optimize", "gif", "gif", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "gif-optimize", "gif", "gif", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Optimization failed.", resErrorCode: 99 });
     }
   }
@@ -3531,7 +3552,7 @@ router.post("/api/post/filebeef/video/gif-resize", optionalAuth, videoUpload.sin
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (!req.file.originalname.match(/\.gif$/i) && req.file.mimetype !== "image/gif") return res.status(400).json({ resStatus: false, resMessage: "Please upload a GIF file.", resErrorCode: 2 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     const width = Math.min(1920, Math.max(50, parseInt(req.body.width) || 320));
@@ -3543,12 +3564,12 @@ router.post("/api/post/filebeef/video/gif-resize", optionalAuth, videoUpload.sin
         ])
       );
       const originalName = req.file.originalname.replace(/\.gif$/i, "");
-      await incrementUsage(user?.user_id, ip, tier, "gif-resize", "gif", "gif", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "gif-resize", "gif", "gif", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "image/gif", "Content-Disposition": `attachment; filename="${originalName}_resized.gif"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(outputBuffer);
     } catch (err) {
       console.error("GIF resize error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "gif-resize", "gif", "gif", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "gif-resize", "gif", "gif", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Resize failed.", resErrorCode: 99 });
     }
   }
@@ -3560,7 +3581,7 @@ router.post("/api/post/filebeef/video/compress", optionalAuth, videoUpload.singl
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
     if (tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "Video Compressor is a Pro feature.", resErrorCode: 4, proOnly: true });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     const quality = req.body.quality || "medium"; // low / medium / high
@@ -3574,12 +3595,12 @@ router.post("/api/post/filebeef/video/compress", optionalAuth, videoUpload.singl
           .outputOptions([`-crf`, String(crf), `-preset`, `fast`, `-movflags`, `+faststart`])
       );
       const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
-      await incrementUsage(user?.user_id, ip, tier, "video-compress", inputExt, "mp4", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "video-compress", inputExt, "mp4", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "video/mp4", "Content-Disposition": `attachment; filename="${originalName}_compressed.mp4"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(outputBuffer);
     } catch (err) {
       console.error("Video compress error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "video-compress", inputExt, "mp4", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "video-compress", inputExt, "mp4", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Compression failed.", resErrorCode: 99 });
     }
   }
@@ -3591,7 +3612,7 @@ router.post("/api/post/filebeef/video/trim", optionalAuth, videoUpload.single("f
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
     if (tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "Video Trimmer is a Pro feature.", resErrorCode: 4, proOnly: true });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     const start = parseFloat(req.body.start) || 0;
@@ -3607,12 +3628,12 @@ router.post("/api/post/filebeef/video/trim", optionalAuth, videoUpload.single("f
           .outputOptions([`-crf`, `20`, `-preset`, `veryfast`, `-pix_fmt`, `yuv420p`, `-movflags`, `+faststart`]);
       });
       const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
-      await incrementUsage(user?.user_id, ip, tier, "video-trim", inputExt, "mp4", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "video-trim", inputExt, "mp4", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "video/mp4", "Content-Disposition": `attachment; filename="${originalName}_trimmed.mp4"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(outputBuffer);
     } catch (err) {
       console.error("Video trim error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "video-trim", inputExt, "mp4", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "video-trim", inputExt, "mp4", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Trim failed.", resErrorCode: 99 });
     }
   }
@@ -3624,7 +3645,7 @@ router.post("/api/post/filebeef/video/convert", optionalAuth, videoUpload.single
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
     if (tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "Video Converter is a Pro feature.", resErrorCode: 4, proOnly: true });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     const format = req.body.format || "mp4";
@@ -3637,12 +3658,12 @@ router.post("/api/post/filebeef/video/convert", optionalAuth, videoUpload.single
         cmd.outputOptions([`-movflags`, `+faststart`])
       );
       const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
-      await incrementUsage(user?.user_id, ip, tier, "video-convert", inputExt, format, fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "video-convert", inputExt, format, fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": mimeMap[format] || "video/mp4", "Content-Disposition": `attachment; filename="${originalName}.${format}"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(outputBuffer);
     } catch (err) {
       console.error("Video convert error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "video-convert", inputExt, format, fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "video-convert", inputExt, format, fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
     }
   }
@@ -3653,7 +3674,7 @@ router.post("/api/post/filebeef/video/extract-audio", optionalAuth, videoUpload.
     const tier = getTier(user); const limits = getVideoLimits(tier);
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 2 });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     const format = req.body.format || "mp3";
@@ -3666,12 +3687,12 @@ router.post("/api/post/filebeef/video/extract-audio", optionalAuth, videoUpload.
         cmd.noVideo().audioCodec(format === "mp3" ? "libmp3lame" : format === "aac" ? "aac" : format === "ogg" ? "libvorbis" : "copy")
       );
       const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
-      await incrementUsage(user?.user_id, ip, tier, "extract-audio", inputExt, format, fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "extract-audio", inputExt, format, fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": mimeMap[format], "Content-Disposition": `attachment; filename="${originalName}.${format}"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(outputBuffer);
     } catch (err) {
       console.error("Extract audio error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "extract-audio", inputExt, format, fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "extract-audio", inputExt, format, fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Audio extraction failed.", resErrorCode: 99 });
     }
   }
@@ -3682,7 +3703,7 @@ router.post("/api/post/filebeef/video/repair", optionalAuth, videoUpload.single(
   const vrepTier = getTier(vrepUser); const vrepLimits = getVideoLimits(vrepTier);
   if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
   if (req.file.size > vrepLimits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${vrepLimits.sizeMB}MB.`, resErrorCode: 2 });
-  const vrepLimitCheck = await checkConversionLimit(vrepUser?.user_id, vrepIp, vrepTier);
+  const vrepLimitCheck = await checkConversionLimit(vrepUser?.user_id, vrepIp, vrepTier, req.cookies?.fb_anon_id);
   if (!vrepLimitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${vrepLimitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier: vrepTier });
 
   const vrepFileSizeKb = Math.round(req.file.size / 1024);
@@ -3765,7 +3786,7 @@ router.post("/api/post/filebeef/video/repair", optionalAuth, videoUpload.single(
         r = await vrepReencode(28);
         if (!r.ok) throw new Error("re-encode produced invalid output");
         if (r.size > vrepInputSize * 1.10) {
-          await incrementUsage(vrepUser?.user_id, vrepIp, vrepTier, "video-repair", vrepInputExt, "mp4", vrepFileSizeKb, "failed");
+          await incrementUsage(vrepUser?.user_id, vrepIp, vrepTier, "video-repair", vrepInputExt, "mp4", vrepFileSizeKb, "failed", req.cookies?.fb_anon_id);
           return res.status(422).json({ resStatus: false, resMessage: "Repaired, but could not stay within the size limit. Try the Video Compressor instead.", resErrorCode: 6, tooLarge: true });
         }
       }
@@ -3774,7 +3795,7 @@ router.post("/api/post/filebeef/video/repair", optionalAuth, videoUpload.single(
 
     const vrepOutBuffer = fs.readFileSync(vrepOutPath);
     const vrepOriginalName = req.file.originalname.replace(/\.[^.]+$/, "");
-    await incrementUsage(vrepUser?.user_id, vrepIp, vrepTier, "video-repair", vrepInputExt, "mp4", vrepFileSizeKb, "success");
+    await incrementUsage(vrepUser?.user_id, vrepIp, vrepTier, "video-repair", vrepInputExt, "mp4", vrepFileSizeKb, "success", req.cookies?.fb_anon_id);
     res.set({
       "Content-Type": "video/mp4",
       "Content-Disposition": `attachment; filename="${vrepOriginalName}-repaired.mp4"`,
@@ -3783,7 +3804,7 @@ router.post("/api/post/filebeef/video/repair", optionalAuth, videoUpload.single(
     return res.status(200).send(vrepOutBuffer);
   } catch (err) {
     console.error("Video repair error:", err.message);
-    await incrementUsage(vrepUser?.user_id, vrepIp, vrepTier, "video-repair", vrepInputExt, "mp4", vrepFileSizeKb, "failed");
+    await incrementUsage(vrepUser?.user_id, vrepIp, vrepTier, "video-repair", vrepInputExt, "mp4", vrepFileSizeKb, "failed", req.cookies?.fb_anon_id);
     return res.status(500).json({ resStatus: false, resMessage: "Could not repair this video. The file may be too badly damaged.", resErrorCode: 99 });
   } finally {
     try { fs.rmSync(vrepDir, { recursive: true, force: true }); } catch (_) {}
@@ -3821,7 +3842,7 @@ router.post("/api/post/filebeef/audio/convert", optionalAuth, audioUpload.single
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (!isAudio(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload an audio file.", resErrorCode: 2 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const format = req.body.format || "mp3";
     const allowedFormats = ["mp3", "ogg", "aac", "m4a"];
@@ -3835,12 +3856,12 @@ router.post("/api/post/filebeef/audio/convert", optionalAuth, audioUpload.single
         cmd.audioCodec(codecMap[format]).noVideo()
       );
       const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
-      await incrementUsage(user?.user_id, ip, tier, "audio-convert", inputExt, format, fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "audio-convert", inputExt, format, fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": mimeMap[format], "Content-Disposition": `attachment; filename="${originalName}.${format}"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(outputBuffer);
     } catch (err) {
       console.error("Audio convert error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "audio-convert", inputExt, format, fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "audio-convert", inputExt, format, fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
     }
   }
@@ -3852,7 +3873,7 @@ router.post("/api/post/filebeef/audio/compress", optionalAuth, audioUpload.singl
     if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded", resErrorCode: 1 });
     if (!isAudio(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload an audio file.", resErrorCode: 2 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     const acRatioMap = { light: 0.7, balanced: 0.5, max: 0.3 };
@@ -3888,12 +3909,12 @@ router.post("/api/post/filebeef/audio/compress", optionalAuth, audioUpload.singl
         cmd.audioCodec("libmp3lame").audioBitrate(`${acTargetKbps}k`).noVideo()
       );
       const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
-      await incrementUsage(user?.user_id, ip, tier, "audio-compress", inputExt, "mp3", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "audio-compress", inputExt, "mp3", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "audio/mpeg", "Content-Disposition": `attachment; filename="${originalName}_compressed.mp3"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(outputBuffer);
     } catch (err) {
       console.error("Audio compress error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "audio-compress", inputExt, "mp3", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "audio-compress", inputExt, "mp3", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Compression failed.", resErrorCode: 99 });
     } finally {
       if (acTmpDir) fs.rmSync(acTmpDir, { recursive: true, force: true });
@@ -3908,7 +3929,7 @@ router.post("/api/post/filebeef/audio/trim", optionalAuth, audioUpload.single("f
     if (!isAudio(req.file)) return res.status(400).json({ resStatus: false, resMessage: "Please upload an audio file.", resErrorCode: 2 });
     if (req.file.size > limits.sizeMB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${limits.sizeMB}MB.`, resErrorCode: 3 });
     if (tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "Audio Trimmer is a Pro feature.", resErrorCode: 4, proOnly: true });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     const start = parseFloat(req.body.start) || 0;
@@ -3922,12 +3943,12 @@ router.post("/api/post/filebeef/audio/trim", optionalAuth, audioUpload.single("f
         return cmd.audioCodec("libmp3lame").audioBitrate("192k").noVideo();
       });
       const originalName = req.file.originalname.replace(/\.[^.]+$/, "");
-      await incrementUsage(user?.user_id, ip, tier, "audio-trim", inputExt, "mp3", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "audio-trim", inputExt, "mp3", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "audio/mpeg", "Content-Disposition": `attachment; filename="${originalName}_trimmed.mp3"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(outputBuffer);
     } catch (err) {
       console.error("Audio trim error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "audio-trim", inputExt, "mp3", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "audio-trim", inputExt, "mp3", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Trim failed.", resErrorCode: 99 });
     }
   }
@@ -3949,7 +3970,7 @@ router.post("/api/post/filebeef/audio/merge", optionalAuth, audioMultiUpload.arr
       const amTotalMB = (amTotalBytes / 1024 / 1024).toFixed(1);
       return res.status(400).json({ resStatus: false, resMessage: `Combined size is too large (${amTotalMB}MB). Max ${limits.sizeMB}MB total.`, resErrorCode: 7 });
     }
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const totalKb = Math.round(amTotalBytes / 1024);
     let amTmpFiles = []; let amTmpOut = null;
@@ -3997,12 +4018,12 @@ router.post("/api/post/filebeef/audio/merge", optionalAuth, audioMultiUpload.arr
       });
 
       const outputBuffer = fs.readFileSync(amTmpOut);
-      await incrementUsage(user?.user_id, ip, tier, "audio-merge", "multiple", "mp3", totalKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "audio-merge", "multiple", "mp3", totalKb, "success", req.cookies?.fb_anon_id);
       res.set({ "Content-Type": "audio/mpeg", "Content-Disposition": `attachment; filename="merged.mp3"`, "Content-Length": outputBuffer.length });
       return res.status(200).send(outputBuffer);
     } catch (err) {
       console.error("Audio merge error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "audio-merge", "multiple", "mp3", totalKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "audio-merge", "multiple", "mp3", totalKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Merge failed.", resErrorCode: 99 });
     } finally {
       amTmpFiles.forEach(f => { try { fs.unlinkSync(f); } catch (_) {} });
@@ -4021,7 +4042,7 @@ router.post("/api/post/filebeef/pdf/pptx-to-pdf", optionalAuth, ipDailyLimit("pp
       if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
       if (!req.file.originalname.match(/\.(pptx|ppt)$/i)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a .pptx or .ppt file.", resErrorCode: 2 });
       if (tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "PowerPoint to PDF is a Pro feature.", resErrorCode: 4, proOnly: true });
-      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
       if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
       const fileSizeKb = Math.round(req.file.size / 1024);
       try {
@@ -4060,12 +4081,12 @@ router.post("/api/post/filebeef/pdf/pptx-to-pdf", optionalAuth, ipDailyLimit("pp
           fs.rmSync(tmpDir, { recursive: true, force: true });
         }
         const originalName = req.file.originalname.replace(/\.(pptx|ppt)$/i, "");
-        await incrementUsage(user?.user_id, ip, tier, "pptx-to-pdf", "pptx", "pdf", fileSizeKb, "success");
+        await incrementUsage(user?.user_id, ip, tier, "pptx-to-pdf", "pptx", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
         res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}.pdf"`, "Content-Length": outputBuffer.length });
         return res.status(200).send(outputBuffer);
       } catch (err) {
         console.error("PPTX to PDF error:", err.message);
-        await incrementUsage(user?.user_id, ip, tier, "pptx-to-pdf", "pptx", "pdf", fileSizeKb, "failed");
+        await incrementUsage(user?.user_id, ip, tier, "pptx-to-pdf", "pptx", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
         return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
       }
     });
@@ -4080,7 +4101,7 @@ router.post("/api/post/filebeef/pdf/rtf-to-pdf", optionalAuth, async (req, res) 
       if (err) return res.status(400).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 1 });
       if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
       if (!req.file.originalname.match(/\.rtf$/i)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a .rtf file.", resErrorCode: 2 });
-      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
       if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
       const fileSizeKb = Math.round(req.file.size / 1024);
       try {
@@ -4097,12 +4118,12 @@ router.post("/api/post/filebeef/pdf/rtf-to-pdf", optionalAuth, async (req, res) 
         fs.unlinkSync(tmpIn);
         fs.unlinkSync(tmpOut);
         const originalName = req.file.originalname.replace(/\.rtf$/i, "");
-        await incrementUsage(user?.user_id, ip, tier, "rtf-to-pdf", "rtf", "pdf", fileSizeKb, "success");
+        await incrementUsage(user?.user_id, ip, tier, "rtf-to-pdf", "rtf", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
         res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}.pdf"`, "Content-Length": outputBuffer.length });
         return res.status(200).send(outputBuffer);
       } catch (err) {
         console.error("RTF to PDF error:", err.message);
-        await incrementUsage(user?.user_id, ip, tier, "rtf-to-pdf", "rtf", "pdf", fileSizeKb, "failed");
+        await incrementUsage(user?.user_id, ip, tier, "rtf-to-pdf", "rtf", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
         return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
       }
     });
@@ -4118,7 +4139,7 @@ router.post("/api/post/filebeef/pdf/odt-to-pdf", optionalAuth, async (req, res) 
       if (err) return res.status(400).json({ resStatus: false, resMessage: "Upload error.", resErrorCode: 1 });
       if (!req.file) return res.status(400).json({ resStatus: false, resMessage: "No file uploaded.", resErrorCode: 1 });
       if (!req.file.originalname.match(/\.odt$/i)) return res.status(400).json({ resStatus: false, resMessage: "Please upload a .odt file.", resErrorCode: 2 });
-      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+      const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
       if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
       const fileSizeKb = Math.round(req.file.size / 1024);
       try {
@@ -4135,12 +4156,12 @@ router.post("/api/post/filebeef/pdf/odt-to-pdf", optionalAuth, async (req, res) 
         fs.unlinkSync(tmpIn);
         fs.unlinkSync(tmpOut);
         const originalName = req.file.originalname.replace(/\.odt$/i, "");
-        await incrementUsage(user?.user_id, ip, tier, "odt-to-pdf", "odt", "pdf", fileSizeKb, "success");
+        await incrementUsage(user?.user_id, ip, tier, "odt-to-pdf", "odt", "pdf", fileSizeKb, "success", req.cookies?.fb_anon_id);
         res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${originalName}.pdf"`, "Content-Length": outputBuffer.length });
         return res.status(200).send(outputBuffer);
       } catch (err) {
         console.error("ODT to PDF error:", err.message);
-        await incrementUsage(user?.user_id, ip, tier, "odt-to-pdf", "odt", "pdf", fileSizeKb, "failed");
+        await incrementUsage(user?.user_id, ip, tier, "odt-to-pdf", "odt", "pdf", fileSizeKb, "failed", req.cookies?.fb_anon_id);
         return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
       }
     });
@@ -4157,7 +4178,7 @@ router.post("/api/post/filebeef/pdf/to-pptx", optionalAuth, ipDailyLimit("pdf-to
     const MAX_MB = 10;
     if (req.file.size > MAX_MB * 1024 * 1024) return res.status(400).json({ resStatus: false, resMessage: `File too large. Max ${MAX_MB}MB.`, resErrorCode: 3 });
     if (tier !== "pro") return res.status(403).json({ resStatus: false, resMessage: "PDF to PowerPoint is a Pro feature.", resErrorCode: 4, proOnly: true });
-    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier);
+    const limitCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id);
     if (!limitCheck.allowed) return res.status(403).json({ resStatus: false, resMessage: `Daily limit reached (${limitCheck.limit}/day).`, resErrorCode: 5, limitReached: true, tier });
     const fileSizeKb = Math.round(req.file.size / 1024);
     try {
@@ -4194,7 +4215,7 @@ router.post("/api/post/filebeef/pdf/to-pptx", optionalAuth, ipDailyLimit("pdf-to
           const raw = fs.readFileSync(txtPath, "utf8");
           const pages = raw.split(/\f/).filter(p => p.trim());
           if (!pages.length) {
-            await incrementUsage(user?.user_id, ip, tier, "pdf-to-pptx", "pdf", "pptx", fileSizeKb, "failed");
+            await incrementUsage(user?.user_id, ip, tier, "pdf-to-pptx", "pdf", "pptx", fileSizeKb, "failed", req.cookies?.fb_anon_id);
             return res.status(400).json({ resStatus: false, resMessage: "No text found in this PDF. It may be scanned — try Exact appearance mode or the OCR tool.", resErrorCode: 7 });
           }
           for (const pageText of pages) {
@@ -4211,7 +4232,7 @@ router.post("/api/post/filebeef/pdf/to-pptx", optionalAuth, ipDailyLimit("pdf-to
         fs.rmSync(tmpDir, { recursive: true, force: true });
       }
       const originalName = req.file.originalname.replace(/\.pdf$/i, "");
-      await incrementUsage(user?.user_id, ip, tier, "pdf-to-pptx", "pdf", "pptx", fileSizeKb, "success");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-to-pptx", "pdf", "pptx", fileSizeKb, "success", req.cookies?.fb_anon_id);
       res.set({
         "Content-Type": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
         "Content-Disposition": `attachment; filename="${originalName}.pptx"`,
@@ -4220,7 +4241,7 @@ router.post("/api/post/filebeef/pdf/to-pptx", optionalAuth, ipDailyLimit("pdf-to
       return res.status(200).send(pptxBuffer);
     } catch (err) {
       console.error("PDF to PPTX error:", err.message);
-      await incrementUsage(user?.user_id, ip, tier, "pdf-to-pptx", "pdf", "pptx", fileSizeKb, "failed");
+      await incrementUsage(user?.user_id, ip, tier, "pdf-to-pptx", "pdf", "pptx", fileSizeKb, "failed", req.cookies?.fb_anon_id);
       return res.status(500).json({ resStatus: false, resMessage: "Conversion failed.", resErrorCode: 99 });
     }
   }
@@ -4328,7 +4349,7 @@ router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('
   }
 
   // ── DAILY SAVE LIMIT CHECK ──
-  const saveCheck = await checkConversionLimit(user?.user_id, ip, tier)
+  const saveCheck = await checkConversionLimit(user?.user_id, ip, tier, req.cookies?.fb_anon_id)
   if (!saveCheck.allowed) {
     return res.status(403).json({
       resStatus: false,
