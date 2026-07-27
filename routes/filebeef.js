@@ -538,8 +538,12 @@ router.post("/api/post/filebeef/auth/logout", async (req, res) => {
 });
 
 // ── GET ME ────────────────────────────────────────────────────────────────
-router.get("/api/get/filebeef/auth/me", requireAuth, async (req, res) => {
+router.get("/api/get/filebeef/auth/me", optionalAuth, async (req, res) => {
   const user = req.filebeefUser;
+  if (!user) {
+    // No session — this is a normal guest state, not an error, so 200.
+    return res.status(200).json({ resStatus: false, authenticated: false });
+  }
   try {
     const today = new Date().toISOString().slice(0, 10);
     const [dailyResult, totalResult, userResult] = await Promise.all([
