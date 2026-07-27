@@ -28,25 +28,21 @@ const useragent = require("useragent");
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// ── ANON DEVICE COOKIE ──────────────────────────────────────────────────
-// Issues a random ID to every FileBeef visitor (logged in or not) so anon
-// usage limits can be tracked per-device instead of per-IP, since mobile
-// carrier CGNAT means many unrelated phones share one public IP.
+// ── ANON DEVICE ID ──────────────────────────────────────────────────────
+// Anon usage limits are tracked per-device instead of per-IP, since mobile
+// carrier CGNAT means many unrelated phones share one public IP. A cookie
+// set here would be third-party from the browser's perspective (frontend
+// and backend are different domains) and mobile browsers silently drop
+// those regardless of SameSite — so the frontend sends this as a header
+// (X-Fb-Device-Id, backed by localStorage) instead of relying on a cookie.
 router.use((req, res, next) => {
-  if (!req.cookies?.fb_anon_id) {
-    const id = crypto.randomBytes(16).toString("hex");
-    res.cookie("fb_anon_id", id, {
-      maxAge: 1000 * 60 * 60 * 24 * 730, // 2 years
-      httpOnly: true,
-      sameSite: "none",
-      secure: true,
-      path: "/"
-    });
-    req.cookies.fb_anon_id = id; // available immediately on this request too
+  if (!req.cookies) req.cookies = {};
+  if (!req.cookies.fb_anon_id) {
+    const headerId = req.headers["x-fb-device-id"];
+    req.cookies.fb_anon_id = headerId || "no-cookie";
   }
   next();
 });
-
 
 // ── CONSTANTS ──────────────────────────────────────────────────────────────
 const FRONTEND_URL    = process.env.FRONTEND_URL_FILEBEEF || "https://filebeef.com";
