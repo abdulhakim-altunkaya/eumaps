@@ -28,21 +28,6 @@ const useragent = require("useragent");
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// ── ANON DEVICE ID ──────────────────────────────────────────────────────
-// Anon usage limits are tracked per-device instead of per-IP, since mobile
-// carrier CGNAT means many unrelated phones share one public IP. A cookie
-// set here would be third-party from the browser's perspective (frontend
-// and backend are different domains) and mobile browsers silently drop
-// those regardless of SameSite — so the frontend sends this as a header
-// (X-Fb-Device-Id, backed by localStorage) instead of relying on a cookie.
-router.use((req, res, next) => {
-  if (!req.cookies) req.cookies = {};
-  if (!req.cookies.fb_anon_id) {
-    const headerId = req.headers["x-fb-device-id"];
-    req.cookies.fb_anon_id = headerId || "no-cookie";
-  }
-  next();
-});
 
 // ── CONSTANTS ──────────────────────────────────────────────────────────────
 const FRONTEND_URL    = process.env.FRONTEND_URL_FILEBEEF || "https://filebeef.com";
@@ -1044,13 +1029,8 @@ async function checkConversionLimit(userId, ip, tier, deviceId) {
   const today = new Date().toISOString().slice(0, 10);
 
   if (tier === "anon") {
-    const devId = deviceId || "no-cookie";
-    const result = await pool.query(
-      `SELECT count FROM filebeef_anon_usage WHERE ip = $1 AND date = $2 AND device_id = $3`,
-      [ip, today, devId]
-    );
-    const used = result.rows[0]?.count || 0;
-    return { allowed: used < limit, used, limit };
+    // Anonymous use is disabled — a free account is required for any tool.
+    return { allowed: false, used: 0, limit: 0 };
   } else {
     const result = await pool.query(
       `SELECT count FROM filebeef_daily_usage WHERE user_id = $1 AND date = $2`,
@@ -1066,13 +1046,8 @@ async function incrementUsage(userId, ip, tier, tool, inputFormat, outputFormat,
   const today = new Date().toISOString().slice(0, 10);
   try {
     if (tier === "anon") {
-      const devId = deviceId || "no-cookie";
-      await pool.query(
-        `INSERT INTO filebeef_anon_usage (ip, date, count, device_id)
-         VALUES ($1, $2, 1, $3)
-         ON CONFLICT (ip, date, device_id) DO UPDATE SET count = filebeef_anon_usage.count + 1`,
-        [ip, today, devId]
-      );
+      // Anonymous use is disabled — nothing to log.
+      return;
     } else {
       await pool.query(
         `INSERT INTO filebeef_daily_usage (user_id, date, count)
