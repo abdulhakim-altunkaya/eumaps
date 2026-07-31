@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Hıza Bağlı Zaman Genişlemesi — eumaps.org</title>
+
+  <meta
+    name="description"
+    content="Bir uzay aracında geçen süreyi ve aracın hızını girerek Dünya'da geçen süreyi ve hıza bağlı zaman genişlemesini hesaplayın."
+  />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Basic&family=Braah+One&family=Inter:wght@400;500;600;700&family=Nunito+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Pacifico&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="../css/einstein-zaman-hiz.css" />
+  <link rel="icon" href="../icons/icon1.png" type="image/png" />
+</head>
+
+<body>
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="brand-box">
+        <a href="../index.html" class="logo-area">
+          <img
+            src="../icons/icon1.png"
+            class="logo-icon"
+            alt="eumaps.org"
+          />
+
+          <span class="logo-text">eumaps.org</span>
+        </a>
+
+        <span class="tagline">
+          Türkiye'nin en büyük hesap-kitap platformu
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-container">
+    <nav class="breadcrumb" aria-label="Sayfa yolu">
+      <a href="../index.html">Ana Sayfa</a>
+      <span aria-hidden="true">›</span>
+
+      <a href="../einstein.html">Einstein Hesaplamaları</a>
+      <span aria-hidden="true">›</span>
+
+      <span>Hıza Bağlı Zaman Genişlemesi</span>
+    </nav>
+
+    <section class="calculator-section">
+      <div class="calculator-heading">
+        <div class="heading-icon">
+          <img
+            src="../icons/dilation.png"
+            alt=""
+            aria-hidden="true"
+          />
+        </div>
+
+        <div>
+          <h1>Hıza Bağlı Zaman Genişlemesi</h1>
+
+          <p>
+            Işık hızına yakın hareket eden bir araçta geçen süre ile dışarıdaki
+            bir gözlemci için geçen süre arasındaki farkı hesaplayın.
+          </p>
+        </div>
+      </div>
+
+      <div class="calculator-layout">
+        <form id="dilationForm" class="calculator-form" novalidate>
+          <div class="form-group">
+            <label for="spaceshipTime">
+              Araçta geçen süre
+            </label>
+
+            <div class="input-wrapper">
+              <input
+                type="number"
+                id="spaceshipTime"
+                name="spaceshipTime"
+                min="0.000001"
+                max="10000000000000"
+                step="any"
+                inputmode="decimal"
+                placeholder="Örnek: 10"
+                required
+              />
+
+              <span class="input-suffix">saniye</span>
+            </div>
+
+            <small>
+              Hareket eden araçtaki saat tarafından ölçülen süreyi girin.
+            </small>
+          </div>
+
+          <div class="form-group">
+            <label for="spaceshipVelocity">
+              Aracın hızı
+            </label>
+
+            <div class="input-wrapper">
+              <input
+                type="number"
+                id="spaceshipVelocity"
+                name="spaceshipVelocity"
+                min="0.000001"
+                max="299792.457999"
+                step="any"
+                inputmode="decimal"
+                placeholder="Örnek: 250000"
+                required
+              />
+
+              <span class="input-suffix">km/sn</span>
+            </div>
+
+            <small>
+              Hız, 299.792,458 km/sn olan ışık hızından düşük olmalıdır.
+            </small>
+          </div>
+
+          <div
+            id="formMessage"
+            class="form-message"
+            role="alert"
+            aria-live="assertive"
+          ></div>
+
+          <div class="button-group">
+            <button type="submit" class="primary-button">
+              Hesapla
+            </button>
+
+            <button type="button" id="clearBtn" class="secondary-button">
+              Temizle
+            </button>
+          </div>
+        </form>
+
+        <aside class="information-box">
+          <h2>Zaman genişlemesi nedir?</h2>
+
+          <p>
+            Özel görelilik kuramına göre, yüksek hızla hareket eden bir araçtaki
+            zaman, dışarıdaki hareketsiz bir gözlemciye göre daha yavaş ilerler.
+          </p>
+
+          <div class="formula-box">
+            <span>Formül</span>
+
+            <strong>
+              T<sub>d</sub> = T<sub>a</sub> ÷ √(1 − v² / c²)
+            </strong>
+          </div>
+
+          <ul>
+            <li>
+              <strong>T<sub>d</sub>:</strong>
+              Dış gözlemci için geçen süre
+            </li>
+
+            <li>
+              <strong>T<sub>a</sub>:</strong>
+              Araçta geçen süre
+            </li>
+
+            <li>
+              <strong>v:</strong>
+              Aracın hızı
+            </li>
+
+            <li>
+              <strong>c:</strong>
+              Işık hızı
+            </li>
+          </ul>
+
+          <p class="speed-note">
+            Işık hızı: <strong>299.792,458 km/sn</strong>
+          </p>
+        </aside>
+      </div>
+    </section>
+
+    <section
+      id="resultSection"
+      class="result-section"
+      aria-live="polite"
+      hidden
+    >
+      <div class="result-heading">
+        <span>Hesaplama sonucu</span>
+        <h2>Zaman Genişlemesi</h2>
+      </div>
+
+      <div class="result-summary">
+        <div class="summary-card">
+          <span>Araçta geçen süre</span>
+          <strong id="spaceshipTimeResult">0 saniye</strong>
+        </div>
+
+        <div class="summary-card">
+          <span>Dünya'da geçen süre</span>
+          <strong id="earthTimeResult">0 saniye</strong>
+        </div>
+
+        <div class="summary-card">
+          <span>Zaman farkı</span>
+          <strong id="timeDifferenceResult">0 saniye</strong>
+        </div>
+
+        <div class="summary-card highlight">
+          <span>Lorentz faktörü</span>
+          <strong id="lorentzFactorResult">1</strong>
+        </div>
+      </div>
+
+      <div class="result-details">
+        <div>
+          <span>Girilen hız</span>
+          <strong id="velocityResult">0 km/sn</strong>
+        </div>
+
+        <div>
+          <span>Işık hızına oranı</span>
+          <strong id="velocityRatioResult">0</strong>
+        </div>
+
+        <div>
+          <span>Işık hızının yüzdesi</span>
+          <strong id="velocityPercentageResult">%0</strong>
+        </div>
+      </div>
+
+      <div class="calculation-box">
+        <h3>Uygulanan hesaplama</h3>
+        <p id="calculationText"></p>
+      </div>
+
+      <div class="unit-note">
+        <h3>Farklı zaman birimleri</h3>
+
+        <p>
+          Girilen süre saniye olarak gösterilir. Ancak aynı oran yıl, ay, gün
+          veya saat için de geçerlidir. Örneğin araçta 10 yıl geçiyorsa,
+          sonuçtaki Dünya süresi de yıl olarak okunabilir.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2020-2026 <strong>eumaps.org</strong></p>
+  </footer>
+
+  <script src="../js/einstein-zaman-hiz.js"></script>
+</body>
+</html>
