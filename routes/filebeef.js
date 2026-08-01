@@ -23,7 +23,8 @@ const jwt = require("jsonwebtoken");
 const { pool, upload } = require("../db");
 const sendEmailBrevo = require("../utils/sendEmailBrevo");
 const { OAuth2Client } = require("google-auth-library");
-const { ipDailyLimit, fbVisitCooldown, fbCommentCheck, fbCommentMark } = require("../middleware/filebeef_MW");
+const { ipDailyLimit, fbVisitCooldown, fbCommentCheck, 
+  fbCommentMark, requireSessionCookie } = require("../middleware/filebeef_MW");
 const useragent = require("useragent");
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -1069,7 +1070,8 @@ async function incrementUsage(userId, ip, tier, tool, inputFormat, outputFormat,
 }
 
 // ── IMAGE CONVERT ──────────────────────────────────────────────────────────
-router.post("/api/post/filebeef/image/convert", optionalAuth, imageUpload.single("file"), async (req, res) => {
+router.post("/api/post/filebeef/image/convert", optionalAuth, requireSessionCookie, 
+  imageUpload.single("file"), async (req, res) => {
     const user = req.filebeefUser;
     const ip = getClientIp(req);
     const tier = getTier(user);
@@ -1211,7 +1213,8 @@ router.post("/api/post/filebeef/image/convert", optionalAuth, imageUpload.single
 );
 
 // ── IMAGE OPTIMIZER (compress + resize) ───────────────────────────────────
-router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.single("file"), async (req, res) => {
+router.post("/api/post/filebeef/image/optimize", optionalAuth, requireSessionCookie, 
+  imageUpload.single("file"), async (req, res) => {
     const user = req.filebeefUser;
     const ip = getClientIp(req);
     const tier = getTier(user);
@@ -1337,7 +1340,8 @@ router.post("/api/post/filebeef/image/optimize", optionalAuth, imageUpload.singl
   }
 );
 // ── FLIP & ROTATE ──────────────────────────────────────────────────────────
-router.post("/api/post/filebeef/image/flip-rotate", optionalAuth, imageUpload.single("file"), async (req, res) => {
+router.post("/api/post/filebeef/image/flip-rotate", requireSessionCookie, optionalAuth, 
+  imageUpload.single("file"), async (req, res) => {
     const user = req.filebeefUser;
     const ip = getClientIp(req);
     const tier = getTier(user);
@@ -1457,7 +1461,8 @@ router.post("/api/post/filebeef/image/flip-rotate", optionalAuth, imageUpload.si
   }
 );
 // ── EXIF REMOVER ───────────────────────────────────────────────────────────
-router.post("/api/post/filebeef/image/exif-remove", optionalAuth, imageUpload.single("file"), async (req, res) => {
+router.post("/api/post/filebeef/image/exif-remove", requireSessionCookie, optionalAuth, 
+  imageUpload.single("file"), async (req, res) => {
     const user = req.filebeefUser;
     const ip = getClientIp(req);
     const tier = getTier(user);
@@ -1532,7 +1537,8 @@ router.post("/api/post/filebeef/image/exif-remove", optionalAuth, imageUpload.si
 );
 
 // ── SVG OPTIMIZER ──────────────────────────────────────────────────────────
-router.post("/api/post/filebeef/image/svg-optimize", optionalAuth, async (req, res) => {
+router.post("/api/post/filebeef/image/svg-optimize", requireSessionCookie, optionalAuth, 
+  async (req, res) => {
     const user = req.filebeefUser;
     const ip = getClientIp(req);
     const tier = getTier(user);
@@ -1591,7 +1597,8 @@ router.post("/api/post/filebeef/image/svg-optimize", optionalAuth, async (req, r
 );
 
 // ── IMAGE WATERMARK ────────────────────────────────────────────────────────
-router.post("/api/post/filebeef/image/watermark", optionalAuth, imageUpload.single("file"), async (req, res) => {
+router.post("/api/post/filebeef/image/watermark", requireSessionCookie, optionalAuth, 
+  imageUpload.single("file"), async (req, res) => {
     const user = req.filebeefUser;
     const ip = getClientIp(req);
     const tier = getTier(user);

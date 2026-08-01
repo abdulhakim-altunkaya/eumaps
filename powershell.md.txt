@@ -51,6 +51,10 @@ Edit values, then save:
 Restart:pm2 restart eumaps
 	pm2 status
 
+Hello, while testing your service as a guest user, I found two issues worth reviewing.
 
+Issue 1 – A guest can repeatedly upload/convert files, consuming heavy backend resources. I converted 30MB PDF to 175MB JPG archive (205MB bandwidth), repeatable over and over.
 
+Issue 2 – After conversion, download can be clicked unlimited times. DevTools confirms each click re-fetches from server instead of a cached copy.
 
+Fixes: limit guest conversions, remove guest usage or serve repeats from a local blob not from server. I'd appreciate consideration for a bug reward or goodwill bounty if this is useful to your team. Best regards

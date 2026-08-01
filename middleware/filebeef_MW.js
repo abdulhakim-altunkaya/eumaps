@@ -59,6 +59,18 @@ setInterval(() => {
   for (const [key, ts] of visitStore) if (ts < cutoff) visitStore.delete(key);
 }, 6 * 60 * 60 * 1000).unref();
 
+// ── SESSION COOKIE PRESENCE CHECK ────────────────────────────────────────
+// Cheap pre-multer gate for tool routes — rejects requests with no session
+// cookie at all BEFORE file upload buffering happens. Not a substitute for
+// optionalAuth/requireAuth (which validate the cookie against the DB) —
+// this only blocks the zero-cookie case early to save bandwidth on anon spam.
+function requireSessionCookie(req, res, next) {
+  if (!req.cookies?.filebeef_session) {
+    return res.status(401).json({ resStatus: false, resMessage: "Account required", resErrorCode: 1 });
+  }
+  next();
+}
+
 // ── COMMENT COOLDOWN (10 min per USER and per IP) ────────────────────────────
 const commentUserStore = new Map(); // userId -> ts(ms)
 const commentIpStore   = new Map(); // ip -> ts(ms)
@@ -90,4 +102,4 @@ setInterval(() => {
   for (const [k, ts] of commentIpStore)   if (ts < cutoff) commentIpStore.delete(k);
 }, 30 * 60 * 1000).unref();
 
-module.exports = { ipDailyLimit, fbVisitCooldown, fbCommentCheck, fbCommentMark };
+module.exports = { ipDailyLimit, fbVisitCooldown, fbCommentCheck, fbCommentMark, requireSessionCookie };
