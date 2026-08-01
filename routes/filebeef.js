@@ -189,21 +189,21 @@ const DAILY_LIMITS = {
 
 // ── IMAGE SIZE LIMITS ──────────────────────────────────────────────────────
 const IMAGE_LIMITS = {
-  anon: { sizeMB: 5  },
+  anon: { sizeMB: 1  },
   free: { sizeMB: 8  },
   pro:  { sizeMB: 20 }
 };
 
 // ── PDF SIZE LIMITS ────────────────────────────────────────────────────────
 const PDF_LIMITS = {
-  anon: { sizeMB: 2  },
+  anon: { sizeMB: 1  },
   free: { sizeMB: 5  },
   pro:  { sizeMB: 20 }
 };
 
 // ── FONT SIZE LIMITS ───────────────────────────────────────────────────────
 const FONT_LIMITS = {
-  anon: { sizeMB: 2  },
+  anon: { sizeMB: 1  },
   free: { sizeMB: 2  },
   pro:  { sizeMB: 20 }
 };
@@ -217,22 +217,22 @@ const SVG_LIMITS = {
 
 // ── VIDEO LIMITS ───────────────────────────────────────────────────────────
 const VIDEO_LIMITS = {
-  anon: { daily: 1, sizeMB: 10 },
+  anon: { daily: 1, sizeMB: 1 },
   free: { daily: 1, sizeMB: 20 },
   pro:  { daily: 3, sizeMB: 75 }
 };
 
 // ── AUDIO LIMITS ───────────────────────────────────────────────────────────
 const AUDIO_LIMITS = {
-  anon: { daily: 1, sizeMB: 10 },
+  anon: { daily: 1, sizeMB: 1 },
   free: { daily: 1, sizeMB: 20 },
   pro:  { daily: 3, sizeMB: 75 }
 };
 // ── PDF EDITOR ─────────────────────────────────────────────────────────────
 const EDITOR_LIMITS = {
   anon: {
-    sizeMB: 3,
-    maxAnnotations: 2,
+    sizeMB: 1,
+    maxAnnotations: 1,
     allowedTypes: ['highlight', 'text'],
     sigDataMaxKB: 400,
     imgMaxKB: 500,
