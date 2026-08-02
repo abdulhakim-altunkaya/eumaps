@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Yerçekimine Bağlı Zaman Genişlemesi — eumaps.org</title>
+  <meta name="description" content="Uzak gözlemci için geçen süreyi, cismin Güneş 
+  kütlesi cinsinden kütlesini ve merkezden uzaklığı girerek yerçekimine bağlı zaman genişlemesini hesaplayın."/>
+  <link rel="stylesheet" href="../css/index.css" />
+  <link rel="stylesheet" href="../css/einstein-zaman-yercekimi.css" />
+  <link rel="icon" href="../icons/icon1.png" type="image/png" />
+</head>
+
+<body>
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="brand-box">
+        <a href="../index.html" class="logoArea">
+          <img src="../icons/icon1.png" class="logoIcon" alt="eumaps.org" />
+          <span class="logoText">eumaps.org</span>
+        </a>
+        <span class="tagline"> Türkiye'nin en büyük hesap-kitap platformu </span>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-container">
+    <nav class="breadcrumb" aria-label="Sayfa yolu">
+      <a href="../index.html">Ana Sayfa</a>
+      <span aria-hidden="true">›</span>
+      <a href="../einstein.html">Einstein Hesaplamaları</a>
+      <span aria-hidden="true">›</span>
+      <span>Yerçekimine Bağlı Zaman Genişlemesi</span>
+    </nav>
+
+    <section class="calculator-section">
+      <div class="calculator-heading">
+        <div class="heading-icon">
+          <img
+            src="../icons/gravity.png"
+            alt=""
+            aria-hidden="true"
+          />
+        </div>
+
+        <div>
+          <h1>Yerçekimine Bağlı Zaman Genişlemesi</h1>
+
+          <p>
+            Büyük kütleli bir cismin yakınında zamanın, uzaktaki bir gözlemciye
+            göre ne kadar yavaş ilerlediğini hesaplayın.
+          </p>
+        </div>
+      </div>
+
+      <div class="calculator-layout">
+        <form id="timeDilationForm" class="calculator-form" novalidate>
+          <div class="form-group">
+            <label for="observerTimeInput">Gözlemci için geçen süre</label>
+
+            <div class="input-wrapper">
+              <input
+                type="number"
+                id="observerTimeInput"
+                name="observerTime"
+                min="0.000001"
+                step="any"
+                inputmode="decimal"
+                required
+              />
+
+              <span class="input-suffix">saniye</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="massOfObjectInput">
+              Cismin kütlesi
+            </label>
+
+            <div class="input-wrapper">
+              <input
+                type="number"
+                id="massOfObjectInput"
+                name="massOfObject"
+                min="0.000001"
+                step="any"
+                inputmode="decimal"
+                required
+              />
+
+              <span class="input-suffix">Güneş kütlesi</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="radiusInput">
+              Cisimden uzaklık
+            </label>
+
+            <div class="input-wrapper">
+              <input
+                type="number"
+                id="radiusInput"
+                name="radius"
+                min="0.000001"
+                step="any"
+                inputmode="decimal"
+                required
+              />
+
+              <span class="input-suffix">km</span>
+            </div>
+          </div>
+
+          <div
+            id="formMessage"
+            class="form-message"
+            role="alert"
+            aria-live="assertive"
+          ></div>
+
+          <div class="button-group">
+            <button type="submit" class="primary-button">
+              Hesapla
+            </button>
+
+            <button type="button" id="clearBtn" class="secondary-button">
+              Temizle
+            </button>
+          </div>
+        </form>
+
+        <aside class="information-box">
+          <div class="formula-box">
+            <span>Formül</span>
+            <strong>t′ = t × √(1 − 2GM / rc²)</strong>
+          </div>
+
+          <ul>
+            <li><strong>t′:</strong> Cismin yakınında geçen süre</li>
+            <li><strong>t:</strong> Uzak gözlemci için geçen süre</li>
+            <li><strong>G:</strong> Evrensel kütleçekim sabiti</li>
+            <li><strong>M:</strong> Cismin kütlesi</li>
+            <li><strong>r:</strong> Cismin merkezinden uzaklık</li>
+            <li><strong>c:</strong> Işık hızı</li>
+          </ul>
+
+          <p class="information-note">
+            Girilen uzaklık, cismin yüzeyinden değil merkezinden ölçülmelidir.
+          </p>
+        </aside>
+      </div>
+    </section>
+
+    <section
+      id="resultSection"
+      class="result-section"
+      aria-live="polite"
+      hidden
+    >
+      <div class="result-heading">
+        <span>Hesaplama sonucu</span>
+        <h2>Yerçekimsel Zaman Farkı</h2>
+      </div>
+
+      <div class="result-list">
+        <div class="result-row">
+          <span>Cismin kütlesi</span>
+          <strong id="massSolarResult">0 Güneş kütlesi</strong>
+        </div>
+
+        <div class="result-row">
+          <span>Kilogram cinsinden kütle</span>
+          <strong id="massKgResult">0 kg</strong>
+        </div>
+
+        <div class="result-row">
+          <span>Merkezden uzaklık</span>
+          <strong id="radiusResult">0 km</strong>
+        </div>
+
+        <div class="result-row">
+          <span>Schwarzschild yarıçapı</span>
+          <strong id="schwarzschildRadiusResult">0 km</strong>
+        </div>
+
+        <div class="result-row">
+          <span>Uzaklığın Schwarzschild yarıçapına oranı</span>
+          <strong id="radiusRatioResult">0</strong>
+        </div>
+
+        <div class="result-row">
+          <span>Zaman akış faktörü</span>
+          <strong id="timeFactorResult">1</strong>
+        </div>
+
+        <div class="result-row">
+          <span>Uzak gözlemci için geçen süre</span>
+          <strong id="observerTimeResult">0 saniye</strong>
+        </div>
+
+        <div class="result-row primary-result">
+          <span>Cismin yakınında geçen süre</span>
+          <strong id="nearObjectTimeResult">0 saniye</strong>
+        </div>
+
+        <div class="result-row">
+          <span>Zaman farkı</span>
+          <strong id="timeDifferenceResult">0 saniye</strong>
+        </div>
+
+        <div class="result-row">
+          <span>Yakındaki saatin yavaşlama oranı</span>
+          <strong id="slowdownPercentageResult">%0</strong>
+        </div>
+      </div>
+
+      <div class="calculation-box">
+        <h3>Uygulanan hesaplama</h3>
+        <p id="calculationText"></p>
+      </div>
+
+      <div class="explanation-box">
+        <h3>Yerçekimine Bağlı Zaman Genişlemesi</h3>
+        <p>
+          Genel izafiyet kuramına göre güçlü bir kütleçekim alanının yakınındaki
+          saat, daha zayıf kütleçekim alanındaki uzak bir saate göre daha yavaş
+          ilerler.
+        </p>
+        <div class="equation">
+          t′ = t × √(1 − 2GM / rc²)
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2020-2026 <strong>eumaps.org</strong></p>
+  </footer>
+
+  <script src="../js/einstein-zaman-yercekimi.js"></script>
+</body>
+</html>
