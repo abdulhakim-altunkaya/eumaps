@@ -6,8 +6,6 @@
   <title>Yatırım Dönüş Hesaplama — eumaps.org</title>
   <meta name="description" content="Başlangıç yatırım tutarınızı, yatırım süresini ve yıllık kazanç oranını girerek 
     bileşik yatırım dönüşünü hesaplayın."/>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="./css/index.css" />
   <link rel="stylesheet" href="./css/investment.css" />
   <link rel="icon" href="./icons/icon1.png" type="image/png" />
@@ -35,27 +33,14 @@
 
     <section class="calculator-section">
       <div class="calculator-heading">
-        <div class="heading-icon">
-          <img
-            src="./icons/investment2.png"
-            alt=""
-            aria-hidden="true"
-          />
-        </div>
-
-        <div>
-          <h1>Yatırım Dönüş Hesaplama</h1>
-          <p>
-            Başlangıç tutarınızı, yatırım süresini ve kazanç oranını
-            girerek yatırımınızın ulaşacağı değeri hesaplayın.
-          </p>
-        </div>
+        <div class="heading-icon"><img src="./icons/investment2.png" alt="" aria-hidden="true" /></div>
+        <div><h1>Yatırım Dönüş Hesaplama</h1></div>
       </div>
 
       <div class="calculator-layout">
         <form class="investment-form" id="investmentForm" novalidate>
           <div class="form-group">
-            <label for="invAmount">Başlangıç yatırım tutarı</label>
+            <label for="invAmount">Yatırım tutarı</label>
 
             <div class="input-wrapper">
               <input
@@ -66,15 +51,13 @@
                 max="10000000000"
                 step="1"
                 inputmode="numeric"
-                placeholder="Örnek: 100000"
                 required
               />
-              <span class="input-suffix">₺</span>
             </div>
           </div>
 
           <div class="form-group">
-            <label for="invDuration">Yatırım süresi</label>
+            <label for="invDuration">Yatırım süresi (yıl, gün veya ay)</label>
 
             <div class="input-wrapper">
               <input
@@ -85,11 +68,8 @@
                 max="100"
                 step="1"
                 inputmode="numeric"
-                placeholder="Örnek: 10"
                 required
               />
-
-              <span class="input-suffix">Yıl</span>
             </div>
           </div>
 
@@ -98,8 +78,7 @@
 
             <div class="input-wrapper">
               <input type="number" id="invPercentage" name="invPercentage" min="1" max="10000"
-                step="1" inputmode="numeric" placeholder="Örnek: 20" required/>
-              <span class="input-suffix">%</span>
+                step="1" inputmode="numeric" required/>
             </div>
           </div>
           <div class="form-message" id="formMessage" role="alert" aria-live="assertive"></div>
@@ -110,16 +89,9 @@
         </form>
 
         <aside class="information-box">
-          <h2>Hesaplama yöntemi</h2>
           <p>Birleşik faiz temelli bir hesaplama sistemidir. Belirlediğiniz zaman birimi sonunda
              elde edilen kazanç mevcut yatırım tutarına eklenir. Bir sonraki zaman biriminin kazancı
               mevcut toplama eklenir.</p>
-          <div class="formula-box">
-            <span>Yeni toplam</span>
-            <strong>Mevcut toplam × (1 + oran ÷ 100)</strong>
-          </div>
-
-          <p class="information-note">Vergi, komisyon, enflasyon ve dönem içindeki ek yatırımlar hesaba katılmaz.</p>
         </aside>
       </div>
     </section>

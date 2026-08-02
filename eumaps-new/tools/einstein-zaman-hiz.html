@@ -4,11 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Hıza Bağlı Zaman Genişlemesi — eumaps.org</title>
-  <meta
-    name="description" content="Bir uzay aracında geçen süreyi ve aracın hızını girerek Dünya'da geçen süreyi 
+  <meta name="description" content="Bir uzay aracında geçen süreyi ve aracın hızını girerek Dünya'da geçen süreyi 
     ve hıza bağlı zaman genişlemesini hesaplayın." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="../css/index.css" />
   <link rel="stylesheet" href="../css/einstein-zaman-hiz.css" />
   <link rel="icon" href="../icons/icon1.png" type="image/png" />
 </head>
@@ -17,8 +15,8 @@
   <header class="navbar">
     <div class="nav-container">
       <div class="brand-box">
-        <a href="./index.html" class="logoArea">
-          <img src="./icons/icon1.png" class="logoIcon" alt="eumaps.org" />
+        <a href="../index.html" class="logoArea">
+          <img src="../icons/icon1.png" class="logoIcon" alt="eumaps.org" />
           <span class="logoText">eumaps.org</span>
         </a>
         <span class="tagline"> Türkiye'nin en büyük hesap-kitap platformu </span>
@@ -49,8 +47,7 @@
           <h1>Hıza Bağlı Zaman Genişlemesi</h1>
 
           <p>
-            Işık hızına yakın hareket eden bir araçta geçen süre ile dışarıdaki
-            bir gözlemci için geçen süre arasındaki farkı hesaplayın.
+            Işık hızına yakın hareket eden bir araç içinde geçen zaman ile dışında geçen zaman arasındaki farkı hesaplayın.
           </p>
         </div>
       </div>
@@ -71,23 +68,15 @@
                 max="10000000000000"
                 step="any"
                 inputmode="decimal"
-                placeholder="Örnek: 10"
                 required
               />
 
               <span class="input-suffix">saniye</span>
             </div>
-
-            <small>
-              Hareket eden araçtaki saat tarafından ölçülen süreyi girin.
-            </small>
           </div>
 
           <div class="form-group">
-            <label for="spaceshipVelocity">
-              Aracın hızı
-            </label>
-
+            <label for="spaceshipVelocity">Aracın hızı</label>
             <div class="input-wrapper">
               <input
                 type="number"
@@ -97,16 +86,10 @@
                 max="299792.457999"
                 step="any"
                 inputmode="decimal"
-                placeholder="Örnek: 250000"
                 required
               />
-
               <span class="input-suffix">km/sn</span>
             </div>
-
-            <small>
-              Hız, 299.792,458 km/sn olan ışık hızından düşük olmalıdır.
-            </small>
           </div>
 
           <div
@@ -128,13 +111,6 @@
         </form>
 
         <aside class="information-box">
-          <h2>Zaman genişlemesi nedir?</h2>
-
-          <p>
-            Özel görelilik kuramına göre, yüksek hızla hareket eden bir araçtaki
-            zaman, dışarıdaki hareketsiz bir gözlemciye göre daha yavaş ilerler.
-          </p>
-
           <div class="formula-box">
             <span>Formül</span>
 

@@ -3,22 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
   <title>Uzunluk Daralması Hesaplama — eumaps.org</title>
-
-  <meta
-    name="description"
-    content="Bir cismin durgun uzunluğunu ve hızını girerek özel görelilik kurallarına göre gözlenen uzunluğunu hesaplayın."
-  />
-
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-
-  <link
-    href="https://fonts.googleapis.com/css2?family=Basic&family=Braah+One&family=Inter:wght@400;500;600;700&family=Nunito+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Pacifico&display=swap"
-    rel="stylesheet"
-  />
-
+  <meta name="description" content="Bir cismin durgun uzunluğunu ve hızını girerek özel görelilik
+   kurallarına göre gözlenen uzunluğunu hesaplayın."/>
+  <link rel="stylesheet" href="../css/index.css" />
   <link rel="stylesheet" href="../css/einstein-uzunluk.css" />
   <link rel="icon" href="../icons/icon1.png" type="image/png" />
 </head>
@@ -27,19 +15,11 @@
   <header class="navbar">
     <div class="nav-container">
       <div class="brand-box">
-        <a href="../index.html" class="logo-area">
-          <img
-            src="../icons/icon1.png"
-            class="logo-icon"
-            alt="eumaps.org"
-          />
-
-          <span class="logo-text">eumaps.org</span>
+        <a href="../index.html" class="logoArea">
+          <img src="../icons/icon1.png" class="logoIcon" alt="eumaps.org" />
+          <span class="logoText">eumaps.org</span>
         </a>
-
-        <span class="tagline">
-          Türkiye'nin en büyük hesap-kitap platformu
-        </span>
+        <span class="tagline"> Türkiye'nin en büyük hesap-kitap platformu </span>
       </div>
     </div>
   </header>
@@ -48,10 +28,8 @@
     <nav class="breadcrumb" aria-label="Sayfa yolu">
       <a href="../index.html">Ana Sayfa</a>
       <span aria-hidden="true">›</span>
-
       <a href="../einstein.html">Einstein Hesaplamaları</a>
       <span aria-hidden="true">›</span>
-
       <span>Uzunluk Daralması</span>
     </nav>
 
@@ -78,10 +56,7 @@
       <div class="calculator-layout">
         <form id="lengthContractionForm" class="calculator-form" novalidate>
           <div class="form-group">
-            <label for="restLengthInput">
-              Cismin durgun uzunluğu
-            </label>
-
+            <label for="restLengthInput">Cismin durgun uzunluğu</label>
             <div class="input-wrapper">
               <input
                 type="number"
@@ -90,19 +65,14 @@
                 min="0.000000001"
                 step="any"
                 inputmode="decimal"
-                placeholder="Örnek: 100"
                 required
               />
-
               <span class="input-suffix">metre</span>
             </div>
           </div>
 
           <div class="form-group">
-            <label for="velocityInput">
-              Cismin hızı
-            </label>
-
+            <label for="velocityInput">Cismin hızı</label>
             <div class="input-wrapper">
               <input
                 type="number"
@@ -112,46 +82,22 @@
                 max="299792.457999"
                 step="any"
                 inputmode="decimal"
-                placeholder="Örnek: 200000"
-                required
-              />
+                required/>
 
               <span class="input-suffix">km/sn</span>
             </div>
           </div>
-
-          <div
-            id="formMessage"
-            class="form-message"
-            role="alert"
-            aria-live="assertive"
-          ></div>
-
+          <div id="formMessage" class="form-message" role="alert" aria-live="assertive"></div>
           <div class="button-group">
-            <button type="submit" class="primary-button">
-              Hesapla
-            </button>
-
-            <button type="button" id="clearBtn" class="secondary-button">
-              Temizle
-            </button>
+            <button type="submit" class="primary-button">Hesapla</button>
+            <button type="button" id="clearBtn" class="secondary-button">Temizle</button>
           </div>
         </form>
 
         <aside class="information-box">
-          <h2>Uzunluk daralması nedir?</h2>
-
-          <p>
-            Özel görelilik kuramına göre, bir cisim gözlemciye göre çok yüksek
-            hızla hareket ettiğinde hareket yönündeki uzunluğu daha kısa ölçülür.
-          </p>
-
           <div class="formula-box">
             <span>Formül</span>
-
-            <strong>
-              L = L₀ × √(1 − v² / c²)
-            </strong>
+            <strong>L = L₀ × √(1 − v² / c²)</strong>
           </div>
 
           <ul>

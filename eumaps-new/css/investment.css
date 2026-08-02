@@ -1,99 +1,4 @@
-:root {
-  --header-bg: #f5d042;
-  --dark-blue: #0a174e;
-  --green: #059669;
-  --green-dark: #047857;
-  --green-light: #d1fae5;
-  --page-bg: #ffffff;
-  --surface: #f4f7f5;
-  --text-main: #064e3b;
-  --text-muted: #52796f;
-  --border: #d1fae5;
-  --danger: #b91c1c;
-  --danger-bg: #fef2f2;
-  --shadow: 0 4px 10px rgba(6, 78, 59, 0.06);
-  --shadow-hover: 0 14px 28px rgba(5, 150, 105, 0.14);
-  --radius: 14px;
-}
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html {
-  scroll-behavior: smooth;
-}
-
-body {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: var(--page-bg);
-  color: var(--text-main);
-  font-family: "Inter", system-ui, sans-serif;
-  line-height: 1.5;
-}
-
-button,
-input {
-  font: inherit;
-}
-
-/* Header */
-
-.navbar {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  padding: 1rem 1.5rem;
-  color: var(--dark-blue);
-  background: var(--header-bg);
-  border-bottom: 1px solid rgba(10, 23, 78, 0.12);
-}
-
-.nav-container {
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.brand-box {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-}
-
-.logo-area {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  color: inherit;
-  text-decoration: none;
-  line-height: 1.1;
-}
-
-.logo-icon {
-  width: 36px;
-  border: 5px solid #ffffff;
-  border-radius: 6px;
-}
-
-.logo-text {
-  color: var(--dark-blue);
-  font-family: "Braah One", sans-serif;
-  font-size: 35px;
-}
-
-.tagline {
-  margin-top: 0.2rem;
-  font-family: "Pacifico", cursive;
-  font-size: 16px;
-  font-weight: 500;
-}
-
-/* Main page */
+/* Investment calculator page */
 
 .page-container {
   width: 100%;
@@ -105,6 +10,7 @@ input {
 .breadcrumb {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.55rem;
   margin-bottom: 1.25rem;
   color: var(--text-muted);
@@ -112,7 +18,7 @@ input {
 }
 
 .breadcrumb a {
-  color: var(--green-dark);
+  color: var(--primary-hover);
   font-weight: 600;
   text-decoration: none;
 }
@@ -159,8 +65,8 @@ input {
 }
 
 .calculator-heading h1 {
-  color: var(--dark-blue);
-  font-family: "Basic", sans-serif;
+  color: #0a174e;
+  font-family: "Basic", serif;
   font-size: clamp(1.55rem, 4vw, 2.1rem);
   line-height: 1.2;
 }
@@ -169,7 +75,7 @@ input {
   max-width: 760px;
   margin-top: 0.4rem;
   color: var(--text-muted);
-  font-family: "Nunito Sans", sans-serif;
+  font-family: "Nunito Sans", serif;
 }
 
 .calculator-layout {
@@ -179,7 +85,8 @@ input {
   padding: 1.5rem;
 }
 
-.investment-form {
+.investment-form,
+.information-box {
   padding: 1.5rem;
   background: #ffffff;
   border: 1px solid var(--border);
@@ -193,7 +100,7 @@ input {
 .form-group label {
   display: block;
   margin-bottom: 0.45rem;
-  color: var(--dark-blue);
+  color: #0a174e;
   font-weight: 700;
 }
 
@@ -205,12 +112,14 @@ input {
   width: 100%;
   min-height: 50px;
   padding: 0.8rem 5rem 0.8rem 0.9rem;
-  color: var(--dark-blue);
+  color: #0a174e;
   background: #ffffff;
   border: 1px solid #b7d8ca;
   border-radius: 9px;
   outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .input-wrapper input::placeholder {
@@ -218,12 +127,12 @@ input {
 }
 
 .input-wrapper input:focus {
-  border-color: var(--green);
-  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.13);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
 }
 
 .input-wrapper input.input-error {
-  border-color: var(--danger);
+  border-color: #b91c1c;
   box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.1);
 }
 
@@ -232,7 +141,7 @@ input {
   top: 50%;
   right: 0.9rem;
   transform: translateY(-50%);
-  color: var(--green-dark);
+  color: var(--primary-hover);
   font-size: 0.85rem;
   font-weight: 700;
   pointer-events: none;
@@ -249,8 +158,8 @@ input {
   display: none;
   margin-top: 1.25rem;
   padding: 0.8rem 0.9rem;
-  color: var(--danger);
-  background: var(--danger-bg);
+  color: #b91c1c;
+  background: #fef2f2;
   border: 1px solid #fecaca;
   border-radius: 8px;
   font-size: 0.875rem;
@@ -275,23 +184,25 @@ input {
   border-radius: 8px;
   cursor: pointer;
   font-weight: 700;
-  transition: transform 0.15s ease, background-color 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    background-color 0.15s ease;
 }
 
 .primary-button {
   color: #ffffff;
-  background: var(--green);
-  border: 1px solid var(--green);
+  background: var(--accent);
+  border: 1px solid var(--accent);
 }
 
 .primary-button:hover {
-  background: var(--green-dark);
-  border-color: var(--green-dark);
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
   transform: translateY(-1px);
 }
 
 .secondary-button {
-  color: var(--dark-blue);
+  color: #0a174e;
   background: #ffffff;
   border: 1px solid #b7d8ca;
 }
@@ -301,24 +212,22 @@ input {
   transform: translateY(-1px);
 }
 
+/* Information */
+
 .information-box {
   align-self: start;
-  padding: 1.5rem;
-  background: #ffffff;
-  border: 1px solid var(--border);
-  border-radius: 12px;
 }
 
 .information-box h2 {
   margin-bottom: 0.75rem;
-  color: var(--dark-blue);
-  font-family: "Basic", sans-serif;
+  color: #0a174e;
+  font-family: "Basic", serif;
   font-size: 1.25rem;
 }
 
 .information-box p {
   color: var(--text-muted);
-  font-family: "Nunito Sans", sans-serif;
+  font-family: "Nunito Sans", serif;
   font-size: 0.925rem;
 }
 
@@ -329,7 +238,7 @@ input {
   margin: 1rem 0;
   padding: 1rem;
   background: var(--surface);
-  border-left: 4px solid var(--green);
+  border-left: 4px solid var(--accent);
   border-radius: 8px;
 }
 
@@ -341,7 +250,7 @@ input {
 }
 
 .formula-box strong {
-  color: var(--dark-blue);
+  color: #0a174e;
   font-size: 0.9rem;
 }
 
@@ -370,7 +279,7 @@ input {
 .section-label {
   display: block;
   margin-bottom: 0.2rem;
-  color: var(--green-dark);
+  color: var(--primary-hover);
   font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -378,26 +287,26 @@ input {
 }
 
 .results-header h2 {
-  color: var(--dark-blue);
-  font-family: "Basic", sans-serif;
+  color: #0a174e;
+  font-family: "Basic", serif;
   font-size: 1.45rem;
 }
 
 .print-button {
   flex: 0 0 auto;
-  color: var(--green-dark);
+  color: var(--primary-hover);
   background: #ffffff;
-  border: 1px solid var(--green);
+  border: 1px solid var(--accent);
 }
 
 .print-button:hover {
   color: #ffffff;
-  background: var(--green);
+  background: var(--accent);
 }
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
   padding: 1.5rem;
 }
@@ -419,18 +328,18 @@ input {
 
 .summary-card strong {
   display: block;
-  color: var(--dark-blue);
+  color: #0a174e;
   font-size: 1.25rem;
   overflow-wrap: anywhere;
 }
 
 .summary-card.highlight {
-  background: var(--green-light);
+  background: #d1fae5;
   border-color: #6ee7b7;
 }
 
 .summary-card.highlight strong {
-  color: var(--green-dark);
+  color: var(--primary-hover);
 }
 
 .table-wrapper {
@@ -457,7 +366,7 @@ td:first-child {
 }
 
 th {
-  color: var(--dark-blue);
+  color: #0a174e;
   background: var(--surface);
   font-size: 0.82rem;
   white-space: nowrap;
@@ -473,20 +382,8 @@ tbody tr:hover {
 }
 
 td:last-child {
-  color: var(--green-dark);
+  color: var(--primary-hover);
   font-weight: 700;
-}
-
-/* Footer */
-
-footer {
-  margin-top: auto;
-  padding: 1.5rem;
-  color: var(--text-muted);
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  text-align: center;
-  font-size: 0.875rem;
 }
 
 /* Responsive */
@@ -502,18 +399,6 @@ footer {
 }
 
 @media (max-width: 680px) {
-  .navbar {
-    padding: 0.8rem 1rem;
-  }
-
-  .logo-text {
-    font-size: 29px;
-  }
-
-  .tagline {
-    font-size: 0.75rem;
-  }
-
   .page-container {
     padding: 1rem 0.75rem 3rem;
   }
@@ -571,6 +456,8 @@ footer {
     padding: 0 1rem 1rem;
   }
 }
+
+/* Printing */
 
 @media print {
   .navbar,
