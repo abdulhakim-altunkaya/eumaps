@@ -24,9 +24,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const brokerResult = document.getElementById("brokerResult");
   const grandTotalResult = document.getElementById("grandTotalResult");
 
-  const exchangeDollar = 46.72;
-  const exchangeEuro = 53.42;
-  const customsBrokerFee = 500;
+  const {
+    exchangeDollar,
+    exchangeEuro,
+    customsBrokerFee
+  } = window.GUMRUK_CONFIG;
 
   form.addEventListener("submit", calculateTax);
   clearBtn.addEventListener("click", clearForm);

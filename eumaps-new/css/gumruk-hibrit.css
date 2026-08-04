@@ -157,10 +157,6 @@ input {
   box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.1);
 }
 
-.full-width {
-  grid-column: 1 / -1;
-}
-
 .input-wrapper {
   position: relative;
 }
@@ -313,7 +309,6 @@ input {
   font-size: 0.85rem;
 }
 
-
 .vehicle-warning {
   color: #92400e;
   background: #fffbeb;
@@ -345,10 +340,6 @@ input {
 
   .form-grid {
     grid-template-columns: 1fr;
-  }
-
-  .full-width {
-    grid-column: auto;
   }
 
   .button-group {

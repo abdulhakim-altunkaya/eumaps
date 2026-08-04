@@ -3,6 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const vehicleConditionInputs = document.querySelectorAll(
     'input[name="vehicleCondition"]'
   );
+
   const calculationFields = document.getElementById("calculationFields");
   const clearBtn = document.getElementById("clearBtn");
   const formMessage = document.getElementById("formMessage");
@@ -13,7 +14,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const invoiceYearInput = document.getElementById("invoiceYear");
   const productionYearInput = document.getElementById("productionYear");
   const customsRegYearInput = document.getElementById("customsRegYear");
-  const engineCapacityInput = document.getElementById("engineCapacity");
+  const electricPowerInput = document.getElementById("electricPower");
+  const fuelEngineCapacityInput = document.getElementById(
+    "fuelEngineCapacity"
+  );
 
   const otvResult = document.getElementById("otvResult");
   const kdvResult = document.getElementById("kdvResult");
@@ -30,6 +34,7 @@ document.addEventListener("DOMContentLoaded", () => {
   } = window.GUMRUK_CONFIG;
 
   form.addEventListener("submit", calculateTax);
+  clearBtn.addEventListener("click", clearForm);
 
   vehicleConditionInputs.forEach((input) => {
     input.addEventListener("change", () => {
@@ -38,14 +43,13 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  clearBtn.addEventListener("click", clearForm);
-
   [
     invoiceAmountInput,
     invoiceYearInput,
     productionYearInput,
     customsRegYearInput,
-    engineCapacityInput
+    electricPowerInput,
+    fuelEngineCapacityInput
   ].forEach((input) => {
     input.addEventListener("input", () => {
       input.classList.remove("input-error");
@@ -58,6 +62,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     hideMessage();
     removeInputErrors();
+
     vehicleWarning.hidden = true;
     vehicleWarning.textContent = "";
 
@@ -83,7 +88,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const invoiceYear = Number(invoiceYearInput.value);
     const productionYear = Number(productionYearInput.value);
     const customsRegYear = Number(customsRegYearInput.value);
-    const engineCapacity = Number(engineCapacityInput.value);
+    const electricPower = Number(electricPowerInput.value);
+    const fuelEngineCapacity = Number(fuelEngineCapacityInput.value);
 
     if (
       invoiceAmountInput.value.trim() === "" ||
@@ -138,15 +144,33 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (
-      engineCapacityInput.value.trim() === "" ||
-      !Number.isFinite(engineCapacity) ||
-      engineCapacity < 100 ||
-      engineCapacity > 10000
+      electricPowerInput.value.trim() === "" ||
+      !Number.isFinite(electricPower) ||
+      electricPower < 10 ||
+      electricPower > 10000
     ) {
       setInputError(
-        engineCapacityInput,
-        "Motor hacmini 100 ile 10.000 cc arasında girin."
+        electricPowerInput,
+        "Elektrik motor gücünü 10 ile 10.000 kW arasında girin."
       );
+      return;
+    }
+
+    if (
+      fuelEngineCapacityInput.value.trim() === "" ||
+      !Number.isFinite(fuelEngineCapacity) ||
+      fuelEngineCapacity < 10 ||
+      fuelEngineCapacity > 10000
+    ) {
+      setInputError(
+        fuelEngineCapacityInput,
+        "Benzin/dizel motor hacmini 10 ile 10.000 cc arasında girin."
+      );
+      return;
+    }
+
+    if (invoiceYear < productionYear) {
+      showMessage("Fatura yılı, aracın üretim yılından önce olamaz.");
       return;
     }
 
@@ -160,9 +184,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let yearDifference = customsRegYear - invoiceYear;
 
     if (yearDifference < 0) {
-      showMessage(
-        "Türkiye'ye kayıt yılı, fatura yılından önce olamaz."
-      );
+      showMessage("Türkiye'ye kayıt yılı, fatura yılından önce olamaz.");
       return;
     }
 
@@ -213,14 +235,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const basePriceLira =
       basePrice * currencyRate;
 
-    const taxPercentage = getTaxPercentage(
-      engineCapacity,
+    const taxPercentage = getHybridTaxPercentage(
+      electricPower,
+      fuelEngineCapacity,
       basePriceLira
     );
 
-    if (taxPercentage === null) {
-      showMessage("Girilen değerler için ÖTV oranı belirlenemedi.");
-      return;
+    if (electricPower < 51) {
+      vehicleWarning.hidden = false;
+      vehicleWarning.textContent =
+        "Elektrik motoru 50 kW veya altında olan hibrit araç, benzinli/dizel araç oranlarıyla hesaplandı.";
     }
 
     const freightAmount =
@@ -252,8 +276,6 @@ document.addEventListener("DOMContentLoaded", () => {
       totalTax + customsBrokerFee;
 
     showResults({
-      depreciationPercentage,
-      basePrice,
       otvAmount,
       kdvAmount,
       freightAmount,
@@ -264,7 +286,59 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  function getTaxPercentage(engineCapacity, basePriceLira) {
+  function getHybridTaxPercentage(
+    electricPower,
+    fuelEngineCapacity,
+    basePriceLira
+  ) {
+    if (electricPower < 51) {
+      return getFuelTaxPercentage(
+        fuelEngineCapacity,
+        basePriceLira
+      );
+    }
+
+    if (
+      fuelEngineCapacity < 1801 &&
+      basePriceLira < 1250001
+    ) {
+      return 0.7;
+    }
+
+    if (fuelEngineCapacity < 1801) {
+      return 0.8;
+    }
+
+    if (
+      electricPower <= 100 &&
+      fuelEngineCapacity < 2501 &&
+      basePriceLira < 1650001
+    ) {
+      return 1.5;
+    }
+
+    if (
+      electricPower > 100 &&
+      fuelEngineCapacity < 2501 &&
+      basePriceLira < 1650001
+    ) {
+      return 1.5;
+    }
+
+    if (
+      electricPower > 100 &&
+      fuelEngineCapacity < 2501
+    ) {
+      return 1.7;
+    }
+
+    return 2.2;
+  }
+
+  function getFuelTaxPercentage(
+    engineCapacity,
+    basePriceLira
+  ) {
     if (engineCapacity < 1401 && basePriceLira < 650001) {
       return 0.7;
     }
@@ -305,11 +379,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return 1.7;
     }
 
-    if (engineCapacity > 2000) {
-      return 2.2;
-    }
-
-    return null;
+    return 2.2;
   }
 
   function showResults(result) {
@@ -344,10 +414,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function clearForm() {
     form.reset();
+
     calculationFields.hidden = true;
     resultSection.hidden = true;
     vehicleWarning.hidden = true;
     vehicleWarning.textContent = "";
+
     otvResult.textContent = "0";
     kdvResult.textContent = "0";
     freightResult.textContent = "0";
@@ -389,7 +461,8 @@ document.addEventListener("DOMContentLoaded", () => {
       invoiceYearInput,
       productionYearInput,
       customsRegYearInput,
-      engineCapacityInput
+      electricPowerInput,
+      fuelEngineCapacityInput
     ].forEach((input) => {
       input.classList.remove("input-error");
     });

@@ -294,7 +294,6 @@ input {
   font-weight: 800;
 }
 
-.result-note,
 .vehicle-warning {
   margin: 1.25rem;
   padding: 1rem;
@@ -302,19 +301,6 @@ input {
   font-size: 0.85rem;
 }
 
-.result-note {
-  color: var(--text-muted);
-  background: var(--surface);
-  border: 1px solid var(--border);
-}
-
-.result-note strong {
-  color: #0a174e;
-}
-
-.result-note p {
-  display: inline;
-}
 
 .vehicle-warning {
   color: #92400e;
@@ -369,7 +355,6 @@ input {
     text-align: left;
   }
 
-  .result-note,
   .vehicle-warning {
     margin: 1rem;
   }

@@ -122,6 +122,29 @@ input {
   text-decoration: underline;
 }
 
+.eligibility-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  padding: 0.9rem;
+  color: #0a174e;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.eligibility-option input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  margin-top: 0.1rem;
+  accent-color: var(--accent);
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -313,7 +336,6 @@ input {
   font-size: 0.85rem;
 }
 
-
 .vehicle-warning {
   color: #92400e;
   background: #fffbeb;
@@ -341,6 +363,11 @@ input {
 
   .radio-option {
     font-size: 0.85rem;
+  }
+
+  .eligibility-option {
+    padding: 0.75rem;
+    font-size: 0.82rem;
   }
 
   .form-grid {
