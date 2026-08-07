@@ -1,5 +1,5 @@
 window.GUMRUK_CONFIG = {
-  exchangeDollar: 46.72,
-  exchangeEuro: 53.42,
+  exchangeDollar: 47.57,
+  exchangeEuro: 54.84,
   customsBrokerFee: 500
 };
