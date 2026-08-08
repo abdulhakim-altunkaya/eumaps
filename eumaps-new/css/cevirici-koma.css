@@ -1,0 +1,280 @@
+button,
+input {
+  font: inherit;
+}
+
+.page-container {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.breadcrumb a {
+  color: var(--primary-hover);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.converter-section {
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.converter-heading {
+  padding: 1.4rem;
+  background: #ffffff;
+  border-bottom: 1px solid var(--border);
+}
+
+.converter-heading h1 {
+  color: #0a174e;
+  font-family: "Basic", sans-serif;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  line-height: 1.2;
+}
+
+.converter-heading p {
+  margin-top: 0.4rem;
+  color: var(--text-muted);
+  font-family: "Nunito Sans", sans-serif;
+}
+
+.converter-content {
+  padding: 1.25rem;
+}
+
+.converter-form {
+  max-width: 650px;
+  padding: 1.25rem;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.form-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.form-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.form-group input {
+  width: 300px;
+  min-height: 46px;
+  padding: 0.7rem 0.85rem;
+  color: #0a174e;
+  background: #ffffff;
+  border: 1px solid #b7d8ca;
+  border-radius: 8px;
+  outline: none;
+}
+
+.form-group input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
+}
+
+.form-group input.input-error {
+  border-color: #b91c1c;
+  box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.1);
+}
+
+.form-group input.result-input {
+  background: var(--surface);
+  font-weight: 700;
+}
+
+.form-group label {
+  min-width: 190px;
+  color: #0a174e;
+  font-weight: 700;
+}
+
+.result-list {
+  margin-top: 1.2rem;
+  border-top: 1px solid var(--border);
+}
+
+.result-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.result-row span {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.result-row strong {
+  color: #0a174e;
+  text-align: right;
+}
+
+.form-message {
+  display: none;
+  margin-top: 1rem;
+  padding: 0.8rem;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.form-message.visible {
+  display: block;
+}
+
+.button-group {
+  display: flex;
+  margin-top: 1.2rem;
+}
+
+.secondary-button {
+  min-height: 42px;
+  padding: 0.65rem 1.2rem;
+  color: #0a174e;
+  background: #ffffff;
+  border: 1px solid #b7d8ca;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.secondary-button:hover {
+  background: var(--surface);
+}
+
+.glasgow-note {
+  margin-top: 1.25rem;
+  padding: 1.4rem;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.glasgow-note h2 {
+  margin-bottom: 0.8rem;
+  color: #0a174e;
+  font-family: "Basic", sans-serif;
+  font-size: 1.25rem;
+}
+
+.glasgow-note p {
+  color: var(--text-muted);
+  font-family: "Nunito Sans", sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.65;
+}
+
+.glasgow-note p + p {
+  margin-top: 0.9rem;
+}
+
+@media (max-width: 680px) {
+  .page-container {
+    padding: 1rem 0.75rem 3rem;
+  }
+
+  .breadcrumb {
+    gap: 0.3rem;
+    margin-bottom: 0.8rem;
+    font-size: 0.76rem;
+  }
+
+  .converter-heading,
+  .converter-content,
+  .converter-form {
+    padding: 0.9rem;
+  }
+
+  .converter-heading h1 {
+    font-size: 1.25rem;
+  }
+
+  .converter-heading p {
+    margin-top: 0.25rem;
+    font-size: 0.8rem;
+    line-height: 1.35;
+  }
+
+  .form-list {
+    gap: 0.55rem;
+  }
+
+  .form-group {
+    gap: 0.65rem;
+  }
+
+  .form-group input {
+    width: 48%;
+    min-height: 40px;
+    padding: 0.55rem 0.65rem;
+    font-size: 0.83rem;
+  }
+
+  .form-group label {
+    min-width: 0;
+    flex: 1;
+    font-size: 0.77rem;
+    line-height: 1.2;
+  }
+
+  .result-row {
+    gap: 0.5rem;
+    padding: 0.7rem 0;
+  }
+
+  .result-row span,
+  .result-row strong {
+    font-size: 0.78rem;
+  }
+
+  .secondary-button {
+    min-height: 38px;
+    padding: 0.55rem 1rem;
+    font-size: 0.82rem;
+  }
+
+  .glasgow-note {
+    margin-top: 0.9rem;
+    padding: 1rem;
+  }
+
+  .glasgow-note h2 {
+    font-size: 1.05rem;
+  }
+
+  .glasgow-note p {
+    font-size: 0.8rem;
+    line-height: 1.5;
+  }
+}

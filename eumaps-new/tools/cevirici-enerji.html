@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enerji Birimleri Çevirici - eumaps.org</title>
+  <meta name="description" content="Joule, kilojoule, kalori, kilokalori, watt-saat, kilowatt-saat ve elektronvolt birimleri arasında dönüşüm yapın.">
+  <link rel="icon" href="../icons/icon1.png" type="image/png">
+  <link rel="stylesheet" href="../css/index.css">
+  <link rel="stylesheet" href="../css/cevirici-enerji.css">
+</head>
+<body>
+
+<header class="navbar">
+  <div class="nav-container">
+    <div class="brand-box">
+      <a href="../index.html" class="logoArea">
+        <img src="../icons/icon1.png" class="logoIcon" alt="eumaps.org">
+        <span class="logoText">eumaps.org</span>
+      </a>
+      <span class="tagline">Hesap-kitap platformu</span>
+    </div>
+  </div>
+</header>
+
+<main class="page-container">
+  <nav class="breadcrumb" aria-label="Sayfa yolu">
+    <a href="../index.html">Ana Sayfa</a>
+    <span aria-hidden="true">›</span>
+    <a href="../cevirici.html">Birim Çevirici</a>
+    <span aria-hidden="true">›</span>
+    <span>Enerji</span>
+  </nav>
+
+  <section class="converter-section">
+    <div class="converter-heading">
+      <h1>Enerji Birimleri Çevirici</h1>
+    </div>
+
+    <div class="converter-content">
+      <form id="energyConverterForm" class="converter-form">
+        <div class="form-list">
+          <div class="form-group">
+            <input type="number" class="inputFields" id="joule" name="joule" min="0" max="1000000000" step="any" inputmode="decimal">
+            <label for="joule">Joule (J)</label>
+          </div>
+          <div class="form-group">
+            <input type="number" class="inputFields" id="kilojoule" name="kilojoule" min="0" max="1000000000" step="any" inputmode="decimal">
+            <label for="kilojoule">Kilojoule (kJ)</label>
+          </div>
+          <div class="form-group">
+            <input type="number" class="inputFields" id="calorie" name="calorie" min="0" max="1000000000" step="any" inputmode="decimal">
+            <label for="calorie">Kalori (cal)</label>
+          </div>
+          <div class="form-group">
+            <input type="number" class="inputFields" id="kilocalorie" name="kilocalorie" min="0" max="1000000000" step="any" inputmode="decimal">
+            <label for="kilocalorie">Kilokalori (kcal)</label>
+          </div>
+          <div class="form-group">
+            <input type="number" class="inputFields" id="wattHour" name="wattHour" min="0" max="1000000000" step="any" inputmode="decimal">
+            <label for="wattHour">Watt-saat (Wh)</label>
+          </div>
+          <div class="form-group">
+            <input type="number" class="inputFields" id="kilowattHour" name="kilowattHour" min="0" max="1000000000" step="any" inputmode="decimal">
+            <label for="kilowattHour">Kilowatt-saat (kWh)</label>
+          </div>
+          <div class="form-group">
+            <input type="number" class="inputFields" id="electronvolt" name="electronvolt" min="0" max="1000000000" step="any" inputmode="decimal">
+            <label for="electronvolt">Elektronvolt (eV)</label>
+          </div>
+        </div>
+
+        <div id="formMessage" class="form-message" role="alert" aria-live="assertive"></div>
+
+        <div class="button-group">
+          <button type="button" id="clearBtn" class="secondary-button">Temizle</button>
+        </div>
+      </form>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>© 2020-2026 <strong>eumaps.org</strong></p>
+</footer>
+
+<script src="../js/cevirici-enerji.js"></script>
+</body>
+</html>
