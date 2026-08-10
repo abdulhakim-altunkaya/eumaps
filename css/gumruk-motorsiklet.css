@@ -331,15 +331,15 @@ input {
   }
 
   .option-group {
-    gap: 0.55rem 0.75rem;
+    gap: 0.50rem 0.70rem;
   }
 
   .option-title {
-    font-size: 0.88rem;
+    font-size: 0.84rem;
   }
 
   .radio-option {
-    font-size: 0.85rem;
+    font-size: 0.83rem;
   }
 
   .form-grid {
