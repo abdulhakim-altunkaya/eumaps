@@ -1,0 +1,73 @@
+ <!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zaman Birimleri Çevirici - eumaps.org</title>
+  <meta name="description" content="Nanosaniye, mikrosaniye, milisaniye, saniye, dakika, saat, gün, hafta, ay, yıl ve diğer zaman birimleri arasında dönüşüm yapın.">
+  <link rel="icon" href="../icons/icon1.png" type="image/png">
+  <link rel="stylesheet" href="../css/index.css">
+  <link rel="stylesheet" href="../css/cevirici-zaman.css">
+</head>
+<body>
+<header class="navbar">
+  <div class="nav-container">
+    <div class="brand-box">
+      <a href="../index.html" class="logoArea">
+        <img src="../icons/icon1.png" class="logoIcon" alt="eumaps.org">
+        <span class="logoText">eumaps.org</span>
+      </a>
+      <span class="tagline">Hesap-kitap platformu</span>
+    </div>
+  </div>
+</header>
+
+<main class="page-container">
+  <nav class="breadcrumb" aria-label="Sayfa yolu">
+    <a href="../index.html">Ana Sayfa</a>
+    <span>›</span>
+    <a href="../cevirici.html">Birim Çevirici</a>
+    <span>›</span>
+    <span>Zaman</span>
+  </nav>
+
+  <section class="converter-section">
+    <div class="converter-heading">
+      <h1>Zaman Birimleri Çevirici</h1>
+    </div>
+
+    <div class="converter-content">
+      <form id="timeConverterForm" class="converter-form">
+        <div class="form-list">
+          <div class="form-group"><input type="number" class="inputFields" id="nanosecond" name="nanosecond" min="0" max="1000000000" step="any"><label for="nanosecond">Nanosaniye (ns)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="microsecond" name="microsecond" min="0" max="1000000000" step="any"><label for="microsecond">Mikrosaniye (µs)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="millisecond" name="millisecond" min="0" max="1000000000" step="any"><label for="millisecond">Milisaniye (ms)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="second" name="second" min="0" max="1000000000" step="any"><label for="second">Saniye (s)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="minute" name="minute" min="0" max="1000000000" step="any"><label for="minute">Dakika (dk)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="hour" name="hour" min="0" max="1000000000" step="any"><label for="hour">Saat</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="day" name="day" min="0" max="1000000000" step="any"><label for="day">Gün</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="week" name="week" min="0" max="1000000000" step="any"><label for="week">Hafta</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="month" name="month" min="0" max="1000000000" step="any"><label for="month">Ay</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="year" name="year" min="0" max="1000000000" step="any"><label for="year">Yıl</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="decade" name="decade" min="0" max="1000000000" step="any"><label for="decade">On Yıl</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="century" name="century" min="0" max="1000000000" step="any"><label for="century">Yüzyıl</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="julianYear" name="julianYear" min="0" max="1000000000" step="any"><label for="julianYear">Jülyen Yılı</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="siderealYear" name="siderealYear" min="0" max="1000000000" step="any"><label for="siderealYear">Yıldız Yılı</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="planckTime" name="planckTime" min="0" max="1000000000" step="any"><label for="planckTime">Planck Zamanı</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="fortnight" name="fortnight" min="0" max="1000000000" step="any"><label for="fortnight">İki Hafta (Fortnight)</label></div>
+        </div>
+
+        <div id="formMessage" class="form-message" role="alert" aria-live="assertive"></div>
+
+        <div class="button-group">
+          <button type="button" id="clearBtn" class="secondary-button">Temizle</button>
+        </div>
+      </form>
+    </div>
+  </section>
+</main>
+
+<footer><p>© 2020-2026 <strong>eumaps.org</strong></p></footer>
+<script src="../js/cevirici-zaman.js"></script>
+</body>
+</html>

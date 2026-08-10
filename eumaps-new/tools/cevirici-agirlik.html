@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Veri Depolama Birimleri Çevirici - eumaps.org</title>
-  <meta name="description" content="Bit, byte, kilobyte, megabyte, gigabyte, terabyte, petabyte ve diğer veri depolama birimleri arasında dönüşüm yapın.">
+  <title>Ağırlık Birimleri Çevirici - eumaps.org</title>
+  <meta name="description" content="Miligram, gram, kilogram, ton, megaton, gigaton, pound, ounce ve karat arasında dönüşüm yapın.">
   <link rel="icon" href="../icons/icon1.png" type="image/png">
   <link rel="stylesheet" href="../css/index.css">
-  <link rel="stylesheet" href="../css/cevirici-veri.css">
+  <link rel="stylesheet" href="../css/cevirici-agirlik.css">
 </head>
 <body>
 
@@ -24,73 +24,32 @@
 </header>
 
 <main class="page-container">
-
   <nav class="breadcrumb" aria-label="Sayfa yolu">
     <a href="../index.html">Ana Sayfa</a>
-    <span aria-hidden="true">›</span>
+    <span>›</span>
     <a href="../cevirici.html">Birim Çevirici</a>
-    <span aria-hidden="true">›</span>
-    <span>Veri Depolama</span>
+    <span>›</span>
+    <span>Ağırlık</span>
   </nav>
 
   <section class="converter-section">
     <div class="converter-heading">
-      <h1>Veri Depolama Birimleri Çevirici</h1>
+      <h1>Ağırlık Birimleri Çevirici</h1>
     </div>
 
     <div class="converter-content">
-      <form id="dataStorageConverterForm" class="converter-form">
-
+      <form id="massConverterForm" class="converter-form">
         <div class="form-list">
-          <div class="form-group">
-            <input type="number" class="inputFields" id="bit" name="bit" min="0" max="1000000000" step="any" inputmode="decimal">
-            <label for="bit">Bit</label>
-          </div>
-
-          <div class="form-group">
-            <input type="number" class="inputFields" id="byte" name="byte" min="0" max="1000000000" step="any" inputmode="decimal">
-            <label for="byte">Byte</label>
-          </div>
-
-          <div class="form-group">
-            <input type="number" class="inputFields" id="kilobyte" name="kilobyte" min="0" max="1000000000" step="any" inputmode="decimal">
-            <label for="kilobyte">Kilobyte (KB)</label>
-          </div>
-
-          <div class="form-group">
-            <input type="number" class="inputFields" id="megabyte" name="megabyte" min="0" max="1000000000" step="any" inputmode="decimal">
-            <label for="megabyte">Megabyte (MB)</label>
-          </div>
-
-          <div class="form-group">
-            <input type="number" class="inputFields" id="gigabyte" name="gigabyte" min="0" max="1000000000" step="any" inputmode="decimal">
-            <label for="gigabyte">Gigabyte (GB)</label>
-          </div>
-
-          <div class="form-group">
-            <input type="number" class="inputFields" id="terabyte" name="terabyte" min="0" max="1000000000" step="any" inputmode="decimal">
-            <label for="terabyte">Terabyte (TB)</label>
-          </div>
-
-          <div class="form-group">
-            <input type="number" class="inputFields" id="petabyte" name="petabyte" min="0" max="1000000000" step="any" inputmode="decimal">
-            <label for="petabyte">Petabyte (PB)</label>
-          </div>
-
-          <div class="form-group">
-            <input type="number" class="inputFields" id="exabyte" name="exabyte" min="0" max="1000000000" step="any" inputmode="decimal">
-            <label for="exabyte">Exabyte (EB)</label>
-          </div>
-
-          <div class="form-group">
-            <input type="number" class="inputFields" id="zettabyte" name="zettabyte" min="0" max="1000000000" step="any" inputmode="decimal">
-            <label for="zettabyte">Zettabyte (ZB)</label>
-          </div>
-
-          <div class="form-group">
-            <input type="number" class="inputFields" id="yottabyte" name="yottabyte" min="0" max="1000000000" step="any" inputmode="decimal">
-            <label for="yottabyte">Yottabyte (YB)</label>
-          </div>
+          <div class="form-group"><input type="number" class="inputFields" id="milligram" name="milligram" min="0" max="1000000000" step="any"><label for="milligram">Miligram (mg)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="gram" name="gram" min="0" max="1000000000" step="any"><label for="gram">Gram (g)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="kilogram" name="kilogram" min="0" max="1000000000" step="any"><label for="kilogram">Kilogram (kg)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="ton" name="ton" min="0" max="1000000000" step="any"><label for="ton">Metrik Ton (t)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="megaton" name="megaton" min="0" max="1000000000" step="any"><label for="megaton">Megaton (Mt)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="gigaton" name="gigaton" min="0" max="1000000000" step="any"><label for="gigaton">Gigaton (Gt)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="uston" name="uston" min="0" max="1000000000" step="any"><label for="uston">ABD Tonu (Short Ton)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="pound" name="pound" min="0" max="1000000000" step="any"><label for="pound">Pound (lb)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="ounce" name="ounce" min="0" max="1000000000" step="any"><label for="ounce">Ons (oz)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="carat" name="carat" min="0" max="1000000000" step="any"><label for="carat">Karat (ct)</label></div>
         </div>
 
         <div id="formMessage" class="form-message" role="alert" aria-live="assertive"></div>
@@ -98,17 +57,15 @@
         <div class="button-group">
           <button type="button" id="clearBtn" class="secondary-button">Temizle</button>
         </div>
-
       </form>
     </div>
   </section>
-
 </main>
 
 <footer>
   <p>© 2020-2026 <strong>eumaps.org</strong></p>
 </footer>
 
-<script src="../js/cevirici-veri.js"></script>
+<script src="../js/cevirici-agirlik.js"></script>
 </body>
 </html>
