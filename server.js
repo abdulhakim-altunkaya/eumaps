@@ -124,7 +124,7 @@ app.use('/api/post/filebeef/payments/webhook', express.raw({ type: 'application/
 app.use(express.json());
 
 //Then go to server.js file and make sure you serve static files from build directory:
-app.use(express.static(path.join(__dirname, 'client/build')));
+app.use(express.static(__dirname));
 //For serving from build directory, you need to install path package and initiate it:
 
 
@@ -1538,7 +1538,7 @@ app.post("/api/kac-milyon/save-reply", async (req, res) => {
 //This piece of code must be under all routes. Otherwise you will have issues like not being able to 
 //fetch comments etc. This code helps with managing routes that are not defined on react frontend.
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 const PORT = process.env.port || 5000;
@@ -1554,10 +1554,4 @@ app.listen(PORT, () => {
 //You can remove cors before production
 //Fix server api routes before production, remove "localhost" part
 //add environment variables
-/*Also add this otherwise only index route will be visible when you deploy app to production
 
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
-});
-
-*/
