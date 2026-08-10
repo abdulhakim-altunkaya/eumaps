@@ -1,0 +1,87 @@
+
+@media (min-width: 781px) {
+    .districtAnnualTableArea {
+        width: 30%;
+        margin-left: 65px;
+        font-family: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+    }
+        
+    .district-annual-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.14);
+    }
+
+    /* Header */
+    .district-annual-table thead th {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 2px solid #e6e6e6;
+      font-weight: 600;
+      background: linear-gradient(180deg,#b2e3c8,#7ab68b);
+      font-weight: bold;
+    }
+
+    /* Body rows */
+    .district-annual-table tbody td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    /* Zebra striping */
+    .district-annual-table tbody tr:nth-child(odd) {
+      background: #ffffff;
+    }
+    .district-annual-table tbody tr:nth-child(even) {
+      background: #f5f5d5;
+    }
+    .district-annual-table tbody tr:hover {
+      cursor: pointer;
+      background-color: lightsteelblue;
+    }
+}
+ 
+    
+@media (max-width: 780px) {
+    .districtAnnualTableArea {
+        width: 250px;
+        margin-left: 20px;
+        font-family: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+    }
+        
+    .district-annual-table {
+      width: 100%;
+      border: 1px solid white;
+      background: #fff;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.14);
+    }
+
+    /* Header */
+    .district-annual-table thead th {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 2px solid #e6e6e6;
+      font-weight: 600;
+      background: linear-gradient(180deg,#b2e3c8,#7ab68b);
+      font-weight: bold;
+    }
+
+    /* Body rows */
+    .district-annual-table tbody td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    /* Zebra striping */
+    .district-annual-table tbody tr:nth-child(odd) {
+      background: #ffffff;
+    }
+    .district-annual-table tbody tr:nth-child(even) {
+      background: #f5f5d5;
+    }
+    .district-annual-table tbody tr:hover {
+      cursor: pointer;
+      background-color: lightsteelblue;
+    }
+}

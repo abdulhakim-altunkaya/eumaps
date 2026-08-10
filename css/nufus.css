@@ -1,0 +1,138 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@200;300;400;500;600;700&family=Paytone+One&display=swap');
+.page-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: auto;
+  padding: 1.5rem 1rem 4rem;
+}
+ 
+.breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.breadcrumb a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.breadcrumb a:hover {
+  text-decoration: underline;
+}
+.map-container {
+  width: 100%;
+  margin: 0 auto 30px;
+  text-align: center;
+}
+
+.map-container h1 {
+  margin: 10px 0 25px;
+  font-family: "Paytone One", sans-serif;
+  font-size: 30px;
+  font-weight: 400;
+  color: var(--dark-blue);
+}
+ 
+#svg-display {
+  display: block;
+  width: 100%;
+  max-width: 1000px;
+  height: auto;
+  margin: 0 auto;
+}
+
+.map-container h2 {
+  width: fit-content;
+  min-width: 180px;
+  margin: 20px auto 0;
+  padding: 8px 20px;
+  border-radius: 8px;
+  background-color: #FCF951;
+  color: #422057;
+  font-family: "Paytone One", sans-serif;
+  font-size: 24px;
+  font-weight: 400;
+}
+
+.mainTable {
+  width: 100%;
+  margin: 0 auto 40px;
+  font-family: "Nunito", sans-serif;
+}
+
+.homepage-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.homepage-table th,
+.homepage-table td {
+  padding: 10px 12px;
+  text-align: center;
+}
+
+.homepage-table th {
+  font-weight: 700;
+}
+
+.homepage-table a {
+  text-decoration: none;
+}
+
+.countyCell {
+  text-align: left;
+}
+
+.countryRow {
+  font-weight: 600;
+}
+
+.countryRow a {
+  color: var(--green-dark);
+}
+
+@media (max-width: 780px) {
+  .map-container {
+    width: 100%;
+    margin-bottom: 20px;
+  }
+
+  .map-container h1 {
+    margin: 5px 0 15px;
+    padding: 5px;
+    font-size: 20px;
+  }
+
+  #svg-display {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .map-container h2 {
+    min-width: 140px;
+    margin-top: 12px;
+    padding: 5px 14px;
+    border-radius: 5px;
+    font-size: 16px;
+  }
+
+  .mainTable {
+    width: 100%;
+    overflow-x: auto;
+    font-size: 13px;
+  }
+
+  .homepage-table {
+    min-width: 650px;
+  }
+
+  .homepage-table th,
+  .homepage-table td {
+    padding: 8px 7px;
+  }
+}

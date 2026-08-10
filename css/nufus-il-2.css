@@ -1,0 +1,66 @@
+@media (min-width: 781px) { 
+    .provinceOriginsTableArea {
+        width: 30%;
+        margin-left: 65px;
+        font-family: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+    }
+    .province-origins-table { 
+      width: 100%;
+      border:3px solid white;
+      background: #fff;
+    }
+
+    /* Header */
+    .province-origins-table thead th {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 2px solid #e6e6e6;
+      font-weight: 600;
+      background: #02343F;
+      color:#F0EDCC;
+      font-weight: bold;
+    }
+
+    /* Body rows */
+    .province-origins-table tbody td {
+      padding: 10px 12px;
+      border-bottom: 1px solid white;
+    }
+    .province-origins-table tbody tr {
+      background-color: #F0EDCC;
+      color: #02343F;
+    }
+}
+@media (max-width: 780px) {
+.provinceOriginsTableArea {
+    width: 98%;
+    font-family: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+}
+
+.province-origins-table { 
+  width: 100%;
+  border: 3px solid white;
+  font-size: 14px;
+}
+
+/* Header */
+.province-origins-table thead th {
+  text-align: left;
+  padding: 5px 6px;
+  background: #02343F;
+  color:#F0EDCC;
+  font-weight: bold;
+}
+
+/* Body rows */
+.province-origins-table tbody td {
+  padding: 5px 6px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.province-origins-table tbody tr {
+    color: #02343F;
+    background:#F0EDCC;
+}
+
+}
