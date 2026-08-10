@@ -1,0 +1,258 @@
+@import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,100..700;1,100..700&family=Kanit:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playwrite+HU:wght@100..400&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Edu+AU+VIC+WA+NT+Hand:wght@400..700&family=Playwrite+HU:wght@100..400&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nerko+One&display=swap'); /* Nerko One*/
+@import url('https://fonts.googleapis.com/css2?family=Acme&family=Lobster&family=Nerko+One&display=swap'); /*Acme Lobster Nerko One*/
+@import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap'); /*Fredoka One*/
+@import url('https://fonts.googleapis.com/css2?family=Courgette&display=swap'); /*Courgette*/
+@import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@300&display=swap');/*Comfortaa*/
+@import url('https://fonts.googleapis.com/css2?family=Concert+One&family=Righteous&display=swap');/*Concert One*/
+@import url('https://fonts.googleapis.com/css2?family=Righteous&display=swap');/*Righteous*/
+@import url('https://fonts.googleapis.com/css2?family=Concert+One&family=Monda:wght@700&family=Righteous&display=swap');/*Monda*/
+@import url('https://fonts.googleapis.com/css2?family=Maven+Pro&display=swap');/*Maven Pro*/
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@200&display=swap'); /*Nunito*/
+@import url('https://fonts.googleapis.com/css2?family=Honk:MORF@16&family=Paytone+One&display=swap');/*Paytone One*/
+@import url('https://fonts.googleapis.com/css2?family=Bungee+Tint&display=swap');/*Bungee Tint*/
+@import url('https://fonts.googleapis.com/css2?family=Style+Script&display=swap'); /*Style Script*/
+@import url('https://fonts.googleapis.com/css2?family=Agbalumo&display=swap'); /*Agbalumo*/
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Baumans&display=swap');/*Baumans*/
+@import url('https://fonts.googleapis.com/css2?family=Audiowide&display=swap');/*Audiowide*/
+@import url('https://fonts.googleapis.com/css2?family=Tourney:ital,wght@0,100..900;1,100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Pattaya&display=swap');
+/*Nunito Maven Pro Righteous Monda Concert One Courgette Fredoka One Lobster Nerko One Poppins Playwrite HU Audiowide
+Baumans*/
+/*Agbalumo     Style Script     Bungee Tint     Paytone One     Nunito  DM Sans      Plus Jakarta    Manrope   Pattaya*/
+
+@import url('https://fonts.googleapis.com/css2?family=Audiowide&family=Braah+One&family=Fascinate+Inline&family=Pacifico&family=Praise&family=Sacramento&family=Vast+Shadow&family=Zen+Dots&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Basic&family=Blinker:wght@100;200;300;400;600;700;800;900&family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Outfit:wght@100..900&display=swap');
+/*
+Zen Dots
+Sacramento
+Fascinate Inline
+Praise
+Pacifico
+Audiowide
+Vast Shadow
+Braah One
+Blinker
+Nunito Sans
+Basic
+Inter
+Outfit
+*/
+:root {
+  --primary: #F0EDCC;         /* Vibrant Emerald Green */
+  --primary-hover: #047857;   /* Darker Green for hover states */
+  --accent: #10b981;          /* Bright Green accent */
+  --icon-bg: #f4f7f5;          
+  --bg: white;             /* Subtle warm green-tinted grey background */
+  --surface: #f4f7f5; 
+  --text-main: #064e3b;       /* Deep forest green for main text */
+  --text-muted: #52796f;     /* Soft slate green for descriptions */
+  --border: #d1fae5;         /* Soft mint green border */
+  --shadow: 0 4px 6px -1px rgba(5, 150, 105, 0.04), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+  --shadow-hover: 0 12px 20px -3px rgba(5, 150, 105, 0.15), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+  --radius: 14px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: var(--bg);
+  color: var(--text-main);
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* --- Header / Nav --- */
+.navbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 1rem 1.5rem;
+  background-color: #F5D042;
+  color:#0A174E;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.nav-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+.brand-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* Custom Logo Styling */
+.logoArea {
+  font-weight: 800;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+.logoIcon {
+  border: 5px solid white;
+  width: 36px;
+  border-radius: 6px;
+}
+.logoText {
+  font-family: "Braah One", serif;
+  font-size: 35px;
+  color:#0A174E;
+}
+.tagline {
+  font-family: "Pacifico", serif;
+  font-size: 16px;
+  font-weight: 500;
+  margin-top: 0.2rem;
+}
+
+/* --- Container & Card Grid --- */
+.container {
+  max-width: 1200px;
+  width: 100%;
+  margin: 2rem auto 4rem;
+  padding: 0 1rem;
+}
+
+/* Grid layout defaulting to multi-column */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+}
+
+/* --- Card Styling --- */
+.card {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem 1.25rem;
+  text-decoration: none;
+  color: inherit;
+  box-shadow: var(--shadow);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-hover);
+  border-color: var(--accent);
+}
+
+.card-icon {
+  color: var(--primary);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 1rem;
+}
+
+.card-icon img {
+  width: 45px;
+  border-radius: 4px;
+}
+.card-icon span {
+  color: #0A174E;
+  font-family:"Basic", serif; 
+  font-weight: bold;
+  font-size: 20px;
+}
+
+.card:hover .card-icon {
+  color: #ffffff;
+}
+
+.card h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.card p {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  font-family: "Nunito Sans", serif;
+  font-style: italic;
+}
+
+/* --- Footer --- */
+footer {
+  margin-top: auto;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  text-align: center;
+  padding: 1.5rem;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+/* --- Responsive Layout Adjustments --- */
+
+/* Medium Screens (Tablets / Laptops) */
+@media (max-width: 1024px) {
+  .card-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Small / Mobile Screens: Fits exactly 2 cards per row */
+@media (max-width: 680px) {
+  .hero h1 {
+    font-size: 1.75rem;
+  }
+
+  .tagline {
+    font-size: 0.75rem; /* Scaled slightly for smaller screens while keeping it visible */
+  }
+
+  .card-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem; /* Smaller gap on mobile screens */
+  }
+
+  .card {
+    padding: 1.1rem 0.9rem; /* Slightly tighter padding for small screens */
+  }
+
+  .card-icon {
+    width: 38px;
+    height: 38px;
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .card h3 {
+    font-size: 1rem;
+  }
+
+  .card p {
+    font-size: 0.8rem;
+  }
+}

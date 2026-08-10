@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ağrı Karşılaştırma Aracı - eumaps.org</title>
+  <meta name="description" content="Farklı ağrı giderme yöntemlerini ve ölçü birimlerini tek sayfada karşılaştırmak için bilgi aracı.">
+  <link rel="icon" href="../icons/icon1.png" type="image/png">
+  <link rel="stylesheet" href="../css/index.css">
+  <link rel="stylesheet" href="../css/cevirici-agri.css">
+</head>
+<body>
+
+<header class="navbar">
+  <div class="nav-container">
+    <div class="brand-box">
+      <a href="../index.html" class="logoArea">
+        <img src="../icons/icon1.png" class="logoIcon" alt="eumaps.org">
+        <span class="logoText">eumaps.org</span>
+      </a>
+      <span class="tagline">Hesap-kitap platformu</span>
+    </div>
+  </div>
+</header>
+
+<main class="page-container">
+  <nav class="breadcrumb" aria-label="Sayfa yolu">
+    <a href="../index.html">Ana Sayfa</a>
+    <span>›</span>
+    <a href="../cevirici.html">Birim Çevirici</a>
+    <span>›</span>
+    <span>Ağrı Kesici Karşılaştırma</span>
+  </nav>
+
+  <section class="converter-section">
+    <div class="converter-heading">
+      <h1>Ağrı Kesici Karşılaştırma Aracı</h1>
+    </div>
+
+    <div class="converter-content">
+      <form id="spuForm" class="converter-form">
+
+        <p class="group-title">Referans Değer</p>
+        <div class="form-list">
+          <div class="form-group">
+            <input type="number" class="inputFields" id="spu" name="spu" min="0" step="any">
+            <label for="spu">SPU (Standard Pain Unit/Standart Ağrı Birimi)</label>
+          </div>
+        </div>
+
+        <p class="group-title">Ağrı Kesiciler</p>
+        <div class="form-list">
+          <div class="form-group"><input type="number" class="inputFields" id="morphine" name="morphine" min="0" step="any"><label for="morphine">Morfin (mg)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="oxycodone" name="oxycodone" min="0" step="any"><label for="oxycodone">Oksikodon (mg)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="hydrocodone" name="hydrocodone" min="0" step="any"><label for="hydrocodone">Hidrokodon (mg)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="tramadol" name="tramadol" min="0" step="any"><label for="tramadol">Tramadol (mg)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="codeine" name="codeine" min="0" step="any"><label for="codeine">Kodein (mg)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="hydromorphone" name="hydromorphone" min="0" step="any"><label for="hydromorphone">Hidromorfon (mg)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="fentanyl" name="fentanyl" min="0" step="any"><label for="fentanyl">Fentanil yaması (mcg/saat)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="ibuprofen" name="ibuprofen" min="0" step="any"><label for="ibuprofen">İbuprofen (400 mg tablet)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="wine" name="wine" min="0" step="any"><label for="wine">Şarap (175 ml kadeh)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="whiskey" name="whiskey" min="0" step="any"><label for="whiskey">Viski (≈40 ml)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="coffee" name="coffee" min="0" step="any"><label for="coffee">Kahve (fincan)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="nicotine" name="nicotine" min="0" step="any"><label for="nicotine">Nikotin (sigara)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="sleep" name="sleep" min="0" step="any"><label for="sleep">Uyku (60 dakika)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="coldshower" name="coldshower" min="0" step="any"><label for="coldshower">Soğuk Duş (3 dakika)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="marijuana" name="marijuana" min="0" step="any"><label for="marijuana">Esrar/Marijuana (5 mg)</label></div>
+        </div>
+
+        <div class="button-group">
+          <button type="button" id="clearBtn" class="secondary-button">Temizle</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="information-section">
+    <p>Klinik doz veya ilaç değiştirme hesabı olarak kullanılmamalıdır.</p>
+  </section>
+</main>
+
+<footer><p>© 2020-2026 <strong>eumaps.org</strong></p></footer>
+
+<script src="../js/cevirici-agri.js"></script>
+</body>
+</html>

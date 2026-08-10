@@ -1,0 +1,495 @@
+/* Investment calculator page */
+
+.page-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-bottom: 1.25rem;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.breadcrumb a {
+  color: var(--primary-hover);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+/* Calculator */
+
+.calculator-section,
+.results-section {
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.calculator-heading {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: #ffffff;
+  border-bottom: 1px solid var(--border);
+}
+
+.heading-icon {
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.heading-icon img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+}
+
+.calculator-heading h1 {
+  color: #0a174e;
+  font-family: "Basic", serif;
+  font-size: clamp(1.55rem, 4vw, 2.1rem);
+  line-height: 1.2;
+}
+
+.calculator-heading p {
+  max-width: 760px;
+  margin-top: 0.4rem;
+  color: var(--text-muted);
+  font-family: "Nunito Sans", serif;
+}
+
+.calculator-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+  gap: 1.5rem;
+  padding: 1.5rem;
+}
+
+.investment-form,
+.information-box {
+  padding: 1.5rem;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.form-group + .form-group {
+  margin-top: 1.25rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.45rem;
+  color: #0a174e;
+  font-weight: 700;
+}
+
+.input-wrapper {
+  position: relative;
+}
+
+.input-wrapper input {
+  width: 100%;
+  min-height: 50px;
+  padding: 0.8rem 5rem 0.8rem 0.9rem;
+  color: #0a174e;
+  background: #ffffff;
+  border: 1px solid #b7d8ca;
+  border-radius: 9px;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.input-wrapper input::placeholder {
+  color: #8da69e;
+}
+
+.input-wrapper input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.input-wrapper input.input-error {
+  border-color: #b91c1c;
+  box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.1);
+}
+
+.input-suffix {
+  position: absolute;
+  top: 50%;
+  right: 0.9rem;
+  transform: translateY(-50%);
+  color: var(--primary-hover);
+  font-size: 0.85rem;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.form-group small {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.form-message {
+  display: none;
+  margin-top: 1.25rem;
+  padding: 0.8rem 0.9rem;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.form-message.visible {
+  display: block;
+}
+
+.button-group {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.primary-button,
+.secondary-button,
+.print-button {
+  min-height: 44px;
+  padding: 0.7rem 1.25rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  transition:
+    transform 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.primary-button {
+  color: #ffffff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.primary-button:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+.secondary-button {
+  color: #0a174e;
+  background: #ffffff;
+  border: 1px solid #b7d8ca;
+}
+
+.secondary-button:hover {
+  background: var(--surface);
+  transform: translateY(-1px);
+}
+
+/* Information */
+
+.information-box {
+  align-self: start;
+}
+
+.information-box h2 {
+  margin-bottom: 0.75rem;
+  color: #0a174e;
+  font-family: "Basic", serif;
+  font-size: 1.25rem;
+}
+
+.information-box p {
+  color: var(--text-muted);
+  font-family: "Nunito Sans", serif;
+  font-size: 0.925rem;
+}
+
+.formula-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 1rem 0;
+  padding: 1rem;
+  background: var(--surface);
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+}
+
+.formula-box span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.formula-box strong {
+  color: #0a174e;
+  font-size: 0.9rem;
+}
+
+.information-note {
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  font-style: italic;
+}
+
+/* Results */
+
+.results-section {
+  margin-top: 1.5rem;
+  background: #ffffff;
+}
+
+.results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.section-label {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: var(--primary-hover);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.results-header h2 {
+  color: #0a174e;
+  font-family: "Basic", serif;
+  font-size: 1.45rem;
+}
+
+.print-button {
+  flex: 0 0 auto;
+  color: var(--primary-hover);
+  background: #ffffff;
+  border: 1px solid var(--accent);
+}
+
+.print-button:hover {
+  color: #ffffff;
+  background: var(--accent);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 1.5rem;
+}
+
+.summary-card {
+  padding: 1.15rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.summary-card span {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.summary-card strong {
+  display: block;
+  color: #0a174e;
+  font-size: 1.25rem;
+  overflow-wrap: anywhere;
+}
+
+.summary-card.highlight {
+  background: #d1fae5;
+  border-color: #6ee7b7;
+}
+
+.summary-card.highlight strong {
+  color: var(--primary-hover);
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  padding: 0 1.5rem 1.5rem;
+}
+
+table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 0.85rem;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+}
+
+th:first-child,
+td:first-child {
+  text-align: left;
+}
+
+th {
+  color: #0a174e;
+  background: var(--surface);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+td {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+tbody tr:hover {
+  background: #f8fffb;
+}
+
+td:last-child {
+  color: var(--primary-hover);
+  font-weight: 700;
+}
+
+/* Responsive */
+
+@media (max-width: 850px) {
+  .calculator-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .information-box {
+    width: 100%;
+  }
+}
+
+@media (max-width: 680px) {
+  .page-container {
+    padding: 1rem 0.75rem 3rem;
+  }
+
+  .calculator-heading {
+    align-items: flex-start;
+    padding: 1.1rem;
+  }
+
+  .heading-icon {
+    width: 50px;
+    height: 50px;
+    flex-basis: 50px;
+  }
+
+  .heading-icon img {
+    width: 34px;
+    height: 34px;
+  }
+
+  .calculator-layout {
+    padding: 0.9rem;
+  }
+
+  .investment-form,
+  .information-box {
+    padding: 1rem;
+  }
+
+  .button-group {
+    flex-direction: column;
+  }
+
+  .primary-button,
+  .secondary-button {
+    width: 100%;
+  }
+
+  .results-header {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 1rem;
+  }
+
+  .print-button {
+    width: 100%;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
+    padding: 1rem;
+  }
+
+  .table-wrapper {
+    padding: 0 1rem 1rem;
+  }
+}
+
+/* Printing */
+
+@media print {
+  .navbar,
+  .breadcrumb,
+  .calculator-section,
+  .print-button,
+  footer {
+    display: none;
+  }
+
+  body,
+  .page-container,
+  .results-section {
+    background: #ffffff;
+  }
+
+  .page-container {
+    max-width: none;
+    padding: 0;
+  }
+
+  .results-section {
+    margin: 0;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .table-wrapper {
+    overflow: visible;
+  }
+
+  table {
+    min-width: 0;
+  }
+}

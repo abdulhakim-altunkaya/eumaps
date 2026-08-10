@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Glasgow Koma - Modified Rankin Ölçeği Çevirici - eumaps.org</title>
+  <meta name="description" content="Glasgow Koma Skalası değerlerini kullanarak toplam GCS puanını, GCS kategorisini ve yaklaşık Modified Rankin Scale sonucunu hesaplayın.">
+  <link rel="icon" href="../icons/icon1.png" type="image/png">
+  <link rel="stylesheet" href="../css/index.css">
+  <link rel="stylesheet" href="../css/cevirici-koma.css">
+</head>
+<body>
+
+<header class="navbar">
+  <div class="nav-container">
+    <div class="brand-box">
+      <a href="../index.html" class="logoArea">
+        <img src="../icons/icon1.png" class="logoIcon" alt="eumaps.org">
+        <span class="logoText">eumaps.org</span>
+      </a>
+      <span class="tagline">Hesap-kitap platformu</span>
+    </div>
+  </div>
+</header>
+
+<main class="page-container">
+  <nav class="breadcrumb" aria-label="Sayfa yolu">
+    <a href="../index.html">Ana Sayfa</a>
+    <span aria-hidden="true">›</span>
+    <a href="../cevirici.html">Birim Çevirici</a>
+    <span aria-hidden="true">›</span>
+    <span>Glasgow Koma - Rankin</span>
+  </nav>
+
+  <section class="converter-section">
+    <div class="converter-heading">
+      <h1>Glasgow Koma Skalası - Modified Rankin Ölçeği Çevirici</h1>
+    </div>
+
+    <div class="converter-content">
+      <form id="gcsMrsConverterForm" class="converter-form">
+        <div class="form-list">
+          <div class="form-group">
+            <input type="number" class="inputFields" id="eye" name="eye" min="1" max="4" step="1" inputmode="numeric">
+            <label for="eye">Göz Yanıtı (1–4)</label>
+          </div>
+          <div class="form-group">
+            <input type="number" class="inputFields" id="verbal" name="verbal" min="1" max="5" step="1" inputmode="numeric">
+            <label for="verbal">Sözel Yanıt (1–5)</label>
+          </div>
+          <div class="form-group">
+            <input type="number" class="inputFields" id="motor" name="motor" min="1" max="6" step="1" inputmode="numeric">
+            <label for="motor">Motor Yanıt (1–6)</label>
+          </div>
+          <div class="form-group">
+            <input type="number" class="inputFields result-input" id="gcs" name="gcs" readonly>
+            <label for="gcs">Toplam GCS (3–15)</label>
+          </div>
+        </div>
+
+        <div class="result-list">
+          <div class="result-row">
+            <span>GCS Kategorisi</span>
+            <strong id="gcsCategory">-</strong>
+          </div>
+          <div class="result-row">
+            <span>Modified Rankin Scale (0–6)</span>
+            <strong id="mrs">-</strong>
+          </div>
+        </div>
+
+        <div id="formMessage" class="form-message" role="alert" aria-live="assertive"></div>
+
+        <div class="button-group">
+          <button type="button" id="clearBtn" class="secondary-button">Temizle</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="glasgow-note">
+    <h2>Glasgow Koma Skalası - Modified Rankin Ölçeği Dönüşüm Açıklaması</h2>
+
+    <p>Glasgow Koma Skalası (GCS), hastanın bilinç düzeyini 3 (derin koma) ile 15 (tamamen uyanık) arasında değerlendirir. Değerlendirme üç bileşene dayanır: Göz Yanıtı (1–4), Sözel Yanıt (1–5) ve Motor Yanıt (1–6). Travmatik beyin hasarı veya inme gibi akut durumlarda yaygın olarak kullanılır. Modified Rankin Scale (mRS) ise uzun vadeli sonuçlara odaklanarak fonksiyonel engellilik düzeyini 0 (belirti yok) ile 6 (ölüm) arasında değerlendirir. Bu çevirici, fonksiyonel etkiyi tahmin etmek amacıyla GCS puanlarını yaklaşık mRS değerleriyle ilişkilendirir; ancak sonuçlar kişiye ve duruma göre değişebilir.</p>
+
+    <p>Çevirici, Göz, Sözel ve Motor yanıt puanlarını toplayarak toplam GCS değerini hesaplar. GCS; Ağır (3–8), Orta (9–12) veya Hafif (13–15) olarak sınıflandırılır. Verilen eşleştirmeye göre GCS 15 ≈ mRS 0–1, GCS 13–14 ≈ mRS 1–2, GCS 9–12 ≈ mRS 3–4, GCS 6–8 ≈ mRS 4–5 ve GCS 3–5 ≈ mRS 5–6 olarak gösterilir.</p>
+  </section>
+</main>
+
+<footer>
+  <p>© 2020-2026 <strong>eumaps.org</strong></p>
+</footer>
+
+<script src="../js/cevirici-koma.js"></script>
+</body>
+</html>

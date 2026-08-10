@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Radyasyon Birimleri Çevirici - eumaps.org</title>
+  <meta name="description" content="Gray, Sievert, milligray, millisievert, rad ve rem radyasyon birimleri arasında dönüşüm yapın.">
+  <link rel="icon" href="../icons/icon1.png" type="image/png">
+  <link rel="stylesheet" href="../css/index.css">
+  <link rel="stylesheet" href="../css/cevirici-radyasyon.css">
+</head>
+<body>
+
+<header class="navbar">
+  <div class="nav-container">
+    <div class="brand-box">
+      <a href="../index.html" class="logoArea">
+        <img src="../icons/icon1.png" class="logoIcon" alt="eumaps.org">
+        <span class="logoText">eumaps.org</span>
+      </a>
+      <span class="tagline">Hesap-kitap platformu</span>
+    </div>
+  </div>
+</header>
+
+<main class="page-container">
+  <nav class="breadcrumb" aria-label="Sayfa yolu">
+    <a href="../index.html">Ana Sayfa</a>
+    <span>›</span>
+    <a href="../cevirici.html">Birim Çevirici</a>
+    <span>›</span>
+    <span>Radyasyon</span>
+  </nav>
+
+  <section class="converter-section">
+    <div class="converter-heading">
+      <h1>Radyasyon Birimleri Çevirici</h1>
+    </div>
+
+    <div class="converter-content">
+      <form id="radiationConverterForm" class="converter-form">
+
+        <div class="radiation-group">
+          <h2>Gamma, X-Işını, Beta ve Elektron</h2>
+          <p class="group-description">Radyoterapi, tanısal görüntüleme, CT taramaları ve uzun mesafeli uçuşlar.</p>
+
+          <div class="form-list">
+            <div class="form-group"><input type="number" class="inputFields" id="grayGamma" name="grayGamma" min="0" max="1000000" step="any"><label for="grayGamma">Gray (Gy)</label></div>
+            <div class="form-group"><input type="number" class="inputFields" id="milligrayGamma" name="milligrayGamma" min="0" max="1000000000" step="any"><label for="milligrayGamma">Milligray (mGy)</label></div>
+            <div class="form-group"><input type="number" class="inputFields" id="sievertGamma" name="sievertGamma" min="0" max="1000000" step="any"><label for="sievertGamma">Sievert (Sv)</label></div>
+            <div class="form-group"><input type="number" class="inputFields" id="millisievertGamma" name="millisievertGamma" min="0" max="1000000000" step="any"><label for="millisievertGamma">Millisievert (mSv)</label></div>
+            <div class="form-group"><input type="number" class="inputFields" id="radGamma" name="radGamma" min="0" max="1000000000" step="any"><label for="radGamma">Rad</label></div>
+            <div class="form-group"><input type="number" class="inputFields" id="remGamma" name="remGamma" min="0" max="1000000000" step="any"><label for="remGamma">Rem</label></div>
+            <div class="form-group"><input type="number" class="inputFields result-input" id="cancerRiskGamma" name="cancerRiskGamma" readonly><label for="cancerRiskGamma">Kanser Riski (% / Sv)</label></div>
+            <div class="form-group"><input type="number" class="inputFields" id="flightDurationGamma" name="flightDurationGamma" min="0" max="100000" step="any"><label for="flightDurationGamma">Uzun Uçuş (Saat)</label></div>
+            <div class="form-group"><input type="number" class="inputFields" id="chestXraysGamma" name="chestXraysGamma" min="0" max="1000000" step="any"><label for="chestXraysGamma">Göğüs Röntgeni Sayısı</label></div>
+          </div>
+        </div>
+
+        <div class="radiation-group">
+          <h2>Alfa Parçacıkları ve Ağır İyonlar</h2>
+          <p class="group-description">Uzay istasyonu, Ay, Mars, kozmik radyasyon ve radon maruziyeti.</p>
+
+          <div class="form-list">
+            <div class="form-group"><input type="number" class="inputFields" id="grayAlpha" name="grayAlpha" min="0" max="1000000" step="any"><label for="grayAlpha">Gray (Gy)</label></div>
+            <div class="form-group"><input type="number" class="inputFields" id="milligrayAlpha" name="milligrayAlpha" min="0" max="1000000000" step="any"><label for="milligrayAlpha">Milligray (mGy)</label></div>
+            <div class="form-group"><input type="number" class="inputFields" id="sievertAlpha" name="sievertAlpha" min="0" max="1000000" step="any"><label for="sievertAlpha">Sievert (Sv)</label></div>
+            <div class="form-group"><input type="number" class="inputFields" id="millisievertAlpha" name="millisievertAlpha" min="0" max="1000000000" step="any"><label for="millisievertAlpha">Millisievert (mSv)</label></div>
+            <div class="form-group"><input type="number" class="inputFields" id="radAlpha" name="radAlpha" min="0" max="1000000000" step="any"><label for="radAlpha">Rad</label></div>
+            <div class="form-group"><input type="number" class="inputFields" id="remAlpha" name="remAlpha" min="0" max="1000000000" step="any"><label for="remAlpha">Rem</label></div>
+            <div class="form-group"><input type="number" class="inputFields result-input" id="cancerRiskAlpha" name="cancerRiskAlpha" readonly><label for="cancerRiskAlpha">Kanser Riski (% / Sv)</label></div>
+            <div class="form-group"><input type="number" class="inputFields" id="issDurationAlpha" name="issDurationAlpha" min="0" max="100000" step="any"><label for="issDurationAlpha">Uluslararası Uzay İstasyonu (Saat)</label></div>
+            <div class="form-group"><input type="number" class="inputFields" id="moonDurationAlpha" name="moonDurationAlpha" min="0" max="100000" step="any"><label for="moonDurationAlpha">Ay'da Kalış (Saat)</label></div>
+            <div class="form-group"><input type="number" class="inputFields" id="marsDurationAlpha" name="marsDurationAlpha" min="0" max="100000" step="any"><label for="marsDurationAlpha">Mars'ta Kalış (Saat)</label></div>
+          </div>
+        </div>
+
+        <div id="formMessage" class="form-message" role="alert" aria-live="assertive"></div>
+
+        <div class="button-group">
+          <button type="button" id="clearBtn" class="secondary-button">Temizle</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="information-section">
+    <h2>Radyasyon Dönüşüm Açıklaması</h2>
+    <p>Gray (Gy) değerini Sievert (Sv) değerine dönüştürmek için radyasyon ağırlık faktörü (w<sub>R</sub>) kullanılır:</p>
+    <p class="formula"><strong>Sievert = Gray × w<sub>R</sub></strong></p>
+
+    <div class="table-wrapper">
+      <table class="conversion-table">
+        <thead>
+          <tr><th>Radyasyon Türü</th><th>w<sub>R</sub></th><th>1 Gy Karşılığı</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Gamma / X-Işını / Beta</td><td>1</td><td>1 Gy = 1 Sv</td></tr>
+          <tr><td>Alfa / Ağır İyonlar</td><td>20</td><td>1 Gy = 20 Sv</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="note-text">1 Sv = 1000 mSv = 100 rem. Sayfadaki risk ve maruziyet karşılıkları yaklaşık referans değerlerdir.</p>
+  </section>
+</main>
+
+<footer>
+  <p>© 2020-2026 <strong>eumaps.org</strong></p>
+</footer>
+
+<script src="../js/cevirici-radyasyon.js"></script>
+</body>
+</html>

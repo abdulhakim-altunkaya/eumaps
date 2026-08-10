@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Yatırım Dönüş Hesaplama — eumaps.org</title>
+  <meta name="description" content="Başlangıç yatırım tutarınızı, yatırım süresini ve yıllık kazanç oranını girerek 
+    bileşik yatırım dönüşünü hesaplayın."/>
+  <link rel="stylesheet" href="./css/index.css" />
+  <link rel="stylesheet" href="./css/investment.css" />
+  <link rel="icon" href="./icons/icon1.png" type="image/png" />
+</head>
+
+<body>
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="brand-box">
+        <a href="./index.html" class="logoArea">
+          <img src="./icons/icon1.png" class="logoIcon" alt="eumaps.org" />
+          <span class="logoText">eumaps.org</span>
+        </a>
+        <span class="tagline">Hesap-kitap platformu </span>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-container">
+    <nav class="breadcrumb" aria-label="Sayfa yolu">
+      <a href="./index.html">Ana Sayfa</a>
+      <span aria-hidden="true">›</span>
+      <span>Yatırım Dönüş Hesaplama</span>
+    </nav>
+
+    <section class="calculator-section">
+      <div class="calculator-heading">
+        <div class="heading-icon"><img src="./icons/investment2.png" alt="" aria-hidden="true" /></div>
+        <div><h1>Yatırım Dönüş Hesaplama</h1></div>
+      </div>
+
+      <div class="calculator-layout">
+        <form class="investment-form" id="investmentForm" novalidate>
+          <div class="form-group">
+            <label for="invAmount">Yatırım tutarı</label>
+
+            <div class="input-wrapper">
+              <input
+                type="number"
+                id="invAmount"
+                name="invAmount"
+                min="1"
+                max="10000000000"
+                step="1"
+                inputmode="numeric"
+                required
+              />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="invDuration">Yatırım süresi (yıl, gün veya ay)</label>
+
+            <div class="input-wrapper">
+              <input
+                type="number"
+                id="invDuration"
+                name="invDuration"
+                min="1"
+                max="100"
+                step="1"
+                inputmode="numeric"
+                required
+              />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="invPercentage">Yıllık, aylık veya günlük kazanç oranı (%)</label>
+
+            <div class="input-wrapper">
+              <input type="number" id="invPercentage" name="invPercentage" min="1" max="10000"
+                step="1" inputmode="numeric" required/>
+            </div>
+          </div>
+          <div class="form-message" id="formMessage" role="alert" aria-live="assertive"></div>
+          <div class="button-group">
+            <button type="submit" class="primary-button">Hesapla</button>
+            <button type="button" class="secondary-button" id="clearButton">Temizle</button>
+          </div>
+        </form>
+
+        <aside class="information-box">
+          <p>Birleşik faiz temelli bir hesaplama sistemidir. Belirlediğiniz zaman birimi sonunda
+             elde edilen kazanç mevcut yatırım tutarına eklenir. Bir sonraki zaman biriminin kazancı
+              mevcut toplama eklenir.</p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="results-section" id="resultsSection" aria-live="polite" hidden>
+      <div class="results-header">
+        <div>
+          <span class="section-label">Hesaplama sonucu</span>
+          <h2>Yatırımınızın yıllara göre değeri</h2>
+        </div>
+
+        <button type="button" class="print-button" id="printButton">
+          Sonucu Yazdır
+        </button>
+      </div>
+
+      <div class="summary-grid">
+        <div class="summary-card">
+          <span>Başlangıç tutarı</span>
+          <strong id="initialAmountResult">0 ₺</strong>
+        </div>
+
+        <div class="summary-card">
+          <span>Toplam kazanç</span>
+          <strong id="totalProfitResult">0 ₺</strong>
+        </div>
+
+        <div class="summary-card highlight">
+          <span>Son yatırım değeri</span>
+          <strong id="finalAmountResult">0 ₺</strong>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Yıl</th>
+              <th scope="col">Yıl başı tutarı</th>
+              <th scope="col">Yıllık kazanç</th>
+              <th scope="col">Yıl sonu tutarı</th>
+            </tr>
+          </thead>
+
+          <tbody id="resultTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2020-2026 <strong>eumaps.org</strong></p>
+  </footer>
+
+  <script src="./js/investment.js"></script>
+</body>
+</html>

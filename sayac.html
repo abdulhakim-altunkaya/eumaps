@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kelime ve Harf Sayacı — eumaps.org</title>
+  <meta name="description" content="Metindeki kelime, karakter, boşluksuz karakter, cümle, paragraf ve satır 
+    sayılarını ücretsiz hesaplayın."/>
+  <link rel="stylesheet" href="./css/index.css" />
+  <link rel="stylesheet" href="./css/counter.css" />
+  <link rel="icon" href="./icons/icon1.png" type="image/png" />
+</head>
+
+<body>
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="brand-box">
+        <a href="./index.html" class="logoArea">
+          <img src="./icons/icon1.png" class="logoIcon" alt="eumaps.org" />
+          <span class="logoText">eumaps.org</span>
+        </a>
+        <span class="tagline">Hesap-kitap platformu</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-container">
+    <nav class="breadcrumb" aria-label="Sayfa yolu">
+      <a href="./index.html">Ana Sayfa</a>
+      <span aria-hidden="true">›</span>
+      <span>Kelime ve Harf Sayacı</span>
+    </nav>
+
+    <section class="counter-section">
+      <div class="counter-heading">
+        <div class="heading-icon"><img src="./icons/sentence.png" alt="kelime harf sayacı" aria-hidden="true"/></div>
+        <div><h1>Kelime ve Harf Sayacı</h1></div>
+      </div>
+
+      <div class="counter-layout">
+        <div class="editor-area">
+          <div class="textarea-header">
+            <label for="textInput">Metin</label>
+            <span id="liveCharacterCount">0 karakter</span>
+          </div>
+
+          <textarea
+            id="textInput"
+            name="textInput"
+            rows="16"
+            placeholder="Metninizi buraya yapıştırın..."
+            aria-describedby="textareaHelp"
+          ></textarea>
+          <div class="button-group">
+            <button type="button" class="primary-button" id="countButton">
+              Say
+            </button>
+
+            <button type="button" class="secondary-button" id="clearButton">
+              Temizle
+            </button>
+
+            <button type="button" class="secondary-button" id="copyButton">
+              Metni Kopyala
+            </button>
+          </div>
+
+          <div
+            class="action-message"
+            id="actionMessage"
+            aria-live="polite"
+          ></div>
+        </div>
+
+        <aside class="results-area" aria-live="polite">
+          <h2>Metin Bilgileri</h2>
+
+          <div class="result-grid">
+            <div class="result-card">
+              <span>Kelime</span>
+              <strong id="wordCount">0</strong>
+            </div>
+
+            <div class="result-card">
+              <span>Karakter</span>
+              <strong id="characterCount">0</strong>
+            </div>
+
+            <div class="result-card">
+              <span>Boşluksuz karakter</span>
+              <strong id="characterWithoutSpacesCount">0</strong>
+            </div>
+
+            <div class="result-card">
+              <span>Harf</span>
+              <strong id="letterCount">0</strong>
+            </div>
+
+            <div class="result-card">
+              <span>Rakam</span>
+              <strong id="numberCount">0</strong>
+            </div>
+
+            <div class="result-card">
+              <span>Cümle</span>
+              <strong id="sentenceCount">0</strong>
+            </div>
+
+            <div class="result-card">
+              <span>Paragraf</span>
+              <strong id="paragraphCount">0</strong>
+            </div>
+
+            <div class="result-card">
+              <span>Satır</span>
+              <strong id="lineCount">0</strong>
+            </div>
+          </div>
+
+          <div class="reading-box">
+            <div>
+              <span>Tahmini okuma süresi</span>
+              <strong id="readingTime">0 saniye</strong>
+            </div>
+
+            <div>
+              <span>Tahmini konuşma süresi</span>
+              <strong id="speakingTime">0 saniye</strong>
+            </div>
+          </div>
+
+          <div class="limit-box" id="twitterLimitBox">
+            <div class="limit-header">
+              <span>X karakter sınırı</span>
+              <strong id="twitterLimitValue">0 / 280</strong>
+            </div>
+
+            <div
+              class="progress-track"
+              role="progressbar"
+              aria-label="X karakter sınırı"
+              aria-valuemin="0"
+              aria-valuemax="280"
+              aria-valuenow="0"
+              id="twitterProgress"
+            >
+              <div class="progress-bar" id="twitterProgressBar"></div>
+            </div>
+
+            <p id="twitterStatus">
+              Metin 280 karakter sınırının içinde.
+            </p>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2020-2026 <strong>eumaps.org</strong></p>
+  </footer>
+
+  <script src="./js/counter.js"></script>
+</body>
+</html>

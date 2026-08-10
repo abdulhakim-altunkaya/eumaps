@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>İzafi Kütle Hesaplama — eumaps.org</title>
+
+  <meta
+    name="description"
+    content="Bir cismin durağan kütlesini ve hızını girerek Lorentz faktörüne göre izafi kütlesini hesaplayın."
+  />
+
+  <link rel="stylesheet" href="../css/index.css" />
+  <link rel="stylesheet" href="../css/einstein-izafi-kutle.css" />
+  <link rel="icon" href="../icons/icon1.png" type="image/png" />
+</head>
+
+<body>
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="brand-box">
+        <a href="../index.html" class="logoArea">
+          <img src="../icons/icon1.png" class="logoIcon" alt="eumaps.org" />
+          <span class="logoText">eumaps.org</span>
+        </a>
+        <span class="tagline">Hesap-kitap platformu</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-container">
+    <nav class="breadcrumb" aria-label="Sayfa yolu">
+      <a href="../index.html">Ana Sayfa</a>
+      <span aria-hidden="true">›</span>
+      <a href="../einstein.html">Einstein Hesaplamaları</a>
+      <span aria-hidden="true">›</span>
+      <span>İzafi Kütle</span>
+    </nav>
+
+    <section class="calculator-section">
+      <div class="calculator-heading">
+        <div class="heading-icon"><img src="../icons/weight.png" alt="" aria-hidden="true" /></div>
+        <div>
+          <h1>İzafi Kütle Hesaplama</h1>
+          <p>Hızla birlikte değişen kütle değerini hesaplayın.</p>
+        </div>
+      </div>
+
+      <div class="calculator-layout">
+        <form id="relMassForm" class="calculator-form" novalidate>
+          <div class="form-group">
+            <label for="restMassInput">Cismin durağan kütlesi</label>
+
+            <div class="input-wrapper">
+              <input
+                type="number"
+                id="restMassInput"
+                name="restMassInput"
+                min="0.000001"
+                step="any"
+                inputmode="decimal"
+                required
+              />
+
+              <span class="input-suffix">gram</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="velocityInput">Cismin hızı</label>
+
+            <div class="input-wrapper">
+              <input
+                type="number"
+                id="velocityInput"
+                name="velocityInput"
+                min="0.000001"
+                max="299792.457999"
+                step="any"
+                inputmode="decimal"
+                required
+              />
+
+              <span class="input-suffix">km/sn</span>
+            </div>
+          </div>
+
+          <div
+            id="formMessage"
+            class="form-message"
+            role="alert"
+            aria-live="assertive"
+          ></div>
+
+          <div class="button-group">
+            <button type="submit" class="primary-button">
+              Hesapla
+            </button>
+
+            <button type="button" id="clearBtn" class="secondary-button">
+              Temizle
+            </button>
+          </div>
+        </form>
+
+        <aside class="information-box">
+          <div class="formula-box">
+            <span>Formül</span>
+            <strong>m(v) = m₀ ÷ √(1 − v² / c²)</strong>
+          </div>
+
+          <ul>
+            <li><strong>m(v):</strong> İzafi kütle</li>
+            <li><strong>m₀:</strong> durağan kütle</li>
+            <li><strong>v:</strong> Cismin hızı</li>
+            <li><strong>c:</strong> Işık hızı</li>
+          </ul>
+
+          <p class="speed-note">
+            Işık hızı: <strong>299.792,458 km/sn</strong>
+          </p>
+        </aside>
+      </div>
+    </section>
+
+    <section
+      id="resultSection"
+      class="result-section"
+      aria-live="polite"
+      hidden
+    >
+      <div class="result-heading">
+        <span>Hesaplama sonucu</span>
+        <h2>İzafi Kütle</h2>
+      </div>
+
+      <div class="result-list">
+        <div class="result-row">
+          <span>durağan kütle</span>
+          <strong id="restMassResult">0 gram</strong>
+        </div>
+
+        <div class="result-row">
+          <span>Girilen hız</span>
+          <strong id="velocityResult">0 km/sn</strong>
+        </div>
+
+        <div class="result-row">
+          <span>Işık hızına oranı</span>
+          <strong id="velocityRatioResult">0</strong>
+        </div>
+
+        <div class="result-row">
+          <span>Işık hızının yüzdesi</span>
+          <strong id="velocityPercentageResult">%0</strong>
+        </div>
+
+        <div class="result-row">
+          <span>Lorentz faktörü</span>
+          <strong id="lorentzFactorResult">1</strong>
+        </div>
+
+        <div class="result-row primary-result">
+          <span>İzafi kütle</span>
+          <strong id="relativisticMassGramResult">0 gram</strong>
+        </div>
+
+        <div class="result-row">
+          <span>Kütle artışı</span>
+          <strong id="massDifferenceResult">0 gram</strong>
+        </div>
+
+        <div class="result-row">
+          <span>Kütle artış oranı</span>
+          <strong id="massIncreasePercentageResult">%0</strong>
+        </div>
+
+        <div class="result-row">
+          <span>Kilogram karşılığı</span>
+          <strong id="relativisticMassKgResult">0 kilogram</strong>
+        </div>
+
+        <div class="result-row">
+          <span>Ton karşılığı</span>
+          <strong id="relativisticMassTonResult">0 ton</strong>
+        </div>
+
+        <div class="result-row">
+          <span>Megaton karşılığı</span>
+          <strong id="relativisticMassMegatonResult">0 megaton</strong>
+        </div>
+
+        <div class="result-row">
+          <span>Gigaton karşılığı</span>
+          <strong id="relativisticMassGigatonResult">0 gigaton</strong>
+        </div>
+      </div>
+
+      <div class="calculation-box">
+        <h3>Uygulanan hesaplama</h3>
+        <p id="calculationText"></p>
+      </div>
+
+      <div class="explanation-box">
+        <h3>İzafi Kütle Denklemi</h3>
+
+        <p class="equation-description">
+          m(v) izafi kütleyi, m₀ durağan kütleyi, v cismin hızını ve c ışık
+          hızını temsil eder.
+        </p>
+
+        <div class="equation">
+          m(v) = m₀ ÷ √(1 − v² / c²)
+        </div>
+
+        <p> Bir cisim ışık hızına yaklaştıkça, izafi kütlesi önemli ölçüde artar. Cisim hızlandıkça 
+          daha fazla kinetik enerji kazanır. İzafiyet kuramında bu ek enerji, cismin durağan kütlesine 
+          eklenir ve bu durum izafi kütlede artış olarak yorumlanır. Bu teoriye göre, cisim ışık hızına 
+          yaklaştıkça izafi kütlesi de arttığı için cismi hızlandırmaya devam ettirmek için daha 
+          fazla enerji gerekir. Daha fazla hız =  daha fazla kütle = daha fazla enerji = daha fazla hız 
+          şeklinde bir mantıksız döngü oluşur. Tiktok ve youtube sitelerinde bu mantıksız döngüden hareketle
+          cisimlerin ışık hızına erişemeyeceği çünkü sonsuz enerji gerektireceği gibi saçma sapan videolar görebilir
+          hatta astro fizik hocalarından bile bunu işitebilirsiniz.</p>
+        <p>Değerli hocalarımızın ve bu saçma videoların gözden kaçırdığı nokta, Einstein bu teoriyi ve kavramı ortaya 
+          attıktan sonra "izafi kütle" kavramını gittikçe daha az kullanmaya başlamış ve nihayetinde bu kavramı terketmiş, 
+          ilerleyen zamanlarında "kütlesi artar" demek yerine "enerjisi artar" demeye başlamıştır. Ne fark eder demeyin, 
+          enerji ışık hızında hareket edebilir ama kütle ışık hızında hareket edemez. Bu nedenle “kütle artıyor” 
+          denildiğinde, cismin boyutunun veya günlük anlamdaki ağırlığının doğrudan arttığı anlaşılmamalıdır.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2020-2026 <strong>eumaps.org</strong></p>
+  </footer>
+
+  <script src="../js/einstein-izafi-kutle.js"></script>
+</body>
+</html>

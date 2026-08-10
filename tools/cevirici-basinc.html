@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Basınç Birimleri Çevirici - eumaps.org</title>
+  <meta name="description" content="Pascal, kilopascal, bar, atmosfer, millibar, psi, torr ve inHg basınç birimleri arasında dönüşüm yapın.">
+  <link rel="icon" href="../icons/icon1.png" type="image/png">
+  <link rel="stylesheet" href="../css/index.css">
+  <link rel="stylesheet" href="../css/cevirici-basinc.css">
+</head>
+<body>
+
+<header class="navbar">
+  <div class="nav-container">
+    <div class="brand-box">
+      <a href="../index.html" class="logoArea">
+        <img src="../icons/icon1.png" class="logoIcon" alt="eumaps.org">
+        <span class="logoText">eumaps.org</span>
+      </a>
+      <span class="tagline">Hesap-kitap platformu</span>
+    </div>
+  </div>
+</header>
+
+<main class="page-container">
+  <nav class="breadcrumb" aria-label="Sayfa yolu">
+    <a href="../index.html">Ana Sayfa</a>
+    <span>›</span>
+    <a href="../cevirici.html">Birim Çevirici</a>
+    <span>›</span>
+    <span>Basınç</span>
+  </nav>
+
+  <section class="converter-section">
+    <div class="converter-heading">
+      <h1>Basınç Birimleri Çevirici</h1>
+    </div>
+
+    <div class="converter-content">
+      <form id="pressureConverterForm" class="converter-form">
+        <div class="form-list">
+          <div class="form-group"><input type="number" class="inputFields" id="pascal" name="pascal" min="0" max="1000000000" step="any"><label for="pascal">Pascal (Pa)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="kilopascal" name="kilopascal" min="0" max="1000000000" step="any"><label for="kilopascal">Kilopascal (kPa)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="bar" name="bar" min="0" max="1000000000" step="any"><label for="bar">Bar</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="atmosphere" name="atmosphere" min="0" max="1000000000" step="any"><label for="atmosphere">Atmosfer (atm)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="millibar" name="millibar" min="0" max="1000000000" step="any"><label for="millibar">Millibar (mbar)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="psi" name="psi" min="0" max="1000000000" step="any"><label for="psi">Pound/in² (psi)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="torr" name="torr" min="0" max="1000000000" step="any"><label for="torr">Torr (mmHg)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="inchMercury" name="inchMercury" min="0" max="1000000000" step="any"><label for="inchMercury">İnç Cıva (inHg)</label></div>
+        </div>
+
+        <div id="formMessage" class="form-message" role="alert" aria-live="assertive"></div>
+
+        <div class="button-group">
+          <button type="button" id="clearBtn" class="secondary-button">Temizle</button>
+        </div>
+      </form>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>© 2020-2026 <strong>eumaps.org</strong></p>
+</footer>
+
+<script src="../js/cevirici-basinc.js"></script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+ <!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manyetik Alan Çevirici - eumaps.org</title>
+  <meta name="description" content="Tesla, millitesla, mikrotesla, gauss ve çeşitli manyetik alan karşılıkları arasında dönüşüm yapın.">
+  <link rel="icon" href="../icons/icon1.png" type="image/png">
+  <link rel="stylesheet" href="../css/index.css">
+  <link rel="stylesheet" href="../css/cevirici-manyetizma.css">
+</head>
+<body>
+
+<header class="navbar">
+  <div class="nav-container">
+    <div class="brand-box">
+      <a href="../index.html" class="logoArea">
+        <img src="../icons/icon1.png" class="logoIcon" alt="eumaps.org">
+        <span class="logoText">eumaps.org</span>
+      </a>
+      <span class="tagline">Hesap-kitap platformu</span>
+    </div>
+  </div>
+</header>
+
+<main class="page-container">
+  <nav class="breadcrumb" aria-label="Sayfa yolu">
+    <a href="../index.html">Ana Sayfa</a>
+    <span>›</span>
+    <a href="../cevirici.html">Birim Çevirici</a>
+    <span>›</span>
+    <span>Manyetizma</span>
+  </nav>
+
+  <section class="converter-section">
+    <div class="converter-heading">
+      <h1>Manyetik Alan Çevirici</h1>
+    </div>
+
+    <div class="converter-content">
+      <form id="magneticConverterForm" class="converter-form">
+        <p class="group-title">Manyetik Alan Birimleri</p>
+
+        <div class="form-list">
+          <div class="form-group">
+            <input type="number" class="inputFields" id="tesla" name="tesla" min="0" max="1000000000" step="any" inputmode="decimal">
+            <label for="tesla">Tesla (T)</label>
+          </div>
+          <div class="form-group">
+            <input type="number" class="inputFields" id="millitesla" name="millitesla" min="0" max="1000000000" step="any" inputmode="decimal">
+            <label for="millitesla">Millitesla (mT)</label>
+          </div>
+          <div class="form-group">
+            <input type="number" class="inputFields" id="microtesla" name="microtesla" min="0" max="1000000000" step="any" inputmode="decimal">
+            <label for="microtesla">Mikrotesla (µT)</label>
+          </div>
+          <div class="form-group">
+            <input type="number" class="inputFields" id="gauss" name="gauss" min="0" max="1000000000" step="any" inputmode="decimal">
+            <label for="gauss">Gauss (G)</label>
+          </div>
+        </div>
+
+        <p class="group-title equivalents-title">Yaklaşık Karşılıklar</p>
+
+        <div class="form-list">
+          <div class="form-group">
+            <input type="number" class="inputFields" id="phoneMagnet" name="phoneMagnet" min="0" max="1000000" step="any" inputmode="decimal">
+            <label for="phoneMagnet">Telefon Mıknatısı Karşılığı</label>
+          </div>
+          <div class="form-group">
+            <input type="number" class="inputFields" id="fridgeMagnet" name="fridgeMagnet" min="0" max="1000000" step="any" inputmode="decimal">
+            <label for="fridgeMagnet">Buzdolabı Mıknatısı Karşılığı</label>
+          </div>
+          <div class="form-group">
+            <input type="number" class="inputFields" id="earthField" name="earthField" min="0" max="1000000" step="any" inputmode="decimal">
+            <label for="earthField">Dünya Manyetik Alanı Karşılığı</label>
+          </div>
+          <div class="form-group">
+            <input type="number" class="inputFields" id="medicalScanner" name="medicalScanner" min="0" max="1000" step="any" inputmode="decimal">
+            <label for="medicalScanner">MR Cihazı Karşılığı</label>
+          </div>
+          <div class="form-group">
+            <input type="number" class="inputFields" id="solarSunspot" name="solarSunspot" min="0" max="10000" step="any" inputmode="decimal">
+            <label for="solarSunspot">Güneş Lekesi Karşılığı</label>
+          </div>
+          <div class="form-group">
+            <input type="number" class="inputFields" id="neutronStar" name="neutronStar" min="0" max="1000000000000000" step="any" inputmode="decimal">
+            <label for="neutronStar">Nötron Yıldızı Karşılığı</label>
+          </div>
+        </div>
+
+        <div id="formMessage" class="form-message" role="alert" aria-live="assertive"></div>
+
+        <div class="button-group">
+          <button type="button" id="clearBtn" class="secondary-button">Temizle</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="information-section">
+    <h2>Manyetik Akı Yoğunluğu Dönüşüm Açıklaması</h2>
+    <p>Manyetik akı yoğunluğu Tesla (T) ile ölçülür. Temel dönüşümler aşağıdaki gibidir:</p>
+
+    <div class="table-wrapper">
+      <table class="conversion-table">
+        <thead>
+          <tr>
+            <th>Birim</th>
+            <th>Tesla Karşılığı</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>1 Tesla (T)</td><td>1 T</td></tr>
+          <tr><td>1 Millitesla (mT)</td><td>0.001 T</td></tr>
+          <tr><td>1 Mikrotesla (µT)</td><td>0.000001 T</td></tr>
+          <tr><td>1 Gauss (G)</td><td>0.0001 T</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>© 2020-2026 <strong>eumaps.org</strong></p>
+</footer>
+
+<script src="../js/cevirici-manyetizma.js"></script>
+</body>
+</html>

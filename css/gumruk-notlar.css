@@ -1,0 +1,123 @@
+.page-container {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.breadcrumb a {
+  color: var(--primary-hover);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.notes-section {
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.notes-heading {
+  padding: 1.4rem;
+  background: #ffffff;
+  border-bottom: 1px solid var(--border);
+}
+
+.notes-heading h1 {
+  color: #0a174e;
+  font-family: "Basic", sans-serif;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  line-height: 1.2;
+}
+
+.notes-content {
+  padding: 1.4rem;
+  color: var(--text-muted);
+  background: #ffffff;
+  font-family: "Nunito Sans", sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+.notes-content strong {
+  color: #0a174e;
+}
+
+.notes-content h4 {
+  margin: 2rem 0 1rem;
+  padding-bottom: 0.55rem;
+  color: #0a174e;
+  border-bottom: 1px solid var(--border);
+  font-family: "Basic", sans-serif;
+  font-size: 1.25rem;
+}
+
+.notes-content a {
+  color: var(--primary-hover);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.notes-content a:hover {
+  text-decoration: underline;
+}
+
+.notes-content p {
+  margin-top: 1.25rem;
+}
+
+.customsNotesAreaExtraMargin {
+  display: block;
+  height: 1rem;
+}
+
+@media (max-width: 680px) {
+  .page-container {
+    padding: 1rem 0.75rem 3rem;
+  }
+
+  .breadcrumb {
+    gap: 0.35rem;
+    margin-bottom: 0.8rem;
+    font-size: 0.76rem;
+  }
+
+  .notes-heading {
+    padding: 1rem;
+  }
+
+  .notes-heading h1 {
+    font-size: 1.3rem;
+  }
+
+  .notes-content {
+    padding: 1rem;
+    font-size: 0.82rem;
+    line-height: 1.55;
+  }
+
+  .notes-content h4 {
+    margin: 1.5rem 0 0.8rem;
+    font-size: 1.05rem;
+  }
+
+  .customsNotesAreaExtraMargin {
+    height: 0.75rem;
+  }
+}
