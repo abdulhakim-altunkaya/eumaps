@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Güç Birimleri Çevirici - eumaps.org</title>
+  <meta name="description" content="Watt, kilowatt, megawatt, beygir gücü, PS, kalori/saniye ve diğer güç birimleri arasında dönüşüm yapın.">
+  <link rel="icon" href="../icons/icon1.png" type="image/png">
+  <link rel="stylesheet" href="../css/index.css">
+  <link rel="stylesheet" href="../css/cevirici-guc.css">
+</head>
+<body>
+
+<header class="navbar">
+  <div class="nav-container">
+    <div class="brand-box">
+      <a href="../index.html" class="logoArea">
+        <img src="../icons/icon1.png" class="logoIcon" alt="eumaps.org">
+        <span class="logoText">eumaps.org</span>
+      </a>
+      <span class="tagline">Hesap-kitap platformu</span>
+    </div>
+  </div>
+</header>
+
+<main class="page-container">
+  <nav class="breadcrumb" aria-label="Sayfa yolu">
+    <a href="../index.html">Ana Sayfa</a>
+    <span>›</span>
+    <a href="../cevirici.html">Birim Çevirici</a>
+    <span>›</span>
+    <span>Güç</span>
+  </nav>
+
+  <section class="converter-section">
+    <div class="converter-heading">
+      <h1>Güç Birimleri Çevirici</h1>
+    </div>
+
+    <div class="converter-content">
+      <form id="powerConverterForm" class="converter-form">
+        <div class="form-list">
+          <div class="form-group"><input type="number" class="inputFields" id="watt" name="watt" min="0" max="1000000000" step="any"><label for="watt">Watt (W)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="kilowatt" name="kilowatt" min="0" max="1000000000" step="any"><label for="kilowatt">Kilowatt (kW)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="megawatt" name="megawatt" min="0" max="1000000000" step="any"><label for="megawatt">Megawatt (MW)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="horsepowerImperial" name="horsepowerImperial" min="0" max="1000000000" step="any"><label for="horsepowerImperial">Beygir Gücü (hp, imperial)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="horsepowerMetric" name="horsepowerMetric" min="0" max="1000000000" step="any"><label for="horsepowerMetric">Beygir Gücü (hp, metrik)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="footPoundPerSecond" name="footPoundPerSecond" min="0" max="1000000000" step="any"><label for="footPoundPerSecond">Foot-pound/Saniye (ft-lb/s)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="caloriePerSecond" name="caloriePerSecond" min="0" max="1000000000" step="any"><label for="caloriePerSecond">Kalori/Saniye (cal/s)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="kilocaloriePerSecond" name="kilocaloriePerSecond" min="0" max="1000000000" step="any"><label for="kilocaloriePerSecond">Kilokalori/Saniye (kcal/s)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="ergPerSecond" name="ergPerSecond" min="0" max="1000000000" step="any"><label for="ergPerSecond">Erg/Saniye (erg/s)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="pferdestarke" name="pferdestarke" min="0" max="1000000000" step="any"><label for="pferdestarke">Pferdestärke (PS)</label></div>
+          <div class="form-group"><input type="number" class="inputFields" id="milliwatt" name="milliwatt" min="0" max="1000000000" step="any"><label for="milliwatt">Milliwatt (mW)</label></div>
+        </div>
+
+        <div id="formMessage" class="form-message" role="alert" aria-live="assertive"></div>
+
+        <div class="button-group">
+          <button type="button" id="clearBtn" class="secondary-button">Temizle</button>
+        </div>
+      </form>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>© 2020-2026 <strong>eumaps.org</strong></p>
+</footer>
+
+<script src="../js/cevirici-guc.js"></script>
+</body>
+</html>
