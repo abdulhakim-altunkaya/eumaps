@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>İlçe Nüfusu | eumaps.org</title>
+  <meta name="description" content="Türkiye'nin illere göre nüfus dağılımını interaktif harita üzerinden inceleyin. İllere göre güncel ve geçmiş nüfus verileri.">
+
+  <link rel="icon" type="image/png" href="../icons/icon1.png">
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <link rel="stylesheet" href="../css/index.css">
+  <link rel="stylesheet" href="../css/nufus.css">
+  <link rel="stylesheet" href="../css/nufus-tablo.css">
+  <link rel="stylesheet" href="../css/nufus-il-1.css">
+  <link rel="stylesheet" href="../css/nufus-il-2.css">
+  <link rel="stylesheet" href="../css/nufus-il-3.css">
+  <script src="../js/nufus.js" defer></script>
+  <script src="../js/nufus-harita.js" defer></script>
+  <script src="../js/nufus-il.js" defer></script>
+  <script src="../js/nufus-ilce.js" defer></script>
+  <script src="../js/nufus-iller-tablo.js" defer></script>
+</head>
+
+<body>
+
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="brand-box">
+        <a href="../index.html" class="logoArea">
+          <img src="../icons/icon1.png" class="logoIcon" alt="eumaps.org">
+          <span class="logoText">eumaps.org</span>
+        </a>
+        <span class="tagline">Hesap-kitap platformu</span>
+      </div>
+    </div>
+  </header>
+
+
+  <main class="page-container">
+    <nav class="breadcrumb" aria-label="Sayfa yolu">
+      <a href="../index.html">Ana Sayfa</a>
+      <span aria-hidden="true">›</span>
+      <span>İlçe Nüfus İstatistikleri</span>
+    </nav>
+
+    <section class="districtAnnualTableArea">
+        <h3>Yıllara ilçe göre nüfus</h3>
+        <table class="district-annual-table" role="table" aria-label="YILLARA GÖRE İLÇE NÜFUS TABLOSU">
+            <thead>
+            <tr>
+                <th></th>
+                <th>Nüfus</th>
+            </tr>
+            </thead>
+            <tbody id="district-annual-table-body"></tbody>
+        </table>
+    </section>
+
+</main>
+
+<footer class="footer"><div class="footer-container"><p>© eumaps.org</p></div></footer>
+
+</body>
+</html>

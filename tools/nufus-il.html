@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>İllerin nüfusu | eumaps.org</title>
+  <meta name="description" content="Türkiye'nin illere göre nüfus dağılımını interaktif 
+  harita üzerinden inceleyin. İllere göre güncel ve geçmiş nüfus verileri.">
+  <link rel="icon" type="image/png" href="../icons/icon1.png">
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <link rel="stylesheet" href="../css/index.css">
+  <link rel="stylesheet" href="../css/nufus.css">
+  <link rel="stylesheet" href="../css/nufus-tablo.css">
+  <link rel="stylesheet" href="../css/nufus-il-1.css">
+  <link rel="stylesheet" href="../css/nufus-il-2.css">
+  <link rel="stylesheet" href="../css/nufus-il-3.css">
+  <script src="../js/nufus.js" defer></script>
+  <script src="../js/nufus-harita.js" defer></script>
+  <script src="../js/nufus-il.js" defer></script>
+  <script src="../js/nufus-ilce.js" defer></script>
+  <script src="../js/nufus-iller-tablo.js" defer></script>
+</head>
+
+<body>
+
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="brand-box">
+        <a href="../index.html" class="logoArea">
+          <img src="../icons/icon1.png" class="logoIcon" alt="eumaps.org">
+          <span class="logoText">eumaps.org</span>
+        </a>
+        <span class="tagline">Hesap-kitap platformu</span>
+      </div>
+    </div>
+  </header>
+
+
+  <main class="page-container">
+    <nav class="breadcrumb" aria-label="Sayfa yolu">
+      <a href="../index.html">Ana Sayfa</a>
+      <span aria-hidden="true">›</span>
+      <span>İl Nüfus İstatistikleri</span>
+    </nav>
+
+    <section class="provinceDistrictsTableArea">
+        <h3>İl ve İlçe Nüfus Tablosu</h3>
+        <table class="province-districts-table" role="table" aria-label="İL İLÇE NÜFUS TABLOSU">
+            <thead>
+            <tr>
+                <th></th>
+                <th>İL</th>
+                <th>İLÇE</th>
+                <th>2025</th>
+                <th>2024</th>
+                <th>2023</th>
+                <th>2015</th>
+                <th>2011</th>
+                <th>2007</th>
+            </tr>
+            </thead>
+            <tbody id="province-districts-table-body"></tbody>
+        </table>
+    </section>
+
+    <section class="twoTables">
+        <section class="provinceOriginsTableArea">
+            <h3>en çok hangi ilde yaşıyor?</h3>
+            <table class="province-origins-table" role="table" aria-label="HEMŞERİ NÜFUS TABLOSU">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>İLLER</th>
+                        <th>Hemşeriler</th>
+                    </tr>
+                </thead>
+                <tbody id="province-origins-table-body"></tbody>
+            </table>
+        </section>
+
+        <section class="provinceAnnualTableArea">
+            <h3>Yıllara göre Toplam ve Yabancı Nüfus</h3>
+            <table class="province-annual-table" role="table" aria-label="YILLARA GÖRE İL NÜFUS VE YABANCI NÜFUS TABLOSU">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Toplam Nüfus</th>
+                        <th>Yabancılar</th>
+                    </tr>
+                </thead>
+                <tbody id="province-annual-table-body"></tbody>
+            </table>
+        </section>
+    </section>
+
+</main>
+
+<footer class="footer"><div class="footer-container"><p>© eumaps.org</p></div></footer>
+
+</body>
+</html>
