@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const tbody = document.getElementById('province-districts-table-body');
   const annualTbody = document.getElementById('province-annual-table-body');
   const originsTbody = document.getElementById('province-origins-table-body');
-  const provinceLabel = document.getElementById('province-label');
+  const provinceLabel = document.querySelector('.provinceDistrictsTableArea h3');
   const originsTitle = document.querySelector('.provinceOriginsTableArea h3');
 
   if (!tbody || !annualTbody || !originsTbody) {
@@ -33,7 +33,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       const provinceData = provinceRes?.data?.resData;
       const name =
         districts?.[0]?.provincename || provinceData?.provincename || 'Unknown Province';
-      provinceLabel.textContent = name;
+      if (provinceLabel) {
+        provinceLabel.textContent = `${name} İl ve İlçe Nüfus Tablosu`;
+      }
 
       tbody.innerHTML = '';
       if (provinceData) {
@@ -68,7 +70,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <td>${formatNumber(d['2007'])}</td>
           `;
           tr.addEventListener('click', () => {
-            window.location.href = `./tools/nufus-ilce.html?districtId=${d.id}`;
+            window.location.href = `./nufus-ilce.html?districtId=${d.id}`;
           });
           tbody.appendChild(tr);
         });
