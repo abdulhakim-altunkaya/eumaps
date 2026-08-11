@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <td>${formatNumber(d['2007'])}</td>
           `;
           tr.addEventListener('click', () => {
-            window.location.href = `./nufus-ilce.html?districtId=${d.id}`;
+            window.location.href = `./tools/nufus-ilce.html?districtId=${d.id}`;
           });
           tbody.appendChild(tr);
         });

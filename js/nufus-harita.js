@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Click to navigate
       el.addEventListener("click", () => {
         const provinceId = el.id; // e.g., "75"
-        window.location.href = `./nufus-il.html?provinceId=${provinceId}`;
+        window.location.href = `./tools/nufus-il.html?provinceId=${provinceId}`;
       });
     });
 
