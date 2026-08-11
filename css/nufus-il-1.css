@@ -1,66 +1,93 @@
-@media (min-width: 781px) { 
-    .provinceAnnualTableArea {
-        width: 30%;
-        margin-left: 65px;
+@media (min-width: 781px) {
+    .provinceDistrictsTableArea {
+        width: 90%;
+        margin: auto;
         font-family: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
-    }
-    .province-annual-table { 
+    }        
+    .province-districts-table {
       width: 100%;
-      border: 3px solid white;
+      border-collapse: collapse;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial;
       background: #fff;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.14);
     }
 
     /* Header */
-    .province-annual-table thead th {
+    .province-districts-table thead th {
       text-align: left;
       padding: 10px 12px;
       border-bottom: 2px solid #e6e6e6;
       font-weight: 600;
-      background: #0A174E;
-      color: #F5D042;
+      background: linear-gradient(180deg,#b2e3c8,#7ab68b);
       font-weight: bold;
     }
 
     /* Body rows */
-    .province-annual-table tbody td {
+    .province-districts-table tbody td {
       padding: 10px 12px;
       border-bottom: 1px solid #f0f0f0;
     }
-    .province-annual-table tbody tr {
-      background: #F5D042;
-      color: #0A174E;
-    }
-  }
-/* Small responsive tweak */
-@media (max-width: 780px) {
-  .provinceAnnualTableArea {
-      width: 98%;
-      font-family: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
-  }
-  .province-annual-table { 
-    width: 100%;
-    border: 3px solid white;
-    font-size: 14px;
-  }
 
-  /* Header */
-  .province-annual-table thead th {
-    text-align: left;
-    padding: 5px 6px;
-    background: #0A174E;
-    color: #F5D042;
+    /* Zebra striping */
+    .province-districts-table tbody tr:nth-child(odd) {
+      background: #ffffff;
+    }
+    .province-districts-table tbody tr:nth-child(even) {
+      background: #f5f5d5;
+    }
+    .province-districts-table tbody tr:hover {
+      cursor: pointer;
+      background-color: lightsteelblue;
+    }
+  .provinceNameCell{
     font-weight: bold;
   }
+}
 
-  /* Body rows */
-  .province-annual-table tbody td {
+@media (max-width: 780px) {
+
+    .provinceDistrictsTableArea {
+  display: block;
+  overflow-x: auto;
+  width: auto;             /* don’t stretch full width */
+  max-width: 100%;         /* prevent going past parent */
+  margin-right: var(--section-gap, 15px); /* keep your page layout margin */
+  padding-bottom: 6px;     /* space for scrollbar */
+  font-family: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+}
+.provinceDistrictsTableArea::-webkit-scrollbar {
+  height: 8px;
+}
+.provinceDistrictsTableArea::-webkit-scrollbar-thumb {
+  background-color: #ccc;
+  border-radius: 3px;
+}
+        
+    .province-districts-table {
+      width: 100%;
+      background: #fff;
+      font-size: 13px;
+    }
+
+
+      /* Header */
+  .province-districts-table thead th {
+    text-align: left;
     padding: 5px 6px;
-    border-bottom: 1px solid #f0f0f0;
+    background: linear-gradient(180deg,#b2e3c8,#7ab68b);
+    font-weight: bold;
   }
-
-  .province-annual-table tbody tr {
-    background: #F5D042;
-    color: #0A174E;
+  .province-districts-table tbody td {
+    padding: 5px 6px;
   }
-
+  /* Zebra striping */
+  .province-districts-table tbody tr:nth-child(odd) {
+    background: #ffffff;
+  }
+  .province-districts-table tbody tr:nth-child(even) {
+    background: #f5f5d5;
+  }
+    .provinceNameCell{
+      font-weight: bold;
+    }
 }
