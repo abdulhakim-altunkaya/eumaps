@@ -128,7 +128,7 @@
   }
 
   .homepage-table {
-    min-width: 650px;
+    width: 90%;
   }
 
   .homepage-table th,
