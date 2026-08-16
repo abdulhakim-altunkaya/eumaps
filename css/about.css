@@ -25,11 +25,18 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 28px;
 }
 
 .about-section {
+  padding: 28px;
   margin-bottom: 28px;
+}
+
+.contact-section {
+  width: 50%;
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 18px;
 }
 
 .about-section h1,
@@ -44,7 +51,8 @@
 }
 
 .contact-section h2 {
-  font-size: 26px;
+  margin-bottom: 7px;
+  font-size: 23px;
 }
 
 .about-section p,
@@ -55,26 +63,32 @@
   font-size: 16px;
 }
 
+.contact-section > p {
+  margin: 0 0 12px;
+  line-height: 1.5;
+  font-size: 14px;
+}
+
 .contact-form {
-  margin-top: 24px;
+  margin-top: 14px;
 }
 
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 18px;
+  gap: 10px;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  margin-bottom: 18px;
+  gap: 5px;
+  margin-bottom: 11px;
 }
 
 .form-group label {
   color: var(--text-main);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
 }
 
@@ -82,12 +96,12 @@
   width: 100%;
   box-sizing: border-box;
   border: 1px solid var(--border);
-  border-radius: 9px;
-  padding: 11px 12px;
+  border-radius: 8px;
+  padding: 9px 10px;
   background: #ffffff;
   color: var(--text-main);
   font-family: inherit;
-  font-size: 16px;
+  font-size: 14px;
   outline: none;
 }
 
@@ -97,26 +111,29 @@
 
 textarea.form-input {
   resize: vertical;
-  min-height: 130px;
+  min-height: 90px;
 }
 
 .contact-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 180px;
-  padding: 13px 26px;
+  min-width: 150px;
+  padding: 10px 18px;
   border: 1px solid #0a174e;
-  border-radius: 10px;
+  border-radius: 9px;
   background: #0a174e;
   color: #ffffff;
   font-family: "Nunito Sans", sans-serif;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.2px;
   cursor: pointer;
   box-shadow: 0 4px 10px rgba(10, 23, 78, 0.18);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
 }
 
 .contact-button:hover {
@@ -146,12 +163,12 @@ textarea.form-input {
 
 .form-error {
   display: none;
-  margin-bottom: 15px;
-  padding: 10px 12px;
+  margin-bottom: 10px;
+  padding: 8px 10px;
   border-radius: 8px;
   background: var(--danger-bg);
   color: var(--danger);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .form-error.show {
@@ -161,16 +178,17 @@ textarea.form-input {
 .form-success {
   display: none;
   align-items: center;
-  gap: 10px;
-  padding: 14px;
-  border-radius: 9px;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 8px;
   background: var(--green-light);
   color: var(--text-main);
+  font-size: 14px;
   font-weight: 600;
 }
 
 .success-icon {
-  font-size: 20px;
+  font-size: 18px;
 }
 
 @media (max-width: 680px) {
@@ -179,9 +197,13 @@ textarea.form-input {
     padding-top: 20px;
   }
 
-  .about-section,
-  .contact-section {
+  .about-section {
     padding: 20px;
+  }
+
+  .contact-section {
+    width: 100%;
+    padding: 16px;
   }
 
   .about-section h1 {
@@ -189,7 +211,7 @@ textarea.form-input {
   }
 
   .contact-section h2 {
-    font-size: 23px;
+    font-size: 21px;
   }
 
   .form-row {
