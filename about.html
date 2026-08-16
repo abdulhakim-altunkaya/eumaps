@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Hakkımızda | eumaps.org</title>
+  <meta name="description" content="eumaps.org hakkında bilgi alın ve bizimle iletişime geçin.">
+
+  <link rel="icon" href="./icons/icon1.png" type="image/x-icon">
+
+  <link rel="stylesheet" href="./css/index.css">
+  <link rel="stylesheet" href="./css/about.css">
+
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="./js/about.js" defer></script>
+</head>
+
+<body>
+
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="brand-box">
+        <a href="./index.html" class="logoArea">
+          <img src="./icons/icon1.png" class="logoIcon" alt="eumaps.org">
+          <span class="logoText">eumaps.org</span>
+        </a>
+        <span class="tagline">Hesap-kitap platformu</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="about-container">
+
+    <nav class="breadcrumb" aria-label="Sayfa yolu">
+      <a href="./index.html">Ana Sayfa</a>
+      <span aria-hidden="true">›</span>
+      <span>Hakkımızda</span>
+    </nav>
+
+    <section class="about-section">
+      <h1>eumaps.org Hakkında</h1>
+      <p>eumaps.org; hesaplama araçları, birim çeviriciler, nüfus istatistikleri,
+        IP sorgulama araçları ve farklı alanlarda kullanışlı çevrimiçi sunan bir platformdur.</p>
+    </section>
+
+    <section class="contact-section" id="contact">
+      <h2>İletişim</h2>
+
+      <p>
+        Soru, öneri, hata bildirimi, iş birliği veya diğer konular için
+        aşağıdaki formu kullanabilirsiniz.
+      </p>
+
+      <div class="contact-form">
+
+        <div class="form-success" id="contactSuccess">
+          <span class="success-icon">✓</span>
+          <span>Mesajınız gönderildi. Teşekkür ederiz.</span>
+        </div>
+
+        <form id="contactForm">
+
+          <div class="form-row">
+
+            <div class="form-group">
+              <label for="contactName">Adınız</label>
+              <input
+                type="text"
+                id="contactName"
+                class="form-input"
+                placeholder="Adınız"
+                maxlength="50"
+                required
+              >
+            </div>
+
+            <div class="form-group">
+              <label for="contactEmail">E-posta</label>
+              <input
+                type="email"
+                id="contactEmail"
+                class="form-input"
+                placeholder="ornek@email.com"
+                maxlength="100"
+                required
+              >
+            </div>
+
+          </div>
+
+          <div class="form-group">
+            <label for="contactSubject">Konu</label>
+            <input
+              type="text"
+              id="contactSubject"
+              class="form-input"
+              placeholder="Mesajınızın konusu"
+              maxlength="120"
+              required
+            >
+          </div>
+
+          <div class="form-group">
+            <label for="contactMessage">Mesaj</label>
+            <textarea
+              id="contactMessage"
+              class="form-input"
+              placeholder="Mesajınızı yazınız..."
+              maxlength="1000"
+              rows="6"
+              required
+            ></textarea>
+          </div>
+
+          <div class="form-error" id="contactError"></div>
+
+          <button type="submit" class="contact-button" id="contactBtn">
+            Mesaj Gönder
+          </button>
+
+        </form>
+
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <p>&copy; 2020-2026 <strong>eumaps.org</strong></p>
+  </footer>
+
+</body>
+</html>
