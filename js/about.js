@@ -27,7 +27,7 @@ async function handleContact(event) {
 
   try {
     await axios.post(
-      "https://www.eumaps.org/api/post/eumaps/contact",
+      "https://www.eumaps.org/api/post/message",
       {
         name,
         email,

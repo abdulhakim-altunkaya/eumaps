@@ -866,8 +866,166 @@ app.post("/api/litvanya-yatirim/save-visitor", visitLoggingMiddleware(3 * 60 * 1
   }
 });
 
+ 
+const messageIpCache = {};
+app.post("/api/post/message", async (req, res) => {
+  const ipVisitor =
+    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+    req.socket.remoteAddress ||
+    req.ip;
+  let client;
+  if (ignoredIPs.includes(ipVisitor)) {
+    return res.status(403).json({
+      resStatus: false,
+      resMessage: "This IP is not allowed to send messages.",
+      resErrorCode: 1
+    });
+  }
+  // One message per IP every ~16.7 minutes
+  if (
+    messageIpCache[ipVisitor] &&
+    Date.now() - messageIpCache[ipVisitor] < 1000000
+  ) {
+    return res.status(429).json({
+      resStatus: false,
+      resMessage: "Çok fazla mesaj gönderdiniz. Lütfen daha sonra tekrar deneyiniz.",
+      resErrorCode: 2
+    });
+  }
 
+  const {
+    name,
+    email,
+    subject,
+    message,
+    source
+  } = req.body || {};
 
+  if (
+    typeof name !== "string" ||
+    typeof email !== "string" ||
+    typeof subject !== "string" ||
+    typeof message !== "string" ||
+    typeof source !== "string"
+  ) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Geçersiz mesaj verisi.",
+      resErrorCode: 3
+    });
+  }
+
+  const cleanName = name.trim();
+  const cleanEmail = email.trim();
+  const cleanSubject = subject.trim();
+  const cleanMessage = message.trim();
+  const cleanSource = source.trim();
+
+  if (
+    !cleanName ||
+    !cleanEmail ||
+    !cleanSubject ||
+    !cleanMessage ||
+    !cleanSource
+  ) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Lütfen tüm alanları doldurunuz.",
+      resErrorCode: 4
+    });
+  }
+
+  if (cleanName.length > 100) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "İsim çok uzun.",
+      resErrorCode: 5
+    });
+  }
+
+  if (cleanEmail.length > 255) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "E-posta adresi çok uzun.",
+      resErrorCode: 6
+    });
+  }
+
+  if (cleanSubject.length > 200) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Konu çok uzun.",
+      resErrorCode: 7
+    });
+  }
+
+  if (cleanMessage.length > 1000) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Mesaj çok uzun.",
+      resErrorCode: 8
+    });
+  }
+
+  if (cleanSource.length > 100) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Geçersiz kaynak bilgisi.",
+      resErrorCode: 9
+    });
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!emailRegex.test(cleanEmail)) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Geçerli bir e-posta adresi giriniz.",
+      resErrorCode: 10
+    });
+  }
+
+  try {
+    client = await pool.connect();
+
+    await client.query(
+      `INSERT INTO messages
+        (name, email, subject, message, ip, webpage)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        cleanName,
+        cleanEmail,
+        cleanSubject,
+        cleanMessage,
+        ipVisitor,
+        cleanSource
+      ]
+    );
+
+    // Only rate-limit after successful database insert
+    messageIpCache[ipVisitor] = Date.now();
+
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "Message sent",
+      resOkCode: 1
+    });
+
+  } catch (error) {
+    console.error("Message save error:", error.message);
+
+    return res.status(500).json({
+      resStatus: false,
+      resMessage: "Database connection error",
+      resErrorCode: 11
+    });
+
+  } finally {
+    if (client) {
+      client.release();
+    }
+  }
+});
 /* SAVE MESSAGE FORMS */
 const ipCache10 = {}
 app.post("/api/save-message/letonya-oturum-english", async (req, res) => {
