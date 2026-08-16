@@ -1,0 +1,215 @@
+@import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,100..700;1,100..700&family=Kanit:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playwrite+HU:wght@100..400&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Edu+AU+VIC+WA+NT+Hand:wght@400..700&family=Playwrite+HU:wght@100..400&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nerko+One&display=swap'); /* Nerko One*/
+@import url('https://fonts.googleapis.com/css2?family=Acme&family=Lobster&family=Nerko+One&display=swap'); /*Acme Lobster Nerko One*/
+@import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap'); /*Fredoka One*/
+@import url('https://fonts.googleapis.com/css2?family=Courgette&display=swap'); /*Courgette*/
+@import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@300&display=swap');/*Comfortaa*/
+@import url('https://fonts.googleapis.com/css2?family=Concert+One&family=Righteous&display=swap');/*Concert One*/
+@import url('https://fonts.googleapis.com/css2?family=Righteous&display=swap');/*Righteous*/
+@import url('https://fonts.googleapis.com/css2?family=Concert+One&family=Monda:wght@700&family=Righteous&display=swap');/*Monda*/
+@import url('https://fonts.googleapis.com/css2?family=Maven+Pro&display=swap');/*Maven Pro*/
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@200&display=swap'); /*Nunito*/
+@import url('https://fonts.googleapis.com/css2?family=Honk:MORF@16&family=Paytone+One&display=swap');/*Paytone One*/
+@import url('https://fonts.googleapis.com/css2?family=Bungee+Tint&display=swap');/*Bungee Tint*/
+@import url('https://fonts.googleapis.com/css2?family=Style+Script&display=swap'); /*Style Script*/
+@import url('https://fonts.googleapis.com/css2?family=Agbalumo&display=swap'); /*Agbalumo*/
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Baumans&display=swap');/*Baumans*/
+/*Nunito Maven Pro Righteous Monda Concert One Courgette Fredoka One Lobster Nerko One Poppins Playwrite HU*/
+/*Agbalumo     Style Script     Bungee Tint     Paytone One     Nunito  DM Sans      Plus Jakarta    Manrope*/
+
+@media (min-width: 781px) {
+    .contentArea {
+        padding: 20px;
+        flex-grow: 2;
+        display: flex;
+        flex-direction: column;
+    }
+    .inputArea {
+        flex: 1;
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        text-align: center;
+        align-items: center;
+    }
+    .inputIP {
+        width: 220px;
+        height: 40px;
+        padding: 5px;
+        border-radius: 5px;
+        outline: none;
+        font-family: "Comfortaa", sans-serif;
+        font-weight: bold;
+        letter-spacing: 2px; 
+        font-size: 15px;
+        box-sizing: border-box; /* Ensures padding fits within height */
+    }
+    .resultAndMapArea {
+        flex: 4;
+        display: flex;
+        flex-direction: row;
+        margin-top: 10px;
+    }
+    .resultArea {
+        width: 50%;
+        padding-left: 120px;
+    }
+    dl {
+        display: grid;
+        grid-template-columns: max-content auto;
+        gap: 8px 16px; /* vertical and horizontal spacing */
+    }
+    dt {
+        font-weight: bold;
+    }
+    dd {
+        margin: 0;
+    }
+    .mapArea {
+        width: 50%;
+    }
+    .mapDiv {
+        height: 300px;
+        width: 300px;
+        border-radius: 5px;
+        box-shadow: 0 8px 16px rgba(39, 75, 158, 0.4);
+    }
+    @import url('https://fonts.googleapis.com/css2?family=Kanit&display=swap');
+    .button1010 {
+        width: 220px;
+        height: 40px; /* Matches inputIP height */
+        margin-left: 20px;
+        font-family: 'Kanit', sans-serif;
+        background-color: #101820;
+        border: 2px solid #FEE715;
+        color: white;
+        padding: 4px 6px; /* Retained, fits within height */
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 22px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+        box-sizing: border-box; /* Ensures padding and border fit within height */
+    }
+    .button1010:hover {
+      background-color: #0D141E;
+      border-color: #FEE715;
+      transform: scale(1.05);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      animation: glowing 1.5s infinite;
+    }
+    .button1010:active {
+      transform: scale(0.95);
+    }
+    .button1010:focus {
+      outline: none;
+      box-shadow: 0 0 5px #FEE715, 0 0 10px #FEE715;
+    }
+    @keyframes glowing {
+      0% { box-shadow: 0 0 5px rgba(254, 231, 21, 0.8); }
+      50% { box-shadow: 0 0 20px rgba(254, 231, 21, 0.8); }
+      100% { box-shadow: 0 0 5px rgba(254, 231, 21, 0.8); }
+    } 
+    
+}
+@media (max-width: 780px) {
+    .contentArea {
+        padding: 20px;
+        flex-grow: 2;
+        display: flex;
+        flex-direction: column;
+    }
+    .resultAndMapArea {
+        flex: 4;
+        display: flex;
+        flex-direction: column;
+        margin-top: 10px;
+    }
+    .resultArea {
+        height: 50%;
+        
+    }
+    .mapArea {
+        height: 50%;
+        margin-top: 15px;
+    }
+    .inputArea {
+        flex: 1;
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        text-align: center;
+        align-items: center;
+    }
+    .inputIP {
+        width: 200px;
+        height: 40px;
+        padding: 5px;
+        border-radius: 5px;
+        outline: none;
+        font-family: "Comfortaa", sans-serif;
+        font-weight: bold;
+        letter-spacing: 2px; 
+        font-size: 15px;
+        box-sizing: border-box; /* Ensures padding fits within height */
+    }
+    dl {
+        display: grid;
+        grid-template-columns: max-content auto;
+        gap: 8px 16px; /* vertical and horizontal spacing */
+    }
+    dt {
+        font-weight: bold;
+    }
+    dd {
+        margin: 0;
+    }
+    .mapDiv {
+        height: 300px;
+        width: 300px;
+        border-radius: 5px;
+        box-shadow: 0 8px 16px rgba(39, 75, 158, 0.4);
+    }
+    
+    @import url('https://fonts.googleapis.com/css2?family=Kanit&display=swap');
+    .button1010 {
+        width: 220px;
+        height: 40px; /* Matches inputIP height */
+        margin-left: 20px;
+        font-family: 'Kanit', sans-serif;
+        background-color: #101820;
+        border: 2px solid #FEE715;
+        color: white;
+        padding: 4px 6px; /* Retained, fits within height */
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 22px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+        box-sizing: border-box; /* Ensures padding and border fit within height */
+    }
+    .button1010:active {
+      transform: scale(0.95);
+    }
+    .button1010:focus {
+      outline: none;
+      box-shadow: 0 0 5px #FEE715, 0 0 10px #FEE715;
+    }
+    @keyframes glowing {
+      0% { box-shadow: 0 0 5px rgba(254, 231, 21, 0.8); }
+      50% { box-shadow: 0 0 20px rgba(254, 231, 21, 0.8); }
+      100% { box-shadow: 0 0 5px rgba(254, 231, 21, 0.8); }
+    } 
+    
+}

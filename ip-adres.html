@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>İP adres sorgulama - eumaps.org</title>
+  <meta name="description" content="İP adres sorgulama, ip yer tespiti, ip adres bulma, ip konumlandırma hizmeti">
+  <link rel="icon" href="./icons/icon1.png" type="image/png">
+  <link rel="stylesheet" href="./css/index.css">
+  <link rel="stylesheet" href="./css/ip-adres.css">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <!-- Leaflet CSS (no integrity) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <!-- FontAwesome CSS (no integrity) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" />
+    <!-- Leaflet JS (no integrity) -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+</head>
+<body>
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="brand-box">
+        <a href="./index.html" class="logoArea">
+          <img src="./icons/icon1.png" class="logoIcon" alt="eumaps.org">
+          <span class="logoText">eumaps.org</span>
+        </a>
+        <span class="tagline">Hesap-kitap platformu</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-container">
+    <nav class="breadcrumb" aria-label="Sayfa yolu">
+      <a href="./index.html">Ana Sayfa</a>
+      <span aria-hidden="true">›</span>
+      <span>İP adres sorgulama</span>
+    </nav>
+    <section class="contentArea">
+        <div class="inputArea">
+            <input class="inputIP" id="ipInput" type="text" 
+                placeholder="enter IP address" maxlength="45" autocomplete="off">
+            <button class="button1010" id="logVisitorBtn">Locate IP</button>
+        </div>
+        <section class="resultAndMapArea">
+            <section class="resultArea">
+                <h3>IP Details</h3>
+                <dl>
+                    <dt>Continent:</dt><dd id="continentSpan"></dd>
+                    <dt>Country:</dt><dd id="countrySpan"></dd>
+                    <dt>City:</dt><dd id="citySpan"></dd>
+                    <dt>Latitude:</dt><dd id="latitudeSpan"></dd>
+                    <dt>Longitude:</dt><dd id="longitudeSpan"></dd>
+                    <dt>Connection Type:</dt><dd id="connectionTypeSpan"></dd>
+                    <dt>IP Type:</dt><dd id="ipTypeSpan"></dd>
+                </dl>
+                <div id="errorArea"></div>
+            </section>
+            <section class="mapArea">
+                <div id="map" class="mapDiv"></div>
+            </section>
+        </section>
+    </section>
+
+  </main>
+
+  <footer>
+    <p>© 2020-2026 <strong>eumaps.org</strong></p>
+  </footer>
+
+  <script src="./js/ip-adres.js"></script>
+</body>
+</html>
