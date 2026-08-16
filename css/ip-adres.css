@@ -152,7 +152,7 @@
         flex-grow: 2;
         display: flex;
         flex-direction: column;
-        font-family: "Nunito Sans", serif;
+        font-family: "Nunito Sans", "Basic" serif;
     }
 
     .page-container{
