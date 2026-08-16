@@ -212,7 +212,12 @@ footer {
   color: var(--text-muted);
   font-size: 0.875rem;
 }
-
+.footerLink {
+  text-decoration: none;
+}
+.footerLink:hover {
+  font-weight: bold;
+}
 /* --- Responsive Layout Adjustments --- */
 
 /* Medium Screens (Tablets / Laptops) */
