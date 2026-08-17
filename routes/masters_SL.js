@@ -1411,65 +1411,7 @@ router.post("/post/delete-reply", blockMaliciousIPs, applyWriteRateLimit, async 
     });
   }
 });
-router.post("/post/message", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
-  const clean = (v, max) =>
-    String(v || "")
-      .trim()
-      .slice(0, max)
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;");
 
-  const name = clean(req.body.name, 40);
-  const email = clean(req.body.email, 40);
-  const message = clean(req.body.message, 500);
-  // length + presence checks
-  if (name.length < 2 || email.length < 5 || message.length < 5) {
-    return res.json({
-      resStatus: false,
-      resErrorCode: 1,
-      resMessage: "Invalid user inputs"
-    });
-  }
-  // basic email sanity check
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.json({
-      resStatus: false,
-      resErrorCode: 2,
-      resMessage: "Invalid email"
-    });
-  }
-  try {
-    const d = new Date();
-    const visitdate = `${String(d.getDate()).padStart(2, "0")}/${String(
-      d.getMonth() + 1
-    ).padStart(2, "0")}/${d.getFullYear()}`;
-
-    const insertQ = `
-      INSERT INTO messages_masters_sl
-        (name, email, message, date)
-      VALUES ($1, $2, $3, $4)
-    `;
-
-    await pool.query(insertQ, [
-      name,
-      email,
-      message,
-      visitdate
-    ]);
-
-    return res.json({
-      resStatus: true,
-      resOkCode: 1
-    });
-  } catch (err) {
-    console.error("Save message error:", err);
-    return res.status(500).json({
-      resStatus: false,
-      resErrorCode: 2,
-      resMessage: "Server error"
-    });
-  }
-});
 router.post("/post/like", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
   // Desktop can use cookies but some mobiles will use headers for login system
   const auth = req.headers.authorization || "";
