@@ -884,10 +884,10 @@ app.post("/api/post/message", async (req, res) => {
     });
   }
 
-  // One message per IP every ~16.7 minutes
+  // One message per IP every ~ 7 minutes
   if (
     messageIpCache[ipVisitor] &&
-    Date.now() - messageIpCache[ipVisitor] < 1000000
+    Date.now() - messageIpCache[ipVisitor] < 420000
   ) {
     return res.status(429).json({
       resStatus: false,
