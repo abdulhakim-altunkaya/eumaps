@@ -149,15 +149,19 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    const windowDays = getWindowDays();
+    const ruleLabel = `90/${windowDays}`;
+
     const occupiedDays = getOccupiedDays();
-    const violation = findFirstViolation(occupiedDays);
+    const violation = findFirstViolation(occupiedDays, windowDays);
 
     const latestTrip = trips[trips.length - 1];
     const referenceDate = latestTrip.exitDate;
 
     const usedDays = countDaysInWindow(
       occupiedDays,
-      referenceDate
+      referenceDate,
+      windowDays
     );
 
     const remainingDays = Math.max(0, 90 - usedDays);
@@ -165,7 +169,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const possibleNextEntry = addDays(referenceDate, 1);
 
     const selectedRegion =
-      regionSelect.value === "turkiye" ? "Türkiye" : "Schengen";
+      regionSelect.value === "schengen"
+        ? "Schengen"
+        : "Türkiye";
 
     let statusHtml;
     let nextEntry;
@@ -173,7 +179,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (violation) {
       statusHtml = `
         <div class="result-status warning">
-          90/180 gün sınırı aşıldı. İlk aşım tarihi:
+          ${ruleLabel} gün sınırı aşıldı. İlk aşım tarihi:
           ${formatDate(violation.date)}.
         </div>
       `;
@@ -182,7 +188,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       statusHtml = `
         <div class="result-status">
-          90/180 gün sınırı aşılmadı.
+          ${ruleLabel} gün sınırı aşılmadı.
         </div>
       `;
 
@@ -196,7 +202,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       <ul class="result-list">
         <li>
-          <span>Son 180 günlük dönemde kullanılan süre</span>
+          <span>Son ${windowDays} günlük dönemde kullanılan süre</span>
           <strong>${usedDays} gün</strong>
         </li>
 
@@ -211,6 +217,14 @@ document.addEventListener("DOMContentLoaded", () => {
         </li>
       </ul>
     `;
+  }
+
+  function getWindowDays() {
+    if (regionSelect.value === "turkiye365") {
+      return 365;
+    }
+
+    return 180;
   }
 
   function getOccupiedDays() {
@@ -228,7 +242,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return occupiedDays;
   }
 
-  function findFirstViolation(occupiedDays) {
+  function findFirstViolation(occupiedDays, windowDays) {
     const sortedDays = [...occupiedDays]
       .map(parseDate)
       .sort((firstDate, secondDate) => firstDate - secondDate);
@@ -236,7 +250,8 @@ document.addEventListener("DOMContentLoaded", () => {
     for (const currentDate of sortedDays) {
       const usedDays = countDaysInWindow(
         occupiedDays,
-        currentDate
+        currentDate,
+        windowDays
       );
 
       if (usedDays > 90) {
@@ -250,8 +265,16 @@ document.addEventListener("DOMContentLoaded", () => {
     return null;
   }
 
-  function countDaysInWindow(occupiedDays, referenceDate) {
-    const windowStart = addDays(referenceDate, -179);
+  function countDaysInWindow(
+    occupiedDays,
+    referenceDate,
+    windowDays
+  ) {
+    const windowStart = addDays(
+      referenceDate,
+      -(windowDays - 1)
+    );
+
     let count = 0;
 
     occupiedDays.forEach((dateKey) => {
@@ -268,8 +291,13 @@ document.addEventListener("DOMContentLoaded", () => {
     return count;
   }
 
-  function calculateContinuousAllowance(startDate, occupiedDays) {
+  function calculateContinuousAllowance(
+    startDate,
+    occupiedDays
+  ) {
     const simulatedDays = new Set(occupiedDays);
+    const windowDays = getWindowDays();
+
     let allowedDays = 0;
 
     for (let dayOffset = 0; dayOffset < 90; dayOffset += 1) {
@@ -280,7 +308,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const usedDays = countDaysInWindow(
         simulatedDays,
-        proposedDate
+        proposedDate,
+        windowDays
       );
 
       if (usedDays > 90) {
