@@ -13,6 +13,17 @@ const { pool, supabase, upload } = require("./db"); // Import configurations
 const useragent = require("useragent");
 // ADD THIS NEAR TOP
 const axios = require('axios');
+const {
+    extractClientIP,
+    blockMaliciousIPs,
+    applyWriteRateLimit,
+    applyReadRateLimit,
+    enforceAdPostingCooldown,
+    checkLogCooldown,
+    enforceLoginProtection,
+    actionCooldown,
+    validateEmail
+  } = require("./middleware/masters_MW");
 
 const sendEmailBrevo = require("./utils/sendEmailBrevo");
 
@@ -20,24 +31,12 @@ const cors = require("cors");
 //app.use(cors()); 
 
 const allowedOrigins = [
-  'https://www.einsteincalculators.com',
-  'https://einsteincalculators.com',
-  'https://visacalculator.org',
-  'https://www.visacalculator.org',
-  'https://www.ipradar.org',
-  'https://ipradar.org',
   'https://www.eumaps.org',
   'https://eumaps.org',
-  'https://www.unitzap.space',
-  'https://unitzap.space',
   'https://www.letonyaoturum.com',
   'https://letonyaoturum.com',
   'https://www.latviaresidency.org',
   'https://latviaresidency.org',
-  'https://www.kacmilyon.com',
-  'https://kacmilyon.com',
-  'https://www.litvanyayatirim.com',
-  'https://litvanyayatirim.com',
   "https://meistarilatvija.lv",
   "http://meistarilatvija.lv",
   "https://www.meistarilatvija.lv",
@@ -143,199 +142,11 @@ app.use("/", grillsLVRoutes);
 const filebeefRoutes = require("./routes/filebeef");
 app.use("/", filebeefRoutes);
 
-//This function for now will be used safely convert image file names to alphanumerical values
-//currently used by latvia masters
-//can be used by any endpoint in the future
-// example value: 30/11/2025_111aaa.jpgo
-function makeSafeName() {
-  const d = new Date();
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  const rand = Math.random().toString(36).substring(2, 8); // 6 chars
-  return `${dd}${mm}${yyyy}_${rand}`;
-}
 
-//MIDDLEWARE TO BLOCK SPAM IP ADDRESSES
-// List of IPs to ignore (server centers, ad bots, my ip etc)
-//The list is updated to let web crawlers to pass and visit website
-//block ip list currently has 2 decoy ip to prevent error on middleware code.
-// List of blocked IPs
-const ignoredIPs = [
-  "66.249.1111168.5",
-  "66.249.68.421323221"
-];
-function getClientIp(req) {
-  const xf = req.headers["x-forwarded-for"];
-  let ip = xf ? xf.split(",")[0].trim() : req.socket?.remoteAddress || req.ip;
-  if (ip && ip.startsWith("::ffff:")) {
-    ip = ip.slice(7);
-  }
-  return ip;
-}
-function blockSpamIPs(req, res, next) {
-  const ip = getClientIp(req);
-  if (!ip) return next();
-  if (ignoredIPs.includes(ip)) {
-    return res.status(403).json({
-      resStatus: false,
-      resMessage: "Access denied",
-      resErrorCode: 100
-    });
-  }
-  next();
-}
-
-//MIDDLEAWARE RATE LIMITER
-//Write: 20 requests per minute
-//Read: 80 requests per minute
-//Currently used only by Latvijas meistari
-const rateStore = Object.create(null);
-function rateLimitWrite(req, res, next) {
-  const ip = getClientIp(req);
-  const now = Date.now();
-  const WINDOW = 60_000; // 1 min
-  const LIMIT = 20;
-  if (!rateStore[ip]) {
-    rateStore[ip] = { w: { count: 1, start: now } };
-    return next();
-  }
-  const w = rateStore[ip].w || { count: 0, start: now };
-  if (now - w.start > WINDOW) {
-    rateStore[ip].w = { count: 1, start: now };
-    return next();
-  }
-  w.count++;
-  rateStore[ip].w = w;
-  if (w.count > LIMIT) {
-    return res.status(429).json({
-      resStatus: false,
-      resMessage: "Too many write requests",
-      resErrorCode: 110
-    });
-  }
-  next();
-}
-function rateLimitRead(req, res, next) {
-  const ip = getClientIp(req);
-  const now = Date.now();
-  const WINDOW = 60_000; // 1 min
-  const LIMIT = 80;
-  if (!rateStore[ip]) {
-    rateStore[ip] = { r: { count: 1, start: now } };
-    return next();
-  }
-  const r = rateStore[ip].r || { count: 0, start: now };
-  if (now - r.start > WINDOW) {
-    rateStore[ip].r = { count: 1, start: now };
-    return next();
-  }
-  r.count++;
-  rateStore[ip].r = r;
-  if (r.count > LIMIT) {
-    return res.status(429).json({
-      resStatus: false,
-      resMessage: "Too many requests",
-      resErrorCode: 111
-    });
-  }
-  next();
-}
-//This middleware is specifically for upload and update endpoints of LM.
-//To prevent reentrancy spamming (race condition), we limit each ip to 1 request per 5 seconds for these endpoints.
-const adCooldownStore = new Map();
-function postAdCooldown(req, res, next) {
-  const ip = req.headers["x-forwarded-for"]
-    ? req.headers["x-forwarded-for"].split(",")[0].trim()
-    : req.socket.remoteAddress || req.ip;
-  const now = Date.now();
-  const COOLDOWN_MS = 5000;
-  const lastUsage = adCooldownStore.get(ip);
-  // Check BEFORE setting to avoid unnecessary updates on blocked requests
-  if (lastUsage && now - lastUsage < COOLDOWN_MS) {
-    return res.status(429).json({
-      resStatus: false,
-      resMessage: "Lūdzu, uzgaidiet 5 sekundes.",
-      resErrorCode: 112
-    });
-  }
-  // Set timestamp only for requests that pass
-  adCooldownStore.set(ip, now);
-  // Improved cleanup: always delete after cooldown period
-  setTimeout(() => {
-    const current = adCooldownStore.get(ip);
-    // Only delete if no newer request has updated it
-    if (current && current <= now) {
-      adCooldownStore.delete(ip);
-    }
-  }, COOLDOWN_MS);
-  next();
-}
-
-//MIDDLEWARE - VISITOR LOGGING
-const visitorCache = {}; //This object array is for cooldown
-//This array is for ip addresses that we dont want to save in visitors table at all.
-//It is for bot ip addresses. They can visit the website but we will not save them.
-const ignoredLoggingIps = new Set([ 
-  "80.89.79.139",
-  "84.15.219.255",
-  "212.3.194.8",
-  "80.89.79.47",
-  "212.3.197.163",
-  "87.250.224.102",
-  "5.255.231.64",
-  "66.249.89.163",
-  "95.108.213.182",
-  "213.180.203.5",
-  "202.8.43.0",
-  "5.255.231.29",
-  "213.180.203.238",
-  "95.108.213.152",
-  "17.241.227.20",
-  
-]);
-function visitLoggingMiddleware(waitingTime) {
-  return (req, res, next) => {
-    const ip =
-      req.headers["x-forwarded-for"]
-        ? req.headers["x-forwarded-for"].split(",")[0].trim()
-        : req.socket.remoteAddress || req.ip;
-    req.clientIp = ip;
-    //Some ip addresses, we can ignore them at all. No need to check cooldowns
-    if (ignoredLoggingIps.has(ip)) {
-      req.shouldLogVisit = false;
-      return next();
-    }
-    const lastVisit = visitorCache[ip];
-    if (lastVisit && Date.now() - lastVisit < waitingTime) {
-      req.shouldLogVisit = false; // silently skip
-    } else {
-      visitorCache[ip] = Date.now();
-      req.shouldLogVisit = true;
-    }
-    next();
-  };
-}
-
-
-//A temporary cache to save ip addresses and it will prevent spam comments and replies for 1 minute.
-//I can do that by checking each ip with database ip addresses but then it will be too many requests to db
-const ipCache2 = {}
-app.post("/serversavecomment", async (req, res) => {
-  //preventing spam comments
-  const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
-  // Check if IP exists in cache and if last comment was less than 1 minute ago
-  
-  if (ipCache2[ipVisitor] && Date.now() - ipCache2[ipVisitor] < 60000) {
-    return res.status(429).json({message: 'Too many comments'});
-  }
- 
-  ipCache2[ipVisitor] = Date.now();//save visitor ip to ipCache2
-
+app.post("/serversavecomment", blockMaliciousIPs, actionCooldown("postMessage", 3 * 60 * 1000), async (req, res) => {
   let client;
   const newComment = req.body;
   const {pageId, name, text, date} = newComment;
-
   try {
     client = await pool.connect();
     const result = await client.query(
@@ -349,17 +160,7 @@ app.post("/serversavecomment", async (req, res) => {
     if(client) client.release();
   }
 });
-app.post("/serversavecommentreply", async (req, res) => {
-  
-  //preventing spam replies
-  const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
-  // Check if IP exists in cache and if last reply was less than 1 minute ago
-  if (ipCache2[ipVisitor] && Date.now() - ipCache2[ipVisitor] < 60000) {
-    return res.status(429).json({message: 'Too many comments'});
-  }
-  ipCache2[ipVisitor] = Date.now();//save visitor ip to ipCache2
-
-
+app.post("/serversavecommentreply", blockMaliciousIPs, actionCooldown("postMessage", 3 * 60 * 1000), async (req, res) => {
   let client;
   const newComment = req.body;
   const {pageId3, name, text, date, commentId} = newComment;
@@ -401,101 +202,51 @@ app.get("/servergetcomments/:pageId", async (req, res) => {
   }
 });
 
-//A temporary cache to save ip addresses and it will prevent saving same ip addresses for 1 hour.
-//I can do that by checking each ip with database ip addresses but then it will be too many requests to db
-//We will save each visitor data to database. 
-const ipCache = {}
-
-app.post("/serversavevisitor/:pageIdVisitorPage", async (req, res) => {
-  //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
-  //and Render is using proxies or load balancers. Because of that I will see "::1" as ip data if I not use
-  //this line below
-  const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
-  let client;
-  const { pageIdVisitorPage } = req.params;
-  // Check if the IP is in the ignored list
-  if (ignoredIPs.includes(ipVisitor)) {
-    return; // Simply exit the function, doing nothing for this IP
+//checkLogCooldown does 2 things: 1) limits logging to once in 5 minutes, 2) ignores technical ip addresses
+app.post("/serversavevisitor/:pageIdVisitorPage", checkLogCooldown(5 * 60 * 1000), async (req, res) => {
+  if (!req.shouldLogVisit) {
+    return res.status(200).end();
   }
-  // Check if IP exists in cache and if last visit was less than 1 minute ago
-  if (ipCache[ipVisitor] && Date.now() - ipCache[ipVisitor] < 60000) {
-    return res.status(429).json({ message: 'Too many requests from this IP.' });
-  } 
-    
-  ipCache[ipVisitor] = Date.now();//save visitor ip to ipCache
-  const userAgentString = req.get('User-Agent');
+  const ipVisitor = req.clientIp;
+  const { pageIdVisitorPage } = req.params;
+  let client;
+  const userAgentString = req.get("User-Agent");
   const agent = useragent.parse(userAgentString);
-  
   try {
     const visitorData = {
       ip: ipVisitor,
-      os: agent.os.toString(), // operating system
-      browser: agent.toAgent(), // browser
-      visitDate: new Date().toLocaleDateString('en-GB'),
-      sectionName: pageIdVisitorPage,
+      os: agent.os.toString(),
+      browser: agent.toAgent(),
+      visitDate: new Date().toLocaleDateString("en-GB"),
+      sectionName: pageIdVisitorPage
     };
-    //save visitor to database
+
     client = await pool.connect();
-    const result = await client.query(
-      `INSERT INTO eumaps_visitors (ip, op, browser, date, sectionid) 
-      VALUES ($1, $2, $3, $4, $5)`, 
+
+    await client.query(
+      `INSERT INTO eumaps_visitors (ip, op, browser, date, sectionid)
+       VALUES ($1, $2, $3, $4, $5)`,
       [visitorData.ip, visitorData.os, visitorData.browser, visitorData.visitDate, visitorData.sectionName]
     );
-    res.status(200).json({message: "Visitor IP successfully logged"});
-  } catch (error) {
-    console.error('Error logging visit:', error);
-    res.status(500).json({message: 'Error logging visit'});
-  } finally {
-    if(client) client.release();
-  }
-})
 
-const ipCache5 = {}
+    return res.status(200).json({ message: "Visitor IP successfully logged" });
+  } catch (error) {
+    console.error("Error logging visit:", error);
+    return res.status(500).json({ message: "Error logging visit" });
+  } finally {
+    if (client) client.release();
+  }
+});
+
+
 // LOG VISITORS
 app.post("/api/get-coordinates-and-log-visitor", async (req, res) => {
-    //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
-  //and Render is using proxies or load balancers. Because of that I will see "::1" as ip data if I not use
-  //this line below
-  const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
-  let client;
-  // Check if the IP is in the ignored list
-  if (ignoredIPs.includes(ipVisitor)) {
-    return res.status(403).json({
-      resStatus: false,
-      resMessage: "This IP is ignored from logging to Database",
-      resErrorCode: 1
-    });
-  }
-  // Check if IP exists in cache and if last visit was less than 9 seconds ago (90000 ms)
-  if (ipCache5[ipVisitor] && Date.now() - ipCache5[ipVisitor] < 9000) {
-    return res.status(429).json({
-      resStatus: false,
-      resMessage: "Too many requests from this IP.",
-      resErrorCode: 2
-    });
-  }
-
-  const { ipInput } = req.body; // Get IP address from the request body
-  ipCache5[ipVisitor] = Date.now();//save visitor ip to ipCache5
-  const userAgentString = req.get('User-Agent') || '';
-  const agent = useragent.parse(userAgentString);
+  const { ipInput } = req.body;
 
   try {
-    const visitorData = {
-      ip: ipVisitor,
-      os: agent.os.toString(), // operating system
-      browser: agent.toAgent(), // browser
-      visitDate: new Date().toLocaleDateString('en-GB')
-    };
-    // OPERATION 1: save visitor to database
-    client = await pool.connect();
-    const result = await client.query(
-      `INSERT INTO visitors_ipradar (ip, op, browser, date) 
-      VALUES ($1, $2, $3, $4)`, [visitorData.ip, visitorData.os, visitorData.browser, visitorData.visitDate]
-    );
-
-    const apiKey = process.env.IPAPI_KEY; // Load API key from .env file
+    const apiKey = process.env.IPAPI_KEY;
     const response = await axios.get(`http://api.ipapi.com/api/${ipInput}?access_key=${apiKey}`);
+
     const geoData = {
       latitude: response.data.latitude,
       longitude: response.data.longitude,
@@ -505,202 +256,26 @@ app.post("/api/get-coordinates-and-log-visitor", async (req, res) => {
       type: response.data.type,
       continent_name: response.data.continent_name
     };
-    return res.status(200).json({ 
+
+    return res.status(200).json({
       resStatus: true,
       resMessage: "Geo data obtained",
       resOkCode: 1,
       resData: geoData
     });
   } catch (error) {
-      console.error("Error fetching geolocation data:", error.message);
-      return res.status(500).json({
-        resStatus: false,
-        resMessage: "Failed to fetch geolocation data",
-        resErrorCode: 3
-      });
-  } finally {
-    if(client) client.release();
-  }
-});
-const ipCache3 = {}
-app.post("/api/save-visitor/schengen", async (req, res) => {
-  //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
-  //and Render is using proxies or load balancers. Because of that I will see "::1" as ip data if I not use
-  //this line below
-  const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
-  let client;
-  // Check if the IP is in the ignored list
-  if (ignoredIPs.includes(ipVisitor)) {
-    return res.status(403).json({
-      resStatus: false,
-      resMessage: "This IP is ignored from logging to Database",
-      resErrorCode: 1
-    });
-  }
-  // Check if IP exists in cache and if last visit was less than 16.67 minutes ago
-  if (ipCache3[ipVisitor] && Date.now() - ipCache3[ipVisitor] < 1000000) {
-    return res.status(429).json({
-      resStatus: false,
-      resMessage: "Too many requests from this IP.",
-      resErrorCode: 2
-    });
-  }
+    console.error("Error fetching geolocation data:", error.message);
 
-  ipCache3[ipVisitor] = Date.now();//save visitor ip to ipCache3
-  const userAgentString = req.get('User-Agent') || '';
-  const agent = useragent.parse(userAgentString);
-
-  try {
-    const visitorData = {
-      ip: ipVisitor,
-      os: agent.os.toString(), // operating system
-      browser: agent.toAgent(), // browser
-      visitDate: new Date().toLocaleDateString('en-GB')
-    };
-    //save visitor to database
-    client = await pool.connect();
-    const result = await client.query(
-      `INSERT INTO visitors_schengen (ip, op, browser, date) 
-      VALUES ($1, $2, $3, $4)`, [visitorData.ip, visitorData.os, visitorData.browser, visitorData.visitDate]
-    );
-    return res.status(200).json({
-      resStatus: true,
-      resMessage: "Visitor successfully logged.",
-      resOkCode: 1
-    });
-  } catch (error) {
-    console.error('Error logging visit:', error);
     return res.status(500).json({
       resStatus: false,
-      resMessage: "Database connection error while logging visitor.",
+      resMessage: "Failed to fetch geolocation data",
       resErrorCode: 3
     });
-  } finally {
-    if(client) client.release();
   }
 });
-const ipCache4 = {}
-app.post("/api/save-visitor/einstein", async (req, res) => {
-  //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
-  //and Render is using proxies or load balancers. Because of that I will see "::1" as ip data if I not use
-  //this line below
-  const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
-  let client;
-  const { sectionName } = req.query;
-  
-  // Check if the IP is in the ignored list
-  if (ignoredIPs.includes(ipVisitor)) {
-    return res.status(403).json({
-      resStatus: false,
-      resMessage: "This IP is ignored from logging to Database",
-      resErrorCode: 1
-    });
-  }
-  // Check if IP exists in cache and if last visit was less than 16.67 minutes ago
-  if (ipCache4[ipVisitor] && Date.now() - ipCache4[ipVisitor] < 1000000) {
-    return res.status(429).json({
-      resStatus: false,
-      resMessage: "Too many requests from this IP.",
-      resErrorCode: 2
-    });
-  }
 
-  ipCache4[ipVisitor] = Date.now();//save visitor ip to ipCache4
-  const userAgentString = req.get('User-Agent') || '';
-  const agent = useragent.parse(userAgentString);
-
-  try {
-    const visitorData = {
-      ip: ipVisitor,
-      os: agent.os.toString(), // operating system
-      browser: agent.toAgent(), // browser
-      visitDate: new Date().toLocaleDateString('en-GB')
-    };
-    //save visitor to database
-    client = await pool.connect();
-    const result = await client.query(
-      `INSERT INTO visitors_einstein (ip, op, browser, date, section) 
-      VALUES ($1, $2, $3, $4, $5)`, 
-      [visitorData.ip, visitorData.os, visitorData.browser, visitorData.visitDate, sectionName]
-    );
-    return res.status(200).json({
-      resStatus: true,
-      resMessage: "Visitor successfully logged.",
-      resOkCode: 1
-    });
-  } catch (error) {
-    console.error('Error logging visit:', error);
-    return res.status(500).json({
-      resStatus: false,
-      resMessage: "Database connection error while logging visitor.",
-      resErrorCode: 3
-    });
-  } finally {
-    if(client) client.release();
-  }
-});
-const ipCache6 = {}
-app.post("/api/save-visitor/units", async (req, res) => {
-  //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
-  //and Render is using proxies or load balancers. Because of that I will see "::1" as ip data if I not use
-  //this line below
-  const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
-  let client;
-  const { sectionName } = req.query;
-  
-  // Check if the IP is in the ignored list
-  if (ignoredIPs.includes(ipVisitor)) {
-    return res.status(403).json({
-      resStatus: false,
-      resMessage: "This IP is ignored from logging to Database",
-      resErrorCode: 1
-    });
-  }
-  // Check if IP exists in cache and if last visit was less than approximately 16.67 minutes ago
-  if (ipCache6[ipVisitor] && Date.now() - ipCache6[ipVisitor] < 1000000) {
-    return res.status(429).json({
-      resStatus: false,
-      resMessage: "Too many requests from this IP.",
-      resErrorCode: 2
-    });
-  }
-
-  ipCache6[ipVisitor] = Date.now();//save visitor ip to ipCache6
-  const userAgentString = req.get('User-Agent') || '';
-  const agent = useragent.parse(userAgentString);
-
-  try {
-    const visitorData = {
-      ip: ipVisitor,
-      os: agent.os.toString(), // operating system
-      browser: agent.toAgent(), // browser
-      visitDate: new Date().toLocaleDateString('en-GB')
-    };
-    //save visitor to database
-    client = await pool.connect();
-    const result = await client.query(
-      `INSERT INTO visitors_units (ip, op, browser, date, section) 
-      VALUES ($1, $2, $3, $4, $5)`, 
-      [visitorData.ip, visitorData.os, visitorData.browser, visitorData.visitDate, sectionName]
-    );
-    return res.status(200).json({
-      resStatus: true,
-      resMessage: "Visitor successfully logged.",
-      resOkCode: 1
-    });
-  } catch (error) {
-    console.error('Error logging visit:', error);
-    return res.status(500).json({
-      resStatus: false,
-      resMessage: "Database connection error while logging visitor.",
-      resErrorCode: 3
-    });
-  } finally {
-    if(client) client.release();
-  }
-});
 //3 minutes
-app.post("/api/save-visitor/letonya-oturum", visitLoggingMiddleware(3 * 60 * 1000), async (req, res) => {
+app.post("/api/save-visitor/letonya-oturum", checkLogCooldown(3 * 60 * 1000), async (req, res) => {
   let client;
   // silently skip if throttled
   if (!req.shouldLogVisit) {
@@ -741,7 +316,7 @@ app.post("/api/save-visitor/letonya-oturum", visitLoggingMiddleware(3 * 60 * 100
     if(client) client.release();
   }
 });
-app.post("/api/save-visitor/letonya-oturum-english", visitLoggingMiddleware(3 * 60 * 1000), async (req, res) => {
+app.post("/api/save-visitor/letonya-oturum-english", checkLogCooldown(3 * 60 * 1000), async (req, res) => {
   let client;
   // silently skip if throttled
   if (!req.shouldLogVisit) {
@@ -782,138 +357,16 @@ app.post("/api/save-visitor/letonya-oturum-english", visitLoggingMiddleware(3 * 
     if(client) client.release();
   }
 });
-app.post("/api/kac-milyon/save-visitor", visitLoggingMiddleware(3 * 60 * 1000), async (req, res) => {
-  let client;
-  // silently skip if throttled
-  if (!req.shouldLogVisit) {
-    return res.status(200).json({
-      resStatus: false,
-      resMessage: "Cooldown triggered or logging skipped",
-      resErrorCode: 1
-    });
-  }
-  const userAgentString = req.get("User-Agent") || "";
-  const agent = useragent.parse(userAgentString);
-
-  try {
-    //save visitor to database
-    client = await pool.connect();
-    const result = await client.query(
-      `INSERT INTO visitors_kac_milyon (ip, op, browser, date) 
-      VALUES ($1, $2, $3, $4)`, 
-      [
-        req.clientIp,
-        agent.os.toString(),
-        agent.toAgent(),
-        new Date().toLocaleDateString("en-GB")
-      ]
-    );
-    return res.status(200).json({
-      resStatus: true,
-      resMessage: "Visitor logged.",
-      resOkCode: 1
-    });
-  } catch (error) {
-    console.error('Error logging visit:', error);
-    return res.status(500).json({
-      resStatus: false,
-      resMessage: "Database connection error while logging visitor.",
-      resErrorCode: 3
-    });
-  } finally {
-    if(client) client.release();
-  }
-});
-app.post("/api/litvanya-yatirim/save-visitor", visitLoggingMiddleware(3 * 60 * 1000), async (req, res) => {
-  let client;
-  // silently skip if throttled
-  if (!req.shouldLogVisit) {
-    return res.status(200).json({
-      resStatus: false,
-      resMessage: "Cooldown triggered or logging skipped",
-      resErrorCode: 1
-    });
-  }
-  const userAgentString = req.get("User-Agent") || "";
-  const agent = useragent.parse(userAgentString);
-  try {
-    //save visitor to database
-    client = await pool.connect();
-    const result = await client.query(
-      `INSERT INTO visitors_litvanyayatirim (ip, op, browser, date) 
-      VALUES ($1, $2, $3, $4)`, 
-      [
-        req.clientIp,
-        agent.os.toString(),
-        agent.toAgent(),
-        new Date().toLocaleDateString("en-GB")
-      ]
-    );
-    return res.status(200).json({
-      resStatus: true,
-      resMessage: "Visitor logged.",
-      resOkCode: 1
-    });
-  } catch (error) {
-    console.error('Error logging visit:', error);
-    return res.status(500).json({
-      resStatus: false,
-      resMessage: "Database connection error while logging visitor.",
-      resErrorCode: 3
-    });
-  } finally {
-    if(client) client.release();
-  }
-});
-
  
-const messageIpCache = {};
 
-app.post("/api/post/message", async (req, res) => {
-  const ipVisitor =
-    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-    req.socket.remoteAddress ||
-    req.ip;
-
+app.post("/api/post/message", blockMaliciousIPs, actionCooldown("postMessage", 3 * 60 * 1000), async (req, res) => {
+  const ipVisitor = extractClientIP(req);
   let client;
 
-  if (ignoredIPs.includes(ipVisitor)) {
-    return res.status(403).json({
-      resStatus: false,
-      resErrorCode: 1
-    });
-  }
+  const { name, email, subject, message, source } = req.body || {};
 
-  // One message per IP every ~ 7 minutes
-  if (
-    messageIpCache[ipVisitor] &&
-    Date.now() - messageIpCache[ipVisitor] < 420000
-  ) {
-    return res.status(429).json({
-      resStatus: false,
-      resErrorCode: 2
-    });
-  }
-
-  const {
-    name,
-    email,
-    subject,
-    message,
-    source
-  } = req.body || {};
-
-  if (
-    typeof name !== "string" ||
-    typeof email !== "string" ||
-    typeof subject !== "string" ||
-    typeof message !== "string" ||
-    typeof source !== "string"
-  ) {
-    return res.status(400).json({
-      resStatus: false,
-      resErrorCode: 3
-    });
+  if (typeof name !== "string" || typeof email !== "string" || typeof subject !== "string" || typeof message !== "string" || typeof source !== "string") {
+    return res.status(400).json({ resStatus: false, resErrorCode: 3 });
   }
 
   const cleanName = name.trim();
@@ -922,99 +375,34 @@ app.post("/api/post/message", async (req, res) => {
   const cleanMessage = message.trim();
   const cleanSource = source.trim();
 
-  if (
-    !cleanName ||
-    !cleanEmail ||
-    !cleanSubject ||
-    !cleanMessage ||
-    !cleanSource
-  ) {
-    return res.status(400).json({
-      resStatus: false,
-      resErrorCode: 4
-    });
+  if (!cleanName || !cleanEmail || !cleanSubject || !cleanMessage || !cleanSource) {
+    return res.status(400).json({ resStatus: false, resErrorCode: 4 });
   }
 
-  if (cleanName.length > 100) {
-    return res.status(400).json({
-      resStatus: false,
-      resErrorCode: 5
-    });
-  }
-
-  if (cleanEmail.length > 255) {
-    return res.status(400).json({
-      resStatus: false,
-      resErrorCode: 6
-    });
-  }
-
-  if (cleanSubject.length > 200) {
-    return res.status(400).json({
-      resStatus: false,
-      resErrorCode: 7
-    });
-  }
-
-  if (cleanMessage.length > 1000) {
-    return res.status(400).json({
-      resStatus: false,
-      resErrorCode: 8
-    });
-  }
-
-  if (cleanSource.length > 100) {
-    return res.status(400).json({
-      resStatus: false,
-      resErrorCode: 9
-    });
-  }
+  if (cleanName.length > 100) return res.status(400).json({ resStatus: false, resErrorCode: 5 });
+  if (cleanEmail.length > 255) return res.status(400).json({ resStatus: false, resErrorCode: 6 });
+  if (cleanSubject.length > 200) return res.status(400).json({ resStatus: false, resErrorCode: 7 });
+  if (cleanMessage.length > 1000) return res.status(400).json({ resStatus: false, resErrorCode: 8 });
+  if (cleanSource.length > 100) return res.status(400).json({ resStatus: false, resErrorCode: 9 });
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
   if (!emailRegex.test(cleanEmail)) {
-    return res.status(400).json({
-      resStatus: false,
-      resErrorCode: 10
-    });
+    return res.status(400).json({ resStatus: false, resErrorCode: 10 });
   }
 
   try {
     client = await pool.connect();
-
     await client.query(
-      `INSERT INTO messages
-        (name, email, subject, message, ip, webpage)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [
-        cleanName,
-        cleanEmail,
-        cleanSubject,
-        cleanMessage,
-        ipVisitor,
-        cleanSource
-      ]
+      `INSERT INTO messages (name, email, subject, message, ip, webpage) VALUES ($1, $2, $3, $4, $5, $6)`,
+      [cleanName, cleanEmail, cleanSubject, cleanMessage, ipVisitor, cleanSource]
     );
 
-    messageIpCache[ipVisitor] = Date.now();
-
-    return res.status(200).json({
-      resStatus: true,
-      resOkCode: 1
-    });
-
+    return res.status(200).json({ resStatus: true, resOkCode: 1 });
   } catch (error) {
     console.error("Message save error:", error.message);
-
-    return res.status(500).json({
-      resStatus: false,
-      resErrorCode: 11
-    });
-
+    return res.status(500).json({ resStatus: false, resErrorCode: 11 });
   } finally {
-    if (client) {
-      client.release();
-    }
+    if (client) client.release();
   }
 });
 
@@ -1371,31 +759,8 @@ app.get("/api/kac-milyon/get-country-civil-status", async (req, res) => {
   }
 });
 /*kacmilyon.com comment, message, visitor log endpoints*/
-app.post("/api/kac-milyon/save-comment", async (req, res) => {
-  //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
-  //and Render is using proxies or load balancers. Because of that I will see "::1" as ip data if I not use
-  //this line below
-  const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
+app.post("/api/kac-milyon/save-comment", blockMaliciousIPs, actionCooldown("postMessage", 3 * 60 * 1000), async (req, res) => {
   let client;
-  
-  // Check if the IP is in the ignored list
-  if (ignoredIPs.includes(ipVisitor)) {
-    return res.status(403).json({
-      resStatus: false,
-      resMessage: "This IP is ignored from logging to Database",
-      resErrorCode: 1
-    });
-  }
-  // Check if IP exists in cache and if last visit was less than approximately 16.67 minutes ago
-  if (ipCache11[ipVisitor] && Date.now() - ipCache11[ipVisitor] < 1000) {
-    return res.status(429).json({
-      resStatus: false,
-      resMessage: "Too many requests from this IP.",
-      resErrorCode: 2
-    });
-  }
-  ipCache11[ipVisitor] = Date.now();//save visitor ip to ipCache11
-
   const messageObject = req.body;
   try {
     const msgLoad = {
@@ -1464,30 +829,9 @@ app.get("/api/kac-milyon/get-comments/:pageId", async (req, res) => {
     if(client) client.release();
   }
 });
-app.post("/api/kac-milyon/save-reply", async (req, res) => {
-  //Here we could basically say "const ipVisitor = req.ip" but my app is running on Render platform
-  //and Render is using proxies or load balancers. Because of that I will see "::1" as ip data if I not use
-  //this line below
-  const ipVisitor = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : req.socket.remoteAddress || req.ip;
+app.post("/api/kac-milyon/save-reply", blockMaliciousIPs, actionCooldown("postMessage", 3 * 60 * 1000), async (req, res) => {
+
   let client;
-  
-  // Check if the IP is in the ignored list
-  if (ignoredIPs.includes(ipVisitor)) {
-    return res.status(403).json({
-      resStatus: false,
-      resMessage: "This IP is ignored from logging to Database",
-      resErrorCode: 1
-    });
-  }
-  // Check if IP exists in cache and if last visit was less than approximately 16.67 minutes ago
-  if (ipCache11[ipVisitor] && Date.now() - ipCache11[ipVisitor] < 1000) {
-    return res.status(429).json({
-      resStatus: false,
-      resMessage: "Too many requests from this IP.",
-      resErrorCode: 2
-    });
-  }
-  ipCache11[ipVisitor] = Date.now();//save visitor ip to ipCache11
 
   const messageObject = req.body;
   try {

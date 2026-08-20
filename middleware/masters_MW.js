@@ -131,32 +131,41 @@ function enforceAdPostingCooldown(req, res, next) {
 }
 
 // Visitor logging middleware
+// Visitor logging middleware
 function checkLogCooldown(waitingTime) {
   return (req, res, next) => {
-    const ip =
+    let ip =
       req.headers["x-forwarded-for"]
         ? req.headers["x-forwarded-for"].split(",")[0].trim()
-        : req.socket.remoteAddress || req.ip;
+        : req.socket?.remoteAddress || req.ip;
+
+    if (ip && ip.startsWith("::ffff:")) {
+      ip = ip.slice(7);
+    }
+
     req.clientIp = ip;
-    
+
     if (excludedFromLoggingIPs.has(ip)) {
       req.shouldLogVisit = false;
       return next();
     }
-    
+
     const lastVisit = visitorLoggingCache[ip];
+
     if (lastVisit && Date.now() - lastVisit < waitingTime) {
       req.shouldLogVisit = false;
     } else {
       visitorLoggingCache[ip] = Date.now();
       req.shouldLogVisit = true;
     }
+
     next();
   };
 }
 const emailActionCooldownStore = {};
-//1 ip can trigger reset password and signup only once per 20 minutes.
-function enforceEmailActionCooldown(actionType, cooldownMs = 2 * 60 * 1000) {
+//1 ip can trigger reset password and signup only once per 2 minutes.
+//default is 2 minutes but anytime this middleare called, the parameters can override it.
+function actionCooldown(actionType, cooldownMs = 2 * 60 * 1000) {
   return (req, res, next) => {
     const ip = extractClientIP(req);
     const now = Date.now();
@@ -302,6 +311,6 @@ module.exports = {
   enforceAdPostingCooldown,
   checkLogCooldown,
   enforceLoginProtection,
-  enforceEmailActionCooldown,
+  actionCooldown,
   validateEmail
 };

@@ -19,7 +19,7 @@ const {
   enforceAdPostingCooldown,
   checkLogCooldown,
   enforceLoginProtection,
-  enforceEmailActionCooldown,
+  actionCooldown,
   validateEmail
 } = require("../middleware/masters_MW");
 
@@ -1990,7 +1990,7 @@ router.get("/api/get/master-latvia/session-user", blockMaliciousIPs, applyReadRa
 });
 /*Email register only send email verification link */
 router.post("/api/post/master-latvia/auth/email-register", blockMaliciousIPs, applyWriteRateLimit, validateEmail,
-   enforceEmailActionCooldown("email_register"), async (req, res) => {
+   actionCooldown("email_register"), async (req, res) => {
 
   const ipVisitor = req.headers["x-forwarded-for"]
     ? req.headers["x-forwarded-for"].split(",")[0]
@@ -2159,7 +2159,7 @@ router.post("/api/post/master-latvia/auth/email-login", blockMaliciousIPs, apply
   }
 });
 router.post("/api/post/master-latvia/auth/email-forget", blockMaliciousIPs, applyWriteRateLimit, validateEmail, 
-  enforceEmailActionCooldown("email_reset"), async (req, res) => {
+  actionCooldown("email_reset"), async (req, res) => {
   const email = String(req.body.email || "").trim().toLowerCase();
   let client;
   try {
