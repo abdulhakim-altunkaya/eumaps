@@ -3,17 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
   <title>Vize Kalış Süresi Hesaplama — eumaps.org</title>
-
-  <meta
-    name="description"
-    content="Schengen veya Türkiye için giriş ve çıkış tarihlerinizi ekleyerek 180 gün içinde 90 günlük kalış sürenizi hesaplayın."
-  />
-
+  <meta name="description" content="Schengen veya Türkiye için giriş ve çıkış tarihlerinizi ekleyerek 
+  180 gün içinde 90 günlük kalış sürenizi hesaplayın."/>
   <link rel="stylesheet" href="./css/index.css" />
   <link rel="stylesheet" href="./css/vize.css" />
   <link rel="icon" href="./icons/icon1.png" type="image/png" />
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 </head>
 
 <body>
@@ -136,5 +132,9 @@
   </footer>
 
   <script src="./js/vize.js"></script>
+  <script>
+    const sectionIdVisitorPage = "eumaps-visa";
+  </script>
+  <script src="./utils/eumaps-visitors.js"></script>
 </body>
 </html>
