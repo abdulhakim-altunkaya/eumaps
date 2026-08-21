@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', function() {
       const provinceName = el.getAttribute('data-name') || el.className.baseVal || '';
       console.log('Clicked province:', provinceName, 'ID:', provinceId);
       // Navigate to province page
-      window.location.href = `./tools/nufus-il.html?provinceId=${provinceId}`;
+      window.location.href = `./tools/nufus-il.html?provinceId=${provinceId}`; 
       event.stopPropagation();
     });
 

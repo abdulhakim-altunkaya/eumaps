@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const row = document.createElement("tr");
       row.innerHTML = `
         <td>${index + 1}</td>
-        <td><a href="./tools/nufus-il.html?provinceId=${province.provinceid}">
+        <td><a href="./nufus-il.html?provinceId=${province.provinceid}"> 
           ${province.provincename}
         </a>
         </td>
