@@ -45,7 +45,7 @@
   }
   
   .comment-text {
-    font-size: 0.85em;
+    font-size: 15px;
     line-height: 1.4;
     text-align: left;
   }
@@ -71,9 +71,9 @@
 
   .replyCommentContainer {
     display: flex;
-    font-family: "Ubuntu" !important;
+    font-family: "Ubuntu", "Maven pro", 'Trebuchet MS', sans-serif;
     flex-direction: column;
-    font-size: 15px !important;
+    font-size: 13px;
     justify-content: space-between;
     padding-left: 25px;
     text-align: left !important;
@@ -130,7 +130,7 @@
   }
   
   .comment-text {
-    font-size: 16px;
+    font-size: 14px;
     line-height: 1.4;
     text-align: left;
   }
@@ -158,7 +158,7 @@
     display: flex;
     font-family: "Ubuntu" !important;
     flex-direction: column;
-    font-size: 15px !important;
+    font-size: 12px;
     justify-content: space-between;
     padding-left: 20px;
     text-align: left !important;
