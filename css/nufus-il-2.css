@@ -1,11 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Maven+Pro&display=swap');/*Maven Pro*/
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&display=swap');
 
 @media (min-width: 781px) { 
     .provinceAnnualTableArea {
         width: 30%;
         margin-left: 65px;
-        font-family: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+        font-family: "Comfortaa", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
     }
     .province-annual-table { 
       width: 100%;
@@ -38,7 +37,7 @@
 @media (max-width: 780px) {
   .provinceAnnualTableArea {
       width: 98%;
-      font-family: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+      font-family: "Comfortaa", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
   }
   .province-annual-table { 
     width: 100%;
