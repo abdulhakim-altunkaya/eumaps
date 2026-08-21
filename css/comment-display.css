@@ -36,11 +36,11 @@
   
   .comment-name {
     font-weight: bolder;
-    font-size: 0.80em;
+    font-size: 17px;
   }
   
   .comment-date {
-    font-size: 0.80em;
+    font-size: 13px;
     color: #555;
   }
   

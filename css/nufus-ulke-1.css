@@ -1,4 +1,9 @@
 @media (min-width: 781px) {
+  .twoTablesCountry {
+    display: flex;
+    gap: 30px;
+    margin-top: 30px;
+  }
 .countryTableArea1 {
         width: 30%;
         margin-left: 65px;
@@ -34,34 +39,41 @@
     
 /* Small responsive tweak */
 @media (max-width: 780px) {
-.countryTableArea1 {
-    width: 98%;
-    font-family: "Manrope";
-}
-.country-population-table { 
-  width: 100%;
-  border: 3px solid white;
-  font-size: 14px;
-}
+  .twoTablesCountry {
+    margin-top: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+    
+  .countryTableArea1 {
+      width: 98%;
+      font-family: "Manrope";
+  }
+  .country-population-table { 
+    width: 100%;
+    border: 3px solid white;
+    font-size: 14px;
+  }
 
-/* Header */
-.country-population-table thead th {
-  text-align: left;
-  padding: 5px 6px;
-  background: #0A174E;
-  color: #F5D042;
-  font-weight: bold;
-}
+  /* Header */
+  .country-population-table thead th {
+    text-align: left;
+    padding: 5px 6px;
+    background: #0A174E;
+    color: #F5D042;
+    font-weight: bold;
+  }
 
-/* Body rows */
-.country-population-table tbody td {
-  padding: 5px 6px;
-  border-bottom: 1px solid #f0f0f0;
-}
+  /* Body rows */
+  .country-population-table tbody td {
+    padding: 5px 6px;
+    border-bottom: 1px solid #f0f0f0;
+  }
 
-.country-population-table tbody tr {
-  background: #F5D042;
-  color: #0A174E;
-}
+  .country-population-table tbody tr {
+    background: #F5D042;
+    color: #0A174E;
+  }
 
 }
