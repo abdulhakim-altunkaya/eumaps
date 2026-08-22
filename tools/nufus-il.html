@@ -19,6 +19,8 @@
   <script src="../js/nufus-il.js" defer></script>
   <script src="../js/nufus-ilce.js" defer></script>
   <script src="../js/nufus-iller-tablo.js" defer></script>
+  <link rel="stylesheet" href="../css/comment-display.css">
+  <link rel="stylesheet" href="../css/comment.css">
 </head>
 
 <body>
@@ -94,13 +96,17 @@
             </table>
         </section>
     </section>
-
+    <div id="comments-root"></div>
 </main>
 
   <footer>
     <p><span><a class="footerLink" href="../about.html">Hakkımızda </a></span> &copy; 2020-2026 <strong>eumaps.org</strong></p>
   </footer>
 
-
+  <script>
+    const provinceId = new URLSearchParams(window.location.search).get('provinceId');
+    document.getElementById('comments-root').dataset.pageId = provinceId;
+  </script>
+  <script src="../utils/eumaps-comments.js"></script>
 </body>
 </html>
