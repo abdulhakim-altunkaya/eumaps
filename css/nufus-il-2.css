@@ -4,7 +4,7 @@
     .provinceAnnualTableArea {
         width: 30%;
         margin-left: 65px;
-        font-family: "Comfortaa", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+        font-family: "Maven Pro","Comfortaa", "Nunito", system-ui, sans-serif;
     }
     .province-annual-table { 
       width: 100%;
@@ -37,7 +37,7 @@
 @media (max-width: 780px) {
   .provinceAnnualTableArea {
       width: 98%;
-      font-family: "Comfortaa", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+      font-family: "Maven Pro","Comfortaa", "Nunito", system-ui, sans-serif;
   }
   .province-annual-table { 
     width: 100%;

@@ -79,7 +79,7 @@ Outfit
 
 .map-container h1 {
   margin: 10px 0 25px;
-  font-family: "Paytone One", sans-serif;
+  font-family: "Paytone One", "Nunito", sans-serif;
   font-size: 30px;
   font-weight: 400;
   color: var(--dark-blue);
@@ -101,7 +101,7 @@ Outfit
   border-radius: 8px;
   background-color: #FCF951;
   color: #422057;
-  font-family: "Paytone One", sans-serif;
+  font-family: "Paytone One", "Nunito", sans-serif;
   font-size: 24px;
   font-weight: 400;
 }
@@ -109,7 +109,7 @@ Outfit
 .mainTable {
   width: 100%;
   margin: 0 auto 40px;
-  font-family: "Nunito", sans-serif;
+  font-family: "Maven Pro","Comfortaa", "Nunito", system-ui, sans-serif;
 }
 
 .homepage-table {

@@ -5,7 +5,7 @@
     .homepage-table {
       width: 100%;
       border-collapse: collapse;
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+      font-family: "Maven Pro","Comfortaa", "Nunito", system-ui, sans-serif;
       background: #fff;
       box-shadow: 0 1px 2px rgba(0,0,0,0.04);
     }
@@ -54,7 +54,7 @@
     .homepage-table {
       width: 100%;
       border-collapse: collapse;
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+      font-family: "Maven Pro","Comfortaa", "Nunito", system-ui, sans-serif;
       background: #fff;
       box-shadow: 0 1px 2px rgba(0,0,0,0.04);
     }

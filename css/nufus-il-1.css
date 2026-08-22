@@ -6,18 +6,18 @@
       flex-direction: row;
       gap: 40px;
       margin-top: 30px;
-      font-family: "Comfortaa", "Nunito";
+      font-family: "Maven Pro","Comfortaa", "Nunito", system-ui, sans-serif;
     }
     .provinceDistrictsTableArea {
         width: 90%;
         margin: auto;
-        font-family: "Comfortaa", "Nunito";
+        font-family: "Maven Pro","Comfortaa", "Nunito", system-ui, sans-serif;
     }        
 
     .province-districts-table {
       width: 100%;
       border-collapse: collapse;
-      font-family: "Comfortaa", "Nunito";
+      font-family: "Maven Pro","Comfortaa", "Nunito", system-ui, sans-serif;
       background: #fff;
       box-shadow: 0 4px 8px rgba(0,0,0,0.14);
     }
@@ -62,7 +62,7 @@
       flex-direction: column;
       gap: 15px;
       margin-bottom: 25px;
-      font-family: "Comfortaa", "Nunito";
+      font-family: "Maven Pro","Comfortaa", "Nunito", system-ui, sans-serif;
     }
     .provinceDistrictsTableArea {
       display: block;
@@ -71,7 +71,7 @@
       max-width: 100%;         /* prevent going past parent */
       margin-right: var(--section-gap, 15px); /* keep your page layout margin */
       padding-bottom: 6px;     /* space for scrollbar */
-      font-family: "Comfortaa", "Nunito";
+      font-family: "Maven Pro","Comfortaa", "Nunito", system-ui, sans-serif;
     }
     .provinceDistrictsTableArea::-webkit-scrollbar {
       height: 8px;

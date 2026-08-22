@@ -4,7 +4,7 @@
     .provinceOriginsTableArea {
         width: 30%;
         margin-left: 65px;
-        font-family: "Maven Pro","Comfortaa", "Nunito";
+        font-family: "Maven Pro","Comfortaa", "Nunito", system-ui, sans-serif;
     }
     .province-origins-table { 
       width: 100%;
@@ -36,7 +36,7 @@
 @media (max-width: 780px) {
 .provinceOriginsTableArea {
     width: 98%;
-    font-family: "Maven Pro","Comfortaa", "Nunito";
+    font-family: "Maven Pro","Comfortaa", "Nunito", system-ui, sans-serif;
 }
 
 .province-origins-table { 
