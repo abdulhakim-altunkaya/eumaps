@@ -2,7 +2,8 @@
 @media (min-width: 781px) {
     .comment-container {
       max-width: 600px;
-      margin-left: 12px;
+      margin-top: 20px;
+      margin-left: 8px;
       padding: 20px;
       border: 1px solid #ddd;
       border-radius: 4px;

@@ -21,7 +21,7 @@
 
     /* Header */
     .homepage-table thead th {
-      text-align: left;
+      text-align: center;
       padding: 10px 12px;
       border-bottom: 2px solid #e6e6e6;
       font-weight: 600;
@@ -75,7 +75,7 @@
   }
     /* Header */
     .homepage-table thead th {
-      text-align: left;
+      text-align: center;
       padding: 10px 12px;
       border-bottom: 2px solid #e6e6e6;
       font-weight: 600;
