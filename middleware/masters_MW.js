@@ -23,7 +23,14 @@ const excludedFromLoggingIPs = new Set([
   "212.3.197.163", "212.3.194.8", "212.3.195.119", "212.3.192.244",
   "213.180.203.5", "213.180.203.238",
 ]);
-
+const excludedFromLoggingBrowsers = new Set([
+  "Googlebot 2.1.0",
+  "bingbot 2.0.0",
+  "crawler 0.0.0",
+  "Bytespider 0.0.0",
+  "Applebot 0.1.0",
+  "meta-webindexer 1.1.0"
+]);
 // Helper function to extract client IP address
 function extractClientIP(req) {
   const xf = req.headers["x-forwarded-for"];
@@ -132,7 +139,6 @@ function enforceAdPostingCooldown(req, res, next) {
 }
 
 // Visitor logging middleware
-// Visitor logging middleware
 function checkLogCooldown(waitingTime) {
   return (req, res, next) => {
     let ip =
@@ -146,7 +152,14 @@ function checkLogCooldown(waitingTime) {
 
     req.clientIp = ip;
 
-    if (excludedFromLoggingIPs.has(ip)) {
+    const userAgentString = req.get("User-Agent") || "";
+    const agent = useragent.parse(userAgentString);
+    const browser = agent.toAgent();
+
+    if (
+      excludedFromLoggingIPs.has(ip) ||
+      excludedFromLoggingBrowsers.has(browser)
+    ) {
       req.shouldLogVisit = false;
       return next();
     }
@@ -163,6 +176,7 @@ function checkLogCooldown(waitingTime) {
     next();
   };
 }
+
 const emailActionCooldownStore = {};
 //1 ip can trigger reset password and signup only once per 2 minutes.
 //default is 2 minutes but anytime this middleare called, the parameters can override it.

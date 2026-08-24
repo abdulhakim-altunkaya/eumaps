@@ -203,7 +203,7 @@ app.get("/servergetcomments/:pageId", async (req, res) => {
 });
 
 //checkLogCooldown does 2 things: 1) limits logging to once in 5 minutes, 2) ignores technical ip addresses
-app.post("/serversavevisitor/:pageIdVisitorPage", checkLogCooldown(5 * 60 * 1000), async (req, res) => {
+app.post("/serversavevisitor/:pageIdVisitorPage", checkLogCooldown(7 * 60 * 1000), async (req, res) => {
   if (!req.shouldLogVisit) {
     return res.status(200).end();
   }
@@ -236,7 +236,7 @@ app.post("/serversavevisitor/:pageIdVisitorPage", checkLogCooldown(5 * 60 * 1000
   } finally {
     if (client) client.release();
   }
-});
+}); 
 
 
 // LOG VISITORS
