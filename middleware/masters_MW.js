@@ -1,7 +1,7 @@
 const rateLimiterStore = Object.create(null);
 const adPostingCooldownStore = new Map();
 const visitorLoggingCache = {};
-
+const useragent = require("useragent");
 // List of blocked IPs (spam, malicious traffic, etc.)
 const blockedIPAddresses = [
   "66.249.1111168.5",

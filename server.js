@@ -203,17 +203,14 @@ app.get("/servergetcomments/:pageId", async (req, res) => {
 });
 
 app.post("/serversavevisitor/:pageIdVisitorPage", checkLogCooldown(1 * 60 * 1000), async (req, res) => {
-  console.log("[visitor-log] endpoint hit, shouldLogVisit:", req.shouldLogVisit, "ip:", req.clientIp);
-  if (!req.shouldLogVisit) {
+ if (!req.shouldLogVisit) {
     return res.status(200).end();
   }
   const ipVisitor = req.clientIp;
   const { pageIdVisitorPage } = req.params;
   let client;
   const userAgentString = req.get("User-Agent");
-  console.log("[visitor-log] userAgentString:", userAgentString);
   const agent = useragent.parse(userAgentString);
-  console.log("[visitor-log] parsed agent os/browser:", agent.os.toString(), agent.toAgent());
   try {
     const visitorData = {
       ip: ipVisitor,
@@ -222,22 +219,16 @@ app.post("/serversavevisitor/:pageIdVisitorPage", checkLogCooldown(1 * 60 * 1000
       visitDate: new Date().toLocaleDateString("en-GB"),
       sectionName: pageIdVisitorPage
     };
-    console.log("[visitor-log] about to insert:", visitorData);
-
     client = await pool.connect();
-    console.log("[visitor-log] db client connected");
-
     await client.query(
       `INSERT INTO eumaps_visitors (ip, op, browser, date, sectionid)
        VALUES ($1, $2, $3, $4, $5)`,
       [visitorData.ip, visitorData.os, visitorData.browser, visitorData.visitDate, visitorData.sectionName]
     );
-    console.log("[visitor-log] insert succeeded");
-
     return res.status(200).json({ message: "Visitor IP successfully logged" });
   } catch (error) {
     console.error("[visitor-log] Error logging visit:", error);
-    return res.status(500).json({ message: "Error logging visit" });
+    return res.status(200).json({ message: "Error logging visit" });
   } finally {
     if (client) client.release();
   }
