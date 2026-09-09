@@ -137,8 +137,8 @@ const grillsLVRoutes = require("./routes/grills_LV");
 app.use("/", grillsLVRoutes);
 const filebeefRoutes = require("./routes/filebeef");
 app.use("/", filebeefRoutes);
-const langasRoutes = require("./routes/langas");
-app.use("/api/langas", langasRoutes);
+/* const langasRoutes = require("./routes/langas");
+app.use("/api/langas", langasRoutes); */
 
 app.post("/serversavecomment", blockMaliciousIPs, actionCooldown("postMessage", 3 * 60 * 1000), async (req, res) => {
   let client;
