@@ -71,21 +71,17 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-
     const normalizedOrigin =
       origin?.replace(/\/$/, '');
-
     if (!origin) {
       return callback(null, true);
     }
-
     if (
       normalizedOrigin &&
       allowedOrigins.includes(normalizedOrigin)
     ) {
       return callback(null, true);
     }
-
     return callback(
       new Error(`Not allowed by CORS: ${origin}`)
     );
@@ -141,7 +137,8 @@ const grillsLVRoutes = require("./routes/grills_LV");
 app.use("/", grillsLVRoutes);
 const filebeefRoutes = require("./routes/filebeef");
 app.use("/", filebeefRoutes);
-
+const langasRoutes = require("./routes/langas");
+app.use("/api/langas", langasRoutes);
 
 app.post("/serversavecomment", blockMaliciousIPs, actionCooldown("postMessage", 3 * 60 * 1000), async (req, res) => {
   let client;
@@ -202,7 +199,7 @@ app.get("/servergetcomments/:pageId", async (req, res) => {
   }
 });
 
-app.post("/serversavevisitor/:pageIdVisitorPage", checkLogCooldown(1 * 60 * 1000), async (req, res) => {
+app.post("/serversavevisitor/:pageIdVisitorPage", checkLogCooldown(7 * 60 * 1000), async (req, res) => {
  if (!req.shouldLogVisit) {
     return res.status(200).end();
   }

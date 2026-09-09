@@ -1,0 +1,4 @@
+const axios=require('axios');
+function similarity(a,b){a=a.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu,'').trim();b=b.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu,'').trim();const A=a.split(/\s+/),B=b.split(/\s+/);let dp=Array(B.length+1).fill(0).map((_,i)=>i);for(let i=1;i<=A.length;i++){let n=[i];for(let j=1;j<=B.length;j++)n[j]=A[i-1]===B[j-1]?dp[j-1]:1+Math.min(dp[j-1],dp[j],n[j-1]);dp=n;}return Math.max(0,1-dp[B.length]/Math.max(A.length,B.length,1));}
+async function scorePronunciation(audio,expected){ if(!process.env.LANGAS_SPEECH_URL) return {enabled:false,score:null,transcript:null}; const r=await axios.post(process.env.LANGAS_SPEECH_URL,audio,{headers:{'Content-Type':'audio/wav'},params:{language:'lv'},timeout:30000}); const transcript=String(r.data.transcript||''); return {enabled:true,transcript,score:Math.round(similarity(transcript,expected)*100)}; }
+module.exports={scorePronunciation};

@@ -16,7 +16,7 @@ const excludedFromLoggingIPs = new Set([
   "35.172.226.126",
   "57.141.20.39", "57.141.20.52",
   "66.249.92.161", "66.249.70.201", "66.102.8.230", "66.102.9.224", "66.249.89.163",
-  "80.89.79.47", "80.89.79.139", "80.89.79.39", "80.89.75.5",
+  "80.89.79.47", "80.89.79.139", "80.89.79.39", "80.89.75.5", "80.89.72.214",
   "84.15.219.255",
   "95.108.213.152", "95.108.213.182",
   "202.8.43.0",
@@ -29,7 +29,9 @@ const excludedFromLoggingBrowsers = new Set([
   "crawler 0.0.0",
   "Bytespider 0.0.0",
   "Applebot 0.1.0",
-  "meta-webindexer 1.1.0"
+  "meta-webindexer 1.1.0",
+  "DuckDuckBot 1.0.0",
+  "Baiduspider-render 2.0.0"
 ]);
 // Helper function to extract client IP address
 function extractClientIP(req) {

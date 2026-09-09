@@ -4225,9 +4225,15 @@ function editorFontKey(fontFamily) {
   return EDITOR_FONT_FILES[first] ? first : null
 }
 
+const MAX_ANNOTATIONS_FIELD_BYTES = EDITOR_LIMITS.pro.maxAnnotations * EDITOR_LIMITS.pro.imgMaxKB * 1024 * 1.5
+
 const editorUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: EDITOR_LIMITS.pro.sizeMB * 1024 * 1024, files: 1 }
+  limits: {
+    fileSize: EDITOR_LIMITS.pro.sizeMB * 1024 * 1024,
+    files: 1,
+    fieldSize: MAX_ANNOTATIONS_FIELD_BYTES
+  }
 })
 
 router.post('/api/post/filebeef/pdf/editor', optionalAuth, editorUpload.single('file'), async (req, res) => {
