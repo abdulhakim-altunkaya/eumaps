@@ -15,7 +15,7 @@ function similarity(a, b) {
 }
 
 async function scorePronunciation(audio, expected) {
-  if (!process.env.LANGAS_SPEECH_URL)
+if (process.env.LANGAS_SPEECH_ENABLED !== "true" || !process.env.LANGAS_SPEECH_URL)
     return { enabled: false, score: null, transcript: null };
 
   const form = new FormData();
