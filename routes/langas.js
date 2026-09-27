@@ -1,305 +1,396 @@
 const express = require("express");
-const crypto = require("crypto");
-const { OAuth2Client } = require("google-auth-library");
-const { pool, supabase } = require("../db");
-const { applyReadRateLimit, applyWriteRateLimit, blockMaliciousIPs } = require("../middleware/masters_MW");
-const { verifyAppleIdentityToken } = require("../services/langasAppleAuth");
-const { verifyStoreSubscription } = require("../services/langasSubscriptionVerifier");
-const { scorePronunciation } = require("../services/langasPronunciation");
-
 const router = express.Router();
-const googleClient = new OAuth2Client(process.env.LANGAS_GOOGLE_CLIENT_ID);
-const FREE_LESSONS = 5;
+const crypto = require("crypto");
+const axios = require("axios");
+const { pool } = require("../db");
 
-function sid() {
-  return crypto.randomBytes(32).toString("hex");
+// ── CONSTANTS ──────────────────────────────────────────────────────────────
+const LANGAS_WEB_CLIENT_ID     = process.env.LANGAS_GOOGLE_WEB_CLIENT_ID;
+const LANGAS_WEB_CLIENT_SECRET = process.env.LANGAS_GOOGLE_WEB_CLIENT_SECRET;
+const LANGAS_SESSION_MS        = 1000 * 60 * 60 * 24 * 365; // 1 year
+const LANGAS_POINTS_PER_CORRECT = 10;
+const LANGAS_LEADERBOARD_LIMIT  = 50;
+const LANGAS_MAX_ANSWERS        = 100;
+const LANGAS_TOKEN_RE           = /^[a-f0-9]{128}$/;
+
+// ── HELPERS ────────────────────────────────────────────────────────────────
+function langasGetIp(req) {
+  const cf = req.headers["cf-connecting-ip"];
+  if (cf) return cf.trim();
+  const xf = req.headers["x-forwarded-for"];
+  let ip = xf ? xf.split(",")[0].trim() : req.socket?.remoteAddress || req.ip;
+  if (ip?.startsWith("::ffff:")) ip = ip.slice(7);
+  return ip || "unknown";
 }
 
-async function auth(req, res, next) {
-  const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-  if (!token) return res.status(401).json({ resStatus: false, resMessage: "Authentication required" });
+function langasAppVersion(req) {
+  const v = parseInt(req.query.appVersion, 10);
+  return Number.isInteger(v) && v > 0 ? v : 1;
+}
 
-  try {
-    const q = await pool.query(`SELECT s.user_id,u.* FROM langas_sessions s JOIN langas_users u ON u.id=s.user_id WHERE s.session_id=$1 AND s.expires_at>now() LIMIT 1`, [token]);
-    if (!q.rowCount) return res.status(401).json({ resStatus: false, resMessage: "Invalid session" });
-    req.langasUser = q.rows[0];
+function langasNormalize(s) {
+  return String(s || "")
+    .normalize("NFC")
+    .toLowerCase()
+    .replace(/[.,!?;:"'()]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function langasParseId(raw) {
+  const n = parseInt(raw, 10);
+  return Number.isInteger(n) && n > 0 && String(n) === String(raw) ? n : null;
+}
+
+// ── RATE LIMITER ───────────────────────────────────────────────────────────
+const langasRateStore = Object.create(null);
+function langasRateLimit(limitPerMinute) {
+  return function (req, res, next) {
+    const key = langasGetIp(req) + "|" + limitPerMinute;
+    const now = Date.now();
+    const w = langasRateStore[key];
+    if (!w || now - w.start > 60_000) {
+      langasRateStore[key] = { count: 1, start: now };
+      return next();
+    }
+    w.count++;
+    if (w.count > limitPerMinute) {
+      return res.status(429).json({ resStatus: false, resMessage: "Too many requests", resErrorCode: 429 });
+    }
     next();
-  } catch (e) {
-    console.error("Langas auth middleware", e);
-    return res.status(500).json({ resStatus: false, resMessage: "Authentication error" });
+  };
+}
+
+// ── AUTH MIDDLEWARE (Bearer token) ─────────────────────────────────────────
+async function langasRequireAuth(req, res, next) {
+  const langasAuthHeader = req.headers["authorization"] || "";
+  const langasAuthToken = langasAuthHeader.startsWith("Bearer ") ? langasAuthHeader.slice(7).trim() : "";
+  if (!LANGAS_TOKEN_RE.test(langasAuthToken)) {
+    return res.status(401).json({ resStatus: false, resMessage: "Unauthorized", resErrorCode: 1 });
+  }
+  try {
+    const langasAuthResult = await pool.query(
+      `SELECT s.id AS session_id, s.expires_at, u.id AS user_id, u.display_name
+       FROM langas_sessions s
+       JOIN langas_users u ON u.id = s.user_id
+       WHERE s.token = $1 LIMIT 1`,
+      [langasAuthToken]
+    );
+    if (!langasAuthResult.rowCount) {
+      return res.status(401).json({ resStatus: false, resMessage: "Invalid session", resErrorCode: 2 });
+    }
+    const langasSession = langasAuthResult.rows[0];
+    if (new Date(langasSession.expires_at) < new Date()) {
+      await pool.query(`DELETE FROM langas_sessions WHERE id = $1`, [langasSession.session_id]);
+      return res.status(401).json({ resStatus: false, resMessage: "Session expired", resErrorCode: 3 });
+    }
+    req.langasUser = {
+      id: langasSession.user_id,
+      displayName: langasSession.display_name,
+      sessionId: langasSession.session_id
+    };
+    next();
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
   }
 }
 
-router.post("/auth", blockMaliciousIPs, applyWriteRateLimit, async (req, res) => {
-  let client;
+// ══════════════════════════════════════════════════════════════════════════
+//  AUTH
+// ══════════════════════════════════════════════════════════════════════════
+
+// Unity sends the Play Games server auth code; we exchange it with Google.
+router.post("/auth/google", langasRateLimit(10), async (req, res) => {
+  const langasLoginCode = String(req.body?.serverAuthCode || "").trim();
+  if (!langasLoginCode || langasLoginCode.length > 2048) {
+    return res.status(400).json({ resStatus: false, resMessage: "Missing auth code", resErrorCode: 1 });
+  }
+  if (!LANGAS_WEB_CLIENT_ID || !LANGAS_WEB_CLIENT_SECRET) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server not configured", resErrorCode: 98 });
+  }
+
+  let langasLoginAccessToken;
+  try {
+    const langasLoginTokenRes = await axios.post(
+      "https://oauth2.googleapis.com/token",
+      new URLSearchParams({
+        code: langasLoginCode,
+        client_id: LANGAS_WEB_CLIENT_ID,
+        client_secret: LANGAS_WEB_CLIENT_SECRET,
+        redirect_uri: "",
+        grant_type: "authorization_code"
+      }).toString(),
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: 10000 }
+    );
+    langasLoginAccessToken = langasLoginTokenRes.data?.access_token;
+  } catch (err) {
+    return res.status(401).json({ resStatus: false, resMessage: "Google verification failed", resErrorCode: 2 });
+  }
+  if (!langasLoginAccessToken) {
+    return res.status(401).json({ resStatus: false, resMessage: "Google verification failed", resErrorCode: 2 });
+  }
+
+  let langasLoginPlayerId, langasLoginDisplayName;
+  try {
+    const langasLoginPlayerRes = await axios.get(
+      "https://games.googleapis.com/games/v1/players/me",
+      { headers: { Authorization: `Bearer ${langasLoginAccessToken}` }, timeout: 10000 }
+    );
+    langasLoginPlayerId = String(langasLoginPlayerRes.data?.playerId || "").trim();
+    langasLoginDisplayName = String(langasLoginPlayerRes.data?.displayName || "Player").trim().slice(0, 60) || "Player";
+  } catch (err) {
+    return res.status(401).json({ resStatus: false, resMessage: "Player lookup failed", resErrorCode: 3 });
+  }
+  if (!langasLoginPlayerId) {
+    return res.status(401).json({ resStatus: false, resMessage: "Player lookup failed", resErrorCode: 3 });
+  }
 
   try {
-    const { provider, idToken, guestProgress } = req.body || {};
-    let p;
+    const langasLoginUser = await pool.query(
+      `INSERT INTO langas_users (google_player_id, display_name)
+       VALUES ($1, $2)
+       ON CONFLICT (google_player_id)
+       DO UPDATE SET display_name = EXCLUDED.display_name, last_login_at = NOW()
+       RETURNING id, display_name`,
+      [langasLoginPlayerId, langasLoginDisplayName]
+    );
+    const langasLoginUserId = langasLoginUser.rows[0].id;
 
-    if (provider === "google") {
-      const t = await googleClient.verifyIdToken({ idToken, audience: process.env.LANGAS_GOOGLE_CLIENT_ID });
-      const x = t.getPayload();
-      p = { id: x.sub, email: x.email, name: x.name || null, avatar: x.picture || null };
-    } else if (provider === "apple") {
-      p = await verifyAppleIdentityToken(idToken);
-    } else {
-      return res.status(400).json({ resStatus: false, resMessage: "Unsupported provider" });
+    await pool.query(`DELETE FROM langas_sessions WHERE user_id = $1 AND expires_at < NOW()`, [langasLoginUserId]);
+
+    const langasLoginToken = crypto.randomBytes(64).toString("hex");
+    await pool.query(
+      `INSERT INTO langas_sessions (user_id, token, expires_at) VALUES ($1, $2, $3)`,
+      [langasLoginUserId, langasLoginToken, new Date(Date.now() + LANGAS_SESSION_MS)]
+    );
+
+    return res.status(200).json({
+      resStatus: true,
+      resMessage: "Logged in",
+      token: langasLoginToken,
+      user: { id: langasLoginUserId, displayName: langasLoginUser.rows[0].display_name }
+    });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
+router.get("/auth/me", langasRateLimit(60), langasRequireAuth, (req, res) => {
+  return res.status(200).json({
+    resStatus: true,
+    user: { id: req.langasUser.id, displayName: req.langasUser.displayName }
+  });
+});
+
+router.post("/auth/logout", langasRateLimit(30), langasRequireAuth, async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM langas_sessions WHERE id = $1`, [req.langasUser.sessionId]);
+    return res.status(200).json({ resStatus: true, resMessage: "Logged out" });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+//  CONTENT
+// ══════════════════════════════════════════════════════════════════════════
+
+// Levels with their exercises + this user's best scores.
+router.get("/levels", langasRateLimit(60), langasRequireAuth, async (req, res) => {
+  const langasLevelsAppVersion = langasAppVersion(req);
+  try {
+    const langasLevelsRows = await pool.query(
+      `SELECT id, code, title FROM langas_levels ORDER BY sort_order`
+    );
+    const langasLevelsExRows = await pool.query(
+      `SELECT e.id, e.level_id, e.title,
+              (SELECT COUNT(*) FROM langas_questions q WHERE q.exercise_id = e.id)::int AS question_count,
+              COALESCE(s.best_score, 0)::int AS best_score,
+              COALESCE(s.attempts, 0)::int AS attempts
+       FROM langas_exercises e
+       LEFT JOIN langas_scores s ON s.exercise_id = e.id AND s.user_id = $1
+       WHERE e.is_active = TRUE AND e.min_app_version <= $2
+       ORDER BY e.sort_order`,
+      [req.langasUser.id, langasLevelsAppVersion]
+    );
+
+    const langasLevels = langasLevelsRows.rows.map(l => ({
+      id: l.id,
+      code: l.code,
+      title: l.title,
+      exercises: langasLevelsExRows.rows
+        .filter(e => e.level_id === l.id)
+        .map(e => ({
+          id: e.id,
+          title: e.title,
+          questionCount: e.question_count,
+          maxScore: e.question_count * LANGAS_POINTS_PER_CORRECT,
+          bestScore: e.best_score,
+          attempts: e.attempts
+        }))
+    }));
+
+    return res.status(200).json({ resStatus: true, levels: langasLevels });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
+// Questions of one exercise — correct answers are NOT sent.
+router.get("/exercises/:id", langasRateLimit(60), langasRequireAuth, async (req, res) => {
+  const langasExId = langasParseId(req.params.id);
+  if (!langasExId) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid exercise", resErrorCode: 1 });
+  }
+  try {
+    const langasExRow = await pool.query(
+      `SELECT id, title FROM langas_exercises
+       WHERE id = $1 AND is_active = TRUE AND min_app_version <= $2`,
+      [langasExId, langasAppVersion(req)]
+    );
+    if (!langasExRow.rowCount) {
+      return res.status(404).json({ resStatus: false, resMessage: "Exercise not found", resErrorCode: 2 });
     }
-
-    client = await pool.connect();
-    await client.query("BEGIN");
-
-    const u = await client.query(`INSERT INTO langas_users(provider,provider_user_id,email,display_name,avatar_url) VALUES($1,$2,$3,$4,$5) ON CONFLICT(provider,provider_user_id) DO UPDATE SET email=COALESCE(EXCLUDED.email,langas_users.email),display_name=COALESCE(EXCLUDED.display_name,langas_users.display_name),avatar_url=COALESCE(EXCLUDED.avatar_url,langas_users.avatar_url),updated_at=now() RETURNING *`, [provider, p.id, p.email || null, p.name || null, p.avatar || null]);
-
-    const user = u.rows[0];
-    const session = sid();
-
-    await client.query(`INSERT INTO langas_sessions(session_id,user_id,expires_at) VALUES($1,$2,now()+interval '90 days')`, [session, user.id]);
-
-    if (guestProgress && typeof guestProgress === "object") {
-      const highest = Math.max(0, Math.min(Number(guestProgress.highestCompletedLesson) || 0, FREE_LESSONS));
-      const guestXp = Math.max(0, Number(guestProgress.xp) || 0);
-      for (let lessonId = 1; lessonId <= highest; lessonId++) {
-        await client.query(`INSERT INTO langas_lesson_progress(user_id,lesson_id,best_score,attempts,completed,completed_at,last_attempt_at) VALUES($1,$2,100,1,true,now(),now()) ON CONFLICT(user_id,lesson_id) DO UPDATE SET completed=true,completed_at=COALESCE(langas_lesson_progress.completed_at,now()),best_score=GREATEST(langas_lesson_progress.best_score,100),last_attempt_at=now()`, [user.id, lessonId]);
+    const langasExQuestions = await pool.query(
+      `SELECT id, type, prompt, options, media_url
+       FROM langas_questions WHERE exercise_id = $1 ORDER BY sort_order`,
+      [langasExId]
+    );
+    return res.status(200).json({
+      resStatus: true,
+      exercise: {
+        id: langasExRow.rows[0].id,
+        title: langasExRow.rows[0].title,
+        questions: langasExQuestions.rows.map(q => ({
+          id: q.id,
+          type: q.type,
+          prompt: q.prompt,
+          options: Array.isArray(q.options) ? q.options : [],
+          mediaUrl: q.media_url || ""
+        }))
       }
-      await client.query(`UPDATE langas_users SET xp=GREATEST(xp,$2),level=GREATEST(1,FLOOR(GREATEST(xp,$2)/500)+1),updated_at=now() WHERE id=$1`, [user.id, guestXp]);
-      await client.query(`INSERT INTO langas_guest_migrations(migration_id,user_id,payload) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, [crypto.randomUUID(), user.id, guestProgress]);
-    }
-
-    await client.query("COMMIT");
-    return res.json({ resStatus: true, resData: { sessionId: session, user } });
-  } catch (e) {
-    if (client) {
-      try { await client.query("ROLLBACK"); } catch {}
-    }
-    console.error("Langas auth", e);
-    return res.status(401).json({ resStatus: false, resMessage: "Sign-in failed" });
-  } finally {
-    if (client) client.release();
+    });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
   }
 });
 
-router.get("/lessons/:id", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
-  const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id < 1 || id > 120) return res.status(400).json({ resStatus: false, resMessage: "Invalid lesson" });
-
-  let user = null;
-  const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-
-  if (token) {
-    const q = await pool.query(`SELECT u.* FROM langas_sessions s JOIN langas_users u ON u.id=s.user_id WHERE s.session_id=$1 AND s.expires_at>now()`, [token]);
-    user = q.rows[0] || null;
+// Grade answers on the server, keep best score.
+// Body: { answers: [ { questionId, choiceIndex, text } ] }  (choiceIndex -1 when unused)
+router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, async (req, res) => {
+  const langasSubExId = langasParseId(req.params.id);
+  if (!langasSubExId) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid exercise", resErrorCode: 1 });
+  }
+  const langasSubAnswers = req.body?.answers;
+  if (!Array.isArray(langasSubAnswers) || langasSubAnswers.length > LANGAS_MAX_ANSWERS) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid answers", resErrorCode: 2 });
   }
 
-  if (id > FREE_LESSONS && (!user || user.subscription_status !== "active" || !user.subscription_expires_at || new Date(user.subscription_expires_at) <= new Date())) {
-    return res.status(402).json({ resStatus: false, resMessage: "Subscription required", resErrorCode: 4021 });
+  const langasSubAnswerMap = new Map();
+  for (const a of langasSubAnswers) {
+    const qid = Number(a?.questionId);
+    if (Number.isInteger(qid)) langasSubAnswerMap.set(qid, a);
   }
-
-  const q = await pool.query(`SELECT id,level,lesson_order,title,is_free,content,version FROM langas_lessons WHERE id=$1 AND is_active=true`, [id]);
-  if (!q.rowCount) return res.status(404).json({ resStatus: false, resMessage: "Lesson not found" });
-
-  return res.json({ resStatus: true, resData: q.rows[0] });
-});
-
-router.get("/audio/:lessonId/:exerciseId", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
-  try {
-    const lessonId = Number(req.params.lessonId);
-    const exerciseId = String(req.params.exerciseId || "");
-
-    if (!Number.isInteger(lessonId) || lessonId < 1 || lessonId > 120)
-      return res.status(400).json({ resStatus: false, resMessage: "Invalid lesson" });
-
-    const q = await pool.query(`SELECT content FROM langas_lessons WHERE id=$1 AND is_active=true`, [lessonId]);
-    if (!q.rowCount) return res.status(404).json({ resStatus: false, resMessage: "Lesson not found" });
-
-    const content = typeof q.rows[0].content === "string" ? JSON.parse(q.rows[0].content) : q.rows[0].content;
-    const exercise = (content.exercises || []).find(x => x.id === exerciseId);
-    if (!exercise) return res.status(404).json({ resStatus: false, resMessage: "Exercise not found" });
-
-    const filename = exercise.audio || exercise.referenceAudio;
-    if (!filename) return res.status(404).json({ resStatus: false, resMessage: "Exercise has no audio" });
-
-    if (lessonId > FREE_LESSONS) {
-      const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-      if (!token) return res.status(401).json({ resStatus: false, resMessage: "Authentication required" });
-
-      const u = await pool.query(`SELECT u.subscription_status,u.subscription_expires_at FROM langas_sessions s JOIN langas_users u ON u.id=s.user_id WHERE s.session_id=$1 AND s.expires_at>now() LIMIT 1`, [token]);
-      const user = u.rows[0];
-
-      if (!user || user.subscription_status !== "active" || !user.subscription_expires_at || new Date(user.subscription_expires_at) <= new Date())
-        return res.status(402).json({ resStatus: false, resMessage: "Subscription required", resErrorCode: 4021 });
-    }
-
-    const { data, error } = await supabase.storage.from("langas_audio").createSignedUrl(filename, 600);
-
-    if (error || !data?.signedUrl) {
-      console.error("Langas audio signed URL", error);
-      return res.status(404).json({ resStatus: false, resMessage: "Audio not found" });
-    }
-
-    return res.json({ resStatus: true, resData: { url: data.signedUrl, expiresIn: 600 } });
-  } catch (e) {
-    console.error("Langas audio", e);
-    return res.status(500).json({ resStatus: false, resMessage: "Audio unavailable" });
-  }
-});
-
-router.post("/progress/exercise", blockMaliciousIPs, applyWriteRateLimit, auth, async (req, res) => {
-  const { lessonId, exerciseId, skill, score, xp = 10 } = req.body || {};
-  const n = Number(score);
-
-  if (!Number.isFinite(n) || n < 0 || n > 100) return res.status(400).json({ resStatus: false, resMessage: "Invalid score" });
-
-  const l = await pool.query(`SELECT content FROM langas_lessons WHERE id=$1`, [lessonId]);
-  if (!l.rowCount) return res.status(404).json({ resStatus: false, resMessage: "Lesson not found" });
-
-  const exercise = (l.rows[0].content.exercises || []).find(x => x.id === exerciseId);
-  if (!exercise) return res.status(400).json({ resStatus: false, resMessage: "Exercise not found" });
-
-  const passed = n >= Number(exercise.passRate || 0.8) * 100;
-  const award = passed ? Math.max(0, Math.min(Number(xp) || 10, 50)) : 0;
-  const uid = req.langasUser.user_id;
-  const client = await pool.connect();
 
   try {
-    await client.query("BEGIN");
-    await client.query(`INSERT INTO langas_exercise_attempts(user_id,lesson_id,exercise_id,skill,score,passed,xp_awarded) VALUES($1,$2,$3,$4,$5,$6,$7)`, [uid, lessonId, exerciseId, skill, n, passed, award]);
-    await client.query(`UPDATE langas_users SET xp=xp+$2,level=GREATEST(1,FLOOR((xp+$2)/500)+1),updated_at=now() WHERE id=$1`, [uid, award]);
-    await client.query(`INSERT INTO langas_daily_activity(user_id,activity_date,exercises_completed,xp_earned) VALUES($1,current_date,1,$2) ON CONFLICT(user_id,activity_date) DO UPDATE SET exercises_completed=langas_daily_activity.exercises_completed+1,xp_earned=langas_daily_activity.xp_earned+$2`, [uid, award]);
-    await client.query(`INSERT INTO langas_weekly_leaderboard(week_start,user_id,xp) VALUES(date_trunc('week',current_date)::date,$1,$2) ON CONFLICT(week_start,user_id) DO UPDATE SET xp=langas_weekly_leaderboard.xp+$2`, [uid, award]);
-    await client.query("COMMIT");
-    return res.json({ resStatus: true, resData: { passed, xpAwarded: award } });
-  } catch (e) {
-    try { await client.query("ROLLBACK"); } catch {}
-    console.error("Langas exercise progress", e);
-    return res.status(500).json({ resStatus: false, resMessage: "Progress could not be saved" });
-  } finally {
-    client.release();
-  }
-});
-
-router.post("/progress/lesson", blockMaliciousIPs, applyWriteRateLimit, auth, async (req, res) => {
-  const { lessonId, score } = req.body || {};
-  const uid = req.langasUser.user_id;
-  const n = Number(score);
-
-  if (!Number.isFinite(n) || n < 0 || n > 100) return res.status(400).json({ resStatus: false, resMessage: "Invalid score" });
-
-  const l = await pool.query(`SELECT completion_pass_rate FROM langas_lessons WHERE id=$1`, [lessonId]);
-  if (!l.rowCount) return res.status(404).json({ resStatus: false, resMessage: "Lesson not found" });
-
-  const completed = n >= Number(l.rows[0].completion_pass_rate) * 100;
-  const client = await pool.connect();
-
-  try {
-    await client.query("BEGIN");
-
-    await client.query(`INSERT INTO langas_lesson_progress(user_id,lesson_id,best_score,attempts,completed,completed_at,last_attempt_at) VALUES($1,$2,$3,1,$4,CASE WHEN $4 THEN now() END,now()) ON CONFLICT(user_id,lesson_id) DO UPDATE SET best_score=GREATEST(langas_lesson_progress.best_score,$3),attempts=langas_lesson_progress.attempts+1,completed=langas_lesson_progress.completed OR $4,completed_at=CASE WHEN langas_lesson_progress.completed_at IS NULL AND $4 THEN now() ELSE langas_lesson_progress.completed_at END,last_attempt_at=now()`, [uid, lessonId, n, completed]);
-
-    let streak = null;
-
-    if (completed) {
-      const u = await client.query(`SELECT streak_days,longest_streak,last_learning_date,streak_protections FROM langas_users WHERE id=$1 FOR UPDATE`, [uid]);
-      const user = u.rows[0];
-
-      const s = await client.query(`
-        UPDATE langas_users SET
-          streak_days=CASE
-            WHEN last_learning_date=current_date THEN streak_days
-            WHEN last_learning_date=current_date-1 THEN streak_days+1
-            WHEN last_learning_date=current_date-2 AND streak_protections>0 THEN streak_days+1
-            ELSE 1
-          END,
-          streak_protections=CASE
-            WHEN last_learning_date=current_date-2 AND streak_protections>0 THEN streak_protections-1
-            ELSE streak_protections
-          END,
-          last_learning_date=current_date,
-          updated_at=now()
-        WHERE id=$1
-        RETURNING streak_days,streak_protections
-      `, [uid]);
-
-      const streakDays = s.rows[0].streak_days;
-
-      await client.query(`UPDATE langas_users SET longest_streak=GREATEST(longest_streak,$2) WHERE id=$1`, [uid, streakDays]);
-
-      streak = { streakDays, streakProtections: s.rows[0].streak_protections };
+    const langasSubExRow = await pool.query(
+      `SELECT id FROM langas_exercises WHERE id = $1 AND is_active = TRUE`,
+      [langasSubExId]
+    );
+    if (!langasSubExRow.rowCount) {
+      return res.status(404).json({ resStatus: false, resMessage: "Exercise not found", resErrorCode: 3 });
     }
 
-    await client.query("COMMIT");
-    return res.json({ resStatus: true, resData: { completed, streak } });
-  } catch (e) {
-    try { await client.query("ROLLBACK"); } catch {}
-    console.error("Langas lesson progress", e);
-    return res.status(500).json({ resStatus: false, resMessage: "Lesson progress could not be saved" });
-  } finally {
-    client.release();
+    const langasSubQuestions = await pool.query(
+      `SELECT id, options, correct_index, accepted_answers
+       FROM langas_questions WHERE exercise_id = $1 ORDER BY sort_order`,
+      [langasSubExId]
+    );
+
+    let langasSubCorrectCount = 0;
+    const langasSubResults = langasSubQuestions.rows.map(q => {
+      const a = langasSubAnswerMap.get(q.id);
+      let correct = false;
+      let correctAnswer = "";
+
+      if (q.correct_index !== null && q.correct_index !== undefined) {
+        correct = !!a && Number(a.choiceIndex) === q.correct_index;
+        correctAnswer = Array.isArray(q.options) ? String(q.options[q.correct_index] ?? "") : "";
+      } else if (Array.isArray(q.accepted_answers) && q.accepted_answers.length) {
+        const given = langasNormalize(a?.text);
+        correct = !!given && q.accepted_answers.some(x => langasNormalize(x) === given);
+        correctAnswer = String(q.accepted_answers[0]);
+      }
+
+      if (correct) langasSubCorrectCount++;
+      return { questionId: q.id, correct, correctAnswer };
+    });
+
+    const langasSubScore = langasSubCorrectCount * LANGAS_POINTS_PER_CORRECT;
+    const langasSubMax = langasSubQuestions.rowCount * LANGAS_POINTS_PER_CORRECT;
+
+    const langasSubBest = await pool.query(
+      `INSERT INTO langas_scores (user_id, exercise_id, best_score, attempts)
+       VALUES ($1, $2, $3, 1)
+       ON CONFLICT (user_id, exercise_id)
+       DO UPDATE SET best_score = GREATEST(langas_scores.best_score, EXCLUDED.best_score),
+                     attempts   = langas_scores.attempts + 1,
+                     updated_at = NOW()
+       RETURNING best_score`,
+      [req.langasUser.id, langasSubExId, langasSubScore]
+    );
+
+    return res.status(200).json({
+      resStatus: true,
+      score: langasSubScore,
+      maxScore: langasSubMax,
+      bestScore: langasSubBest.rows[0].best_score,
+      results: langasSubResults
+    });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
   }
 });
 
-router.get("/leaderboard/:scope", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
-  const scope = req.params.scope;
-  let q;
-
-  if (scope === "weekly") {
-    q = await pool.query(`SELECT u.display_name,u.avatar_url,w.xp FROM langas_weekly_leaderboard w JOIN langas_users u ON u.id=w.user_id WHERE w.week_start=date_trunc('week',current_date)::date ORDER BY w.xp DESC LIMIT 100`);
-  } else if (scope === "all") {
-    q = await pool.query(`SELECT display_name,avatar_url,xp FROM langas_users ORDER BY xp DESC LIMIT 100`);
-  } else {
-    return res.status(400).json({ resStatus: false, resMessage: "Invalid scope" });
-  }
-
-  return res.json({ resStatus: true, resData: q.rows });
-});
-
-router.put("/settings", blockMaliciousIPs, applyWriteRateLimit, auth, async (req, res) => {
-  const { dailyGoalExercises, reminderEnabled, reminderTime } = req.body || {};
-  const g = Math.max(1, Math.min(Number(dailyGoalExercises) || 11, 55));
-
-  await pool.query(`UPDATE langas_users SET daily_goal_exercises=$2,reminder_enabled=$3,reminder_time=$4,updated_at=now() WHERE id=$1`, [req.langasUser.user_id, g, !!reminderEnabled, reminderTime || null]);
-
-  return res.json({ resStatus: true });
-});
-
-router.post("/subscription/verify", blockMaliciousIPs, applyWriteRateLimit, auth, async (req, res) => {
-  let client;
-
+// ══════════════════════════════════════════════════════════════════════════
+//  LEADERBOARD
+// ══════════════════════════════════════════════════════════════════════════
+router.get("/leaderboard", langasRateLimit(30), langasRequireAuth, async (req, res) => {
   try {
-    const v = await verifyStoreSubscription(req.body || {});
-    if (!v.valid) return res.status(400).json({ resStatus: false, resMessage: "Subscription could not be verified" });
+    const langasLbRows = await pool.query(
+      `WITH totals AS (
+         SELECT u.id, u.display_name, SUM(s.best_score)::int AS total
+         FROM langas_users u
+         JOIN langas_scores s ON s.user_id = u.id
+         GROUP BY u.id
+       ), ranked AS (
+         SELECT id, display_name, total, RANK() OVER (ORDER BY total DESC)::int AS rnk
+         FROM totals
+       )
+       SELECT id, display_name, total, rnk FROM ranked
+       WHERE rnk <= $1 OR id = $2
+       ORDER BY rnk, id`,
+      [LANGAS_LEADERBOARD_LIMIT, req.langasUser.id]
+    );
 
-    client = await pool.connect();
-    await client.query("BEGIN");
-
-    await client.query(`INSERT INTO langas_subscription_receipts(user_id,store,product_id,transaction_id,raw_receipt,verified,expires_at) VALUES($1,$2,$3,$4,$5,true,$6) ON CONFLICT(transaction_id) DO UPDATE SET verified=true,expires_at=EXCLUDED.expires_at`, [req.langasUser.user_id, v.store, v.productId, v.transactionId, v.rawReceipt, v.expiresAt]);
-
-    await client.query(`UPDATE langas_users SET subscription_status='active',subscription_store=$2,subscription_expires_at=$3,updated_at=now() WHERE id=$1`, [req.langasUser.user_id, v.store, v.expiresAt]);
-
-    await client.query("COMMIT");
-    return res.json({ resStatus: true, resData: { expiresAt: v.expiresAt } });
-  } catch (e) {
-    if (client) {
-      try { await client.query("ROLLBACK"); } catch {}
+    const langasLbEntries = [];
+    let langasLbMe = { rank: 0, total: 0 };
+    for (const r of langasLbRows.rows) {
+      if (r.id === req.langasUser.id) langasLbMe = { rank: r.rnk, total: r.total };
+      if (r.rnk <= LANGAS_LEADERBOARD_LIMIT) {
+        langasLbEntries.push({
+          rank: r.rnk,
+          displayName: r.display_name,
+          total: r.total,
+          isMe: r.id === req.langasUser.id
+        });
+      }
     }
-    console.error("Langas subscription verify", e);
-    return res.status(500).json({ resStatus: false, resMessage: "Verification error" });
-  } finally {
-    if (client) client.release();
-  }
-});
 
-router.post("/pronunciation", blockMaliciousIPs, applyWriteRateLimit, auth, express.raw({ type: "audio/*", limit: "5mb" }), async (req, res) => {
-  try {
-    const expected = String(req.query.expected || "").slice(0, 300);
-    if (!expected || !Buffer.isBuffer(req.body)) return res.status(400).json({ resStatus: false, resMessage: "Audio and expected text required" });
-
-    const result = await scorePronunciation(req.body, expected);
-    return res.json({ resStatus: true, resData: result });
-  } catch (e) {
-    console.error("Langas pronunciation", e);
-    return res.status(503).json({ resStatus: false, resMessage: "Pronunciation service unavailable" });
+    return res.status(200).json({ resStatus: true, entries: langasLbEntries, me: langasLbMe });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
   }
 });
 
