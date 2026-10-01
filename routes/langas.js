@@ -252,7 +252,7 @@ router.get("/exercises/:id", langasRateLimit(60), langasRequireAuth, async (req,
       return res.status(404).json({ resStatus: false, resMessage: "Exercise not found", resErrorCode: 2 });
     }
     const langasExQuestions = await pool.query(
-      `SELECT id, type, prompt, options, media_url
+      `SELECT id, type, prompt, options, media_url, instruction
        FROM langas_questions WHERE exercise_id = $1 ORDER BY sort_order`,
       [langasExId]
     );
@@ -266,7 +266,8 @@ router.get("/exercises/:id", langasRateLimit(60), langasRequireAuth, async (req,
           type: q.type,
           prompt: q.prompt,
           options: Array.isArray(q.options) ? q.options : [],
-          mediaUrl: q.media_url || ""
+          mediaUrl: q.media_url || "",
+          instruction: q.instruction || ""
         }))
       }
     });
