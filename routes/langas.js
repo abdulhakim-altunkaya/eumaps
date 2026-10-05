@@ -204,7 +204,7 @@ router.get("/levels", langasRateLimit(60), langasRequireAuth, async (req, res) =
     );
     const langasLevelsExRows = await pool.query(
       `SELECT e.id, e.level_id, e.title,
-              (SELECT COUNT(*) FROM langas_questions q WHERE q.exercise_id = e.id)::int AS question_count,
+              (SELECT COUNT(*) FROM langas_questions q WHERE q.exercise_id = e.id AND q.min_app_version <= $2)::int AS question_count,
               COALESCE(s.best_score, 0)::int AS best_score,
               COALESCE(s.attempts, 0)::int AS attempts
        FROM langas_exercises e
@@ -253,8 +253,8 @@ router.get("/exercises/:id", langasRateLimit(60), langasRequireAuth, async (req,
     }
     const langasExQuestions = await pool.query(
       `SELECT id, type, prompt, options, media_url, instruction
-       FROM langas_questions WHERE exercise_id = $1 ORDER BY sort_order`,
-      [langasExId]
+       FROM langas_questions WHERE exercise_id = $1 AND min_app_version <= $2 ORDER BY sort_order`,
+      [langasExId, langasAppVersion(req)]
     );
     return res.status(200).json({
       resStatus: true,
@@ -305,8 +305,8 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
 
     const langasSubQuestions = await pool.query(
       `SELECT id, options, correct_index, accepted_answers
-       FROM langas_questions WHERE exercise_id = $1 ORDER BY sort_order`,
-      [langasSubExId]
+       FROM langas_questions WHERE exercise_id = $1 AND min_app_version <= $2 ORDER BY sort_order`,
+      [langasSubExId, langasAppVersion(req)]
     );
 
     let langasSubCorrectCount = 0;
