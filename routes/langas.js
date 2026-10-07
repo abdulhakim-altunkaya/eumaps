@@ -203,7 +203,7 @@ router.get("/levels", langasRateLimit(60), langasRequireAuth, async (req, res) =
       `SELECT id, code, title FROM langas_levels ORDER BY sort_order`
     );
     const langasLevelsExRows = await pool.query(
-      `SELECT e.id, e.level_id, e.title,
+      `SELECT e.id, e.level_id, e.title, e.icon,
               (SELECT COUNT(*) FROM langas_questions q WHERE q.exercise_id = e.id AND q.min_app_version <= $2)::int AS question_count,
               COALESCE(s.best_score, 0)::int AS best_score,
               COALESCE(s.attempts, 0)::int AS attempts
@@ -223,6 +223,7 @@ router.get("/levels", langasRateLimit(60), langasRequireAuth, async (req, res) =
         .map(e => ({
           id: e.id,
           title: e.title,
+          icon: e.icon || "",
           questionCount: e.question_count,
           maxScore: e.question_count * LANGAS_POINTS_PER_CORRECT,
           bestScore: e.best_score,
@@ -230,7 +231,34 @@ router.get("/levels", langasRateLimit(60), langasRequireAuth, async (req, res) =
         }))
     }));
 
-    return res.status(200).json({ resStatus: true, levels: langasLevels });
+    const langasLevelsStats = await pool.query(
+      `WITH totals AS (
+         SELECT user_id, SUM(best_score)::int AS total
+         FROM langas_scores GROUP BY user_id
+       ), ranked AS (
+         SELECT user_id, total, RANK() OVER (ORDER BY total DESC)::int AS rnk
+         FROM totals
+       )
+       SELECT u.streak_days,
+              (u.streak_last_date >= (NOW() AT TIME ZONE 'Europe/Riga')::date - 1) AS streak_alive,
+              COALESCE(r.total, 0)::int AS total,
+              COALESCE(r.rnk, 0)::int AS rnk
+       FROM langas_users u
+       LEFT JOIN ranked r ON r.user_id = u.id
+       WHERE u.id = $1`,
+      [req.langasUser.id]
+    );
+    const langasStatsRow = langasLevelsStats.rows[0] || {};
+
+    return res.status(200).json({
+      resStatus: true,
+      levels: langasLevels,
+      stats: {
+        streak: langasStatsRow.streak_alive ? langasStatsRow.streak_days : 0,
+        points: langasStatsRow.total || 0,
+        rank: langasStatsRow.rnk || 0
+      }
+    });
   } catch (err) {
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
   }
@@ -340,6 +368,18 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
                      updated_at = NOW()
        RETURNING best_score`,
       [req.langasUser.id, langasSubExId, langasSubScore]
+    );
+
+    await pool.query(
+      `UPDATE langas_users SET
+         streak_days = CASE
+           WHEN streak_last_date = (NOW() AT TIME ZONE 'Europe/Riga')::date THEN streak_days
+           WHEN streak_last_date = (NOW() AT TIME ZONE 'Europe/Riga')::date - 1 THEN streak_days + 1
+           ELSE 1
+         END,
+         streak_last_date = (NOW() AT TIME ZONE 'Europe/Riga')::date
+       WHERE id = $1`,
+      [req.langasUser.id]
     );
 
     return res.status(200).json({
