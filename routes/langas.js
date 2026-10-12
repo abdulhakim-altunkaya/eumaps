@@ -3,6 +3,7 @@ const router = express.Router();
 const crypto = require("crypto");
 const axios = require("axios");
 const { pool } = require("../db");
+const path = require("path");
 
 // ── CONSTANTS ──────────────────────────────────────────────────────────────
 const LANGAS_WEB_CLIENT_ID     = process.env.LANGAS_GOOGLE_WEB_CLIENT_ID;
@@ -12,6 +13,12 @@ const LANGAS_POINTS_PER_CORRECT = 10;
 const LANGAS_LEADERBOARD_LIMIT  = 50;
 const LANGAS_MAX_ANSWERS        = 100;
 const LANGAS_TOKEN_RE           = /^[a-f0-9]{128}$/;
+
+// ── AUDIO FILES (public, cached 30 days) ───────────────────────────────────
+router.use("/audio", express.static(path.join(__dirname, "..", "langas_audio"), {
+  maxAge: "30d",
+  index: false
+}));
 
 // ── HELPERS ────────────────────────────────────────────────────────────────
 function langasGetIp(req) {

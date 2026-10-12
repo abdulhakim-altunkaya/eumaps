@@ -1,0 +1,305 @@
+file,latvian,lesson,question
+0001_paldies,Paldies,1,201
+0002_labrit_ka_tev_iet,Labrīt! Kā tev iet?,1,202
+0003_labrit,Labrīt,1,203
+0004_paldies_labi,"Paldies, labi.",1,204
+0005_ne,Nē,2,201
+0006_atvainojiet_kur_ir_tualete,"Atvainojiet, kur ir tualete?",2,202
+0007_labvakar,Labvakar,2,203
+0008_ne_paldies,"Nē, paldies.",2,204
+0009_divi,divi,3,201
+0010_man_ir_divi_brali,Man ir divi brāļi.,3,202
+0011_cetri,četri,3,203
+0012_viens_divi_tris,"Viens, divi, trīs.",3,204
+0013_septini,septiņi,4,201
+0014_pulkstenis_ir_devini,Pulkstenis ir deviņi.,4,202
+0015_devini,deviņi,4,203
+0016_septinas_dienas,Septiņas dienas.,4,204
+0017_zils,zils,5,201
+0018_mana_masina_ir_zila,Mana mašīna ir zila.,5,202
+0019_dzeltens,dzeltens,5,203
+0020_zals_koks,Zaļš koks.,5,204
+0021_tevs,tēvs,6,201
+0022_mana_mate_ir_skolotaja,Mana māte ir skolotāja.,6,202
+0023_masa,māsa,6,203
+0024_mans_tevs,Mans tēvs.,6,204
+0025_maize,maize,7,201
+0026_es_gribu_udeni_ludzu,"Es gribu ūdeni, lūdzu.",7,202
+0027_siers,siers,7,203
+0028_maize_un_siers,Maize un siers.,7,204
+0029_kakis,kaķis,8,201
+0030_man_ir_suns_un_kakis,Man ir suns un kaķis.,8,202
+0031_govs,govs,8,203
+0032_liels_zirgs,Liels zirgs.,8,204
+0033_otrdiena,otrdiena,9,201
+0034_pirmdien_es_stradaju,Pirmdien es strādāju.,9,202
+0035_ceturtdiena,ceturtdiena,9,203
+0036_sodien_ir_otrdiena,Šodien ir otrdiena.,9,204
+0037_iela,iela,10,201
+0038_skola_ir_saja_iela,Skola ir šajā ielā.,10,202
+0039_skola,skola,10,203
+0040_mana_maja,Mana māja.,10,204
+0041_divpadsmit,divpadsmit,11,201
+0042_man_ir_divpadsmit_gadu,Man ir divpadsmit gadu.,11,202
+0043_cetrpadsmit,četrpadsmit,11,203
+0044_vienpadsmit_eiro,Vienpadsmit eiro.,11,204
+0045_septinpadsmit,septiņpadsmit,12,201
+0046_manai_masai_ir_septinpadsmit_gadu,Manai māsai ir septiņpadsmit gadu.,12,202
+0047_devinpadsmit,deviņpadsmit,12,203
+0048_astonpadsmit_minutes,Astoņpadsmit minūtes.,12,204
+0049_cetrdesmit,četrdesmit,13,201
+0050_tas_maksa_piecdesmit_eiro,Tas maksā piecdesmit eiro.,13,202
+0051_simts,simts,13,203
+0052_trisdesmit_dienas,Trīsdesmit dienas.,13,204
+0053_bruns,brūns,14,201
+0054_sniegs_ir_balts,Sniegs ir balts.,14,202
+0055_roza,rozā,14,203
+0056_peleks_kakis,Pelēks kaķis.,14,204
+0057_svetdiena,svētdiena,15,201
+0058_svetdien_mes_atpusamies,Svētdien mēs atpūšamies.,15,202
+0059_diena,diena,15,203
+0060_viena_nedela,Viena nedēļa.,15,204
+0061_februaris,februāris,16,201
+0062_mana_dzimsanas_diena_ir_marta,Mana dzimšanas diena ir martā.,16,202
+0063_aprilis,aprīlis,16,203
+0064_janvari_ir_auksts,Janvārī ir auksts.,16,204
+0065_julijs,jūlijs,17,201
+0066_septembri_sakas_skola,Septembrī sākas skola.,17,202
+0067_septembris,septembris,17,203
+0068_julija_ir_silts,Jūlijā ir silts.,17,204
+0069_pavasaris,pavasaris,18,201
+0070_ziema_ir_daudz_sniega,Ziemā ir daudz sniega.,18,202
+0071_rudens,rudens,18,203
+0072_vasara_ir_silta,Vasara ir silta.,18,204
+0073_decembris,decembris,19,201
+0074_decembri_ir_ziemassvetki,Decembrī ir Ziemassvētki.,19,202
+0075_sodien,šodien,19,203
+0076_sodien_ir_silts,Šodien ir silts.,19,204
+0077_tagad,tagad,20,201
+0078_vakar_es_biju_majas,Vakar es biju mājās.,20,202
+0079_vakars,vakars,20,203
+0080_es_tagad_edu,Es tagad ēdu.,20,204
+0081_vecmamina,vecmāmiņa,21,201
+0082_mana_vecmamina_dzivo_riga,Mana vecmāmiņa dzīvo Rīgā.,21,202
+0083_berns,bērns,21,203
+0084_mazs_berns,Mazs bērns.,21,204
+0085_sieviete,sieviete,22,201
+0086_ta_meitene_ir_mana_masa,Tā meitene ir mana māsa.,22,202
+0087_meitene,meitene,22,203
+0088_zens_lasa,Zēns lasa.,22,204
+0089_roka,roka,23,201
+0090_man_sap_galva,Man sāp galva.,23,202
+0091_acs,acs,23,203
+0092_laba_roka,Labā roka.,23,204
+0093_mute,mute,24,201
+0094_vinai_ir_gari_mati,Viņai ir gari mati.,24,202
+0095_zobs,zobs,24,203
+0096_balti_zobi,Balti zobi.,24,204
+0097_zivs,zivs,25,201
+0098_es_needu_galu,Es neēdu gaļu.,25,202
+0099_sviests,sviests,25,203
+0100_maize_ar_sviestu,Maize ar sviestu.,25,204
+0101_banans,banāns,26,201
+0102_es_gribu_bananu,Es gribu banānu.,26,202
+0103_zemene,zemene,26,203
+0104_saldas_zemenes,Saldas zemenes.,26,204
+0105_tomats,tomāts,27,201
+0106_kartupeli_ir_leti,Kartupeļi ir lēti.,27,202
+0107_burkans,burkāns,27,203
+0108_tomats_ir_sarkans,Tomāts ir sarkans.,27,204
+0109_teja,tēja,28,201
+0110_vai_tu_gribi_kafiju,Vai tu gribi kafiju?,28,202
+0111_alus,alus,28,203
+0112_teja_ar_cukuru,Tēja ar cukuru.,28,204
+0113_kruze,krūze,29,201
+0114_kur_ir_karote,Kur ir karote?,29,202
+0115_daksa,dakša,29,203
+0116_tirs_skivis,Tīrs šķīvis.,29,204
+0117_pusdienas,pusdienas,30,201
+0118_brokastis_es_edu_maizi,Brokastīs es ēdu maizi.,30,202
+0119_cukurs,cukurs,30,203
+0120_pusdienas_ir_gatavas,Pusdienas ir gatavas.,30,204
+0121_aita,aita,31,201
+0122_vista_dej_olas,Vista dēj olas.,31,202
+0123_pele,pele,31,203
+0124_maza_pele,Maza pele.,31,204
+0125_lapsa,lapsa,32,201
+0126_meza_dzivo_vilks,Mežā dzīvo vilks.,32,202
+0127_briedis,briedis,32,203
+0128_atrs_zakis,Ātrs zaķis.,32,204
+0129_virtuve,virtuve,33,201
+0130_virtuve_ir_maza,Virtuve ir maza.,33,202
+0131_logs,logs,33,203
+0132_atver_logu,Atver logu!,33,204
+0133_kresls,krēsls,34,201
+0134_galds_ir_virtuve,Galds ir virtuvē.,34,202
+0135_skapis,skapis,34,203
+0136_jauns_kresls,Jauns krēsls.,34,204
+0137_bikses,bikses,35,201
+0138_vinai_ir_sarkana_kleita,Viņai ir sarkana kleita.,35,202
+0139_svarki,svārki,35,203
+0140_balts_krekls,Balts krekls.,35,204
+0141_cepure,cepure,36,201
+0142_uzvelc_cepuri,Uzvelc cepuri!,36,202
+0143_metelis,mētelis,36,203
+0144_jaunas_kurpes,Jaunas kurpes.,36,204
+0145_lietus,lietus,37,201
+0146_sodien_list_lietus,Šodien līst lietus.,37,202
+0147_vejs,vējš,37,203
+0148_spid_saule,Spīd saule.,37,204
+0149_auksts,auksts,38,201
+0150_udens_ir_auksts,Ūdens ir auksts.,38,202
+0151_vejains,vējains,38,203
+0152_karsta_teja,Karsta tēja.,38,204
+0153_zieds,zieds,39,201
+0154_upe_ir_aiz_meza,Upe ir aiz meža.,39,202
+0155_upe,upe,39,203
+0156_skaists_zieds,Skaists zieds.,39,204
+0157_kalns,kalns,40,201
+0158_debesis_ir_zilas,Debesis ir zilas.,40,202
+0159_zvaigzne,zvaigzne,40,203
+0160_liels_ezers,Liels ezers.,40,204
+0161_autobuss,autobuss,41,201
+0162_es_braucu_ar_autobusu,Es braucu ar autobusu.,41,202
+0163_lidmasina,lidmašīna,41,203
+0164_vilciens_ir_atrs,Vilciens ir ātrs.,41,204
+0165_aptieka,aptieka,42,201
+0166_kur_ir_aptieka,Kur ir aptieka?,42,202
+0167_pasts,pasts,42,203
+0168_banka_ir_slegta,Banka ir slēgta.,42,204
+0169_muzejs,muzejs,43,201
+0170_parks_ir_pilsetas_centra,Parks ir pilsētas centrā.,43,202
+0171_stacija,stacija,43,203
+0172_kur_ir_stacija,Kur ir stacija?,43,204
+0173_pa_labi,pa labi,44,201
+0174_veikals_ir_pa_labi,Veikals ir pa labi.,44,202
+0175_seit,šeit,44,203
+0176_ej_taisni,Ej taisni!,44,204
+0177_mazs,mazs,45,201
+0178_mana_istaba_ir_maza,Mana istaba ir maza.,45,202
+0179_iss,īss,45,203
+0180_gars_cels,Garš ceļš.,45,204
+0181_slikts,slikts,46,201
+0182_si_ir_laba_gramata,Šī ir laba grāmata.,46,202
+0183_vecs,vecs,46,203
+0184_vecs_dators,Vecs dators.,46,204
+0185_lens,lēns,47,201
+0186_latviesu_valoda_nav_gruta,Latviešu valoda nav grūta.,47,202
+0187_gruts,grūts,47,203
+0188_atra_masina,Ātra mašīna.,47,204
+0189_bedigs,bēdīgs,48,201
+0190_es_esmu_loti_noguris,Es esmu ļoti noguris.,48,202
+0191_izsalcis,izsalcis,48,203
+0192_es_esmu_izsalcis,Es esmu izsalcis.,48,204
+0193_est,ēst,49,201
+0194_es_gribu_est,Es gribu ēst.,49,202
+0195_gulet,gulēt,49,203
+0196_es_eju_majas,Es eju mājās.,49,204
+0197_rakstit,rakstīt,50,201
+0198_es_runaju_latviski,Es runāju latviski.,50,202
+0199_klausities,klausīties,50,203
+0200_es_lasu_gramatu,Es lasu grāmatu.,50,204
+0201_macities,mācīties,51,201
+0202_es_macos_latviesu_valodu,Es mācos latviešu valodu.,51,202
+0203_gatavot,gatavot,51,203
+0204_es_stradaju_seit,Es strādāju šeit.,51,204
+0205_dot,dot,52,201
+0206_nac_surp_ludzu,"Nāc šurp, lūdzu!",52,202
+0207_zinat,zināt,52,203
+0208_es_nezinu,Es nezinu.,52,204
+0209_kur,Kur?,53,201
+0210_kur_tu_dzivo,Kur tu dzīvo?,53,202
+0211_kapec,Kāpēc?,53,203
+0212_kas_tas_ir,Kas tas ir?,53,204
+0213_tu,tu,54,201
+0214_vins_ir_mans_draugs,Viņš ir mans draugs.,54,202
+0215_vina,viņa,54,203
+0216_es_esmu_anna,Es esmu Anna.,54,204
+0217_vini,viņi,55,201
+0218_si_ir_mana_maja,Šī ir mana māja.,55,202
+0219_tavs,tavs,55,203
+0220_vini_ir_seit,Viņi ir šeit.,55,204
+0221_es_nesaprotu,Es nesaprotu,56,201
+0222_ludzu_runajiet_lenak,"Lūdzu, runājiet lēnāk.",56,202
+0223_protams,Protams,56,203
+0224_man_iet_labi,Man iet labi.,56,204
+0225_prieks_iepazities,Prieks iepazīties,57,201
+0226_mani_sauc_peteris,Mani sauc Pēteris.,57,202
+0227_es_esmu_no_latvijas,Es esmu no Latvijas,57,203
+0228_es_esmu_no_rigas,Es esmu no Rīgas.,57,204
+0229_nauda,nauda,58,201
+0230_cik_maksa_maize,Cik maksā maize?,58,202
+0231_eiro,eiro,58,203
+0232_tas_ir_dargi,Tas ir dārgi.,58,204
+0233_rekins,rēķins,59,201
+0234_rekinu_ludzu,"Rēķinu, lūdzu!",59,202
+0235_labu_apetiti,Labu apetīti,59,203
+0236_edienkarti_ludzu,"Ēdienkarti, lūdzu.",59,204
+0237_arsts,ārsts,60,201
+0238_mans_bralis_ir_arsts,Mans brālis ir ārsts.,60,202
+0239_soferis,šoferis,60,203
+0240_es_esmu_students,Es esmu students.,60,204
+0241_pildspalva,pildspalva,61,201
+0242_vai_tev_ir_pildspalva,Vai tev ir pildspalva?,61,202
+0243_papirs,papīrs,61,203
+0244_mana_gramata,Mana grāmata.,61,204
+0245_dators,dators,62,201
+0246_mans_telefons_nestrada,Mans telefons nestrādā.,62,202
+0247_e_pasts,e-pasts,62,203
+0248_jauns_dators,Jauns dators.,62,204
+0249_filma,filma,63,201
+0250_man_patik_muzika,Man patīk mūzika.,63,202
+0251_spele,spēle,63,203
+0252_laba_filma,Laba filma.,63,204
+0253_lietuva,Lietuva,64,201
+0254_riga_ir_latvija,Rīga ir Latvijā.,64,202
+0255_vacija,Vācija,64,203
+0256_es_dzivoju_latvija,Es dzīvoju Latvijā.,64,204
+0257_anglu_valoda,angļu valoda,65,201
+0258_vai_tu_runa_angliski,Vai tu runā angliski?,65,202
+0259_vacu_valoda,vācu valoda,65,203
+0260_es_runaju_vaciski,Es runāju vāciski.,65,204
+0261_otrais,otrais,66,201
+0262_si_ir_mana_pirma_nodarbiba,Šī ir mana pirmā nodarbība.,66,202
+0263_pedejais,pēdējais,66,203
+0264_pedeja_diena,Pēdējā diena.,66,204
+0265_minute,minūte,67,201
+0266_cik_ir_pulkstenis,Cik ir pulkstenis?,67,202
+0267_pulkstenis,pulkstenis,67,203
+0268_viena_stunda,Viena stunda.,67,204
+0269_vesels,vesels,68,201
+0270_man_vajag_arstu,Man vajag ārstu.,68,202
+0271_sapes,sāpes,68,203
+0272_es_esmu_slims,Es esmu slims.,68,204
+0273_uguns,uguns,69,201
+0274_zvaniet_policijai,Zvaniet policijai!,69,202
+0275_briesmas,briesmas,69,203
+0276_esi_uzmanigs,Esi uzmanīgs!,69,204
+0277_viesnica,viesnīca,70,201
+0278_man_vajag_vienu_bileti,Man vajag vienu biļeti.,70,202
+0279_koferis,koferis,70,203
+0280_kur_ir_viesnica,Kur ir viesnīca?,70,204
+0281_dvielis,dvielis,71,201
+0282_kur_ir_mana_atslega,Kur ir mana atslēga?,71,202
+0283_spogulis,spogulis,71,203
+0284_tirs_dvielis,Tīrs dvielis.,71,204
+0285_nekad,nekad,72,201
+0286_es_vienmer_dzeru_kafiju,Es vienmēr dzeru kafiju.,72,202
+0287_dazreiz,dažreiz,72,203
+0288_es_nekad_needu_zivi,Es nekad neēdu zivi.,72,204
+0289_vai,vai,73,201
+0290_teja_vai_kafija,Tēja vai kafija?,73,202
+0291_ar,ar,73,203
+0292_es_un_tu,Es un tu.,73,204
+0293_mazliet,mazliet,74,201
+0294_es_runaju_mazliet_latviski,Es runāju mazliet latviski.,74,202
+0295_nekas,nekas,74,203
+0296_paldies_par_visu,Paldies par visu!,74,204
+0297_laipni_ludzam,Laipni lūdzam,75,201
+0298_laipni_ludzam_latvija,Laipni lūdzam Latvijā!,75,202
+0299_cau,Čau,75,203
+0300_uz_tiksanos_rit,Uz tikšanos rīt!,75,204
+0301_priecigus_ziemassvetkus,Priecīgus Ziemassvētkus!,76,201
+0302_laimigu_jauno_gadu_draugi,"Laimīgu Jauno gadu, draugi!",76,202
+0303_apsveicu,Apsveicu!,76,203
+0304_apsveicu_tevi,Apsveicu tevi!,76,204
