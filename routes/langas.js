@@ -442,4 +442,40 @@ router.get("/leaderboard", langasRateLimit(30), langasRequireAuth, async (req, r
   }
 });
 
+// ══════════════════════════════════════════════════════════════════════════
+//  REPORTS (🚩 on a question)
+// ══════════════════════════════════════════════════════════════════════════
+const LANGAS_REPORT_CATEGORIES = ["translation", "audio", "spelling", "other"];
+
+router.post("/reports", langasRateLimit(10), langasRequireAuth, async (req, res) => {
+  const langasRepQuestionId = Number(req.body?.questionId);
+  const langasRepCategory = String(req.body?.category || "");
+  const langasRepMessage = String(req.body?.message || "").trim().slice(0, 1000);
+  const langasRepAppVersion = parseInt(req.body?.appVersion, 10);
+
+  if (!LANGAS_REPORT_CATEGORIES.includes(langasRepCategory)) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid category", resErrorCode: 1 });
+  }
+  if (!Number.isInteger(langasRepQuestionId) || langasRepQuestionId <= 0) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid question", resErrorCode: 2 });
+  }
+
+  try {
+    await pool.query(
+      `INSERT INTO langas_reports (user_id, question_id, category, message, app_version)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        req.langasUser.id,
+        langasRepQuestionId,
+        langasRepCategory,
+        langasRepMessage,
+        Number.isInteger(langasRepAppVersion) ? langasRepAppVersion : null
+      ]
+    );
+    return res.status(200).json({ resStatus: true, resMessage: "Thanks" });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
 module.exports = router;
