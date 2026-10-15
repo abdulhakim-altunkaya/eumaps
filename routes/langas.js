@@ -15,6 +15,8 @@ const LANGAS_MAX_ANSWERS        = 100;
 const LANGAS_TOKEN_RE           = /^[a-f0-9]{128}$/;
 const LANGAS_TIME_LIMIT_MS      = 7 * 60 * 1000;
 const LANGAS_TIME_BONUS         = 20;
+const LANGAS_FAST_MS            = 4 * 60 * 1000;
+const LANGAS_FAST_BONUS         = 20;
 const langasStartTimes          = new Map(); // "userId:exerciseId" -> ms when the lesson was opened
 
 // ── AUDIO FILES (public, cached 30 days) ───────────────────────────────────
@@ -382,6 +384,12 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
       langasSubScore * 2 >= langasSubMax
         ? LANGAS_TIME_BONUS
         : 0;
+    const langasSubSpeed =
+      langasSubBonus > 0 &&
+      Date.now() - langasSubStart <= LANGAS_FAST_MS + 5000 &&
+      langasSubScore * 5 >= langasSubMax * 4
+        ? LANGAS_FAST_BONUS
+        : 0;
 
     const langasSubBest = await pool.query(
       `INSERT INTO langas_scores (user_id, exercise_id, best_score, attempts)
@@ -391,7 +399,7 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
                      attempts   = langas_scores.attempts + 1,
                      updated_at = NOW()
        RETURNING best_score`,
-      [req.langasUser.id, langasSubExId, langasSubScore + langasSubBonus]
+      [req.langasUser.id, langasSubExId, langasSubScore + langasSubBonus + langasSubSpeed]
     );
 
     await pool.query(
@@ -411,6 +419,7 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
       score: langasSubScore,
       maxScore: langasSubMax,
       timeBonus: langasSubBonus,
+      speedBonus: langasSubSpeed,
       bestScore: langasSubBest.rows[0].best_score,
       results: langasSubResults
     });
