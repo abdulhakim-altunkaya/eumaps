@@ -298,6 +298,8 @@ router.get("/exercises/:id", langasRateLimit(60), langasRequireAuth, async (req,
     );
     if (langasStartTimes.size > 20000) langasStartTimes.clear();
     langasStartTimes.set(req.langasUser.id + ":" + langasExId, Date.now());
+    if (langasProgress.size > 20000) langasProgress.clear();
+    langasProgress.set(req.langasUser.id + ":" + langasExId, {});
 
     return res.status(200).json({
       resStatus: true,
@@ -314,6 +316,140 @@ router.get("/exercises/:id", langasRateLimit(60), langasRequireAuth, async (req,
         }))
       }
     });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+//  INSTANT CHECK + HINTS (app version 4+)
+// ══════════════════════════════════════════════════════════════════════════
+const LANGAS_POINTS_FIRST = 10;
+const LANGAS_POINTS_SECOND = 5;
+const LANGAS_POINTS_AFTER_HINT = 2;
+const langasProgress = new Map(); // "userId:exerciseId" -> { questionId: { tries, hinted, done, correct, points } }
+
+function langasGrade(q, a) {
+  let correct = false;
+  let correctAnswer = "";
+  if (q.correct_index !== null && q.correct_index !== undefined) {
+    correct = !!a && Number(a.choiceIndex) === q.correct_index;
+    correctAnswer = Array.isArray(q.options) ? String(q.options[q.correct_index] ?? "") : "";
+  } else if (Array.isArray(q.accepted_answers) && q.accepted_answers.length) {
+    const given = langasNormalize(a?.text);
+    correct = !!given && q.accepted_answers.some(x => langasNormalize(x) === given);
+    correctAnswer = String(q.accepted_answers[0]);
+  }
+  return { correct, correctAnswer };
+}
+
+// "Sveiki" -> "S _ _ _ _ i  (6 letters)"
+function langasLetterHint(answer) {
+  const chars = Array.from(String(answer || "").normalize("NFC"));
+  const isLetter = c => /\p{L}/u.test(c);
+  const letters = chars.map((c, i) => (isLetter(c) ? i : -1)).filter(i => i >= 0);
+  if (!letters.length) return String(answer || "");
+  const first = letters[0];
+  const last = letters[letters.length - 1];
+  const shown = chars
+    .map((c, i) => {
+      if (c === " ") return " ";
+      if (!isLetter(c)) return c;
+      return i === first || i === last ? c : "_";
+    })
+    .join(" ");
+  return shown + "   (" + letters.length + " letters)";
+}
+
+async function langasLoadQuestion(exId, questionId) {
+  const r = await pool.query(
+    `SELECT id, options, correct_index, accepted_answers
+     FROM langas_questions WHERE id = $1 AND exercise_id = $2`,
+    [questionId, exId]
+  );
+  return r.rowCount ? r.rows[0] : null;
+}
+
+function langasEntry(prog, questionId) {
+  if (!prog[questionId]) prog[questionId] = { tries: 0, hinted: false, done: false, correct: false, points: 0 };
+  return prog[questionId];
+}
+
+function langasReveal(q) {
+  const g = langasGrade(q, null);
+  const isChoice = q.correct_index !== null && q.correct_index !== undefined;
+  return { correctAnswer: g.correctAnswer, correctIndex: isChoice ? q.correct_index : -1 };
+}
+
+// Body: { questionId, choiceIndex, text, giveUp }
+router.post("/exercises/:id/check", langasRateLimit(120), langasRequireAuth, async (req, res) => {
+  const langasChkExId = langasParseId(req.params.id);
+  const langasChkQid = Number(req.body?.questionId);
+  if (!langasChkExId || !Number.isInteger(langasChkQid)) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid request", resErrorCode: 1 });
+  }
+  const langasChkProg = langasProgress.get(req.langasUser.id + ":" + langasChkExId);
+  if (!langasChkProg) {
+    return res.status(409).json({ resStatus: false, resMessage: "Lesson expired", resErrorCode: 2 });
+  }
+  try {
+    const q = await langasLoadQuestion(langasChkExId, langasChkQid);
+    if (!q) return res.status(404).json({ resStatus: false, resMessage: "Question not found", resErrorCode: 3 });
+
+    const entry = langasEntry(langasChkProg, langasChkQid);
+    if (entry.done) {
+      return res.status(200).json({ resStatus: true, correct: entry.correct, done: true, ...langasReveal(q) });
+    }
+    if (req.body?.giveUp) {
+      entry.done = true;
+      return res.status(200).json({ resStatus: true, correct: false, done: true, ...langasReveal(q) });
+    }
+
+    entry.tries++;
+    const g = langasGrade(q, req.body);
+    if (g.correct) {
+      entry.done = true;
+      entry.correct = true;
+      entry.points = entry.hinted ? LANGAS_POINTS_AFTER_HINT : (entry.tries === 1 ? LANGAS_POINTS_FIRST : LANGAS_POINTS_SECOND);
+      return res.status(200).json({ resStatus: true, correct: true, done: true, correctAnswer: "", correctIndex: -1 });
+    }
+    if (entry.hinted || entry.tries >= 3) {
+      entry.done = true;
+      return res.status(200).json({ resStatus: true, correct: false, done: true, ...langasReveal(q) });
+    }
+    return res.status(200).json({ resStatus: true, correct: false, done: false, correctAnswer: "", correctIndex: -1 });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
+// Body: { questionId }  -> choice: removeIndices (2 wrong options); typing: hint text
+router.post("/exercises/:id/hint", langasRateLimit(60), langasRequireAuth, async (req, res) => {
+  const langasHntExId = langasParseId(req.params.id);
+  const langasHntQid = Number(req.body?.questionId);
+  if (!langasHntExId || !Number.isInteger(langasHntQid)) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid request", resErrorCode: 1 });
+  }
+  const langasHntProg = langasProgress.get(req.langasUser.id + ":" + langasHntExId);
+  if (!langasHntProg) {
+    return res.status(409).json({ resStatus: false, resMessage: "Lesson expired", resErrorCode: 2 });
+  }
+  try {
+    const q = await langasLoadQuestion(langasHntExId, langasHntQid);
+    if (!q) return res.status(404).json({ resStatus: false, resMessage: "Question not found", resErrorCode: 3 });
+
+    langasEntry(langasHntProg, langasHntQid).hinted = true;
+
+    const isChoice = q.correct_index !== null && q.correct_index !== undefined;
+    if (isChoice) {
+      const wrong = (Array.isArray(q.options) ? q.options : [])
+        .map((_, i) => i)
+        .filter(i => i !== q.correct_index)
+        .sort((a, b) => ((q.id * 7 + a * 13) % 11) - ((q.id * 7 + b * 13) % 11));
+      return res.status(200).json({ resStatus: true, hint: "", removeIndices: wrong.slice(0, 2) });
+    }
+    const answer = Array.isArray(q.accepted_answers) && q.accepted_answers.length ? q.accepted_answers[0] : "";
+    return res.status(200).json({ resStatus: true, hint: langasLetterHint(answer), removeIndices: [] });
   } catch (err) {
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
   }
@@ -352,26 +488,22 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
       [langasSubExId, langasAppVersion(req)]
     );
 
-    let langasSubCorrectCount = 0;
+    const langasSubProg = langasProgress.get(req.langasUser.id + ":" + langasSubExId);
+    langasProgress.delete(req.langasUser.id + ":" + langasSubExId);
+
+    let langasSubScore = 0;
     const langasSubResults = langasSubQuestions.rows.map(q => {
-      const a = langasSubAnswerMap.get(q.id);
-      let correct = false;
-      let correctAnswer = "";
-
-      if (q.correct_index !== null && q.correct_index !== undefined) {
-        correct = !!a && Number(a.choiceIndex) === q.correct_index;
-        correctAnswer = Array.isArray(q.options) ? String(q.options[q.correct_index] ?? "") : "";
-      } else if (Array.isArray(q.accepted_answers) && q.accepted_answers.length) {
-        const given = langasNormalize(a?.text);
-        correct = !!given && q.accepted_answers.some(x => langasNormalize(x) === given);
-        correctAnswer = String(q.accepted_answers[0]);
+      const g = langasGrade(q, langasSubAnswerMap.get(q.id));
+      const entry = langasSubProg ? langasSubProg[q.id] : null;
+      if (entry && entry.done) {
+        // App v4+: points come from the instant checks (1st try 10, 2nd 5, after hint 2).
+        langasSubScore += entry.points;
+        return { questionId: q.id, correct: entry.correct, correctAnswer: g.correctAnswer };
       }
-
-      if (correct) langasSubCorrectCount++;
-      return { questionId: q.id, correct, correctAnswer };
+      if (g.correct) langasSubScore += LANGAS_POINTS_PER_CORRECT;
+      return { questionId: q.id, correct: g.correct, correctAnswer: g.correctAnswer };
     });
 
-    const langasSubScore = langasSubCorrectCount * LANGAS_POINTS_PER_CORRECT;
     const langasSubMax = langasSubQuestions.rowCount * LANGAS_POINTS_PER_CORRECT;
 
     const langasSubKey = req.langasUser.id + ":" + langasSubExId;

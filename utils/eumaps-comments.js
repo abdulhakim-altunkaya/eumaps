@@ -277,9 +277,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       body.appendChild(text);
 
-      const replies = comments.filter(
-        reply => Number(reply.parent_id) === Number(comment.id)
-      );
+      const replies = comments
+        .filter(reply => Number(reply.parent_id) === Number(comment.id))
+        .sort((a, b) => Number(a.id) - Number(b.id));
 
       replies.forEach(reply => {
         const replyContainer = document.createElement('div');
