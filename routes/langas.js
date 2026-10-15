@@ -13,6 +13,9 @@ const LANGAS_POINTS_PER_CORRECT = 10;
 const LANGAS_LEADERBOARD_LIMIT  = 50;
 const LANGAS_MAX_ANSWERS        = 100;
 const LANGAS_TOKEN_RE           = /^[a-f0-9]{128}$/;
+const LANGAS_TIME_LIMIT_MS      = 7 * 60 * 1000;
+const LANGAS_TIME_BONUS         = 20;
+const langasStartTimes          = new Map(); // "userId:exerciseId" -> ms when the lesson was opened
 
 // ── AUDIO FILES (public, cached 30 days) ───────────────────────────────────
 router.use("/audio", express.static(path.join(__dirname, "..", "langas_audio"), {
@@ -291,6 +294,9 @@ router.get("/exercises/:id", langasRateLimit(60), langasRequireAuth, async (req,
        FROM langas_questions WHERE exercise_id = $1 AND min_app_version <= $2 ORDER BY sort_order`,
       [langasExId, langasAppVersion(req)]
     );
+    if (langasStartTimes.size > 20000) langasStartTimes.clear();
+    langasStartTimes.set(req.langasUser.id + ":" + langasExId, Date.now());
+
     return res.status(200).json({
       resStatus: true,
       exercise: {
@@ -366,6 +372,17 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
     const langasSubScore = langasSubCorrectCount * LANGAS_POINTS_PER_CORRECT;
     const langasSubMax = langasSubQuestions.rowCount * LANGAS_POINTS_PER_CORRECT;
 
+    const langasSubKey = req.langasUser.id + ":" + langasSubExId;
+    const langasSubStart = langasStartTimes.get(langasSubKey);
+    langasStartTimes.delete(langasSubKey);
+    const langasSubBonus =
+      langasSubStart &&
+      Date.now() - langasSubStart <= LANGAS_TIME_LIMIT_MS + 10000 &&
+      langasSubMax > 0 &&
+      langasSubScore * 2 >= langasSubMax
+        ? LANGAS_TIME_BONUS
+        : 0;
+
     const langasSubBest = await pool.query(
       `INSERT INTO langas_scores (user_id, exercise_id, best_score, attempts)
        VALUES ($1, $2, $3, 1)
@@ -374,7 +391,7 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
                      attempts   = langas_scores.attempts + 1,
                      updated_at = NOW()
        RETURNING best_score`,
-      [req.langasUser.id, langasSubExId, langasSubScore]
+      [req.langasUser.id, langasSubExId, langasSubScore + langasSubBonus]
     );
 
     await pool.query(
@@ -393,6 +410,7 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
       resStatus: true,
       score: langasSubScore,
       maxScore: langasSubMax,
+      timeBonus: langasSubBonus,
       bestScore: langasSubBest.rows[0].best_score,
       results: langasSubResults
     });
