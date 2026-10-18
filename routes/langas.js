@@ -602,6 +602,100 @@ router.get("/leaderboard", langasRateLimit(30), langasRequireAuth, async (req, r
 });
 
 // ══════════════════════════════════════════════════════════════════════════
+//  SPEAKING (app version 4+): the app sends a short WAV, the local
+//  speech service (langas_asr, 127.0.0.1:8765) turns it into text,
+//  and we compare that with the expected Latvian.
+// ══════════════════════════════════════════════════════════════════════════
+const LANGAS_ASR_URL = "http://127.0.0.1:8765/transcribe_raw";
+const LANGAS_SPEAK_PASS = 0.8; // 80% of letters must match
+
+// Lowercase, no punctuation, no long marks: "Labrīt!" -> "labrit"
+function langasLoose(s) {
+  return langasNormalize(s)
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function langasSimilarity(a, b) {
+  a = langasLoose(a);
+  b = langasLoose(b);
+  if (!a && !b) return 1;
+  if (!a || !b) return 0;
+  const prev = new Array(b.length + 1);
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    let diag = prev[0];
+    prev[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = prev[j];
+      prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diag + (a[i - 1] === b[j - 1] ? 0 : 1));
+      diag = tmp;
+    }
+  }
+  return 1 - prev[b.length] / Math.max(a.length, b.length);
+}
+// Body: raw WAV bytes. Query: ?questionId=123
+router.post("/exercises/:id/speak", langasRateLimit(30), langasRequireAuth,
+ express.raw({ type: () => true, limit: "2mb" }),
+  async (req, res) => {
+    const langasSpkExId = langasParseId(req.params.id);
+    const langasSpkQid = Number(req.query.questionId);
+    if (!langasSpkExId || !Number.isInteger(langasSpkQid)) {
+      return res.status(400).json({ resStatus: false, resMessage: "Invalid request", resErrorCode: 1 });
+    }
+    if (!Buffer.isBuffer(req.body) || req.body.length < 1000) {
+      return res.status(400).json({ resStatus: false, resMessage: "No recording", resErrorCode: 4 });
+    }
+    const langasSpkProg = langasProgress.get(req.langasUser.id + ":" + langasSpkExId);
+    if (!langasSpkProg) {
+      return res.status(409).json({ resStatus: false, resMessage: "Lesson expired", resErrorCode: 2 });
+    }
+    try {
+      const q = await langasLoadQuestion(langasSpkExId, langasSpkQid);
+      if (!q || !Array.isArray(q.accepted_answers) || !q.accepted_answers.length) {
+        return res.status(404).json({ resStatus: false, resMessage: "Question not found", resErrorCode: 3 });
+      }
+
+      const entry = langasEntry(langasSpkProg, langasSpkQid);
+      const expected = String(q.accepted_answers[0]);
+      if (entry.done) {
+        return res.status(200).json({ resStatus: true, correct: entry.correct, done: true, heard: "", correctAnswer: expected, correctIndex: -1 });
+      }
+
+      let heard = "";
+      try {
+        const asr = await axios.post(LANGAS_ASR_URL, req.body, {
+          headers: { "Content-Type": "application/octet-stream" },
+          timeout: 20000,
+          maxBodyLength: 3 * 1024 * 1024
+        });
+        heard = String(asr.data?.text || "");
+      } catch (e) {
+        return res.status(503).json({ resStatus: false, resMessage: "Speech check is busy, please try again", resErrorCode: 5 });
+      }
+
+      const best = Math.max(...q.accepted_answers.map(x => langasSimilarity(heard, x)));
+      entry.tries++;
+      if (best >= LANGAS_SPEAK_PASS) {
+        entry.done = true;
+        entry.correct = true;
+        entry.points = entry.hinted ? LANGAS_POINTS_AFTER_HINT : (entry.tries === 1 ? LANGAS_POINTS_FIRST : LANGAS_POINTS_SECOND);
+        return res.status(200).json({ resStatus: true, correct: true, done: true, heard, correctAnswer: "", correctIndex: -1 });
+      }
+      if (entry.hinted || entry.tries >= 3) {
+        entry.done = true;
+        return res.status(200).json({ resStatus: true, correct: false, done: true, heard, correctAnswer: expected, correctIndex: -1 });
+      }
+      return res.status(200).json({ resStatus: true, correct: false, done: false, heard, correctAnswer: "", correctIndex: -1 });
+    } catch (err) {
+      return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+    }
+  }
+);
+
+// ══════════════════════════════════════════════════════════════════════════
 //  REPORTS (🚩 on a question)
 // ══════════════════════════════════════════════════════════════════════════
 const LANGAS_REPORT_CATEGORIES = ["translation", "audio", "spelling", "other"];

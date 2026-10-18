@@ -1,6 +1,6 @@
 # Langas speech check: turns a short Latvian recording into text.
 # Runs only inside the VPS (127.0.0.1:8765); the Express backend calls it.
-# Start (pm2):  pm2 start ~/langas-asr/venv/bin/python --name langas-asr -- ~/eumaps/langas_asr/server.py
+# Start (pm2):  LANGAS_ASR_MODEL=small pm2 start ~/langas-asr/venv/bin/python --name langas-asr -- ~/eumaps/langas_asr/server.py
 import os
 import subprocess
 import tempfile
@@ -8,10 +8,12 @@ import time
 
 import numpy as np
 import uvicorn
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from faster_whisper import WhisperModel
 
 MODEL_NAME = os.environ.get("LANGAS_ASR_MODEL", "small")
+MAX_BYTES = 2_000_000
 model = WhisperModel(MODEL_NAME, device="cpu", compute_type="int8", cpu_threads=4)
 app = FastAPI()
 
@@ -27,17 +29,9 @@ def load_audio(path):
     return np.frombuffer(out, np.int16).astype(np.float32) / 32768.0
 
 
-@app.get("/health")
-def health():
-    return {"ok": True, "model": MODEL_NAME}
-
-
-@app.post("/transcribe")
-def transcribe(file: UploadFile = File(...)):
-    data = file.file.read()
-    if not data or len(data) > 2_000_000:
+def run_whisper(data, suffix):
+    if not data or len(data) > MAX_BYTES:
         return {"ok": False, "error": "bad size"}
-    suffix = os.path.splitext(file.filename or "")[1] or ".wav"
     # Temporary file is deleted as soon as the check is done; recordings are never kept.
     with tempfile.NamedTemporaryFile(suffix=suffix) as f:
         f.write(data)
@@ -56,6 +50,25 @@ def transcribe(file: UploadFile = File(...)):
         )
         text = " ".join(s.text.strip() for s in segments).strip()
     return {"ok": True, "text": text, "seconds": round(time.time() - start, 2)}
+
+
+@app.get("/health")
+def health():
+    return {"ok": True, "model": MODEL_NAME}
+
+
+# For manual tests with curl:  curl -F file=@word.mp3 http://127.0.0.1:8765/transcribe
+@app.post("/transcribe")
+def transcribe(file: UploadFile = File(...)):
+    suffix = os.path.splitext(file.filename or "")[1] or ".wav"
+    return run_whisper(file.file.read(), suffix)
+
+
+# Used by the Express backend: the request body is the raw recording.
+@app.post("/transcribe_raw")
+async def transcribe_raw(request: Request):
+    data = await request.body()
+    return await run_in_threadpool(run_whisper, data, ".wav")
 
 
 if __name__ == "__main__":
