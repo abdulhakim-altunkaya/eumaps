@@ -2,9 +2,11 @@
 # Runs only inside the VPS (127.0.0.1:8765); the Express backend calls it.
 # Start (pm2):  pm2 start ~/langas-asr/venv/bin/python --name langas-asr -- ~/eumaps/langas_asr/server.py
 import os
+import subprocess
 import tempfile
 import time
 
+import numpy as np
 import uvicorn
 from fastapi import FastAPI, File, UploadFile
 from faster_whisper import WhisperModel
@@ -12,6 +14,17 @@ from faster_whisper import WhisperModel
 MODEL_NAME = os.environ.get("LANGAS_ASR_MODEL", "small")
 model = WhisperModel(MODEL_NAME, device="cpu", compute_type="int8", cpu_threads=4)
 app = FastAPI()
+
+
+def load_audio(path):
+    # ffmpeg turns any recording (wav, mp3, ogg, m4a...) into 16 kHz mono sound for Whisper.
+    out = subprocess.run(
+        ["ffmpeg", "-nostdin", "-loglevel", "error", "-i", path,
+         "-f", "s16le", "-ac", "1", "-ar", "16000", "-"],
+        capture_output=True,
+        check=True,
+    ).stdout
+    return np.frombuffer(out, np.int16).astype(np.float32) / 32768.0
 
 
 @app.get("/health")
@@ -30,8 +43,12 @@ def transcribe(file: UploadFile = File(...)):
         f.write(data)
         f.flush()
         start = time.time()
+        try:
+            audio = load_audio(f.name)
+        except subprocess.CalledProcessError:
+            return {"ok": False, "error": "bad audio"}
         segments, _ = model.transcribe(
-            f.name,
+            audio,
             language="lv",
             beam_size=5,
             vad_filter=False,
