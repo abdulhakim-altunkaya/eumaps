@@ -54,6 +54,16 @@ function langasParseId(raw) {
   return Number.isInteger(n) && n > 0 && String(n) === String(raw) ? n : null;
 }
 
+// Grammar rule card -> always the same shape for the app
+function langasRuleDto(r) {
+  const o = r && typeof r === "object" ? r : {};
+  return {
+    title: String(o.title || ""),
+    intro: String(o.intro || ""),
+    rows: Array.isArray(o.rows) ? o.rows.map(String) : [],
+    note: String(o.note || "")
+  };
+}
 // ── RATE LIMITER ───────────────────────────────────────────────────────────
 const langasRateStore = Object.create(null);
 function langasRateLimit(limitPerMinute) {
@@ -284,7 +294,7 @@ router.get("/exercises/:id", langasRateLimit(60), langasRequireAuth, async (req,
   }
   try {
     const langasExRow = await pool.query(
-      `SELECT id, title FROM langas_exercises
+      `SELECT id, title, rule, time_limit_sec FROM langas_exercises
        WHERE id = $1 AND is_active = TRUE AND min_app_version <= $2`,
       [langasExId, langasAppVersion(req)]
     );
@@ -297,7 +307,8 @@ router.get("/exercises/:id", langasRateLimit(60), langasRequireAuth, async (req,
       [langasExId, langasAppVersion(req)]
     );
     if (langasStartTimes.size > 20000) langasStartTimes.clear();
-    langasStartTimes.set(req.langasUser.id + ":" + langasExId, Date.now());
+    const langasExLimitSec = langasExRow.rows[0].time_limit_sec || LANGAS_TIME_LIMIT_MS / 1000;
+    langasStartTimes.set(req.langasUser.id + ":" + langasExId, { at: Date.now(), limitSec: langasExLimitSec });
     if (langasProgress.size > 20000) langasProgress.clear();
     langasProgress.set(req.langasUser.id + ":" + langasExId, {});
 
@@ -306,6 +317,8 @@ router.get("/exercises/:id", langasRateLimit(60), langasRequireAuth, async (req,
       exercise: {
         id: langasExRow.rows[0].id,
         title: langasExRow.rows[0].title,
+        timeLimitSec: langasExLimitSec,
+        rule: langasRuleDto(langasExRow.rows[0].rule),
         questions: langasExQuestions.rows.map(q => ({
           id: q.id,
           type: q.type,
@@ -509,16 +522,18 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
     const langasSubKey = req.langasUser.id + ":" + langasSubExId;
     const langasSubStart = langasStartTimes.get(langasSubKey);
     langasStartTimes.delete(langasSubKey);
+    const langasSubLimitMs = (langasSubStart ? langasSubStart.limitSec : LANGAS_TIME_LIMIT_MS / 1000) * 1000;
+    const langasSubFastMs = langasSubLimitMs > LANGAS_TIME_LIMIT_MS ? 5 * 60 * 1000 : LANGAS_FAST_MS;
+    const langasSubTook = langasSubStart ? Date.now() - langasSubStart.at : Infinity;
     const langasSubBonus =
-      langasSubStart &&
-      Date.now() - langasSubStart <= LANGAS_TIME_LIMIT_MS + 10000 &&
+      langasSubTook <= langasSubLimitMs + 10000 &&
       langasSubMax > 0 &&
       langasSubScore * 2 >= langasSubMax
         ? LANGAS_TIME_BONUS
         : 0;
     const langasSubSpeed =
       langasSubBonus > 0 &&
-      Date.now() - langasSubStart <= LANGAS_FAST_MS + 5000 &&
+      langasSubTook <= langasSubFastMs + 5000 &&
       langasSubScore * 5 >= langasSubMax * 4
         ? LANGAS_FAST_BONUS
         : 0;
