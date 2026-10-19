@@ -228,6 +228,7 @@ router.get("/levels", langasRateLimit(60), langasRequireAuth, async (req, res) =
       `SELECT e.id, e.level_id, e.title, e.icon,
               (SELECT COUNT(*) FROM langas_questions q WHERE q.exercise_id = e.id AND q.min_app_version <= $2)::int AS question_count,
               COALESCE(s.best_score, 0)::int AS best_score,
+              COALESCE(s.best_correct, 0)::int AS best_correct,
               COALESCE(s.attempts, 0)::int AS attempts
        FROM langas_exercises e
        LEFT JOIN langas_scores s ON s.exercise_id = e.id AND s.user_id = $1
@@ -249,6 +250,7 @@ router.get("/levels", langasRateLimit(60), langasRequireAuth, async (req, res) =
           questionCount: e.question_count,
           maxScore: e.question_count * LANGAS_POINTS_PER_CORRECT,
           bestScore: e.best_score,
+          bestCorrect: e.best_correct,
           attempts: e.attempts
         }))
     }));
@@ -567,14 +569,15 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
         : 0;
 
     const langasSubBest = await pool.query(
-      `INSERT INTO langas_scores (user_id, exercise_id, best_score, attempts)
-       VALUES ($1, $2, $3, 1)
+      `INSERT INTO langas_scores (user_id, exercise_id, best_score, best_correct, attempts)
+       VALUES ($1, $2, $3, $4, 1)
        ON CONFLICT (user_id, exercise_id)
-       DO UPDATE SET best_score = GREATEST(langas_scores.best_score, EXCLUDED.best_score),
-                     attempts   = langas_scores.attempts + 1,
-                     updated_at = NOW()
+       DO UPDATE SET best_score   = GREATEST(langas_scores.best_score, EXCLUDED.best_score),
+                     best_correct = GREATEST(langas_scores.best_correct, EXCLUDED.best_correct),
+                     attempts     = langas_scores.attempts + 1,
+                     updated_at   = NOW()
        RETURNING best_score`,
-      [req.langasUser.id, langasSubExId, langasSubScore + langasSubBonus + langasSubSpeed]
+      [req.langasUser.id, langasSubExId, langasSubScore + langasSubBonus + langasSubSpeed, langasSubScore]
     );
 
     await pool.query(
