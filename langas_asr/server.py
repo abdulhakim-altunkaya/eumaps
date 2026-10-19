@@ -41,12 +41,18 @@ def run_whisper(data, suffix):
             audio = load_audio(f.name)
         except subprocess.CalledProcessError:
             return {"ok": False, "error": "bad audio"}
+        # Silence or almost silence: answer at once, don't run Whisper.
+        if audio.size == 0 or float(np.abs(audio).max()) < 0.01:
+            return {"ok": True, "text": "", "seconds": round(time.time() - start, 2)}
+        audio = audio[: 16000 * 8]  # never more than 8 seconds
         segments, _ = model.transcribe(
             audio,
             language="lv",
             beam_size=5,
-            vad_filter=False,
+            vad_filter=True,  # skip the silent parts
+            vad_parameters=dict(min_silence_duration_ms=300),
             condition_on_previous_text=False,
+            without_timestamps=True,
         )
         text = " ".join(s.text.strip() for s in segments).strip()
     return {"ok": True, "text": text, "seconds": round(time.time() - start, 2)}

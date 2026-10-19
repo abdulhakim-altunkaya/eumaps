@@ -374,9 +374,29 @@ function langasLetterHint(answer) {
   return shown + "   (" + letters.length + " letters)";
 }
 
+// Listening hint: "Es runāju latviski." -> "E _   r u _ _ _ u   l _ _ _ _ _ _ _ ."  (~30% of letters)
+function langasPartialHint(answer, seed) {
+  const chars = Array.from(String(answer || "").normalize("NFC"));
+  const isLetter = c => /\p{L}/u.test(c);
+  const letters = chars.map((c, i) => (isLetter(c) ? i : -1)).filter(i => i >= 0);
+  if (!letters.length) return String(answer || "");
+  const shown = new Set();
+  chars.forEach((c, i) => { if (isLetter(c) && (i === 0 || !isLetter(chars[i - 1]))) shown.add(i); });
+  const target = Math.max(1, Math.round(letters.length * 0.3));
+  const rest = letters.filter(i => !shown.has(i));
+  let s = (Number(seed) || 1) >>> 0;
+  while (shown.size < target && rest.length) {
+    s = (s * 1103515245 + 12345) >>> 0;
+    shown.add(rest.splice(s % rest.length, 1)[0]);
+  }
+  return chars
+    .map((c, i) => (c === " " ? " " : !isLetter(c) ? c : shown.has(i) ? c : "_"))
+    .join(" ");
+}
+
 async function langasLoadQuestion(exId, questionId) {
   const r = await pool.query(
-    `SELECT id, options, correct_index, accepted_answers
+    `SELECT id, type, options, correct_index, accepted_answers
      FROM langas_questions WHERE id = $1 AND exercise_id = $2`,
     [questionId, exId]
   );
@@ -454,12 +474,20 @@ router.post("/exercises/:id/hint", langasRateLimit(60), langasRequireAuth, async
     langasEntry(langasHntProg, langasHntQid).hinted = true;
 
     const isChoice = q.correct_index !== null && q.correct_index !== undefined;
+    const listenText =
+      (q.type === "listen" || q.type === "listen_write") &&
+      Array.isArray(q.accepted_answers) && q.accepted_answers.length
+        ? langasPartialHint(q.accepted_answers[0], q.id)
+        : "";
     if (isChoice) {
       const wrong = (Array.isArray(q.options) ? q.options : [])
         .map((_, i) => i)
         .filter(i => i !== q.correct_index)
         .sort((a, b) => ((q.id * 7 + a * 13) % 11) - ((q.id * 7 + b * 13) % 11));
-      return res.status(200).json({ resStatus: true, hint: "", removeIndices: wrong.slice(0, 2) });
+      return res.status(200).json({ resStatus: true, hint: listenText, removeIndices: wrong.slice(0, 2) });
+    }
+    if (listenText) {
+      return res.status(200).json({ resStatus: true, hint: listenText, removeIndices: [] });
     }
     const answer = Array.isArray(q.accepted_answers) && q.accepted_answers.length ? q.accepted_answers[0] : "";
     return res.status(200).json({ resStatus: true, hint: langasLetterHint(answer), removeIndices: [] });
