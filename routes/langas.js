@@ -49,6 +49,28 @@ function langasNormalize(s) {
     .trim();
 }
 
+// Typing questions: the player types the first 6 letters, the rest is shown.
+// "pirmdiena" -> { head: "pirmdi", tail: "ena" }; 6 letters or fewer -> tail ""
+const LANGAS_TYPE_LETTERS = 6;
+function langasSplitTyping(answer) {
+  const chars = Array.from(String(answer || "").normalize("NFC"));
+  const isLetter = c => /\p{L}/u.test(c);
+  let n = 0;
+  for (let i = 0; i < chars.length; i++) {
+    if (isLetter(chars[i]) && ++n === LANGAS_TYPE_LETTERS) {
+      const tail = chars.slice(i + 1).join("");
+      if (!/\p{L}/u.test(tail)) break;
+      return { head: chars.slice(0, i + 1).join(""), tail };
+    }
+  }
+  return { head: String(answer || ""), tail: "" };
+}
+
+function langasIsTyping(q) {
+  return (q.type === "write" || q.type === "listen_write") &&
+    Array.isArray(q.accepted_answers) && q.accepted_answers.length > 0;
+}
+
 function langasParseId(raw) {
   const n = parseInt(raw, 10);
   return Number.isInteger(n) && n > 0 && String(n) === String(raw) ? n : null;
@@ -225,7 +247,7 @@ router.get("/levels", langasRateLimit(60), langasRequireAuth, async (req, res) =
       `SELECT id, code, title FROM langas_levels ORDER BY sort_order`
     );
     const langasLevelsExRows = await pool.query(
-      `SELECT e.id, e.level_id, e.title, e.icon,
+      `SELECT e.id, e.level_id, e.title, e.icon, (e.rule IS NOT NULL) AS is_grammar,
               (SELECT COUNT(*) FROM langas_questions q WHERE q.exercise_id = e.id AND q.min_app_version <= $2)::int AS question_count,
               COALESCE(s.best_score, 0)::int AS best_score,
               COALESCE(s.best_correct, 0)::int AS best_correct,
@@ -247,6 +269,7 @@ router.get("/levels", langasRateLimit(60), langasRequireAuth, async (req, res) =
           id: e.id,
           title: e.title,
           icon: e.icon || "",
+          grammar: e.is_grammar,
           questionCount: e.question_count,
           maxScore: e.question_count * LANGAS_POINTS_PER_CORRECT,
           bestScore: e.best_score,
@@ -304,7 +327,7 @@ router.get("/exercises/:id", langasRateLimit(60), langasRequireAuth, async (req,
       return res.status(404).json({ resStatus: false, resMessage: "Exercise not found", resErrorCode: 2 });
     }
     const langasExQuestions = await pool.query(
-      `SELECT id, type, prompt, options, media_url, instruction
+      `SELECT id, type, prompt, options, media_url, instruction, accepted_answers
        FROM langas_questions WHERE exercise_id = $1 AND min_app_version <= $2 ORDER BY sort_order`,
       [langasExId, langasAppVersion(req)]
     );
@@ -327,7 +350,8 @@ router.get("/exercises/:id", langasRateLimit(60), langasRequireAuth, async (req,
           prompt: q.prompt,
           options: Array.isArray(q.options) ? q.options : [],
           mediaUrl: q.media_url || "",
-          instruction: q.instruction || ""
+          instruction: q.instruction || "",
+          given: langasIsTyping(q) ? langasSplitTyping(q.accepted_answers[0]).tail : ""
         }))
       }
     });
@@ -351,8 +375,13 @@ function langasGrade(q, a) {
     correct = !!a && Number(a.choiceIndex) === q.correct_index;
     correctAnswer = Array.isArray(q.options) ? String(q.options[q.correct_index] ?? "") : "";
   } else if (Array.isArray(q.accepted_answers) && q.accepted_answers.length) {
-    const given = langasNormalize(a?.text);
-    correct = !!given && q.accepted_answers.some(x => langasNormalize(x) === given);
+    const typed = langasNormalize(a?.text);
+    correct = !!typed && q.accepted_answers.some(x => langasNormalize(x) === typed);
+    // Typing questions: the first 6 letters are enough (the rest is shown in the app).
+    if (!correct && typed && langasIsTyping(q)) {
+      const split = langasSplitTyping(q.accepted_answers[0]);
+      correct = split.tail !== "" && langasNormalize(split.head) === typed;
+    }
     correctAnswer = String(q.accepted_answers[0]);
   }
   return { correct, correctAnswer };
@@ -479,7 +508,7 @@ router.post("/exercises/:id/hint", langasRateLimit(60), langasRequireAuth, async
     const listenText =
       (q.type === "listen" || q.type === "listen_write") &&
       Array.isArray(q.accepted_answers) && q.accepted_answers.length
-        ? langasPartialHint(q.accepted_answers[0], q.id)
+        ? langasPartialHint(q.type === "listen_write" ? langasSplitTyping(q.accepted_answers[0]).head : q.accepted_answers[0], q.id)
         : "";
     if (isChoice) {
       const wrong = (Array.isArray(q.options) ? q.options : [])
@@ -492,7 +521,9 @@ router.post("/exercises/:id/hint", langasRateLimit(60), langasRequireAuth, async
       return res.status(200).json({ resStatus: true, hint: listenText, removeIndices: [] });
     }
     const answer = Array.isArray(q.accepted_answers) && q.accepted_answers.length ? q.accepted_answers[0] : "";
-    return res.status(200).json({ resStatus: true, hint: langasLetterHint(answer), removeIndices: [] });
+    return res.status(200).json({ 
+      resStatus: true, hint: langasLetterHint(langasSplitTyping(answer).head), removeIndices: [] 
+    });
   } catch (err) {
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
   }
@@ -526,7 +557,7 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
     }
 
     const langasSubQuestions = await pool.query(
-      `SELECT id, options, correct_index, accepted_answers
+      `SELECT id, type, options, correct_index, accepted_answers
        FROM langas_questions WHERE exercise_id = $1 AND min_app_version <= $2 ORDER BY sort_order`,
       [langasSubExId, langasAppVersion(req)]
     );
