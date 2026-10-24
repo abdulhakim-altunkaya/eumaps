@@ -504,6 +504,12 @@ router.post("/exercises/:id/hint", langasRateLimit(60), langasRequireAuth, async
 
     langasEntry(langasHntProg, langasHntQid).hinted = true;
 
+    // Sentence builder: the hint shows the first 2 words
+    if (q.type === "build") {
+      const words = String((q.accepted_answers || [])[0] || "").split(/\s+/).filter(Boolean);
+      return res.status(200).json({ resStatus: true, hint: words.slice(0, 2).join(" ") + " …", removeIndices: [] });
+    }
+
     // Match: put up to 2 right chips into slots that are empty or wrong (no points for them)
     if (q.type === "match") {
       const key = langasMatchKey(q);
