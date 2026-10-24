@@ -504,6 +504,20 @@ router.post("/exercises/:id/hint", langasRateLimit(60), langasRequireAuth, async
 
     langasEntry(langasHntProg, langasHntQid).hinted = true;
 
+    // Match: put up to 2 right chips into slots that are empty or wrong (no points for them)
+    if (q.type === "match") {
+      const key = langasMatchKey(q);
+      const chips = Array.isArray(req.body?.chips) ? req.body.chips.map(Number) : [];
+      const entry = langasEntry(langasHntProg, langasHntQid);
+      const open = key.map((_, i) => i).filter(i => chips[i] !== key[i]);
+      const give = open.slice(0, 2);
+      entry.hintSlots = (entry.hintSlots || []).concat(give);
+      return res.status(200).json({
+        resStatus: true, hint: "", removeIndices: [],
+        matchSlots: give, matchChips: give.map(i => key[i])
+      });
+    }
+
     const isChoice = q.correct_index !== null && q.correct_index !== undefined;
     const listenText =
       (q.type === "listen" || q.type === "listen_write") &&
@@ -524,6 +538,82 @@ router.post("/exercises/:id/hint", langasRateLimit(60), langasRequireAuth, async
     return res.status(200).json({ 
       resStatus: true, hint: langasLetterHint(langasSplitTyping(answer).head), removeIndices: [] 
     });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+//  MATCH THE PAIRS (app version 6+)
+//  options = 5 words on the left, then 10 chips. accepted_answers = right chip (0-9) per left word.
+// ══════════════════════════════════════════════════════════════════════════
+const LANGAS_MATCH_TRIES = 3;
+
+function langasMatchKey(q) {
+  return Array.isArray(q.accepted_answers) ? q.accepted_answers.map(Number) : [];
+}
+
+// 2 points per right pair (pairs placed by a hint give nothing); 1st check x1, 2nd x0.5, 3rd x0.2
+function langasMatchPoints(entry, key, chips) {
+  const factor = entry.tries <= 1 ? 1 : entry.tries === 2 ? 0.5 : 0.2;
+  const hinted = entry.hintSlots || [];
+  let n = 0;
+  key.forEach((k, i) => { if (chips[i] === k && !hinted.includes(i)) n++; });
+  return Math.round(n * 2 * factor);
+}
+
+function langasMatchText(q) {
+  const key = langasMatchKey(q);
+  const opts = Array.isArray(q.options) ? q.options : [];
+  const left = opts.slice(0, key.length);
+  const chips = opts.slice(key.length);
+  return left.map((w, i) => w + " · " + (chips[key[i]] ?? "")).join("\n");
+}
+
+// Body: { questionId, chips: [chip index per slot], giveUp }
+router.post("/exercises/:id/match", langasRateLimit(120), langasRequireAuth, async (req, res) => {
+  const langasMtExId = langasParseId(req.params.id);
+  const langasMtQid = Number(req.body?.questionId);
+  if (!langasMtExId || !Number.isInteger(langasMtQid)) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid request", resErrorCode: 1 });
+  }
+  const langasMtProg = langasProgress.get(req.langasUser.id + ":" + langasMtExId);
+  if (!langasMtProg) {
+    return res.status(409).json({ resStatus: false, resMessage: "Lesson expired", resErrorCode: 2 });
+  }
+  try {
+    const q = await langasLoadQuestion(langasMtExId, langasMtQid);
+    if (!q || q.type !== "match") {
+      return res.status(404).json({ resStatus: false, resMessage: "Question not found", resErrorCode: 3 });
+    }
+    const key = langasMatchKey(q);
+    const entry = langasEntry(langasMtProg, langasMtQid);
+    if (entry.done) {
+      return res.status(200).json({ resStatus: true, correct: entry.correct, done: true, wrongCount: 0, correctChips: key });
+    }
+    if (req.body?.giveUp) {
+      entry.done = true;
+      return res.status(200).json({ resStatus: true, correct: false, done: true, wrongCount: 0, correctChips: key });
+    }
+    const chips = Array.isArray(req.body?.chips) ? req.body.chips.map(Number) : [];
+    if (chips.length !== key.length) {
+      return res.status(400).json({ resStatus: false, resMessage: "Fill every slot", resErrorCode: 4 });
+    }
+    entry.tries++;
+    const wrong = key.reduce((n, k, i) => n + (chips[i] === k ? 0 : 1), 0);
+    if (wrong === 0) {
+      entry.done = true;
+      entry.correct = true;
+      entry.points = langasMatchPoints(entry, key, chips);
+      return res.status(200).json({ resStatus: true, correct: true, done: true, wrongCount: 0, correctChips: [] });
+    }
+    if (entry.tries >= LANGAS_MATCH_TRIES) {
+      entry.done = true;
+      entry.points = langasMatchPoints(entry, key, chips);
+      return res.status(200).json({ resStatus: true, correct: false, done: true, wrongCount: wrong, correctChips: key });
+    }
+    // Not over: only say how many are wrong, never which ones.
+    return res.status(200).json({ resStatus: true, correct: false, done: false, wrongCount: wrong, correctChips: [] });
   } catch (err) {
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
   }
@@ -569,13 +659,15 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
     const langasSubResults = langasSubQuestions.rows.map(q => {
       const g = langasGrade(q, langasSubAnswerMap.get(q.id));
       const entry = langasSubProg ? langasSubProg[q.id] : null;
+      const langasSubAnswerText = q.type === "match" ? langasMatchText(q) : g.correctAnswer;
       if (entry && entry.done) {
         // App v4+: points come from the instant checks (1st try 10, 2nd 5, after hint 2).
         langasSubScore += entry.points;
-        return { questionId: q.id, correct: entry.correct, correctAnswer: g.correctAnswer };
+        return { questionId: q.id, correct: entry.correct, correctAnswer: langasSubAnswerText };
       }
+      if (q.type === "match") return { questionId: q.id, correct: false, correctAnswer: langasSubAnswerText };
       if (g.correct) langasSubScore += LANGAS_POINTS_PER_CORRECT;
-      return { questionId: q.id, correct: g.correct, correctAnswer: g.correctAnswer };
+      return { questionId: q.id, correct: g.correct, correctAnswer: langasSubAnswerText };
     });
 
     const langasSubMax = langasSubQuestions.rowCount * LANGAS_POINTS_PER_CORRECT;
