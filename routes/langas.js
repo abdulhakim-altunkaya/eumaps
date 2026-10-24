@@ -736,7 +736,241 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
 });
 
 // ══════════════════════════════════════════════════════════════════════════
-//  LEADERBOARD
+//  PROFILE (app version 6+): stats, custom name, photo
+// ══════════════════════════════════════════════════════════════════════════
+const LANGAS_AVATAR_BUCKET = "langas_storage";
+const LANGAS_AVATAR_SIZE = 256;          // px, square
+const LANGAS_AVATAR_MAX_BYTES = 200 * 1024;
+const LANGAS_NAME_MAX_SAME = 10;         // max players sharing one name
+const LANGAS_NAME_RE = /^[\p{L}\p{N}][\p{L}\p{N} ._-]{1,18}[\p{L}\p{N}.]$/u; // 3–20 chars
+const LANGAS_TZ = "Europe/Riga";
+
+function langasCleanName(raw) {
+  return String(raw || "").normalize("NFC").replace(/\s+/g, " ").trim();
+}
+
+function langasPeriod(row, prefix) {
+  return {
+    minutes: Math.round((row[prefix + "_sec"] || 0) / 60),
+    lessons: row[prefix + "_lessons"] || 0,
+    points: row[prefix + "_points"] || 0
+  };
+}
+
+router.get("/profile", langasRateLimit(30), langasRequireAuth, async (req, res) => {
+  const langasPrUid = req.langasUser.id;
+  const langasPrVer = langasAppVersion(req);
+  try {
+    const langasPrUser = await pool.query(
+      `SELECT id, COALESCE(custom_name, display_name) AS name, avatar_url, streak_days, best_streak,
+              (streak_last_date >= (NOW() AT TIME ZONE '${LANGAS_TZ}')::date - 1) AS streak_alive
+       FROM langas_users WHERE id = $1`,
+      [langasPrUid]
+    );
+    if (!langasPrUser.rowCount) {
+      return res.status(404).json({ resStatus: false, resMessage: "User not found", resErrorCode: 1 });
+    }
+    const u = langasPrUser.rows[0];
+
+    // Lessons per level (same filter as /levels) + crowns (90%+ without bonuses).
+    const langasPrLevels = await pool.query(
+      `SELECT l.id, l.code, l.title, l.sort_order,
+              COUNT(e.id)::int AS total,
+              COUNT(e.id) FILTER (WHERE COALESCE(s.attempts, 0) > 0)::int AS done,
+              COUNT(e.id) FILTER (WHERE COALESCE(s.attempts, 0) > 0
+                AND s.best_correct * 100 >= 90 * 10 * (SELECT COUNT(*) FROM langas_questions q
+                                                     WHERE q.exercise_id = e.id AND q.min_app_version <= $2))::int AS crowns
+       FROM langas_levels l
+       JOIN langas_exercises e ON e.level_id = l.id AND e.is_active = TRUE AND e.min_app_version <= $2
+       LEFT JOIN langas_scores s ON s.exercise_id = e.id AND s.user_id = $1
+       GROUP BY l.id
+       ORDER BY l.sort_order`,
+      [langasPrUid, langasPrVer]
+    );
+    const langasPrLvRows = langasPrLevels.rows;
+    const langasPrLevel =
+      langasPrLvRows.find(l => l.done < l.total) || langasPrLvRows[langasPrLvRows.length - 1] || null;
+    const langasPrCrowns = langasPrLvRows.reduce((n, l) => n + l.crowns, 0);
+
+    // Time / lessons / points: today, this week (Mon–Sun), this month, all time. Riga days.
+    const langasPrStats = await pool.query(
+      `WITH t AS (SELECT (NOW() AT TIME ZONE '${LANGAS_TZ}')::date AS today),
+       x AS (
+         SELECT seconds, points, correct_count, question_count,
+                (created_at AT TIME ZONE '${LANGAS_TZ}')::date AS d
+         FROM langas_lesson_log WHERE user_id = $1
+       )
+       SELECT
+         COALESCE(SUM(seconds) FILTER (WHERE d = t.today), 0)::int AS today_sec,
+         COUNT(*) FILTER (WHERE d = t.today)::int AS today_lessons,
+         COALESCE(SUM(points) FILTER (WHERE d = t.today), 0)::int AS today_points,
+         COALESCE(SUM(seconds) FILTER (WHERE d >= date_trunc('week', t.today)::date), 0)::int AS week_sec,
+         COUNT(*) FILTER (WHERE d >= date_trunc('week', t.today)::date)::int AS week_lessons,
+         COALESCE(SUM(points) FILTER (WHERE d >= date_trunc('week', t.today)::date), 0)::int AS week_points,
+         COALESCE(SUM(seconds) FILTER (WHERE d >= date_trunc('month', t.today)::date), 0)::int AS month_sec,
+         COUNT(*) FILTER (WHERE d >= date_trunc('month', t.today)::date)::int AS month_lessons,
+         COALESCE(SUM(points) FILTER (WHERE d >= date_trunc('month', t.today)::date), 0)::int AS month_points,
+         COALESCE(SUM(seconds), 0)::int AS all_sec,
+         COALESCE(SUM(correct_count), 0)::int AS all_correct,
+         COALESCE(SUM(question_count), 0)::int AS all_questions,
+         (t.today - date_trunc('week', t.today)::date)::int AS today_index
+       FROM t LEFT JOIN x ON TRUE
+       GROUP BY t.today`,
+      [langasPrUid]
+    );
+    const st = langasPrStats.rows[0] || {};
+
+    const langasPrWeek = await pool.query(
+      `WITH t AS (SELECT date_trunc('week', (NOW() AT TIME ZONE '${LANGAS_TZ}')::date)::date AS mon)
+       SELECT g.d::date AS d, COALESCE(SUM(l.seconds), 0)::int AS sec
+       FROM t, generate_series(t.mon, t.mon + 6, INTERVAL '1 day') AS g(d)
+       LEFT JOIN langas_lesson_log l
+         ON l.user_id = $1 AND (l.created_at AT TIME ZONE '${LANGAS_TZ}')::date = g.d::date
+       GROUP BY g.d ORDER BY g.d`,
+      [langasPrUid]
+    );
+
+    const langasPrRank = await pool.query(
+      `WITH totals AS (SELECT user_id, SUM(best_score)::int AS total FROM langas_scores GROUP BY user_id),
+       ranked AS (SELECT user_id, total, RANK() OVER (ORDER BY total DESC)::int AS rnk FROM totals)
+       SELECT total, rnk FROM ranked WHERE user_id = $1`,
+      [langasPrUid]
+    );
+    const rk = langasPrRank.rows[0] || { total: 0, rnk: 0 };
+
+    const langasPrStreak = u.streak_alive ? u.streak_days : 0;
+    return res.status(200).json({
+      resStatus: true,
+      profile: {
+        id: u.id,
+        name: u.name,
+        avatarUrl: u.avatar_url || "",
+        levelCode: langasPrLevel ? langasPrLevel.code : "",
+        levelTitle: langasPrLevel ? langasPrLevel.title : "",
+        lessonsDone: langasPrLevel ? langasPrLevel.done : 0,
+        lessonsTotal: langasPrLevel ? langasPrLevel.total : 0,
+        today: langasPeriod(st, "today"),
+        week: langasPeriod(st, "week"),
+        month: langasPeriod(st, "month"),
+        weekMinutes: langasPrWeek.rows.map(r => Math.round(r.sec / 60)),
+        todayIndex: st.today_index || 0,
+        crowns: langasPrCrowns,
+        accuracy: st.all_questions > 0 ? Math.round((100 * st.all_correct) / st.all_questions) : 0,
+        streak: langasPrStreak,
+        bestStreak: Math.max(u.best_streak || 0, langasPrStreak),
+        totalMinutes: Math.round((st.all_sec || 0) / 60),
+        totalPoints: rk.total || 0,
+        rank: rk.rnk || 0
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
+// Body: { name }. 3–20 letters/digits (space . _ - inside). Max 10 players per name.
+router.post("/profile/name", langasRateLimit(10), langasRequireAuth, async (req, res) => {
+  const langasNmName = langasCleanName(req.body?.name);
+  if (!LANGAS_NAME_RE.test(langasNmName)) {
+    return res.status(400).json({
+      resStatus: false,
+      resMessage: "Use 3–20 letters or numbers",
+      resErrorCode: 1
+    });
+  }
+  try {
+    const langasNmCount = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM langas_users
+       WHERE lower(COALESCE(custom_name, display_name)) = lower($1) AND id <> $2`,
+      [langasNmName, req.langasUser.id]
+    );
+    if (langasNmCount.rows[0].n >= LANGAS_NAME_MAX_SAME) {
+      return res.status(409).json({
+        resStatus: false,
+        resMessage: "Too many players use this name. Try another one",
+        resErrorCode: 2
+      });
+    }
+    await pool.query(`UPDATE langas_users SET custom_name = $1 WHERE id = $2`, [langasNmName, req.langasUser.id]);
+    return res.status(200).json({ resStatus: true, resMessage: "Saved", name: langasNmName });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
+// Body: raw image bytes (jpg/png/webp/heic). Saved as a 256×256 JPEG, well under 200 KB, no metadata.
+router.post(
+  "/profile/photo",
+  langasRateLimit(6),
+  langasRequireAuth,
+  express.raw({ type: () => true, limit: "8mb" }),
+  async (req, res) => {
+    if (!Buffer.isBuffer(req.body) || req.body.length < 100) {
+      return res.status(400).json({ resStatus: false, resMessage: "No photo", resErrorCode: 1 });
+    }
+    let langasPhJpg;
+    try {
+      let langasPhQuality = 82;
+      do {
+        langasPhJpg = await sharp(req.body, { limitInputPixels: 50_000_000 })
+          .rotate()
+          .resize(LANGAS_AVATAR_SIZE, LANGAS_AVATAR_SIZE, { fit: "cover", position: "attention" })
+          .flatten({ background: "#ffffff" })
+          .jpeg({ quality: langasPhQuality, mozjpeg: true })
+          .toBuffer();
+        langasPhQuality -= 15;
+      } while (langasPhJpg.length > LANGAS_AVATAR_MAX_BYTES && langasPhQuality > 30);
+    } catch (err) {
+      return res.status(400).json({ resStatus: false, resMessage: "This photo can't be read", resErrorCode: 2 });
+    }
+    if (langasPhJpg.length > LANGAS_AVATAR_MAX_BYTES) {
+      return res.status(400).json({ resStatus: false, resMessage: "Photo is too big", resErrorCode: 3 });
+    }
+
+    const langasPhPath = `avatars/${req.langasUser.id}_${Date.now()}.jpg`;
+    try {
+      const { error: langasPhUpErr } = await supabase.storage
+        .from(LANGAS_AVATAR_BUCKET)
+        .upload(langasPhPath, langasPhJpg, { contentType: "image/jpeg", cacheControl: "31536000", upsert: false });
+      if (langasPhUpErr) {
+        return res.status(502).json({ resStatus: false, resMessage: "Upload failed, try again", resErrorCode: 4 });
+      }
+      const langasPhUrl = supabase.storage.from(LANGAS_AVATAR_BUCKET).getPublicUrl(langasPhPath).data.publicUrl;
+
+      const langasPhOld = await pool.query(`SELECT avatar_url FROM langas_users WHERE id = $1`, [req.langasUser.id]);
+      await pool.query(`UPDATE langas_users SET avatar_url = $1 WHERE id = $2`, [langasPhUrl, req.langasUser.id]);
+      await langasRemoveAvatar(langasPhOld.rows[0]?.avatar_url);
+
+      return res.status(200).json({ resStatus: true, resMessage: "Saved", avatarUrl: langasPhUrl });
+    } catch (err) {
+      return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+    }
+  }
+);
+
+router.delete("/profile/photo", langasRateLimit(6), langasRequireAuth, async (req, res) => {
+  try {
+    const langasPdOld = await pool.query(`SELECT avatar_url FROM langas_users WHERE id = $1`, [req.langasUser.id]);
+    await pool.query(`UPDATE langas_users SET avatar_url = NULL WHERE id = $1`, [req.langasUser.id]);
+    await langasRemoveAvatar(langasPdOld.rows[0]?.avatar_url);
+    return res.status(200).json({ resStatus: true, resMessage: "Removed", avatarUrl: "" });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
+// Deletes an old avatar file from storage. Failures are ignored (the DB no longer points to it).
+async function langasRemoveAvatar(url) {
+  const langasRaMark = `/${LANGAS_AVATAR_BUCKET}/`;
+  const langasRaAt = url ? url.indexOf(langasRaMark) : -1;
+  if (langasRaAt < 0) return;
+  const langasRaPath = url.slice(langasRaAt + langasRaMark.length);
+  if (!langasRaPath.startsWith("avatars/")) return;
+  try {
+    await supabase.storage.from(LANGAS_AVATAR_BUCKET).remove([langasRaPath]);
+  } catch (e) { /* ignore */ }
+}
+
 // ══════════════════════════════════════════════════════════════════════════
 router.get("/leaderboard", langasRateLimit(30), langasRequireAuth, async (req, res) => {
   try {
