@@ -736,6 +736,11 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
        langasSubResults.filter(r => r.correct).length, langasSubQuestions.rowCount]
     );
 
+    const langasSubNewAch = await langasAwardAchievements(req.langasUser.id, langasAppVersion(req), {
+      perfect: langasSubResults.length > 0 && langasSubResults.every(r => r.correct),
+      lightning: langasSubSpeed > 0
+    });
+
     return res.status(200).json({
       resStatus: true,
       score: langasSubScore,
@@ -743,7 +748,8 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
       timeBonus: langasSubBonus,
       speedBonus: langasSubSpeed,
       bestScore: langasSubBest.rows[0].best_score,
-      results: langasSubResults
+      results: langasSubResults,
+      achievements: langasSubNewAch
     });
   } catch (err) {
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
@@ -761,6 +767,92 @@ const LANGAS_AVATAR_LINK_SEC = 60 * 60 * 24; // signed photo links live 24 h (bu
 const LANGAS_NAME_MAX_SAME = 10;         // max players sharing one name
 const LANGAS_NAME_RE = /^[\p{L}\p{N}][\p{L}\p{N} ._-]{1,18}[\p{L}\p{N}.]$/u; // 3–20 chars
 const LANGAS_TZ = "Europe/Riga";
+
+// ── ACHIEVEMENTS ───────────────────────────────────────────────────────────
+// color: sun | coral | ink | mint | teal (badge colour in the app)
+const LANGAS_ACHIEVEMENTS = [
+  { code: "lessons_1",   title: "First lesson",    text: "Finish your first lesson",         icon: "star",    color: "sun" },
+  { code: "lessons_10",  title: "10 lessons",      text: "Finish 10 lessons",                icon: "trophy",  color: "sun" },
+  { code: "lessons_25",  title: "25 lessons",      text: "Finish 25 lessons",                icon: "trophy",  color: "sun" },
+  { code: "lessons_50",  title: "50 lessons",      text: "Finish 50 lessons",                icon: "trophy",  color: "sun" },
+  { code: "lessons_all", title: "All lessons",     text: "Finish every lesson",              icon: "trophy",  color: "coral" },
+  { code: "crown_1",     title: "First crown",     text: "Score 90% or more in a lesson",    icon: "crown",   color: "sun" },
+  { code: "crown_10",    title: "10 crowns",       text: "Earn 10 crowns",                   icon: "crown",   color: "sun" },
+  { code: "crown_25",    title: "25 crowns",       text: "Earn 25 crowns",                   icon: "crown",   color: "sun" },
+  { code: "perfect_1",   title: "Perfect!",        text: "Get every answer right",           icon: "star",    color: "coral" },
+  { code: "streak_3",    title: "3-day streak",    text: "Practise 3 days in a row",         icon: "flame",   color: "coral" },
+  { code: "streak_7",    title: "7-day streak",    text: "Practise 7 days in a row",         icon: "flame",   color: "coral" },
+  { code: "streak_30",   title: "30-day streak",   text: "Practise 30 days in a row",        icon: "flame",   color: "coral" },
+  { code: "lightning_1", title: "Lightning fast",  text: "Win a lightning bonus",            icon: "bolt",    color: "ink" },
+  { code: "grammar_1",   title: "Grammar starter", text: "Finish a grammar lesson",          icon: "book",    color: "mint" },
+  { code: "grammar_all", title: "Grammar master",  text: "Finish every grammar lesson",      icon: "book",    color: "mint" },
+  { code: "time_60",     title: "1 hour",          text: "Practise for 1 hour in total",     icon: "clock",   color: "teal" },
+  { code: "time_600",    title: "10 hours",        text: "Practise for 10 hours in total",   icon: "clock",   color: "teal" }
+];
+const LANGAS_ACH_BY_CODE = Object.fromEntries(LANGAS_ACHIEVEMENTS.map(a => [a.code, a]));
+
+function langasAchDto(code, date) {
+  const a = LANGAS_ACH_BY_CODE[code];
+  return a ? { code: a.code, title: a.title, text: a.text, icon: a.icon, color: a.color, date: date || "" } : null;
+}
+
+// After a lesson: saves every achievement the player now qualifies for, returns only the new ones.
+// lesson = { perfect, lightning }. Never throws (a failure here must not break the result screen).
+async function langasAwardAchievements(userId, appVersion, lesson) {
+  try {
+    const r = await pool.query(
+      `WITH qc AS (
+         SELECT e.id, e.rule IS NOT NULL AS grammar,
+                (SELECT COUNT(*) FROM langas_questions q WHERE q.exercise_id = e.id AND q.min_app_version <= $2) AS n
+         FROM langas_exercises e WHERE e.is_active = TRUE AND e.min_app_version <= $2
+       )
+       SELECT
+         (SELECT COUNT(*) FROM qc)::int AS total,
+         (SELECT COUNT(*) FROM qc WHERE grammar)::int AS g_total,
+         COUNT(s.exercise_id) FILTER (WHERE s.attempts > 0)::int AS done,
+         COUNT(s.exercise_id) FILTER (WHERE s.attempts > 0 AND qc.grammar)::int AS g_done,
+         COUNT(s.exercise_id) FILTER (WHERE s.attempts > 0 AND s.best_correct * 100 >= 90 * 10 * qc.n)::int AS crowns,
+         (SELECT COALESCE(SUM(seconds), 0) FROM langas_lesson_log WHERE user_id = $1)::int AS secs,
+         (SELECT GREATEST(streak_days, best_streak) FROM langas_users WHERE id = $1)::int AS streak
+       FROM qc LEFT JOIN langas_scores s ON s.exercise_id = qc.id AND s.user_id = $1`,
+      [userId, appVersion]
+    );
+    const st = r.rows[0] || {};
+    const earned = [];
+    const add = (cond, code) => { if (cond) earned.push(code); };
+    add(st.done >= 1, "lessons_1");
+    add(st.done >= 10, "lessons_10");
+    add(st.done >= 25, "lessons_25");
+    add(st.done >= 50, "lessons_50");
+    add(st.total > 0 && st.done >= st.total, "lessons_all");
+    add(st.crowns >= 1, "crown_1");
+    add(st.crowns >= 10, "crown_10");
+    add(st.crowns >= 25, "crown_25");
+    add(lesson && lesson.perfect, "perfect_1");
+    add(st.streak >= 3, "streak_3");
+    add(st.streak >= 7, "streak_7");
+    add(st.streak >= 30, "streak_30");
+    add(lesson && lesson.lightning, "lightning_1");
+    add(st.g_done >= 1, "grammar_1");
+    add(st.g_total > 0 && st.g_done >= st.g_total, "grammar_all");
+    add(st.secs >= 60 * 60, "time_60");
+    add(st.secs >= 600 * 60, "time_600");
+    if (!earned.length) return [];
+
+    const ins = await pool.query(
+      `INSERT INTO langas_achievements (user_id, code)
+       SELECT $1, unnest($2::text[])
+       ON CONFLICT (user_id, code) DO NOTHING
+       RETURNING code`,
+      [userId, earned]
+    );
+    const fresh = new Set(ins.rows.map(x => x.code));
+    // Keep the list order (easy ones first) for the result screen.
+    return earned.filter(c => fresh.has(c)).map(c => langasAchDto(c, "")).filter(Boolean);
+  } catch (e) {
+    return [];
+  }
+}
 
 function langasCleanName(raw) {
   return String(raw || "").normalize("NFC").replace(/\s+/g, " ").trim();
@@ -868,6 +960,13 @@ async function langasSendProfile(req, res, langasPrUid) {
     );
     const rk = langasPrRank.rows[0] || { total: 0, rnk: 0 };
 
+    const langasPrAch = await pool.query(
+      `SELECT code, to_char(earned_at AT TIME ZONE '${LANGAS_TZ}', 'FMDD Mon') AS d
+       FROM langas_achievements WHERE user_id = $1
+       ORDER BY earned_at DESC, id DESC LIMIT 5`,
+      [langasPrUid]
+    );
+
     const langasPrStreak = u.streak_alive ? u.streak_days : 0;
     return res.status(200).json({
       resStatus: true,
@@ -891,7 +990,8 @@ async function langasSendProfile(req, res, langasPrUid) {
         bestStreak: Math.max(u.best_streak || 0, langasPrStreak),
         totalMinutes: Math.round((st.all_sec || 0) / 60),
         totalPoints: rk.total || 0,
-        rank: rk.rnk || 0
+        rank: rk.rnk || 0,
+        achievements: langasPrAch.rows.map(a => langasAchDto(a.code, a.d)).filter(Boolean)
       }
     });
   } catch (err) {
