@@ -1018,6 +1018,64 @@ router.get("/profile/:id", langasRateLimit(60), langasRequireAuth, (req, res) =>
   return langasSendProfile(req, res, langasPuId);
 });
 
+// Who congratulated this achievement (owner only), newest first.
+function langasAgo(date) {
+  const langasAgMin = Math.max(0, Math.floor((Date.now() - new Date(date).getTime()) / 60000));
+  if (langasAgMin < 1) return "just now";
+  if (langasAgMin < 60) return langasAgMin + " min ago";
+  const langasAgH = Math.floor(langasAgMin / 60);
+  if (langasAgH < 24) return langasAgH + " h ago";
+  const langasAgD = Math.floor(langasAgH / 24);
+  if (langasAgD === 1) return "yesterday";
+  return langasAgD + " days ago";
+}
+
+router.get("/achievements/:id/cheers", langasRateLimit(60), langasRequireAuth, async (req, res) => {
+  const langasCwId = langasParseId(req.params.id);
+  if (!langasCwId) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid achievement", resErrorCode: 1 });
+  }
+  try {
+    const langasCwOwner = await pool.query(`SELECT user_id FROM langas_achievements WHERE id = $1`, [langasCwId]);
+    if (!langasCwOwner.rowCount) {
+      return res.status(404).json({ resStatus: false, resMessage: "Achievement not found", resErrorCode: 2 });
+    }
+    if (Number(langasCwOwner.rows[0].user_id) !== Number(req.langasUser.id)) {
+      return res.status(403).json({ resStatus: false, resMessage: "Only for your own achievements", resErrorCode: 3 });
+    }
+    const langasCwRows = await pool.query(
+      `SELECT u.id, COALESCE(u.custom_name, u.display_name) AS name, u.avatar_path, c.created_at
+       FROM langas_achievement_cheers c
+       JOIN langas_users u ON u.id = c.user_id
+       WHERE c.achievement_id = $1
+       ORDER BY c.created_at DESC
+       LIMIT 100`,
+      [langasCwId]
+    );
+    const langasCwPaths = langasCwRows.rows.map(r => r.avatar_path).filter(Boolean);
+    const langasCwLinks = {};
+    if (langasCwPaths.length) {
+      try {
+        const { data } = await supabase.storage
+          .from(LANGAS_AVATAR_BUCKET)
+          .createSignedUrls(langasCwPaths, LANGAS_AVATAR_LINK_SEC);
+        for (const l of data || []) if (l && l.path && l.signedUrl) langasCwLinks[l.path] = l.signedUrl;
+      } catch (e) { /* no photos: the app shows first letters */ }
+    }
+    return res.status(200).json({
+      resStatus: true,
+      people: langasCwRows.rows.map(r => ({
+        userId: Number(r.id),
+        name: r.name,
+        avatarUrl: langasCwLinks[r.avatar_path] || "",
+        ago: langasAgo(r.created_at)
+      }))
+    });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
 // Congratulate another player's achievement; calling it again takes it back.
 router.post("/achievements/:id/cheer", langasRateLimit(60), langasRequireAuth, async (req, res) => {
   const langasChId = langasParseId(req.params.id);
