@@ -961,10 +961,13 @@ async function langasSendProfile(req, res, langasPrUid) {
     const rk = langasPrRank.rows[0] || { total: 0, rnk: 0 };
 
     const langasPrAch = await pool.query(
-      `SELECT code, to_char(earned_at AT TIME ZONE '${LANGAS_TZ}', 'FMDD Mon') AS d
-       FROM langas_achievements WHERE user_id = $1
-       ORDER BY earned_at DESC, id DESC LIMIT 5`,
-      [langasPrUid]
+      `SELECT a.id, a.code, to_char(a.earned_at AT TIME ZONE '${LANGAS_TZ}', 'FMDD Mon') AS d,
+              (SELECT COUNT(*) FROM langas_achievement_cheers c WHERE c.achievement_id = a.id)::int AS cheers,
+              EXISTS (SELECT 1 FROM langas_achievement_cheers c
+                      WHERE c.achievement_id = a.id AND c.user_id = $2) AS cheered
+       FROM langas_achievements a WHERE a.user_id = $1
+       ORDER BY a.earned_at DESC, a.id DESC LIMIT 5`,
+      [langasPrUid, req.langasUser.id]
     );
 
     const langasPrStreak = u.streak_alive ? u.streak_days : 0;
@@ -991,7 +994,12 @@ async function langasSendProfile(req, res, langasPrUid) {
         totalMinutes: Math.round((st.all_sec || 0) / 60),
         totalPoints: rk.total || 0,
         rank: rk.rnk || 0,
-        achievements: langasPrAch.rows.map(a => langasAchDto(a.code, a.d)).filter(Boolean)
+        achievements: langasPrAch.rows
+          .map(a => {
+            const dto = langasAchDto(a.code, a.d);
+            return dto ? { ...dto, id: Number(a.id), cheers: a.cheers, cheered: a.cheered } : null;
+          })
+          .filter(Boolean)
       }
     });
   } catch (err) {
@@ -1008,6 +1016,45 @@ router.get("/profile/:id", langasRateLimit(60), langasRequireAuth, (req, res) =>
     return res.status(400).json({ resStatus: false, resMessage: "Invalid player", resErrorCode: 1 });
   }
   return langasSendProfile(req, res, langasPuId);
+});
+
+// Congratulate another player's achievement; calling it again takes it back.
+router.post("/achievements/:id/cheer", langasRateLimit(60), langasRequireAuth, async (req, res) => {
+  const langasChId = langasParseId(req.params.id);
+  if (!langasChId) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid achievement", resErrorCode: 1 });
+  }
+  try {
+    const langasChRow = await pool.query(`SELECT user_id FROM langas_achievements WHERE id = $1`, [langasChId]);
+    if (!langasChRow.rowCount) {
+      return res.status(404).json({ resStatus: false, resMessage: "Achievement not found", resErrorCode: 2 });
+    }
+    if (Number(langasChRow.rows[0].user_id) === Number(req.langasUser.id)) {
+      return res.status(400).json({ resStatus: false, resMessage: "You can't congratulate yourself", resErrorCode: 3 });
+    }
+    const langasChDel = await pool.query(
+      `DELETE FROM langas_achievement_cheers WHERE achievement_id = $1 AND user_id = $2`,
+      [langasChId, req.langasUser.id]
+    );
+    if (!langasChDel.rowCount) {
+      await pool.query(
+        `INSERT INTO langas_achievement_cheers (achievement_id, user_id) VALUES ($1, $2)
+         ON CONFLICT (achievement_id, user_id) DO NOTHING`,
+        [langasChId, req.langasUser.id]
+      );
+    }
+    const langasChCount = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM langas_achievement_cheers WHERE achievement_id = $1`,
+      [langasChId]
+    );
+    return res.status(200).json({
+      resStatus: true,
+      cheered: langasChDel.rowCount === 0,
+      cheers: langasChCount.rows[0].n
+    });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
 });
 
 // Body: { name }. 3–20 letters/digits (space . _ - inside). Max 10 players per name.
