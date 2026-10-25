@@ -1003,19 +1003,32 @@ router.get("/leaderboard", langasRateLimit(30), langasRequireAuth, async (req, r
   try {
     const langasLbRows = await pool.query(
       `WITH totals AS (
-         SELECT u.id, COALESCE(u.custom_name, u.display_name) AS display_name, SUM(s.best_score)::int AS total
+         SELECT u.id, COALESCE(u.custom_name, u.display_name) AS display_name, u.avatar_path,
+                SUM(s.best_score)::int AS total
          FROM langas_users u
          JOIN langas_scores s ON s.user_id = u.id
          GROUP BY u.id
        ), ranked AS (
-         SELECT id, display_name, total, RANK() OVER (ORDER BY total DESC)::int AS rnk
+         SELECT id, display_name, avatar_path, total, RANK() OVER (ORDER BY total DESC)::int AS rnk
          FROM totals
        )
-       SELECT id, display_name, total, rnk FROM ranked
+       SELECT id, display_name, avatar_path, total, rnk FROM ranked
        WHERE rnk <= $1 OR id = $2
        ORDER BY rnk, id`,
       [LANGAS_LEADERBOARD_LIMIT, req.langasUser.id]
     );
+
+    // Signed links for the photos on this page (one call for all of them).
+    const langasLbPaths = langasLbRows.rows.map(r => r.avatar_path).filter(Boolean);
+    const langasLbLinks = {};
+    if (langasLbPaths.length) {
+      try {
+        const { data } = await supabase.storage
+          .from(LANGAS_AVATAR_BUCKET)
+          .createSignedUrls(langasLbPaths, LANGAS_AVATAR_LINK_SEC);
+        for (const l of data || []) if (l && l.path && l.signedUrl) langasLbLinks[l.path] = l.signedUrl;
+      } catch (e) { /* no photos: the app shows first letters */ }
+    }
 
     const langasLbEntries = [];
     let langasLbMe = { rank: 0, total: 0 };
@@ -1025,6 +1038,7 @@ router.get("/leaderboard", langasRateLimit(30), langasRequireAuth, async (req, r
         langasLbEntries.push({
           rank: r.rnk,
           displayName: r.display_name,
+          avatarUrl: langasLbLinks[r.avatar_path] || "",
           total: r.total,
           isMe: r.id === req.langasUser.id
         });
