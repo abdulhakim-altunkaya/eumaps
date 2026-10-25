@@ -970,6 +970,9 @@ async function langasSendProfile(req, res, langasPrUid) {
       [langasPrUid, req.langasUser.id]
     );
 
+    const langasPrFriendState = await langasFriendState(req.langasUser.id, u.id);
+    const langasPrLists = langasPrFriendState === "me" ? await langasFriendLists(u.id) : { friends: [], requests: [] };
+
     const langasPrStreak = u.streak_alive ? u.streak_days : 0;
     return res.status(200).json({
       resStatus: true,
@@ -999,7 +1002,10 @@ async function langasSendProfile(req, res, langasPrUid) {
             const dto = langasAchDto(a.code, a.d);
             return dto ? { ...dto, id: Number(a.id), cheers: a.cheers, cheered: a.cheered } : null;
           })
-          .filter(Boolean)
+          .filter(Boolean),
+        friendState: langasPrFriendState,
+        friends: langasPrLists.friends,
+        requests: langasPrLists.requests
       }
     });
   } catch (err) {
@@ -1214,6 +1220,130 @@ async function langasRemoveAvatar(filePath) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+//  FRIENDS (request + accept). One row per pair of players.
+// ══════════════════════════════════════════════════════════════════════════
+const LANGAS_FRIEND_ACTIONS = ["request", "accept", "decline", "cancel", "remove"];
+
+// "me" | "none" | "sent" (I asked) | "incoming" (they asked) | "friends"
+async function langasFriendState(me, other) {
+  if (Number(me) === Number(other)) return "me";
+  const r = await pool.query(
+    `SELECT requester_id, status FROM langas_friends
+     WHERE LEAST(requester_id, addressee_id) = LEAST($1::bigint, $2::bigint)
+       AND GREATEST(requester_id, addressee_id) = GREATEST($1::bigint, $2::bigint)`,
+    [me, other]
+  );
+  if (!r.rowCount) return "none";
+  const f = r.rows[0];
+  if (f.status === "accepted") return "friends";
+  return Number(f.requester_id) === Number(me) ? "sent" : "incoming";
+}
+
+// Own profile: friends (with points + streak) and incoming requests, each with a photo link.
+async function langasFriendLists(me) {
+  const r = await pool.query(
+    `WITH pairs AS (
+       SELECT CASE WHEN requester_id = $1 THEN addressee_id ELSE requester_id END AS other,
+              status, requester_id = $1 AS mine, COALESCE(accepted_at, created_at) AS at
+       FROM langas_friends
+       WHERE requester_id = $1 OR addressee_id = $1
+     )
+     SELECT p.other AS id, p.status, p.mine,
+            COALESCE(u.custom_name, u.display_name) AS name, u.avatar_path,
+            COALESCE((SELECT SUM(best_score) FROM langas_scores s WHERE s.user_id = u.id), 0)::int AS points,
+            CASE WHEN u.streak_last_date >= (NOW() AT TIME ZONE 'Europe/Riga')::date - 1
+                 THEN u.streak_days ELSE 0 END AS streak
+     FROM pairs p JOIN langas_users u ON u.id = p.other
+     WHERE p.status = 'accepted' OR NOT p.mine
+     ORDER BY (p.status = 'accepted'), points DESC, p.at DESC
+     LIMIT 100`,
+    [me]
+  );
+  const langasFlPaths = r.rows.map(x => x.avatar_path).filter(Boolean);
+  const langasFlLinks = {};
+  if (langasFlPaths.length) {
+    try {
+      const { data } = await supabase.storage
+        .from(LANGAS_AVATAR_BUCKET)
+        .createSignedUrls(langasFlPaths, LANGAS_AVATAR_LINK_SEC);
+      for (const l of data || []) if (l && l.path && l.signedUrl) langasFlLinks[l.path] = l.signedUrl;
+    } catch (e) { /* no photos: first letters */ }
+  }
+  const dto = x => ({
+    userId: Number(x.id), name: x.name, avatarUrl: langasFlLinks[x.avatar_path] || "",
+    points: x.points || 0, streak: x.streak || 0
+  });
+  return {
+    friends: r.rows.filter(x => x.status === "accepted").map(dto),
+    requests: r.rows.filter(x => x.status === "pending" && !x.mine).map(dto)
+  };
+}
+
+// POST /friends/:id/request | accept | decline | cancel | remove  -> { state }
+router.post("/friends/:id/:action", langasRateLimit(30), langasRequireAuth, async (req, res) => {
+  const langasFrOther = langasParseId(req.params.id);
+  const langasFrAction = String(req.params.action || "");
+  const langasFrMe = req.langasUser.id;
+  if (!langasFrOther || !LANGAS_FRIEND_ACTIONS.includes(langasFrAction)) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid request", resErrorCode: 1 });
+  }
+  if (Number(langasFrOther) === Number(langasFrMe)) {
+    return res.status(400).json({ resStatus: false, resMessage: "That's you", resErrorCode: 2 });
+  }
+  try {
+    const langasFrUser = await pool.query(`SELECT id FROM langas_users WHERE id = $1`, [langasFrOther]);
+    if (!langasFrUser.rowCount) {
+      return res.status(404).json({ resStatus: false, resMessage: "Player not found", resErrorCode: 3 });
+    }
+    const langasFrNow = await langasFriendState(langasFrMe, langasFrOther);
+    const langasFrPair = `LEAST(requester_id, addressee_id) = LEAST($1::bigint, $2::bigint)
+       AND GREATEST(requester_id, addressee_id) = GREATEST($1::bigint, $2::bigint)`;
+
+    if (langasFrAction === "request") {
+      if (langasFrNow === "none") {
+        await pool.query(
+          `INSERT INTO langas_friends (requester_id, addressee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+          [langasFrMe, langasFrOther]
+        );
+      } else if (langasFrNow === "incoming") {
+        // They already asked: asking back means yes.
+        await pool.query(
+          `UPDATE langas_friends SET status = 'accepted', accepted_at = NOW()
+           WHERE requester_id = $2 AND addressee_id = $1 AND status = 'pending'`,
+          [langasFrMe, langasFrOther]
+        );
+      }
+    } else if (langasFrAction === "accept") {
+      if (langasFrNow === "incoming") {
+        await pool.query(
+          `UPDATE langas_friends SET status = 'accepted', accepted_at = NOW()
+           WHERE requester_id = $2 AND addressee_id = $1 AND status = 'pending'`,
+          [langasFrMe, langasFrOther]
+        );
+      }
+    } else if (langasFrAction === "decline") {
+      if (langasFrNow === "incoming") {
+        await pool.query(`DELETE FROM langas_friends WHERE ${langasFrPair} AND status = 'pending'`,
+          [langasFrMe, langasFrOther]);
+      }
+    } else if (langasFrAction === "cancel") {
+      if (langasFrNow === "sent") {
+        await pool.query(`DELETE FROM langas_friends WHERE ${langasFrPair} AND status = 'pending'`,
+          [langasFrMe, langasFrOther]);
+      }
+    } else if (langasFrAction === "remove") {
+      if (langasFrNow === "friends") {
+        await pool.query(`DELETE FROM langas_friends WHERE ${langasFrPair} AND status = 'accepted'`,
+          [langasFrMe, langasFrOther]);
+      }
+    }
+    return res.status(200).json({ resStatus: true, state: await langasFriendState(langasFrMe, langasFrOther) });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════
 //  LEADERBOARD
 // ══════════════════════════════════════════════════════════════════════════
 router.get("/leaderboard", langasRateLimit(30), langasRequireAuth, async (req, res) => {
@@ -1224,6 +1354,11 @@ router.get("/leaderboard", langasRateLimit(30), langasRequireAuth, async (req, r
                 SUM(s.best_score)::int AS total
          FROM langas_users u
          JOIN langas_scores s ON s.user_id = u.id
+         WHERE $3::boolean = FALSE OR u.id = $2 OR u.id IN (
+           SELECT CASE WHEN f.requester_id = $2 THEN f.addressee_id ELSE f.requester_id END
+           FROM langas_friends f
+           WHERE f.status = 'accepted' AND (f.requester_id = $2 OR f.addressee_id = $2)
+         )
          GROUP BY u.id
        ), ranked AS (
          SELECT id, display_name, avatar_path, total, RANK() OVER (ORDER BY total DESC)::int AS rnk
@@ -1232,7 +1367,7 @@ router.get("/leaderboard", langasRateLimit(30), langasRequireAuth, async (req, r
        SELECT id, display_name, avatar_path, total, rnk FROM ranked
        WHERE rnk <= $1 OR id = $2
        ORDER BY rnk, id`,
-      [LANGAS_LEADERBOARD_LIMIT, req.langasUser.id]
+      [LANGAS_LEADERBOARD_LIMIT, req.langasUser.id, req.query.scope === "friends"]
     );
 
     // Signed links for the photos on this page (one call for all of them).
