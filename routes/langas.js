@@ -766,17 +766,54 @@ function langasCleanName(raw) {
   return String(raw || "").normalize("NFC").replace(/\s+/g, " ").trim();
 }
 
-// Private bucket: the DB keeps the file path, the app gets a short-lived signed link.
+const LANGAS_REPORT_HIDE_AT = 3;         // distinct reports that hide a photo / reset a name
+const LANGAS_USER_REPORT_REASONS = ["photo", "name"];
+
+// Private bucket: the DB keeps the file path, the app gets a signed link.
+// Links are reused until 2 h before they expire, so the app can cache the images.
+const langasAvatarLinkCache = new Map(); // path -> { url, until }
+
+async function langasAvatarLinks(filePaths) {
+  const langasAlNow = Date.now();
+  const langasAlOut = {};
+  const langasAlMissing = [];
+  for (const p of new Set(filePaths.filter(Boolean))) {
+    const c = langasAvatarLinkCache.get(p);
+    if (c && c.until > langasAlNow) langasAlOut[p] = c.url;
+    else langasAlMissing.push(p);
+  }
+  if (langasAlMissing.length) {
+    try {
+      const { data, error } = await supabase.storage
+        .from(LANGAS_AVATAR_BUCKET)
+        .createSignedUrls(langasAlMissing, LANGAS_AVATAR_LINK_SEC);
+      if (!error && Array.isArray(data)) {
+        if (langasAvatarLinkCache.size > 5000) langasAvatarLinkCache.clear();
+        for (const row of data) {
+          if (!row || row.error || !row.signedUrl || !row.path) continue;
+          langasAlOut[row.path] = row.signedUrl;
+          langasAvatarLinkCache.set(row.path, {
+            url: row.signedUrl,
+            until: langasAlNow + (LANGAS_AVATAR_LINK_SEC - 2 * 60 * 60) * 1000
+          });
+        }
+      }
+    } catch (e) { /* no links: the app shows the first letter instead */ }
+  }
+  return langasAlOut;
+}
+
 async function langasAvatarLink(filePath) {
   if (!filePath) return "";
-  try {
-    const { data, error } = await supabase.storage
-      .from(LANGAS_AVATAR_BUCKET)
-      .createSignedUrl(filePath, LANGAS_AVATAR_LINK_SEC);
-    return error || !data ? "" : data.signedUrl;
-  } catch (e) {
-    return "";
-  }
+  const langasAlMap = await langasAvatarLinks([filePath]);
+  return langasAlMap[filePath] || "";
+}
+
+// Hidden (reported) photos are shown only to their owner.
+function langasVisibleAvatar(row, viewerId) {
+  if (!row.avatar_path) return null;
+  if (row.avatar_hidden && row.id !== viewerId) return null;
+  return row.avatar_path;
 }
 
 function langasPeriod(row, prefix) {
@@ -787,12 +824,12 @@ function langasPeriod(row, prefix) {
   };
 }
 
-router.get("/profile", langasRateLimit(30), langasRequireAuth, async (req, res) => {
-  const langasPrUid = req.langasUser.id;
+// Profile of any player. Owner sees everything incl. a reported photo; others see the public part.
+async function langasSendProfile(req, res, langasPrUid) {
   const langasPrVer = langasAppVersion(req);
   try {
     const langasPrUser = await pool.query(
-      `SELECT id, COALESCE(custom_name, display_name) AS name, avatar_path, streak_days, best_streak,
+      `SELECT id, COALESCE(custom_name, display_name) AS name, avatar_path, avatar_hidden, streak_days, best_streak,
               (streak_last_date >= (NOW() AT TIME ZONE '${LANGAS_TZ}')::date - 1) AS streak_alive
        FROM langas_users WHERE id = $1`,
       [langasPrUid]
@@ -874,7 +911,9 @@ router.get("/profile", langasRateLimit(30), langasRequireAuth, async (req, res) 
       profile: {
         id: u.id,
         name: u.name,
-        avatarUrl: await langasAvatarLink(u.avatar_path),
+        avatarUrl: await langasAvatarLink(langasVisibleAvatar(u, req.langasUser.id)),
+        isMe: u.id === req.langasUser.id,
+        photoHidden: u.id === req.langasUser.id && !!u.avatar_path && !!u.avatar_hidden,
         levelCode: langasPrLevel ? langasPrLevel.code : "",
         levelTitle: langasPrLevel ? langasPrLevel.title : "",
         lessonsDone: langasPrLevel ? langasPrLevel.done : 0,
@@ -893,6 +932,69 @@ router.get("/profile", langasRateLimit(30), langasRequireAuth, async (req, res) 
         rank: rk.rnk || 0
       }
     });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+}
+
+router.get("/profile", langasRateLimit(30), langasRequireAuth, (req, res) =>
+  langasSendProfile(req, res, req.langasUser.id));
+
+router.get("/profile/:id", langasRateLimit(60), langasRequireAuth, (req, res) => {
+  const langasPuId = langasParseId(req.params.id);
+  if (!langasPuId) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid player", resErrorCode: 1 });
+  }
+  return langasSendProfile(req, res, langasPuId);
+});
+
+// Body: { reason: "photo" | "name" }. One report per reporter per photo / name.
+router.post("/profile/:id/report", langasRateLimit(10), langasRequireAuth, async (req, res) => {
+  const langasUrId = langasParseId(req.params.id);
+  const langasUrReason = String(req.body?.reason || "");
+  if (!langasUrId || !LANGAS_USER_REPORT_REASONS.includes(langasUrReason)) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid report", resErrorCode: 1 });
+  }
+  if (langasUrId === req.langasUser.id) {
+    return res.status(400).json({ resStatus: false, resMessage: "You can't report yourself", resErrorCode: 2 });
+  }
+  try {
+    const langasUrUser = await pool.query(
+      `SELECT id, avatar_path, COALESCE(custom_name, display_name) AS name, custom_name
+       FROM langas_users WHERE id = $1`,
+      [langasUrId]
+    );
+    if (!langasUrUser.rowCount) {
+      return res.status(404).json({ resStatus: false, resMessage: "Player not found", resErrorCode: 3 });
+    }
+    const t = langasUrUser.rows[0];
+    const langasUrTarget = langasUrReason === "photo" ? t.avatar_path : t.name;
+    if (!langasUrTarget) {
+      return res.status(400).json({ resStatus: false, resMessage: "Nothing to report", resErrorCode: 4 });
+    }
+
+    await pool.query(
+      `INSERT INTO langas_user_reports (reporter_id, user_id, reason, target)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (reporter_id, user_id, reason, target) DO NOTHING`,
+      [req.langasUser.id, langasUrId, langasUrReason, langasUrTarget]
+    );
+    const langasUrCount = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM langas_user_reports WHERE user_id = $1 AND reason = $2 AND target = $3`,
+      [langasUrId, langasUrReason, langasUrTarget]
+    );
+
+    // Enough players agree: hide the photo / drop the custom name until you review it.
+    if (langasUrCount.rows[0].n >= LANGAS_REPORT_HIDE_AT) {
+      if (langasUrReason === "photo") {
+        await pool.query(`UPDATE langas_users SET avatar_hidden = TRUE WHERE id = $1 AND avatar_path = $2`,
+          [langasUrId, langasUrTarget]);
+      } else if (t.custom_name) {
+        await pool.query(`UPDATE langas_users SET custom_name = NULL WHERE id = $1 AND custom_name = $2`,
+          [langasUrId, t.custom_name]);
+      }
+    }
+    return res.status(200).json({ resStatus: true, resMessage: "Thanks, we'll check it" });
   } catch (err) {
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
   }
@@ -966,7 +1068,8 @@ router.post(
         return res.status(502).json({ resStatus: false, resMessage: "Upload failed, try again", resErrorCode: 4 });
       }
       const langasPhOld = await pool.query(`SELECT avatar_path FROM langas_users WHERE id = $1`, [req.langasUser.id]);
-      await pool.query(`UPDATE langas_users SET avatar_path = $1 WHERE id = $2`, [langasPhPath, req.langasUser.id]);
+      await pool.query(`UPDATE langas_users SET avatar_path = $1, avatar_hidden = FALSE WHERE id = $2`,
+        [langasPhPath, req.langasUser.id]);
       await langasRemoveAvatar(langasPhOld.rows[0]?.avatar_path);
       const langasPhUrl = await langasAvatarLink(langasPhPath);
 
@@ -980,7 +1083,7 @@ router.post(
 router.delete("/profile/photo", langasRateLimit(6), langasRequireAuth, async (req, res) => {
   try {
     const langasPdOld = await pool.query(`SELECT avatar_path FROM langas_users WHERE id = $1`, [req.langasUser.id]);
-    await pool.query(`UPDATE langas_users SET avatar_path = NULL WHERE id = $1`, [req.langasUser.id]);
+    await pool.query(`UPDATE langas_users SET avatar_path = NULL, avatar_hidden = FALSE WHERE id = $1`, [req.langasUser.id]);
     await langasRemoveAvatar(langasPdOld.rows[0]?.avatar_path);
     return res.status(200).json({ resStatus: true, resMessage: "Removed", avatarUrl: "" });
   } catch (err) {
@@ -1003,20 +1106,24 @@ router.get("/leaderboard", langasRateLimit(30), langasRequireAuth, async (req, r
   try {
     const langasLbRows = await pool.query(
       `WITH totals AS (
-         SELECT u.id, COALESCE(u.custom_name, u.display_name) AS display_name, SUM(s.best_score)::int AS total
+         SELECT u.id, COALESCE(u.custom_name, u.display_name) AS display_name,
+                u.avatar_path, u.avatar_hidden, SUM(s.best_score)::int AS total
          FROM langas_users u
          JOIN langas_scores s ON s.user_id = u.id
          GROUP BY u.id
        ), ranked AS (
-         SELECT id, display_name, total, RANK() OVER (ORDER BY total DESC)::int AS rnk
+         SELECT id, display_name, avatar_path, avatar_hidden, total, RANK() OVER (ORDER BY total DESC)::int AS rnk
          FROM totals
        )
-       SELECT id, display_name, total, rnk FROM ranked
+       SELECT id, display_name, avatar_path, avatar_hidden, total, rnk FROM ranked
        WHERE rnk <= $1 OR id = $2
        ORDER BY rnk, id`,
       [LANGAS_LEADERBOARD_LIMIT, req.langasUser.id]
     );
 
+    const langasLbLinks = await langasAvatarLinks(
+      langasLbRows.rows.map(r => langasVisibleAvatar(r, req.langasUser.id))
+    );
     const langasLbEntries = [];
     let langasLbMe = { rank: 0, total: 0 };
     for (const r of langasLbRows.rows) {
@@ -1024,7 +1131,9 @@ router.get("/leaderboard", langasRateLimit(30), langasRequireAuth, async (req, r
       if (r.rnk <= LANGAS_LEADERBOARD_LIMIT) {
         langasLbEntries.push({
           rank: r.rnk,
+          userId: r.id,
           displayName: r.display_name,
+          avatarUrl: langasLbLinks[langasVisibleAvatar(r, req.langasUser.id)] || "",
           total: r.total,
           isMe: r.id === req.langasUser.id
         });
