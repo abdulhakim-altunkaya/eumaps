@@ -787,8 +787,8 @@ function langasPeriod(row, prefix) {
   };
 }
 
-router.get("/profile", langasRateLimit(30), langasRequireAuth, async (req, res) => {
-  const langasPrUid = req.langasUser.id;
+// Profile of any player (own or from the leaderboard).
+async function langasSendProfile(req, res, langasPrUid) {
   const langasPrVer = langasAppVersion(req);
   try {
     const langasPrUser = await pool.query(
@@ -875,6 +875,7 @@ router.get("/profile", langasRateLimit(30), langasRequireAuth, async (req, res) 
         id: u.id,
         name: u.name,
         avatarUrl: await langasAvatarLink(u.avatar_path),
+        isMe: u.id === req.langasUser.id,
         levelCode: langasPrLevel ? langasPrLevel.code : "",
         levelTitle: langasPrLevel ? langasPrLevel.title : "",
         lessonsDone: langasPrLevel ? langasPrLevel.done : 0,
@@ -896,6 +897,17 @@ router.get("/profile", langasRateLimit(30), langasRequireAuth, async (req, res) 
   } catch (err) {
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
   }
+}
+
+router.get("/profile", langasRateLimit(30), langasRequireAuth, (req, res) =>
+  langasSendProfile(req, res, req.langasUser.id));
+
+router.get("/profile/:id", langasRateLimit(60), langasRequireAuth, (req, res) => {
+  const langasPuId = langasParseId(req.params.id);
+  if (!langasPuId) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid player", resErrorCode: 1 });
+  }
+  return langasSendProfile(req, res, langasPuId);
 });
 
 // Body: { name }. 3–20 letters/digits (space . _ - inside). Max 10 players per name.
@@ -1037,6 +1049,7 @@ router.get("/leaderboard", langasRateLimit(30), langasRequireAuth, async (req, r
       if (r.rnk <= LANGAS_LEADERBOARD_LIMIT) {
         langasLbEntries.push({
           rank: r.rnk,
+          userId: r.id,
           displayName: r.display_name,
           avatarUrl: langasLbLinks[r.avatar_path] || "",
           total: r.total,
