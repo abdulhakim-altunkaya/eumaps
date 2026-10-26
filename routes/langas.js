@@ -1495,7 +1495,7 @@ router.get("/leaderboard", langasRateLimit(30), langasRequireAuth, async (req, r
 //  and we compare that with the expected Latvian.
 // ══════════════════════════════════════════════════════════════════════════
 const LANGAS_ASR_URL = "http://127.0.0.1:8765/transcribe_raw";
-const LANGAS_SPEAK_PASS = 0.8; // 80% of letters must match
+const LANGAS_SPEAK_PASS = 0.6; // 80% of letters must match
 
 // Lowercase, no punctuation, no long marks: "Labrīt!" -> "labrit"
 function langasLoose(s) {

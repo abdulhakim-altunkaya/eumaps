@@ -4,6 +4,7 @@
 import os
 import subprocess
 import tempfile
+import threading
 import time
 
 import numpy as np
@@ -16,6 +17,29 @@ MODEL_NAME = os.environ.get("LANGAS_ASR_MODEL", "small")
 MAX_BYTES = 2_000_000
 model = WhisperModel(MODEL_NAME, device="cpu", compute_type="int8", cpu_threads=4)
 app = FastAPI()
+
+
+# Warm-up: the first real check is slow because the silence filter and Whisper's memory are set up
+# only on first use. Do that right at start, and repeat every 10 minutes so it never goes cold.
+def warm_up():
+    noise = (np.random.default_rng(0).standard_normal(16000) * 0.05).astype(np.float32)
+    for vad in (True, False):
+        try:
+            segments, _ = model.transcribe(noise, language="lv", beam_size=1, vad_filter=vad,
+                                           without_timestamps=True)
+            list(segments)  # actually run it
+        except Exception:
+            pass
+
+
+def keep_warm():
+    while True:
+        time.sleep(600)
+        warm_up()
+
+
+warm_up()
+threading.Thread(target=keep_warm, daemon=True).start()
 
 
 def load_audio(path):
@@ -48,7 +72,7 @@ def run_whisper(data, suffix):
         segments, _ = model.transcribe(
             audio,
             language="lv",
-            beam_size=5,
+            beam_size=2,
             vad_filter=True,  # skip the silent parts
             vad_parameters=dict(min_silence_duration_ms=300),
             condition_on_previous_text=False,
