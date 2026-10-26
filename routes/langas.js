@@ -26,6 +26,12 @@ router.use("/audio", express.static(path.join(__dirname, "..", "langas_audio"), 
   index: false
 }));
 
+// ── MEMORY GAME PICTURES (public, cached 30 days): langas_pictures/0001.png … ──
+router.use("/pictures", express.static(path.join(__dirname, "..", "langas_pictures"), {
+  maxAge: "30d",
+  index: false
+}));
+
 // ── HELPERS ────────────────────────────────────────────────────────────────
 function langasGetIp(req) {
   const cf = req.headers["cf-connecting-ip"];
@@ -333,6 +339,9 @@ router.get("/exercises/:id", langasRateLimit(60), langasRequireAuth, async (req,
        FROM langas_questions WHERE exercise_id = $1 AND min_app_version <= $2 ORDER BY sort_order`,
       [langasExId, langasAppVersion(req)]
     );
+    const langasExMemory = langasExQuestions.rows.some(q => q.type === "memory")
+      ? await langasMemoryCards(langasExId, langasAppVersion(req))
+      : [];
     if (langasStartTimes.size > 20000) langasStartTimes.clear();
     const langasExLimitSec = langasExRow.rows[0].time_limit_sec || LANGAS_TIME_LIMIT_MS / 1000;
     langasStartTimes.set(req.langasUser.id + ":" + langasExId, { at: Date.now(), limitSec: langasExLimitSec });
@@ -350,7 +359,7 @@ router.get("/exercises/:id", langasRateLimit(60), langasRequireAuth, async (req,
           id: q.id,
           type: q.type,
           prompt: q.prompt,
-          options: Array.isArray(q.options) ? q.options : [],
+          options: q.type === "memory" ? langasExMemory : (Array.isArray(q.options) ? q.options : []),
           mediaUrl: q.media_url || "",
           instruction: q.instruction || "",
           given: langasIsTyping(q) ? langasSplitTyping(q.accepted_answers[0]).tail : ""
@@ -622,6 +631,82 @@ router.post("/exercises/:id/match", langasRateLimit(120), langasRequireAuth, asy
     }
     // Not over: only say how many are wrong, never which ones.
     return res.status(200).json({ resStatus: true, correct: false, done: false, wrongCount: wrong, correctChips: [] });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+//  MEMORY GAME (app version 7+): 10 words + their pictures = 20 cards.
+//  Pictures: langas_pictures/0001.png … (number = langas_memory_words.id).
+//  Lesson 1: words 1–10. Later lessons: 7 new words (continuing, wraps around) + 3 earlier ones.
+// ══════════════════════════════════════════════════════════════════════════
+const LANGAS_MEMORY_PAIRS = 10;
+const LANGAS_MEMORY_NEW = 7;
+const LANGAS_MEMORY_POINTS = 10; // all or nothing: finish = 10, skip = 0
+
+async function langasMemoryCards(exId, appVersion) {
+  const langasMwRows = await pool.query(
+    `SELECT id, word FROM langas_memory_words WHERE is_active = TRUE ORDER BY id`
+  );
+  const words = langasMwRows.rows;
+  const n = words.length;
+  if (!n) return [];
+  const langasMwPos = await pool.query(
+    `SELECT COUNT(*)::int AS i FROM langas_exercises
+     WHERE is_active = TRUE AND min_app_version <= $2
+       AND sort_order < (SELECT sort_order FROM langas_exercises WHERE id = $1)`,
+    [exId, appVersion]
+  );
+  const lesson = langasMwPos.rows[0] ? langasMwPos.rows[0].i : 0;
+  const pairs = Math.min(LANGAS_MEMORY_PAIRS, n);
+  const picked = [];
+  const take = idx => {
+    const w = words[((idx % n) + n) % n];
+    if (!picked.includes(w) && picked.length < pairs) picked.push(w);
+  };
+
+  if (lesson === 0) {
+    for (let k = 0; k < pairs; k++) take(k);
+  } else {
+    const start = LANGAS_MEMORY_PAIRS + (lesson - 1) * LANGAS_MEMORY_NEW;
+    for (let k = 0; k < LANGAS_MEMORY_NEW; k++) take(start + k);
+    // review words: from the ones already met in earlier lessons, a new mix every time
+    const met = words.slice(0, Math.min(n, start)).filter(w => !picked.includes(w));
+    for (let k = met.length - 1; k > 0; k--) {
+      const j = Math.floor(Math.random() * (k + 1));
+      [met[k], met[j]] = [met[j], met[k]];
+    }
+    while (picked.length < pairs && met.length) picked.push(met.pop());
+    for (let k = 0; picked.length < pairs && k < n; k++) take(k);
+  }
+  // "0007|skriet" -> picture 0007.png + the word
+  return picked.map(w => String(w.id).padStart(4, "0") + "|" + w.word);
+}
+
+// Body: { questionId, completed }  -> finished = 10 points, skipped = 0
+router.post("/exercises/:id/memory", langasRateLimit(60), langasRequireAuth, async (req, res) => {
+  const langasMmExId = langasParseId(req.params.id);
+  const langasMmQid = Number(req.body?.questionId);
+  if (!langasMmExId || !Number.isInteger(langasMmQid)) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid request", resErrorCode: 1 });
+  }
+  const langasMmProg = langasProgress.get(req.langasUser.id + ":" + langasMmExId);
+  if (!langasMmProg) {
+    return res.status(409).json({ resStatus: false, resMessage: "Lesson expired", resErrorCode: 2 });
+  }
+  try {
+    const q = await langasLoadQuestion(langasMmExId, langasMmQid);
+    if (!q || q.type !== "memory") {
+      return res.status(404).json({ resStatus: false, resMessage: "Question not found", resErrorCode: 3 });
+    }
+    const entry = langasEntry(langasMmProg, langasMmQid);
+    if (!entry.done) {
+      entry.done = true;
+      entry.correct = !!req.body?.completed;
+      entry.points = entry.correct ? LANGAS_MEMORY_POINTS : 0;
+    }
+    return res.status(200).json({ resStatus: true, correct: entry.correct, done: true, points: entry.points });
   } catch (err) {
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
   }
