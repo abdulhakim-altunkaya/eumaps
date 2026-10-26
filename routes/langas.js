@@ -846,7 +846,7 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
 //  PROFILE (app version 6+): stats, custom name, photo
 // ══════════════════════════════════════════════════════════════════════════
 const LANGAS_AVATAR_BUCKET = "langas_storage";
-const LANGAS_AVATAR_SIZE = 256;          // px, square
+const LANGAS_AVATAR_SIZE = 512;          // px, square
 const LANGAS_AVATAR_MAX_BYTES = 200 * 1024;
 const LANGAS_AVATAR_LINK_SEC = 60 * 60 * 24; // signed photo links live 24 h (bucket is private)
 const LANGAS_NAME_MAX_SAME = 10;         // max players sharing one name
@@ -1055,6 +1055,26 @@ async function langasSendProfile(req, res, langasPrUid) {
       [langasPrUid, req.langasUser.id]
     );
 
+    // Last lesson played + its place on the home path (same order as /levels: level, then lesson).
+    const langasPrLast = await pool.query(
+      `WITH path AS (
+         SELECT e.id, e.title,
+                (ROW_NUMBER() OVER (ORDER BY l.sort_order, e.sort_order, e.id) - 1)::int AS pos
+         FROM langas_exercises e
+         JOIN langas_levels l ON l.id = e.level_id
+         WHERE e.is_active = TRUE AND e.min_app_version <= $2
+       )
+       SELECT p.title, p.pos, g.correct_count, g.question_count,
+              to_char(g.created_at AT TIME ZONE '${LANGAS_TZ}', 'FMDD FMMonth YYYY') AS d
+       FROM langas_lesson_log g
+       JOIN path p ON p.id = g.exercise_id
+       WHERE g.user_id = $1
+       ORDER BY g.created_at DESC, g.id DESC
+       LIMIT 1`,
+      [langasPrUid, langasPrVer]
+    );
+    const lastL = langasPrLast.rows[0] || null;
+
     const langasPrFriendState = await langasFriendState(req.langasUser.id, u.id);
     const langasPrLists = langasPrFriendState === "me" ? await langasFriendLists(u.id) : { friends: [], requests: [] };
 
@@ -1088,6 +1108,11 @@ async function langasSendProfile(req, res, langasPrUid) {
             return dto ? { ...dto, id: Number(a.id), cheers: a.cheers, cheered: a.cheered } : null;
           })
           .filter(Boolean),
+        lastTitle: lastL ? lastL.title : "",
+        lastPos: lastL ? lastL.pos : -1,
+        lastDate: lastL ? lastL.d : "",
+        lastPct: lastL && lastL.question_count > 0
+          ? Math.round((100 * lastL.correct_count) / lastL.question_count) : -1,
         friendState: langasPrFriendState,
         friends: langasPrLists.friends,
         requests: langasPrLists.requests
@@ -1495,7 +1520,7 @@ router.get("/leaderboard", langasRateLimit(30), langasRequireAuth, async (req, r
 //  and we compare that with the expected Latvian.
 // ══════════════════════════════════════════════════════════════════════════
 const LANGAS_ASR_URL = "http://127.0.0.1:8765/transcribe_raw";
-const LANGAS_SPEAK_PASS = 0.6; // 80% of letters must match
+const LANGAS_SPEAK_PASS = 0.6; // 60% of letters must match
 
 // Lowercase, no punctuation, no long marks: "Labrīt!" -> "labrit"
 function langasLoose(s) {
