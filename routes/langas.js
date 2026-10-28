@@ -1486,6 +1486,71 @@ function langasMsgDto(m, me) {
   return { id: Number(m.id), mine: Number(m.sender_id) === Number(me), text: m.body, time: m.t };
 }
 
+// Messages screen: your friends (newest chat first) with the last message, time and unread count.
+router.get("/messages", langasRateLimit(60), langasRequireAuth, async (req, res) => {
+  const langasIbMe = req.langasUser.id;
+  try {
+    const langasIbRows = await pool.query(
+      `WITH fr AS (
+         SELECT CASE WHEN requester_id = $1 THEN addressee_id ELSE requester_id END AS other
+         FROM langas_friends
+         WHERE status = 'accepted' AND (requester_id = $1 OR addressee_id = $1)
+       ), last AS (
+         SELECT DISTINCT ON (LEAST(m.sender_id, m.receiver_id), GREATEST(m.sender_id, m.receiver_id))
+                CASE WHEN m.sender_id = $1 THEN m.receiver_id ELSE m.sender_id END AS other,
+                m.id, m.sender_id, m.body,
+                CASE
+                  WHEN (m.created_at AT TIME ZONE '${LANGAS_TZ}')::date = (NOW() AT TIME ZONE '${LANGAS_TZ}')::date
+                  THEN to_char(m.created_at AT TIME ZONE '${LANGAS_TZ}', 'HH24:MI')
+                  WHEN (m.created_at AT TIME ZONE '${LANGAS_TZ}')::date = (NOW() AT TIME ZONE '${LANGAS_TZ}')::date - 1
+                  THEN 'Yesterday'
+                  ELSE to_char(m.created_at AT TIME ZONE '${LANGAS_TZ}', 'FMDD Mon')
+                END AS t
+         FROM langas_messages m
+         WHERE m.sender_id = $1 OR m.receiver_id = $1
+         ORDER BY LEAST(m.sender_id, m.receiver_id), GREATEST(m.sender_id, m.receiver_id), m.id DESC
+       )
+       SELECT fr.other AS id, COALESCE(u.custom_name, u.display_name) AS name, u.avatar_path,
+              l.id AS last_id, l.sender_id, l.body, l.t,
+              (SELECT COUNT(*) FROM langas_messages x
+               WHERE x.sender_id = fr.other AND x.receiver_id = $1 AND x.read_at IS NULL)::int AS unread
+       FROM fr
+       JOIN langas_users u ON u.id = fr.other
+       LEFT JOIN last l ON l.other = fr.other
+       ORDER BY l.id DESC NULLS LAST, name
+       LIMIT 200`,
+      [langasIbMe]
+    );
+
+    const langasIbPaths = langasIbRows.rows.map(r => r.avatar_path).filter(Boolean);
+    const langasIbLinks = {};
+    if (langasIbPaths.length) {
+      try {
+        const { data } = await supabase.storage
+          .from(LANGAS_AVATAR_BUCKET)
+          .createSignedUrls(langasIbPaths, LANGAS_AVATAR_LINK_SEC);
+        for (const l of data || []) if (l && l.path && l.signedUrl) langasIbLinks[l.path] = l.signedUrl;
+      } catch (e) { /* no photos: first letters */ }
+    }
+
+    const langasIbPerson = r => ({
+      userId: Number(r.id), name: r.name, avatarUrl: langasIbLinks[r.avatar_path] || "", unread: r.unread || 0
+    });
+    return res.status(200).json({
+      resStatus: true,
+      chats: langasIbRows.rows.filter(r => r.last_id).map(r => ({
+        ...langasIbPerson(r),
+        text: r.body,
+        mine: Number(r.sender_id) === Number(langasIbMe),
+        time: r.t
+      })),
+      friends: langasIbRows.rows.map(langasIbPerson)
+    });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
 // Red dot on the home screen: unread messages + friend requests waiting for you.
 router.get("/messages/unread", langasRateLimit(60), langasRequireAuth, async (req, res) => {
   try {
