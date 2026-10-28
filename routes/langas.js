@@ -1077,6 +1077,12 @@ async function langasSendProfile(req, res, langasPrUid) {
 
     const langasPrFriendState = await langasFriendState(req.langasUser.id, u.id);
     const langasPrLists = langasPrFriendState === "me" ? await langasFriendLists(u.id) : { friends: [], requests: [] };
+    // Unread messages from this friend (dot on the message button)
+    const langasPrUnread = langasPrFriendState === "friends"
+      ? (await pool.query(
+          `SELECT COUNT(*)::int AS n FROM langas_messages WHERE sender_id = $1 AND receiver_id = $2 AND read_at IS NULL`,
+          [u.id, req.langasUser.id])).rows[0].n
+      : 0;
 
     const langasPrStreak = u.streak_alive ? u.streak_days : 0;
     return res.status(200).json({
@@ -1113,6 +1119,7 @@ async function langasSendProfile(req, res, langasPrUid) {
         lastDate: lastL ? lastL.d : "",
         lastPct: lastL && lastL.question_count > 0
           ? Math.round((100 * lastL.correct_count) / lastL.question_count) : -1,
+        unread: langasPrUnread,
         friendState: langasPrFriendState,
         friends: langasPrLists.friends,
         requests: langasPrLists.requests
@@ -1362,7 +1369,9 @@ async function langasFriendLists(me) {
             COALESCE(u.custom_name, u.display_name) AS name, u.avatar_path,
             COALESCE((SELECT SUM(best_score) FROM langas_scores s WHERE s.user_id = u.id), 0)::int AS points,
             CASE WHEN u.streak_last_date >= (NOW() AT TIME ZONE 'Europe/Riga')::date - 1
-                 THEN u.streak_days ELSE 0 END AS streak
+                 THEN u.streak_days ELSE 0 END AS streak,
+            (SELECT COUNT(*) FROM langas_messages m
+             WHERE m.sender_id = u.id AND m.receiver_id = $1 AND m.read_at IS NULL)::int AS unread
      FROM pairs p JOIN langas_users u ON u.id = p.other
      WHERE p.status = 'accepted' OR NOT p.mine
      ORDER BY (p.status = 'accepted'), points DESC, p.at DESC
@@ -1381,7 +1390,7 @@ async function langasFriendLists(me) {
   }
   const dto = x => ({
     userId: Number(x.id), name: x.name, avatarUrl: langasFlLinks[x.avatar_path] || "",
-    points: x.points || 0, streak: x.streak || 0
+    points: x.points || 0, streak: x.streak || 0, unread: x.unread || 0
   });
   return {
     friends: r.rows.filter(x => x.status === "accepted").map(dto),
@@ -1448,6 +1457,119 @@ router.post("/friends/:id/:action", langasRateLimit(30), langasRequireAuth, asyn
       }
     }
     return res.status(200).json({ resStatus: true, state: await langasFriendState(langasFrMe, langasFrOther) });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+//  MESSAGES (friends only, short notes up to 200 characters — not a chat app)
+// ══════════════════════════════════════════════════════════════════════════
+const LANGAS_MSG_MAX = 200;
+const LANGAS_MSG_PAGE = 50;           // newest messages shown in a conversation
+const LANGAS_MSG_PER_MINUTE = 10;     // per sender
+
+// "14:05" today, "27 Oct 14:05" earlier (Riga time)
+const LANGAS_MSG_TIME = `CASE
+    WHEN (m.created_at AT TIME ZONE '${LANGAS_TZ}')::date = (NOW() AT TIME ZONE '${LANGAS_TZ}')::date
+    THEN to_char(m.created_at AT TIME ZONE '${LANGAS_TZ}', 'HH24:MI')
+    ELSE to_char(m.created_at AT TIME ZONE '${LANGAS_TZ}', 'FMDD Mon HH24:MI') END`;
+
+// Unread messages from current friends only (a removed friend's old messages don't keep a dot)
+const LANGAS_MSG_FROM_FRIEND = `EXISTS (
+    SELECT 1 FROM langas_friends f
+    WHERE f.status = 'accepted'
+      AND LEAST(f.requester_id, f.addressee_id) = LEAST(m.sender_id, m.receiver_id)
+      AND GREATEST(f.requester_id, f.addressee_id) = GREATEST(m.sender_id, m.receiver_id))`;
+
+function langasMsgDto(m, me) {
+  return { id: Number(m.id), mine: Number(m.sender_id) === Number(me), text: m.body, time: m.t };
+}
+
+// Red dot on the home screen: unread messages + friend requests waiting for you.
+router.get("/messages/unread", langasRateLimit(60), langasRequireAuth, async (req, res) => {
+  try {
+    const langasMuRow = await pool.query(
+      `SELECT
+         (SELECT COUNT(*) FROM langas_messages m
+          WHERE m.receiver_id = $1 AND m.read_at IS NULL AND ${LANGAS_MSG_FROM_FRIEND})::int AS messages,
+         (SELECT COUNT(*) FROM langas_friends WHERE addressee_id = $1 AND status = 'pending')::int AS requests`,
+      [req.langasUser.id]
+    );
+    const x = langasMuRow.rows[0] || { messages: 0, requests: 0 };
+    return res.status(200).json({
+      resStatus: true, messages: x.messages, requests: x.requests, total: x.messages + x.requests
+    });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
+// Conversation with a friend (newest 50, oldest first). Marks their messages as read.
+router.get("/messages/:id", langasRateLimit(60), langasRequireAuth, async (req, res) => {
+  const langasMgOther = langasParseId(req.params.id);
+  const langasMgMe = req.langasUser.id;
+  if (!langasMgOther || Number(langasMgOther) === Number(langasMgMe)) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid request", resErrorCode: 1 });
+  }
+  try {
+    if (await langasFriendState(langasMgMe, langasMgOther) !== "friends") {
+      return res.status(403).json({ resStatus: false, resMessage: "Only friends can send messages", resErrorCode: 2 });
+    }
+    const langasMgRows = await pool.query(
+      `SELECT * FROM (
+         SELECT m.id, m.sender_id, m.body, ${LANGAS_MSG_TIME} AS t
+         FROM langas_messages m
+         WHERE LEAST(m.sender_id, m.receiver_id) = LEAST($1::bigint, $2::bigint)
+           AND GREATEST(m.sender_id, m.receiver_id) = GREATEST($1::bigint, $2::bigint)
+         ORDER BY m.id DESC
+         LIMIT ${LANGAS_MSG_PAGE}
+       ) x ORDER BY id`,
+      [langasMgMe, langasMgOther]
+    );
+    await pool.query(
+      `UPDATE langas_messages SET read_at = NOW()
+       WHERE sender_id = $2 AND receiver_id = $1 AND read_at IS NULL`,
+      [langasMgMe, langasMgOther]
+    );
+    return res.status(200).json({ resStatus: true, messages: langasMgRows.rows.map(m => langasMsgDto(m, langasMgMe)) });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
+// Body: { text }  -> { message }
+router.post("/messages/:id", langasRateLimit(30), langasRequireAuth, async (req, res) => {
+  const langasMsOther = langasParseId(req.params.id);
+  const langasMsMe = req.langasUser.id;
+  if (!langasMsOther || Number(langasMsOther) === Number(langasMsMe)) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid request", resErrorCode: 1 });
+  }
+  const langasMsText = String(req.body?.text ?? "").replace(/\s+/g, " ").trim();
+  if (!langasMsText) {
+    return res.status(400).json({ resStatus: false, resMessage: "Write something first", resErrorCode: 3 });
+  }
+  if ([...langasMsText].length > LANGAS_MSG_MAX) {
+    return res.status(400).json({ resStatus: false, resMessage: "Max 200 characters", resErrorCode: 4 });
+  }
+  try {
+    if (await langasFriendState(langasMsMe, langasMsOther) !== "friends") {
+      return res.status(403).json({ resStatus: false, resMessage: "Only friends can send messages", resErrorCode: 2 });
+    }
+    const langasMsRecent = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM langas_messages
+       WHERE sender_id = $1 AND created_at > NOW() - INTERVAL '1 minute'`,
+      [langasMsMe]
+    );
+    if (langasMsRecent.rows[0].n >= LANGAS_MSG_PER_MINUTE) {
+      return res.status(429).json({ resStatus: false, resMessage: "Slow down a little", resErrorCode: 5 });
+    }
+    const langasMsIns = await pool.query(
+      `INSERT INTO langas_messages (sender_id, receiver_id, body) VALUES ($1, $2, $3)
+       RETURNING id, sender_id, body, to_char(created_at AT TIME ZONE '${LANGAS_TZ}', 'HH24:MI') AS t`,
+      [langasMsMe, langasMsOther, langasMsText]
+    );
+    return res.status(200).json({ resStatus: true, message: langasMsgDto(langasMsIns.rows[0], langasMsMe) });
   } catch (err) {
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
   }
