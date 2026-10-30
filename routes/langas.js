@@ -244,6 +244,145 @@ router.post("/auth/logout", langasRateLimit(30), langasRequireAuth, async (req, 
 });
 
 // ══════════════════════════════════════════════════════════════════════════
+//  FULL VERSION (€7 one-time Google Play purchase: langas_full)
+//  Free: the first 3 lessons on the path. Everything else needs is_full.
+// ══════════════════════════════════════════════════════════════════════════
+const { JWT: LangasPlayJWT } = require("google-auth-library");
+const LANGAS_PACKAGE = "com.langas.app";
+const LANGAS_FULL_PRODUCT = "langas_full";
+const LANGAS_FREE_LESSONS = 3;
+const LANGAS_PLAY_API = "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/" + LANGAS_PACKAGE;
+
+// Google Play Developer API client (service account from .env)
+let langasPlayClient = null;
+function langasPlay() {
+  if (!langasPlayClient) {
+    langasPlayClient = new LangasPlayJWT({
+      email: process.env.LANGAS_PLAY_CLIENT_EMAIL,
+      key: String(process.env.LANGAS_PLAY_PRIVATE_KEY || "").replace(/\\n/g, "\n"),
+      scopes: ["https://www.googleapis.com/auth/androidpublisher"]
+    });
+  }
+  return langasPlayClient;
+}
+
+async function langasIsFull(userId) {
+  const r = await pool.query(`SELECT is_full FROM langas_users WHERE id = $1`, [userId]);
+  return r.rowCount > 0 && r.rows[0].is_full === true;
+}
+
+// Ids of the free lessons: the first 3 on the path (same order as the home screen)
+async function langasFreeExerciseIds(appVersion) {
+  const r = await pool.query(
+    `SELECT e.id
+     FROM langas_exercises e
+     JOIN langas_levels l ON l.id = e.level_id
+     WHERE e.is_active = TRUE AND e.min_app_version <= $1
+     ORDER BY l.sort_order, e.sort_order, e.id
+     LIMIT ${LANGAS_FREE_LESSONS}`,
+    [appVersion]
+  );
+  return new Set(r.rows.map(x => Number(x.id)));
+}
+
+// Body: { productId, purchaseToken, orderId }  -> { full: true }
+// Checks the purchase with Google, links it to this account (one purchase = one account),
+// acknowledges it (unacknowledged purchases are refunded after 3 days) and unlocks.
+router.post("/purchase", langasRateLimit(20), langasRequireAuth, async (req, res) => {
+  const langasPuProduct = String(req.body?.productId || "");
+  const langasPuToken = String(req.body?.purchaseToken || "");
+  const langasPuMe = req.langasUser.id;
+  if (langasPuProduct !== LANGAS_FULL_PRODUCT || langasPuToken.length < 20 || langasPuToken.length > 4096) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid purchase", resErrorCode: 1 });
+  }
+  const langasPuUrl = LANGAS_PLAY_API + "/purchases/products/" + encodeURIComponent(langasPuProduct) +
+    "/tokens/" + encodeURIComponent(langasPuToken);
+  try {
+    let langasPuInfo;
+    try {
+      langasPuInfo = (await langasPlay().request({ url: langasPuUrl, method: "GET" })).data;
+    } catch (e) {
+      const code = e?.response?.status;
+      if (code === 400 || code === 404 || code === 410) {
+        return res.status(400).json({ resStatus: false, resMessage: "Google doesn't know this purchase", resErrorCode: 2 });
+      }
+      return res.status(502).json({ resStatus: false, resMessage: "Couldn't reach Google Play, try again", resErrorCode: 3 });
+    }
+
+    // 0 = purchased, 1 = canceled, 2 = pending (e.g. cash payment not done yet)
+    if (langasPuInfo.purchaseState === 2) {
+      return res.status(409).json({ resStatus: false, resMessage: "Payment is still pending", resErrorCode: 4 });
+    }
+    if (langasPuInfo.purchaseState !== 0) {
+      return res.status(409).json({ resStatus: false, resMessage: "This purchase was canceled", resErrorCode: 5 });
+    }
+
+    // Link the token to this account; a token already linked to another account is refused
+    await pool.query(
+      `INSERT INTO langas_purchases (user_id, product_id, order_id, purchase_token)
+       VALUES ($1, $2, $3, $4) ON CONFLICT (purchase_token) DO NOTHING`,
+      [langasPuMe, langasPuProduct, langasPuInfo.orderId || null, langasPuToken]
+    );
+    const langasPuRow = await pool.query(
+      `SELECT user_id, state FROM langas_purchases WHERE purchase_token = $1`, [langasPuToken]
+    );
+    const langasPuOwner = langasPuRow.rows[0];
+    if (!langasPuOwner || Number(langasPuOwner.user_id) !== Number(langasPuMe)) {
+      return res.status(409).json({ resStatus: false, resMessage: "This purchase belongs to another Langas account", resErrorCode: 6 });
+    }
+    if (langasPuOwner.state === "voided") {
+      return res.status(409).json({ resStatus: false, resMessage: "This purchase was refunded", resErrorCode: 7 });
+    }
+
+    // Acknowledge with Google (once)
+    if (langasPuInfo.acknowledgementState === 0) {
+      try {
+        await langasPlay().request({ url: langasPuUrl + ":acknowledge", method: "POST", data: {} });
+      } catch (e) { /* the app confirms too; Google retries pending purchases */ }
+    }
+
+    await pool.query(`UPDATE langas_users SET is_full = TRUE WHERE id = $1`, [langasPuMe]);
+    return res.status(200).json({ resStatus: true, full: true });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
+// Refunds / chargebacks: once a day ask Google for voided purchases (last 30 days) and lock those accounts again.
+async function langasCheckVoided() {
+  if (!process.env.LANGAS_PLAY_CLIENT_EMAIL) return;
+  try {
+    const since = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    let pageToken = "";
+    do {
+      const url = LANGAS_PLAY_API + "/purchases/voidedpurchases?startTime=" + since +
+        (pageToken ? "&token=" + encodeURIComponent(pageToken) : "");
+      const data = (await langasPlay().request({ url, method: "GET" })).data || {};
+      for (const v of data.voidedPurchases || []) {
+        const r = await pool.query(
+          `UPDATE langas_purchases SET state = 'voided', voided_at = NOW()
+           WHERE purchase_token = $1 AND state <> 'voided' RETURNING user_id`,
+          [v.purchaseToken]
+        );
+        for (const row of r.rows) {
+          await pool.query(
+            `UPDATE langas_users SET is_full = FALSE
+             WHERE id = $1 AND NOT EXISTS (
+               SELECT 1 FROM langas_purchases WHERE user_id = $1 AND state = 'purchased')`,
+            [row.user_id]
+          );
+        }
+      }
+      pageToken = data.tokenPagination?.nextPageToken || "";
+    } while (pageToken);
+  } catch (e) {
+    console.error("Langas voided purchases check failed:", e?.response?.status || e.message);
+  }
+}
+setTimeout(langasCheckVoided, 60 * 1000);
+setInterval(langasCheckVoided, 24 * 60 * 60 * 1000);
+
+// ══════════════════════════════════════════════════════════════════════════
 //  CONTENT
 // ══════════════════════════════════════════════════════════════════════════
 
@@ -286,6 +425,16 @@ router.get("/levels", langasRateLimit(60), langasRequireAuth, async (req, res) =
         }))
     }));
 
+    // Free players: everything after the first 3 lessons on the path is locked
+    const langasLvFull = await langasIsFull(req.langasUser.id);
+    let langasLvPos = 0;
+    for (const l of langasLevels) {
+      for (const e of l.exercises) {
+        e.locked = !langasLvFull && langasLvPos >= LANGAS_FREE_LESSONS;
+        langasLvPos++;
+      }
+    }
+
     const langasLevelsStats = await pool.query(
       `WITH totals AS (
          SELECT user_id, SUM(best_score)::int AS total
@@ -308,6 +457,7 @@ router.get("/levels", langasRateLimit(60), langasRequireAuth, async (req, res) =
     return res.status(200).json({
       resStatus: true,
       levels: langasLevels,
+      full: langasLvFull,
       stats: {
         streak: langasStatsRow.streak_alive ? langasStatsRow.streak_days : 0,
         points: langasStatsRow.total || 0,
@@ -326,6 +476,13 @@ router.get("/exercises/:id", langasRateLimit(60), langasRequireAuth, async (req,
     return res.status(400).json({ resStatus: false, resMessage: "Invalid exercise", resErrorCode: 1 });
   }
   try {
+    // Locked lesson for a free player (the app shows the unlock screen)
+    if (!(await langasIsFull(req.langasUser.id))) {
+      const langasExFree = await langasFreeExerciseIds(langasAppVersion(req));
+      if (!langasExFree.has(Number(langasExId))) {
+        return res.status(402).json({ resStatus: false, resMessage: "Unlock the full version to open this lesson", resErrorCode: 402 });
+      }
+    }
     const langasExRow = await pool.query(
       `SELECT id, title, rule, time_limit_sec FROM langas_exercises
        WHERE id = $1 AND is_active = TRUE AND min_app_version <= $2`,
