@@ -4,15 +4,14 @@ const express = require("express");
 const router = express.Router();
 const crypto = require("crypto");
 const useragent = require("useragent");
-const { pool, supabase } = require("../db");
+const { pool } = require("../db");
 const {
   blockMaliciousIPs,
-  applyReadRateLimit,
   applyWriteRateLimit
 } = require("../middleware/masters_MW");
 
-const LANGAS_WEB_AVATAR_BUCKET = "langas_storage";   // same private bucket as the app
-const LANGAS_WEB_AVATAR_LINK_SEC = 60 * 60;          // photo links on invite pages live 1 h
+// ══════════════════════════════════════════════════════════════════════════
+//  INVITE PREVIEW — GET /u/:id   (public, nothing private)
 const LANGAS_WEB_VISIT_COOLDOWN_MS = 3 * 60 * 1000;  // same visitor + same page counted once per 3 min
 const LANGAS_WEB_FORM_COOLDOWN_MS = 60 * 1000;       // one form per IP per minute
 const LANGAS_WEB_VISIT_KEEP_MONTHS = 12;             // privacy policy: visits kept up to 12 months
@@ -185,77 +184,6 @@ router.post("/delete-request", blockMaliciousIPs, applyWriteRateLimit, langasWeb
   } catch (err) {
     console.error("Langas web delete request error:", err.message);
     return res.status(500).json({ resStatus: false, resMessage: "Server error. Please try again later.", resErrorCode: 99 });
-  }
-});
-
-// ══════════════════════════════════════════════════════════════════════════
-//  INVITE PREVIEW — GET /u/:id   (public, nothing private)
-//  -> { player: { name, avatarUrl, levelCode, levelTitle, points, streak, crowns } }
-// ══════════════════════════════════════════════════════════════════════════
-router.get("/u/:id", blockMaliciousIPs, applyReadRateLimit, async (req, res) => {
-  const langasWebId = /^\d{1,12}$/.test(String(req.params.id)) ? Number(req.params.id) : 0;
-  if (!langasWebId) {
-    return res.status(400).json({ resStatus: false, resMessage: "Invalid player", resErrorCode: 1 });
-  }
-  try {
-    const langasWebUser = await pool.query(
-      `SELECT u.id, COALESCE(u.custom_name, u.display_name) AS name, u.avatar_path,
-              CASE WHEN u.streak_last_date >= (NOW() AT TIME ZONE 'Europe/Riga')::date - 1
-                   THEN u.streak_days ELSE 0 END AS streak,
-              COALESCE((SELECT SUM(s.best_score) FROM langas_scores s WHERE s.user_id = u.id), 0)::int AS points
-       FROM langas_users u WHERE u.id = $1`,
-      [langasWebId]
-    );
-    if (!langasWebUser.rowCount) {
-      return res.status(404).json({ resStatus: false, resMessage: "Player not found", resErrorCode: 2 });
-    }
-    const u = langasWebUser.rows[0];
-
-    // Level they're on (first level with an unplayed lesson) + crowns (90%+ lessons)
-    const langasWebLevels = await pool.query(
-      `SELECT l.code, l.title, l.sort_order,
-              COUNT(e.id)::int AS total,
-              COUNT(e.id) FILTER (WHERE COALESCE(s.attempts, 0) > 0)::int AS done,
-              COUNT(e.id) FILTER (WHERE COALESCE(s.attempts, 0) > 0
-                AND s.best_correct * 100 >= 90 * 10 * (SELECT COUNT(*) FROM langas_questions q
-                                                     WHERE q.exercise_id = e.id))::int AS crowns
-       FROM langas_levels l
-       JOIN langas_exercises e ON e.level_id = l.id AND e.is_active = TRUE
-       LEFT JOIN langas_scores s ON s.exercise_id = e.id AND s.user_id = $1
-       GROUP BY l.id
-       ORDER BY l.sort_order`,
-      [langasWebId]
-    );
-    const langasWebRows = langasWebLevels.rows;
-    const langasWebLevel = langasWebRows.find(l => l.done < l.total) || langasWebRows[langasWebRows.length - 1] || null;
-    const langasWebCrowns = langasWebRows.reduce((n, l) => n + l.crowns, 0);
-
-    let langasWebAvatar = "";
-    if (u.avatar_path) {
-      try {
-        const { data } = await supabase.storage
-          .from(LANGAS_WEB_AVATAR_BUCKET)
-          .createSignedUrl(u.avatar_path, LANGAS_WEB_AVATAR_LINK_SEC);
-        langasWebAvatar = data?.signedUrl || "";
-      } catch (e) { /* no photo: first letter */ }
-    }
-
-    res.set("Cache-Control", "public, max-age=300");
-    return res.status(200).json({
-      resStatus: true,
-      player: {
-        name: u.name,
-        avatarUrl: langasWebAvatar,
-        levelCode: langasWebLevel ? langasWebLevel.code : "",
-        levelTitle: langasWebLevel ? langasWebLevel.title : "",
-        points: u.points || 0,
-        streak: u.streak || 0,
-        crowns: langasWebCrowns
-      }
-    });
-  } catch (err) {
-    console.error("Langas web invite error:", err.message);
-    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
   }
 });
 
