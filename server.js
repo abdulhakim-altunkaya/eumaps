@@ -65,7 +65,10 @@ const allowedOrigins = [
   "https://www.filebeef.com",
   "http://filebeef.com",
   "http://www.filebeef.com",
-  "https://filebeef.netlify.app"
+  "https://filebeef.netlify.app",
+  "https://langas.online",
+  "https://www.langas.online",
+  "http://langas.online",
 ];
 
 
@@ -139,6 +142,8 @@ const filebeefRoutes = require("./routes/filebeef");
 app.use("/", filebeefRoutes);
 const langasRoutes = require("./routes/langas");
 app.use("/api/langas", langasRoutes);
+const langasOnlineRoutes = require("./routes/langas_online");
+app.use("/api/langas-web", langasOnlineRoutes);
 
 app.post("/serversavecomment", blockMaliciousIPs, actionCooldown("postMessage", 3 * 60 * 1000), async (req, res) => {
   let client;
