@@ -387,6 +387,30 @@ setInterval(langasCheckVoided, 24 * 60 * 60 * 1000);
 //  CONTENT
 // ══════════════════════════════════════════════════════════════════════════
 
+// Unit reviews + final test (app version 8+): questions mixed from the unit's lessons / all of the level
+const LANGAS_REVIEW_QUESTIONS = 25;
+const LANGAS_FINAL_QUESTIONS = 40;
+const LANGAS_FINAL_PASS = 0.8;          // 80% correct to pass the final test
+const LANGAS_REVIEW_LIMIT_SEC = 540;
+const LANGAS_FINAL_LIMIT_SEC = 900;
+const langasMixes = new Map();          // "userId:exerciseId" -> [questionId, ...] picked for this attempt
+
+// Which lessons a review / final draws from (r = review/final row, s = source lesson)
+const LANGAS_MIX_SCOPE = `s.kind = 'lesson' AND s.is_active = TRUE AND s.level_id = r.level_id AND (
+  (r.kind = 'review' AND s.sort_order BETWEEN r.sort_order - 6 AND r.sort_order - 1) OR r.kind = 'final')`;
+
+async function langasMixPick(exId, kind, appVersion) {
+  const r = await pool.query(
+    `SELECT q.id FROM langas_questions q
+     JOIN langas_exercises s ON s.id = q.exercise_id
+     JOIN langas_exercises r ON r.id = $1
+     WHERE q.type <> 'memory' AND q.min_app_version <= $2 AND s.min_app_version <= $2 AND ${LANGAS_MIX_SCOPE}
+     ORDER BY random() LIMIT $3`,
+    [exId, appVersion, kind === "final" ? LANGAS_FINAL_QUESTIONS : LANGAS_REVIEW_QUESTIONS]
+  );
+  return r.rows.map(x => Number(x.id));
+}
+
 // Levels with their exercises + this user's best scores.
 router.get("/levels", langasRateLimit(60), langasRequireAuth, async (req, res) => {
   const langasLevelsAppVersion = langasAppVersion(req);
@@ -395,8 +419,12 @@ router.get("/levels", langasRateLimit(60), langasRequireAuth, async (req, res) =
       `SELECT id, code, title FROM langas_levels ORDER BY sort_order`
     );
     const langasLevelsExRows = await pool.query(
-      `SELECT e.id, e.level_id, e.title, e.icon, (e.rule IS NOT NULL) AS is_grammar,
-              (SELECT COUNT(*) FROM langas_questions q WHERE q.exercise_id = e.id AND q.min_app_version <= $2)::int AS question_count,
+      `SELECT e.id, e.level_id, e.title, e.icon, (e.rule IS NOT NULL) AS is_grammar, e.kind,
+              (CASE e.kind
+                 WHEN 'review' THEN ${LANGAS_REVIEW_QUESTIONS}
+                 WHEN 'final'  THEN ${LANGAS_FINAL_QUESTIONS}
+                 ELSE (SELECT COUNT(*) FROM langas_questions q WHERE q.exercise_id = e.id AND q.min_app_version <= $2)
+               END)::int AS question_count,
               COALESCE(s.best_score, 0)::int AS best_score,
               COALESCE(s.best_correct, 0)::int AS best_correct,
               COALESCE(s.attempts, 0)::int AS attempts
@@ -418,6 +446,7 @@ router.get("/levels", langasRateLimit(60), langasRequireAuth, async (req, res) =
           title: e.title,
           icon: e.icon || "",
           grammar: e.is_grammar,
+          kind: e.kind || "lesson",
           questionCount: e.question_count,
           maxScore: e.question_count * LANGAS_POINTS_PER_CORRECT,
           bestScore: e.best_score,
@@ -485,23 +514,39 @@ router.get("/exercises/:id", langasRateLimit(60), langasRequireAuth, async (req,
       }
     }
     const langasExRow = await pool.query(
-      `SELECT id, title, rule, time_limit_sec FROM langas_exercises
+      `SELECT id, title, rule, time_limit_sec, kind FROM langas_exercises
        WHERE id = $1 AND is_active = TRUE AND min_app_version <= $2`,
       [langasExId, langasAppVersion(req)]
     );
     if (!langasExRow.rowCount) {
       return res.status(404).json({ resStatus: false, resMessage: "Exercise not found", resErrorCode: 2 });
     }
-    const langasExQuestions = await pool.query(
-      `SELECT id, type, prompt, options, media_url, instruction, accepted_answers
-       FROM langas_questions WHERE exercise_id = $1 AND min_app_version <= $2 ORDER BY sort_order`,
-      [langasExId, langasAppVersion(req)]
-    );
+    const langasExKind = langasExRow.rows[0].kind || "lesson";
+    let langasExQuestions;
+    if (langasExKind === "lesson") {
+      langasExQuestions = await pool.query(
+        `SELECT id, type, prompt, options, media_url, instruction, accepted_answers
+         FROM langas_questions WHERE exercise_id = $1 AND min_app_version <= $2 ORDER BY sort_order`,
+        [langasExId, langasAppVersion(req)]
+      );
+    } else {
+      // Review / final: a new random mix every attempt, remembered until submit
+      const langasExMix = await langasMixPick(langasExId, langasExKind, langasAppVersion(req));
+      if (langasMixes.size > 20000) langasMixes.clear();
+      langasMixes.set(req.langasUser.id + ":" + langasExId, langasExMix);
+      langasExQuestions = await pool.query(
+        `SELECT id, type, prompt, options, media_url, instruction, accepted_answers
+         FROM langas_questions WHERE id::bigint = ANY($1::bigint[])
+         ORDER BY array_position($1::bigint[], id::bigint)`,
+        [langasExMix]
+      );
+    }
     const langasExMemory = langasExQuestions.rows.some(q => q.type === "memory")
       ? await langasMemoryCards(langasExId, langasAppVersion(req))
       : [];
     if (langasStartTimes.size > 20000) langasStartTimes.clear();
-    const langasExLimitSec = langasExRow.rows[0].time_limit_sec || LANGAS_TIME_LIMIT_MS / 1000;
+    const langasExLimitSec = langasExRow.rows[0].time_limit_sec ||
+      (langasExKind === "final" ? LANGAS_FINAL_LIMIT_SEC : langasExKind === "review" ? LANGAS_REVIEW_LIMIT_SEC : LANGAS_TIME_LIMIT_MS / 1000);
     langasStartTimes.set(req.langasUser.id + ":" + langasExId, { at: Date.now(), limitSec: langasExLimitSec });
     if (langasProgress.size > 20000) langasProgress.clear();
     langasProgress.set(req.langasUser.id + ":" + langasExId, {});
@@ -511,6 +556,8 @@ router.get("/exercises/:id", langasRateLimit(60), langasRequireAuth, async (req,
       exercise: {
         id: langasExRow.rows[0].id,
         title: langasExRow.rows[0].title,
+        kind: langasExKind,
+        passPercent: langasExKind === "final" ? Math.round(LANGAS_FINAL_PASS * 100) : 0,
         timeLimitSec: langasExLimitSec,
         rule: langasRuleDto(langasExRow.rows[0].rule),
         questions: langasExQuestions.rows.map(q => ({
@@ -596,8 +643,11 @@ function langasPartialHint(answer, seed) {
 
 async function langasLoadQuestion(exId, questionId) {
   const r = await pool.query(
-    `SELECT id, type, options, correct_index, accepted_answers
-     FROM langas_questions WHERE id = $1 AND exercise_id = $2`,
+    `SELECT q.id, q.type, q.options, q.correct_index, q.accepted_answers
+     FROM langas_questions q
+     WHERE q.id = $1 AND (q.exercise_id = $2 OR EXISTS (
+       SELECT 1 FROM langas_exercises r JOIN langas_exercises s ON s.id = q.exercise_id
+       WHERE r.id = $2 AND ${LANGAS_MIX_SCOPE}))`,
     [questionId, exId]
   );
   return r.rowCount ? r.rows[0] : null;
@@ -890,18 +940,34 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
 
   try {
     const langasSubExRow = await pool.query(
-      `SELECT id FROM langas_exercises WHERE id = $1 AND is_active = TRUE`,
+      `SELECT id, kind FROM langas_exercises WHERE id = $1 AND is_active = TRUE`,
       [langasSubExId]
     );
     if (!langasSubExRow.rowCount) {
       return res.status(404).json({ resStatus: false, resMessage: "Exercise not found", resErrorCode: 3 });
     }
 
-    const langasSubQuestions = await pool.query(
-      `SELECT id, type, options, correct_index, accepted_answers
-       FROM langas_questions WHERE exercise_id = $1 AND min_app_version <= $2 ORDER BY sort_order`,
-      [langasSubExId, langasAppVersion(req)]
-    );
+    const langasSubKind = langasSubExRow.rows[0].kind || "lesson";
+    let langasSubQuestions;
+    if (langasSubKind === "lesson") {
+      langasSubQuestions = await pool.query(
+        `SELECT id, type, options, correct_index, accepted_answers
+         FROM langas_questions WHERE exercise_id = $1 AND min_app_version <= $2 ORDER BY sort_order`,
+        [langasSubExId, langasAppVersion(req)]
+      );
+    } else {
+      const langasSubMix = langasMixes.get(req.langasUser.id + ":" + langasSubExId);
+      if (!langasSubMix) {
+        return res.status(409).json({ resStatus: false, resMessage: "Lesson expired", resErrorCode: 4 });
+      }
+      langasMixes.delete(req.langasUser.id + ":" + langasSubExId);
+      langasSubQuestions = await pool.query(
+        `SELECT id, type, options, correct_index, accepted_answers
+         FROM langas_questions WHERE id::bigint = ANY($1::bigint[])
+         ORDER BY array_position($1::bigint[], id::bigint)`,
+        [langasSubMix]
+      );
+    }
 
     const langasSubProg = langasProgress.get(req.langasUser.id + ":" + langasSubExId);
     langasProgress.delete(req.langasUser.id + ":" + langasSubExId);
@@ -996,6 +1062,9 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
       timeBonus: langasSubBonus,
       speedBonus: langasSubSpeed,
       bestScore: langasSubBest.rows[0].best_score,
+      kind: langasSubKind,
+      passed: langasSubKind !== "final" ||
+        langasSubResults.filter(r => r.correct).length >= Math.ceil(langasSubResults.length * LANGAS_FINAL_PASS),
       results: langasSubResults,
       achievements: langasSubNewAch
     });
