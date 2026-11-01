@@ -461,7 +461,7 @@ router.get("/levels", langasRateLimit(60), langasRequireAuth, async (req, res) =
       stats: {
         streak: langasStatsRow.streak_alive ? langasStatsRow.streak_days : 0,
         points: langasStatsRow.total || 0,
-        rank: langasStatsRow.rnk || 0
+        rank: await langasWeekRank(req.langasUser.id) // place in this week's group
       }
     });
   } catch (err) {
@@ -949,7 +949,7 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
                      best_correct = GREATEST(langas_scores.best_correct, EXCLUDED.best_correct),
                      attempts     = langas_scores.attempts + 1,
                      updated_at   = NOW()
-       RETURNING best_score`,
+       RETURNING best_score, attempts`,
       [req.langasUser.id, langasSubExId, langasSubScore + langasSubBonus + langasSubSpeed, langasSubScore]
     );
 
@@ -964,6 +964,11 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
        WHERE id = $1`,
       [req.langasUser.id]
     );
+
+    // Weekly race: full points for a new lesson, 30% for a replay
+    const langasSubTotal = langasSubScore + langasSubBonus + langasSubSpeed;
+    await langasWeekAddPoints(req.langasUser.id,
+      langasSubBest.rows[0].attempts > 1 ? Math.round(langasSubTotal * LANGAS_REPLAY_SHARE) : langasSubTotal);
 
     // Profile stats: best streak + time spent (capped at the lesson limit + 1 minute).
     await pool.query(`UPDATE langas_users SET best_streak = GREATEST(best_streak, streak_days) WHERE id = $1`,
@@ -1126,7 +1131,7 @@ async function langasSendProfile(req, res, langasPrUid) {
   const langasPrVer = langasAppVersion(req);
   try {
     const langasPrUser = await pool.query(
-      `SELECT id, COALESCE(custom_name, display_name) AS name, avatar_path, streak_days, best_streak,
+      `SELECT id, COALESCE(custom_name, display_name) AS name, avatar_path, streak_days, best_streak, palladium,
               (streak_last_date >= (NOW() AT TIME ZONE '${LANGAS_TZ}')::date - 1) AS streak_alive
        FROM langas_users WHERE id = $1`,
       [langasPrUid]
@@ -1265,6 +1270,7 @@ async function langasSendProfile(req, res, langasPrUid) {
         totalMinutes: Math.round((st.all_sec || 0) / 60),
         totalPoints: rk.total || 0,
         rank: rk.rnk || 0,
+        palladium: u.palladium || 0,
         achievements: langasPrAch.rows
           .map(a => {
             const dto = langasAchDto(a.code, a.d);
@@ -1843,30 +1849,194 @@ router.post("/messages/:id", langasRateLimit(30), langasRequireAuth, async (req,
 });
 
 // ══════════════════════════════════════════════════════════════════════════
+//  WEEKLY RACE: groups of 38, Monday 00:00 Riga reset, palladium rewards
+// ══════════════════════════════════════════════════════════════════════════
+const LANGAS_WEEK_GROUP = 38;        // Monday: groups fill up to 38, then a new group opens
+const LANGAS_REPLAY_SHARE = 0.3;     // replaying a finished lesson gives 30% of its points
+const LANGAS_WEEK_SQL = `date_trunc('week', NOW() AT TIME ZONE '${LANGAS_TZ}')::date`; // this Monday
+
+// Palladium (grams) for a place in the group. Needs at least 1 point.
+function langasWeekReward(rank) {
+  if (rank === 1) return 7;
+  if (rank === 2) return 6;
+  if (rank === 3) return 5;
+  if (rank === 4) return 4;
+  if (rank <= 10) return 3;
+  if (rank <= 20) return 2;
+  if (rank <= 30) return 1;
+  return 0;
+}
+
+// Adds race points. The first lesson of the week puts the player in a group:
+// Monday = first group with room (< 38) or a new one; from Tuesday = the smallest group.
+async function langasWeekAddPoints(userId, points) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(7101)"); // one join at a time
+    const wk = (await client.query(
+      `SELECT to_char(${LANGAS_WEEK_SQL}, 'YYYY-MM-DD') AS w,
+              (NOW() AT TIME ZONE '${LANGAS_TZ}') < (${LANGAS_WEEK_SQL} + 1) AS monday`
+    )).rows[0];
+    const mem = await client.query(
+      `SELECT group_id FROM langas_week_members WHERE week_start = $1 AND user_id = $2`,
+      [wk.w, userId]
+    );
+    if (!mem.rowCount) {
+      const groups = await client.query(
+        `SELECT g.id, COUNT(m.user_id)::int AS n
+         FROM langas_week_groups g
+         LEFT JOIN langas_week_members m ON m.group_id = g.id
+         WHERE g.week_start = $1
+         GROUP BY g.id ORDER BY g.id`,
+        [wk.w]
+      );
+      let gid = null;
+      if (wk.monday) {
+        const open = groups.rows.find(g => g.n < LANGAS_WEEK_GROUP);
+        if (open) gid = open.id;
+      } else if (groups.rowCount) {
+        gid = groups.rows.reduce((a, b) => (b.n < a.n ? b : a)).id;
+      }
+      if (!gid) {
+        gid = (await client.query(
+          `INSERT INTO langas_week_groups (week_start) VALUES ($1) RETURNING id`, [wk.w]
+        )).rows[0].id;
+      }
+      await client.query(
+        `INSERT INTO langas_week_members (week_start, user_id, group_id, points) VALUES ($1, $2, $3, $4)`,
+        [wk.w, userId, gid, points]
+      );
+    } else if (points > 0) {
+      await client.query(
+        `UPDATE langas_week_members SET points = points + $3, reached_at = NOW()
+         WHERE week_start = $1 AND user_id = $2`,
+        [wk.w, userId, points]
+      );
+    }
+    await client.query("COMMIT");
+  } catch (e) {
+    try { await client.query("ROLLBACK"); } catch (e2) { /* ignore */ }
+    console.error("Langas week points error:", e.message);
+  } finally {
+    client.release();
+  }
+}
+
+// Ends finished weeks: ranks every group, saves the results, adds the palladium.
+async function langasWeekFinish() {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(7102)");
+    const groups = await client.query(
+      `SELECT id, to_char(week_start, 'YYYY-MM-DD') AS w FROM langas_week_groups
+       WHERE finalized = FALSE AND week_start < ${LANGAS_WEEK_SQL} ORDER BY id`
+    );
+    for (const g of groups.rows) {
+      const m = await client.query(
+        `SELECT user_id, points FROM langas_week_members WHERE group_id = $1
+         ORDER BY points DESC, reached_at ASC, user_id ASC`,
+        [g.id]
+      );
+      let rank = 0;
+      for (const r of m.rows) {
+        rank++;
+        const pd = r.points >= 1 ? langasWeekReward(rank) : 0;
+        const ins = await client.query(
+          `INSERT INTO langas_week_results (week_start, user_id, group_id, rank, group_size, points, palladium)
+           VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING`,
+          [g.w, r.user_id, g.id, rank, m.rowCount, r.points, pd]
+        );
+        if (ins.rowCount && pd > 0) {
+          await client.query(`UPDATE langas_users SET palladium = palladium + $2 WHERE id = $1`, [r.user_id, pd]);
+        }
+      }
+      await client.query(`UPDATE langas_week_groups SET finalized = TRUE WHERE id = $1`, [g.id]);
+    }
+    await client.query("COMMIT");
+  } catch (e) {
+    try { await client.query("ROLLBACK"); } catch (e2) { /* ignore */ }
+    console.error("Langas week finish error:", e.message);
+  } finally {
+    client.release();
+  }
+}
+setTimeout(langasWeekFinish, 90 * 1000);
+setInterval(langasWeekFinish, 10 * 60 * 1000);
+
+// Your place in this week's group (0 = not playing this week yet).
+async function langasWeekRank(userId) {
+  const r = await pool.query(
+    `WITH me AS (
+       SELECT group_id FROM langas_week_members WHERE week_start = ${LANGAS_WEEK_SQL} AND user_id = $1
+     ), ranked AS (
+       SELECT m.user_id, ROW_NUMBER() OVER (ORDER BY m.points DESC, m.reached_at ASC, m.user_id ASC)::int AS rnk
+       FROM langas_week_members m JOIN me ON m.group_id = me.group_id
+     )
+     SELECT rnk FROM ranked WHERE user_id = $1`,
+    [userId]
+  );
+  return r.rowCount ? r.rows[0].rnk : 0;
+}
+
+// Monday popup: last week's result, once (marked as seen when sent).
+router.get("/week/last", langasRateLimit(30), langasRequireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `UPDATE langas_week_results SET seen = TRUE
+       WHERE user_id = $1 AND seen = FALSE
+       RETURNING week_start, rank, group_size, points, palladium`,
+      [req.langasUser.id]
+    );
+    if (!r.rowCount) return res.status(200).json({ resStatus: true, has: false });
+    const last = r.rows.reduce((a, b) => (b.week_start > a.week_start ? b : a));
+    const tot = await pool.query(`SELECT palladium FROM langas_users WHERE id = $1`, [req.langasUser.id]);
+    return res.status(200).json({
+      resStatus: true,
+      has: true,
+      rank: last.rank,
+      groupSize: last.group_size,
+      points: last.points,
+      palladium: last.palladium,
+      total: tot.rowCount ? tot.rows[0].palladium : 0
+    });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════
 //  LEADERBOARD
 // ══════════════════════════════════════════════════════════════════════════
+// Weekly leaderboard: your group this week, with the palladium each place would win now.
 router.get("/leaderboard", langasRateLimit(30), langasRequireAuth, async (req, res) => {
+  const langasLbMeId = req.langasUser.id;
   try {
+    const langasLbWeek = (await pool.query(
+      `SELECT GREATEST(0, EXTRACT(EPOCH FROM
+                (((${LANGAS_WEEK_SQL} + 7)::timestamp AT TIME ZONE '${LANGAS_TZ}') - NOW())))::int AS ends,
+              (SELECT group_id FROM langas_week_members
+               WHERE week_start = ${LANGAS_WEEK_SQL} AND user_id = $1) AS gid`,
+      [langasLbMeId]
+    )).rows[0];
+
+    if (!langasLbWeek.gid) {
+      return res.status(200).json({
+        resStatus: true, entries: [], me: { rank: 0, total: 0, palladium: 0 },
+        endsInSec: langasLbWeek.ends, groupSize: 0
+      });
+    }
+
     const langasLbRows = await pool.query(
-      `WITH totals AS (
-         SELECT u.id, COALESCE(u.custom_name, u.display_name) AS display_name, u.avatar_path,
-                SUM(s.best_score)::int AS total
-         FROM langas_users u
-         JOIN langas_scores s ON s.user_id = u.id
-         WHERE $3::boolean = FALSE OR u.id = $2 OR u.id IN (
-           SELECT CASE WHEN f.requester_id = $2 THEN f.addressee_id ELSE f.requester_id END
-           FROM langas_friends f
-           WHERE f.status = 'accepted' AND (f.requester_id = $2 OR f.addressee_id = $2)
-         )
-         GROUP BY u.id
-       ), ranked AS (
-         SELECT id, display_name, avatar_path, total, RANK() OVER (ORDER BY total DESC)::int AS rnk
-         FROM totals
-       )
-       SELECT id, display_name, avatar_path, total, rnk FROM ranked
-       WHERE rnk <= $1 OR id = $2
-       ORDER BY rnk, id`,
-      [LANGAS_LEADERBOARD_LIMIT, req.langasUser.id, req.query.scope === "friends"]
+      `SELECT m.user_id AS id, COALESCE(u.custom_name, u.display_name) AS display_name, u.avatar_path,
+              m.points AS total,
+              ROW_NUMBER() OVER (ORDER BY m.points DESC, m.reached_at ASC, m.user_id ASC)::int AS rnk
+       FROM langas_week_members m
+       JOIN langas_users u ON u.id = m.user_id
+       WHERE m.group_id = $1
+       ORDER BY rnk`,
+      [langasLbWeek.gid]
     );
 
     // Signed links for the photos on this page (one call for all of them).
@@ -1882,26 +2052,32 @@ router.get("/leaderboard", langasRateLimit(30), langasRequireAuth, async (req, r
     }
 
     const langasLbEntries = [];
-    let langasLbMe = { rank: 0, total: 0 };
+    let langasLbMe = { rank: 0, total: 0, palladium: 0 };
     for (const r of langasLbRows.rows) {
-      if (r.id === req.langasUser.id) langasLbMe = { rank: r.rnk, total: r.total };
-      if (r.rnk <= LANGAS_LEADERBOARD_LIMIT) {
-        langasLbEntries.push({
-          rank: r.rnk,
-          userId: r.id,
-          displayName: r.display_name,
-          avatarUrl: langasLbLinks[r.avatar_path] || "",
-          total: r.total,
-          isMe: r.id === req.langasUser.id
-        });
-      }
+      const pd = r.total >= 1 ? langasWeekReward(r.rnk) : 0;
+      const isMe = Number(r.id) === Number(langasLbMeId);
+      if (isMe) langasLbMe = { rank: r.rnk, total: r.total, palladium: pd };
+      langasLbEntries.push({
+        rank: r.rnk,
+        userId: Number(r.id),
+        displayName: r.display_name,
+        avatarUrl: langasLbLinks[r.avatar_path] || "",
+        total: r.total,
+        palladium: pd,
+        isMe
+      });
     }
 
-    return res.status(200).json({ resStatus: true, entries: langasLbEntries, me: langasLbMe });
+    return res.status(200).json({
+      resStatus: true, entries: langasLbEntries, me: langasLbMe,
+      endsInSec: langasLbWeek.ends, groupSize: langasLbRows.rowCount
+    });
   } catch (err) {
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
   }
 });
+
+
 
 // ══════════════════════════════════════════════════════════════════════════
 //  SPEAKING (app version 4+): the app sends a short WAV, the local
