@@ -1619,6 +1619,51 @@ router.post("/friends/:id/:action", langasRateLimit(30), langasRequireAuth, asyn
   }
 });
 
+// GET /users/search?q=an -> up to 20 players whose name contains the text (never you), with friend state
+router.get("/users/search", langasRateLimit(30), langasRequireAuth, async (req, res) => {
+  const langasSrMe = req.langasUser.id;
+  const langasSrQ = String(req.query.q || "").trim().slice(0, 20);
+  if (langasSrQ.length < 2) return res.status(200).json({ resStatus: true, users: [] });
+  const langasSrEsc = langasSrQ.replace(/[\\%_]/g, c => "\\" + c); // % and _ are typed letters, not wildcards
+  try {
+    const r = await pool.query(
+      `SELECT u.id, COALESCE(u.custom_name, u.display_name) AS name, u.avatar_path,
+              COALESCE((SELECT SUM(best_score) FROM langas_scores s WHERE s.user_id = u.id), 0)::int AS points,
+              f.requester_id, f.status
+       FROM langas_users u
+       LEFT JOIN langas_friends f
+         ON LEAST(f.requester_id, f.addressee_id) = LEAST(u.id, $3::bigint)
+        AND GREATEST(f.requester_id, f.addressee_id) = GREATEST(u.id, $3::bigint)
+       WHERE u.id <> $3 AND COALESCE(u.custom_name, u.display_name) ILIKE $1
+       ORDER BY (COALESCE(u.custom_name, u.display_name) ILIKE $2) DESC, points DESC, u.id
+       LIMIT 20`,
+      ["%" + langasSrEsc + "%", langasSrEsc + "%", langasSrMe]
+    );
+    const langasSrPaths = r.rows.map(x => x.avatar_path).filter(Boolean);
+    const langasSrLinks = {};
+    if (langasSrPaths.length) {
+      try {
+        const { data } = await supabase.storage
+          .from(LANGAS_AVATAR_BUCKET)
+          .createSignedUrls(langasSrPaths, LANGAS_AVATAR_LINK_SEC);
+        for (const l of data || []) if (l && l.path && l.signedUrl) langasSrLinks[l.path] = l.signedUrl;
+      } catch (e) { /* no photos: first letters */ }
+    }
+    const langasSrState = x => !x.status ? "none"
+      : x.status === "accepted" ? "friends"
+      : Number(x.requester_id) === Number(langasSrMe) ? "sent" : "incoming";
+    return res.status(200).json({
+      resStatus: true,
+      users: r.rows.map(x => ({
+        userId: Number(x.id), name: x.name, avatarUrl: langasSrLinks[x.avatar_path] || "",
+        points: x.points || 0, friendState: langasSrState(x)
+      }))
+    });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
 // ══════════════════════════════════════════════════════════════════════════
 //  MESSAGES (friends only, short notes up to 200 characters — not a chat app)
 // ══════════════════════════════════════════════════════════════════════════
