@@ -342,6 +342,7 @@ router.post("/purchase", langasRateLimit(20), langasRequireAuth, async (req, res
     }
 
     await pool.query(`UPDATE langas_users SET is_full = TRUE WHERE id = $1`, [langasPuMe]);
+    langasAchCheck(langasPuMe, langasAppVersion(req));
     return res.status(200).json({ resStatus: true, full: true });
   } catch (err) {
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
@@ -1017,34 +1018,70 @@ const LANGAS_TZ = "Europe/Riga";
 
 // ── ACHIEVEMENTS ───────────────────────────────────────────────────────────
 // color: sun | coral | ink | mint | teal (badge colour in the app)
+// Order = easy first (the result screen shows the last new one as the biggest).
 const LANGAS_ACHIEVEMENTS = [
-  { code: "lessons_1",   title: "First lesson",    text: "Finish your first lesson",         icon: "star",    color: "sun" },
-  { code: "lessons_10",  title: "10 lessons",      text: "Finish 10 lessons",                icon: "trophy",  color: "sun" },
-  { code: "lessons_25",  title: "25 lessons",      text: "Finish 25 lessons",                icon: "trophy",  color: "sun" },
-  { code: "lessons_50",  title: "50 lessons",      text: "Finish 50 lessons",                icon: "trophy",  color: "sun" },
-  { code: "lessons_all", title: "All lessons",     text: "Finish every lesson",              icon: "trophy",  color: "coral" },
-  { code: "crown_1",     title: "First crown",     text: "Score 90% or more in a lesson",    icon: "crown",   color: "sun" },
-  { code: "crown_10",    title: "10 crowns",       text: "Earn 10 crowns",                   icon: "crown",   color: "sun" },
-  { code: "crown_25",    title: "25 crowns",       text: "Earn 25 crowns",                   icon: "crown",   color: "sun" },
-  { code: "perfect_1",   title: "Perfect!",        text: "Get every answer right",           icon: "star",    color: "coral" },
-  { code: "streak_3",    title: "3-day streak",    text: "Practise 3 days in a row",         icon: "flame",   color: "coral" },
-  { code: "streak_7",    title: "7-day streak",    text: "Practise 7 days in a row",         icon: "flame",   color: "coral" },
-  { code: "streak_30",   title: "30-day streak",   text: "Practise 30 days in a row",        icon: "flame",   color: "coral" },
-  { code: "lightning_1", title: "Lightning fast",  text: "Win a lightning bonus",            icon: "bolt",    color: "ink" },
-  { code: "grammar_1",   title: "Grammar starter", text: "Finish a grammar lesson",          icon: "book",    color: "mint" },
-  { code: "grammar_all", title: "Grammar master",  text: "Finish every grammar lesson",      icon: "book",    color: "mint" },
-  { code: "time_60",     title: "1 hour",          text: "Practise for 1 hour in total",     icon: "clock",   color: "teal" },
-  { code: "time_600",    title: "10 hours",        text: "Practise for 10 hours in total",   icon: "clock",   color: "teal" }
+  { code: "lessons_1",   title: "First lesson",    text: "Finish your first lesson",         icon: "star",      color: "sun" },
+  { code: "lessons_5",   title: "5 lessons",       text: "Finish 5 lessons",                 icon: "trophy",    color: "sun" },
+  { code: "lessons_10",  title: "10 lessons",      text: "Finish 10 lessons",                icon: "trophy",    color: "sun" },
+  { code: "lessons_25",  title: "25 lessons",      text: "Finish 25 lessons",                icon: "trophy",    color: "sun" },
+  { code: "lessons_50",  title: "50 lessons",      text: "Finish 50 lessons",                icon: "trophy",    color: "sun" },
+  { code: "lessons_75",  title: "75 lessons",      text: "Finish 75 lessons",                icon: "trophy",    color: "coral" },
+  { code: "lessons_100", title: "100 lessons",     text: "Finish 100 lessons",               icon: "trophy",    color: "ink" },
+  { code: "crown_1",     title: "First crown",     text: "Score 90% or more in a lesson",    icon: "crown",     color: "sun" },
+  { code: "crown_5",     title: "5 crowns",        text: "Earn 5 crowns",                    icon: "crown",     color: "sun" },
+  { code: "crown_10",    title: "10 crowns",       text: "Earn 10 crowns",                   icon: "crown",     color: "sun" },
+  { code: "crown_25",    title: "25 crowns",       text: "Earn 25 crowns",                   icon: "crown",     color: "sun" },
+  { code: "crown_50",    title: "50 crowns",       text: "Earn 50 crowns",                   icon: "crown",     color: "coral" },
+  { code: "crown_100",   title: "100 crowns",      text: "Earn 100 crowns",                  icon: "crown",     color: "ink" },
+  { code: "perfect_1",   title: "Perfect!",        text: "Get every answer right",           icon: "star",      color: "coral" },
+  { code: "perfect_5",   title: "5 perfect lessons",  text: "Get every answer right 5 times",  icon: "star",    color: "coral" },
+  { code: "perfect_25",  title: "25 perfect lessons", text: "Get every answer right 25 times", icon: "star",    color: "ink" },
+  { code: "lightning_1", title: "Lightning fast",  text: "Win a lightning bonus",            icon: "bolt",      color: "ink" },
+  { code: "streak_3",    title: "3-day streak",    text: "Practise 3 days in a row",         icon: "flame",     color: "coral" },
+  { code: "streak_7",    title: "7-day streak",    text: "Practise 7 days in a row",         icon: "flame",     color: "coral" },
+  { code: "streak_14",   title: "14-day streak",   text: "Practise 14 days in a row",        icon: "flame",     color: "coral" },
+  { code: "streak_30",   title: "30-day streak",   text: "Practise 30 days in a row",        icon: "flame",     color: "coral" },
+  { code: "streak_60",   title: "60-day streak",   text: "Practise 60 days in a row",        icon: "flame",     color: "ink" },
+  { code: "streak_100",  title: "100-day streak",  text: "Practise 100 days in a row",       icon: "flame",     color: "ink" },
+  { code: "time_60",     title: "1 hour",          text: "Practise for 1 hour in total",     icon: "clock",     color: "teal" },
+  { code: "time_300",    title: "5 hours",         text: "Practise for 5 hours in total",    icon: "clock",     color: "teal" },
+  { code: "time_600",    title: "10 hours",        text: "Practise for 10 hours in total",   icon: "clock",     color: "teal" },
+  { code: "time_1500",   title: "25 hours",        text: "Practise for 25 hours in total",   icon: "clock",     color: "ink" },
+  { code: "day_5",       title: "Busy day",        text: "Finish 5 lessons in one day",      icon: "calendar",  color: "mint" },
+  { code: "day_10",      title: "Marathon",        text: "Finish 10 lessons in one day",     icon: "calendar",  color: "coral" },
+  { code: "early_bird",  title: "Early bird",      text: "Finish a lesson before 08:00",     icon: "sun",       color: "sun" },
+  { code: "night_owl",   title: "Night owl",       text: "Finish a lesson after 23:00",      icon: "clock",     color: "ink" },
+  { code: "replay_1",    title: "Practice makes perfect", text: "Replay a lesson",           icon: "arrow",     color: "mint" },
+  { code: "replay_10",   title: "Replay 10 lessons", text: "Replay 10 different lessons",    icon: "arrow",     color: "teal" },
+  { code: "grammar_1",   title: "Grammar starter", text: "Finish a grammar lesson",          icon: "book",      color: "mint" },
+  { code: "grammar_all", title: "Grammar master",  text: "Finish every grammar lesson",      icon: "book",      color: "mint" },
+  { code: "friend_1",    title: "First friend",    text: "Make your first friend",           icon: "friends",   color: "mint" },
+  { code: "friend_5",    title: "5 friends",       text: "Have 5 friends",                   icon: "friends",   color: "mint" },
+  { code: "friend_10",   title: "10 friends",      text: "Have 10 friends",                  icon: "friends",   color: "teal" },
+  { code: "message_1",   title: "First message",   text: "Send a message to a friend",       icon: "chat",      color: "sun" },
+  { code: "cheer_1",     title: "Cheerleader",     text: "Cheer someone's achievement",      icon: "thumb",     color: "sun" },
+  { code: "photo_1",     title: "Say cheese",      text: "Add a profile photo",              icon: "camera",    color: "mint" },
+  { code: "name_1",      title: "New name",        text: "Change your name",                 icon: "pencil",    color: "sun" },
+  { code: "pd_1",        title: "First palladium", text: "Win palladium in a weekly race",   icon: "palladium", color: "ink" },
+  { code: "pd_10",       title: "10 g palladium",  text: "Collect 10 g of palladium",        icon: "palladium", color: "ink" },
+  { code: "pd_50",       title: "50 g palladium",  text: "Collect 50 g of palladium",        icon: "palladium", color: "teal" },
+  { code: "pd_100",      title: "100 g palladium", text: "Collect 100 g of palladium",       icon: "palladium", color: "coral" },
+  { code: "podium_1",    title: "Podium",          text: "Finish top 3 in your weekly group", icon: "trophy",   color: "sun" },
+  { code: "champion_1",  title: "Champion",        text: "Finish #1 in your weekly group",   icon: "trophy",    color: "coral" },
+  { code: "racer_4",     title: "Racer",           text: "Finish 4 weekly races",            icon: "flag",      color: "mint" },
+  { code: "lessons_all", title: "All lessons",     text: "Finish every lesson",              icon: "trophy",    color: "coral" },
+  { code: "supporter",   title: "Supporter",       text: "Unlock the full version",          icon: "heart",     color: "coral" }
 ];
 const LANGAS_ACH_BY_CODE = Object.fromEntries(LANGAS_ACHIEVEMENTS.map(a => [a.code, a]));
+const LANGAS_ACH_ALL_VERSIONS = 1000000; // checks outside a lesson count every lesson
 
 function langasAchDto(code, date) {
   const a = LANGAS_ACH_BY_CODE[code];
   return a ? { code: a.code, title: a.title, text: a.text, icon: a.icon, color: a.color, date: date || "" } : null;
 }
 
-// After a lesson: saves every achievement the player now qualifies for, returns only the new ones.
-// lesson = { perfect, lightning }. Never throws (a failure here must not break the result screen).
+// Saves every achievement the player now qualifies for, returns only the new ones.
+// lesson = { perfect, lightning } after a lesson, null otherwise. Never throws.
 async function langasAwardAchievements(userId, appVersion, lesson) {
   try {
     const r = await pool.query(
@@ -1052,6 +1089,14 @@ async function langasAwardAchievements(userId, appVersion, lesson) {
          SELECT e.id, e.rule IS NOT NULL AS grammar,
                 (SELECT COUNT(*) FROM langas_questions q WHERE q.exercise_id = e.id AND q.min_app_version <= $2) AS n
          FROM langas_exercises e WHERE e.is_active = TRUE AND e.min_app_version <= $2
+       ), lg AS (
+         SELECT created_at AT TIME ZONE '${LANGAS_TZ}' AS t, correct_count, question_count
+         FROM langas_lesson_log WHERE user_id = $1
+       ), me AS (
+         SELECT avatar_path IS NOT NULL AS photo, custom_name IS NOT NULL AS named,
+                COALESCE(palladium, 0) AS pd, COALESCE(is_full, FALSE) AS paid,
+                GREATEST(streak_days, best_streak) AS streak
+         FROM langas_users WHERE id = $1
        )
        SELECT
          (SELECT COUNT(*) FROM qc)::int AS total,
@@ -1060,7 +1105,23 @@ async function langasAwardAchievements(userId, appVersion, lesson) {
          COUNT(s.exercise_id) FILTER (WHERE s.attempts > 0 AND qc.grammar)::int AS g_done,
          COUNT(s.exercise_id) FILTER (WHERE s.attempts > 0 AND s.best_correct * 100 >= 90 * 10 * qc.n)::int AS crowns,
          (SELECT COALESCE(SUM(seconds), 0) FROM langas_lesson_log WHERE user_id = $1)::int AS secs,
-         (SELECT GREATEST(streak_days, best_streak) FROM langas_users WHERE id = $1)::int AS streak
+         (SELECT streak FROM me)::int AS streak,
+         (SELECT COUNT(*) FROM lg WHERE question_count > 0 AND correct_count >= question_count)::int AS perfects,
+         (SELECT COALESCE(MAX(n), 0) FROM (SELECT COUNT(*) AS n FROM lg GROUP BY t::date) d)::int AS day_max,
+         EXISTS (SELECT 1 FROM lg WHERE EXTRACT(HOUR FROM t) < 8) AS early,
+         EXISTS (SELECT 1 FROM lg WHERE EXTRACT(HOUR FROM t) >= 23) AS night,
+         (SELECT COUNT(*) FROM langas_scores WHERE user_id = $1 AND attempts >= 2)::int AS replays,
+         (SELECT COUNT(*) FROM langas_friends
+          WHERE status = 'accepted' AND (requester_id = $1 OR addressee_id = $1))::int AS friends,
+         EXISTS (SELECT 1 FROM langas_messages WHERE sender_id = $1) AS messaged,
+         EXISTS (SELECT 1 FROM langas_achievement_cheers WHERE user_id = $1) AS cheered,
+         (SELECT photo FROM me) AS photo,
+         (SELECT named FROM me) AS named,
+         (SELECT pd FROM me)::int AS pd,
+         (SELECT paid FROM me) AS paid,
+         EXISTS (SELECT 1 FROM langas_week_results WHERE user_id = $1 AND rank <= 3 AND points >= 1) AS podium,
+         EXISTS (SELECT 1 FROM langas_week_results WHERE user_id = $1 AND rank = 1 AND points >= 1) AS champion,
+         (SELECT COUNT(*) FROM langas_week_results WHERE user_id = $1)::int AS races
        FROM qc LEFT JOIN langas_scores s ON s.exercise_id = qc.id AND s.user_id = $1`,
       [userId, appVersion]
     );
@@ -1068,22 +1129,56 @@ async function langasAwardAchievements(userId, appVersion, lesson) {
     const earned = [];
     const add = (cond, code) => { if (cond) earned.push(code); };
     add(st.done >= 1, "lessons_1");
+    add(st.done >= 5, "lessons_5");
     add(st.done >= 10, "lessons_10");
     add(st.done >= 25, "lessons_25");
     add(st.done >= 50, "lessons_50");
-    add(st.total > 0 && st.done >= st.total, "lessons_all");
+    add(st.done >= 75, "lessons_75");
+    add(st.done >= 100, "lessons_100");
     add(st.crowns >= 1, "crown_1");
+    add(st.crowns >= 5, "crown_5");
     add(st.crowns >= 10, "crown_10");
     add(st.crowns >= 25, "crown_25");
-    add(lesson && lesson.perfect, "perfect_1");
+    add(st.crowns >= 50, "crown_50");
+    add(st.crowns >= 100, "crown_100");
+    add((lesson && lesson.perfect) || st.perfects >= 1, "perfect_1");
+    add(st.perfects >= 5, "perfect_5");
+    add(st.perfects >= 25, "perfect_25");
+    add(lesson && lesson.lightning, "lightning_1");
     add(st.streak >= 3, "streak_3");
     add(st.streak >= 7, "streak_7");
+    add(st.streak >= 14, "streak_14");
     add(st.streak >= 30, "streak_30");
-    add(lesson && lesson.lightning, "lightning_1");
+    add(st.streak >= 60, "streak_60");
+    add(st.streak >= 100, "streak_100");
+    add(st.secs >= 60 * 60, "time_60");
+    add(st.secs >= 300 * 60, "time_300");
+    add(st.secs >= 600 * 60, "time_600");
+    add(st.secs >= 1500 * 60, "time_1500");
+    add(st.day_max >= 5, "day_5");
+    add(st.day_max >= 10, "day_10");
+    add(st.early, "early_bird");
+    add(st.night, "night_owl");
+    add(st.replays >= 1, "replay_1");
+    add(st.replays >= 10, "replay_10");
     add(st.g_done >= 1, "grammar_1");
     add(st.g_total > 0 && st.g_done >= st.g_total, "grammar_all");
-    add(st.secs >= 60 * 60, "time_60");
-    add(st.secs >= 600 * 60, "time_600");
+    add(st.friends >= 1, "friend_1");
+    add(st.friends >= 5, "friend_5");
+    add(st.friends >= 10, "friend_10");
+    add(st.messaged, "message_1");
+    add(st.cheered, "cheer_1");
+    add(st.photo, "photo_1");
+    add(st.named, "name_1");
+    add(st.pd >= 1, "pd_1");
+    add(st.pd >= 10, "pd_10");
+    add(st.pd >= 50, "pd_50");
+    add(st.pd >= 100, "pd_100");
+    add(st.podium, "podium_1");
+    add(st.champion, "champion_1");
+    add(st.races >= 4, "racer_4");
+    add(st.total > 0 && st.done >= st.total, "lessons_all");
+    add(st.paid, "supporter");
     if (!earned.length) return [];
 
     const ins = await pool.query(
@@ -1099,6 +1194,11 @@ async function langasAwardAchievements(userId, appVersion, lesson) {
   } catch (e) {
     return [];
   }
+}
+
+// After a friend / message / cheer / photo / name / purchase / weekly reset: check right away, in the background.
+function langasAchCheck(userId, appVersion) {
+  langasAwardAchievements(userId, appVersion || LANGAS_ACH_ALL_VERSIONS, null).catch(() => {});
 }
 
 function langasCleanName(raw) {
@@ -1213,7 +1313,7 @@ async function langasSendProfile(req, res, langasPrUid) {
               EXISTS (SELECT 1 FROM langas_achievement_cheers c
                       WHERE c.achievement_id = a.id AND c.user_id = $2) AS cheered
        FROM langas_achievements a WHERE a.user_id = $1
-       ORDER BY a.earned_at DESC, a.id DESC LIMIT 5`,
+       ORDER BY a.earned_at DESC, a.id DESC LIMIT 7`,
       [langasPrUid, req.langasUser.id]
     );
 
@@ -1386,6 +1486,7 @@ router.post("/achievements/:id/cheer", langasRateLimit(60), langasRequireAuth, a
          ON CONFLICT (achievement_id, user_id) DO NOTHING`,
         [langasChId, req.langasUser.id]
       );
+      langasAchCheck(req.langasUser.id, langasAppVersion(req));
     }
     const langasChCount = await pool.query(
       `SELECT COUNT(*)::int AS n FROM langas_achievement_cheers WHERE achievement_id = $1`,
@@ -1425,6 +1526,7 @@ router.post("/profile/name", langasRateLimit(10), langasRequireAuth, async (req,
       });
     }
     await pool.query(`UPDATE langas_users SET custom_name = $1 WHERE id = $2`, [langasNmName, req.langasUser.id]);
+    langasAchCheck(req.langasUser.id, langasAppVersion(req));
     return res.status(200).json({ resStatus: true, resMessage: "Saved", name: langasNmName });
   } catch (err) {
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
@@ -1470,6 +1572,7 @@ router.post(
       }
       const langasPhOld = await pool.query(`SELECT avatar_path FROM langas_users WHERE id = $1`, [req.langasUser.id]);
       await pool.query(`UPDATE langas_users SET avatar_path = $1 WHERE id = $2`, [langasPhPath, req.langasUser.id]);
+      langasAchCheck(req.langasUser.id, langasAppVersion(req));
       await langasRemoveAvatar(langasPhOld.rows[0]?.avatar_path);
       const langasPhUrl = await langasAvatarLink(langasPhPath);
 
@@ -1619,6 +1722,8 @@ router.post("/friends/:id/:action", langasRateLimit(30), langasRequireAuth, asyn
           [langasFrMe, langasFrOther]);
       }
     }
+    langasAchCheck(langasFrMe, langasAppVersion(req));
+    langasAchCheck(langasFrOther, langasAppVersion(req));
     return res.status(200).json({ resStatus: true, state: await langasFriendState(langasFrMe, langasFrOther) });
   } catch (err) {
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
@@ -1842,6 +1947,7 @@ router.post("/messages/:id", langasRateLimit(30), langasRequireAuth, async (req,
        RETURNING id, sender_id, body, to_char(created_at AT TIME ZONE '${LANGAS_TZ}', 'HH24:MI') AS t`,
       [langasMsMe, langasMsOther, langasMsText]
     );
+    langasAchCheck(langasMsMe, langasAppVersion(req));
     return res.status(200).json({ resStatus: true, message: langasMsgDto(langasMsIns.rows[0], langasMsMe) });
   } catch (err) {
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
@@ -1929,6 +2035,7 @@ async function langasWeekFinish() {
   try {
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(7102)");
+    const langasWkDone = []; // players whose result was just saved (palladium / race achievements)
     const groups = await client.query(
       `SELECT id, to_char(week_start, 'YYYY-MM-DD') AS w FROM langas_week_groups
        WHERE finalized = FALSE AND week_start < ${LANGAS_WEEK_SQL} ORDER BY id`
@@ -1948,6 +2055,7 @@ async function langasWeekFinish() {
            VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING`,
           [g.w, r.user_id, g.id, rank, m.rowCount, r.points, pd]
         );
+        if (ins.rowCount) langasWkDone.push(r.user_id);
         if (ins.rowCount && pd > 0) {
           await client.query(`UPDATE langas_users SET palladium = palladium + $2 WHERE id = $1`, [r.user_id, pd]);
         }
@@ -1955,6 +2063,7 @@ async function langasWeekFinish() {
       await client.query(`UPDATE langas_week_groups SET finalized = TRUE WHERE id = $1`, [g.id]);
     }
     await client.query("COMMIT");
+    for (const uid of langasWkDone) langasAchCheck(uid);
   } catch (e) {
     try { await client.query("ROLLBACK"); } catch (e2) { /* ignore */ }
     console.error("Langas week finish error:", e.message);
