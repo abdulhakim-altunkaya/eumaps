@@ -1407,7 +1407,7 @@ async function langasSendProfile(req, res, langasPrUid) {
     const lastL = langasPrLast.rows[0] || null;
 
     const langasPrFriendState = await langasFriendState(req.langasUser.id, u.id);
-    const langasPrLists = langasPrFriendState === "me" ? await langasFriendLists(u.id) : { friends: [], requests: [] };
+    const langasPrLists = langasPrFriendState === "me" ? await langasFriendLists(u.id) : { friends: [], requests: [], declined: [] };
     // Unread messages from this friend (dot on the message button)
     const langasPrUnread = langasPrFriendState === "friends"
       ? (await pool.query(
@@ -1454,7 +1454,8 @@ async function langasSendProfile(req, res, langasPrUid) {
         unread: langasPrUnread,
         friendState: langasPrFriendState,
         friends: langasPrLists.friends,
-        requests: langasPrLists.requests
+        requests: langasPrLists.requests,
+        declined: langasPrLists.declined
       }
     });
   } catch (err) {
@@ -1675,6 +1676,7 @@ async function langasRemoveAvatar(filePath) {
 //  FRIENDS (request + accept). One row per pair of players.
 // ══════════════════════════════════════════════════════════════════════════
 const LANGAS_FRIEND_ACTIONS = ["request", "accept", "decline", "cancel", "remove"];
+const LANGAS_FRIEND_REQUESTS_PER_MONTH = 20; // new requests per player, rolling 30 days
 
 // "me" | "none" | "sent" (I asked) | "incoming" (they asked) | "friends"
 async function langasFriendState(me, other) {
@@ -1687,6 +1689,7 @@ async function langasFriendState(me, other) {
   );
   if (!r.rowCount) return "none";
   const f = r.rows[0];
+  if (f.status === "cancelled") return "none";
   if (f.status === "accepted") return "friends";
   return Number(f.requester_id) === Number(me) ? "sent" : "incoming";
 }
@@ -1696,11 +1699,12 @@ async function langasFriendLists(me) {
   const r = await pool.query(
     `WITH pairs AS (
        SELECT CASE WHEN requester_id = $1 THEN addressee_id ELSE requester_id END AS other,
-              status, requester_id = $1 AS mine, COALESCE(accepted_at, created_at) AS at
+              status, requester_id = $1 AS mine, COALESCE(accepted_at, created_at) AS at,
+              declined_at IS NOT NULL AS declined
        FROM langas_friends
        WHERE requester_id = $1 OR addressee_id = $1
      )
-     SELECT p.other AS id, p.status, p.mine,
+     SELECT p.other AS id, p.status, p.mine, p.declined,
             COALESCE(u.custom_name, u.display_name) AS name, u.avatar_path,
             COALESCE((SELECT SUM(best_score) FROM langas_scores s WHERE s.user_id = u.id), 0)::int AS points,
             CASE WHEN u.streak_last_date >= (NOW() AT TIME ZONE 'Europe/Riga')::date - 1
@@ -1708,7 +1712,7 @@ async function langasFriendLists(me) {
             (SELECT COUNT(*) FROM langas_messages m
              WHERE m.sender_id = u.id AND m.receiver_id = $1 AND m.read_at IS NULL)::int AS unread
      FROM pairs p JOIN langas_users u ON u.id = p.other
-     WHERE p.status = 'accepted' OR NOT p.mine
+     WHERE p.status = 'accepted' OR (p.status = 'pending' AND NOT p.mine)
      ORDER BY (p.status = 'accepted'), points DESC, p.at DESC
      LIMIT 100`,
     [me]
@@ -1729,7 +1733,8 @@ async function langasFriendLists(me) {
   });
   return {
     friends: r.rows.filter(x => x.status === "accepted").map(dto),
-    requests: r.rows.filter(x => x.status === "pending" && !x.mine).map(dto)
+    requests: r.rows.filter(x => x.status === "pending" && !x.mine && !x.declined).map(dto),
+    declined: r.rows.filter(x => x.status === "pending" && !x.mine && x.declined).map(dto) // only you see these
   };
 }
 
@@ -1755,10 +1760,36 @@ router.post("/friends/:id/:action", langasRateLimit(30), langasRequireAuth, asyn
 
     if (langasFrAction === "request") {
       if (langasFrNow === "none") {
-        await pool.query(
-          `INSERT INTO langas_friends (requester_id, addressee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        const langasFrLog = await pool.query(
+          `SELECT COUNT(*)::int AS n, MIN(created_at) AS first FROM langas_friend_request_log
+           WHERE user_id = $1 AND created_at > NOW() - INTERVAL '30 days'`,
+          [langasFrMe]
+        );
+        if (langasFrLog.rows[0].n >= LANGAS_FRIEND_REQUESTS_PER_MONTH) {
+          const langasFrNext = new Date(new Date(langasFrLog.rows[0].first).getTime() + 30 * 24 * 60 * 60 * 1000);
+          const langasFrDay = langasFrNext.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: LANGAS_TZ });
+          return res.status(403).json({
+            resStatus: false, resErrorCode: 7,
+            resMessage: "You can send " + LANGAS_FRIEND_REQUESTS_PER_MONTH + " friend requests a month. Next one on " + langasFrDay + "."
+          });
+        }
+        // A cancelled request comes back (if they declined it, it stays declined); otherwise a new row
+        const langasFrBack = await pool.query(
+          `UPDATE langas_friends
+           SET status = 'pending', created_at = NOW(),
+               declined_at = CASE WHEN requester_id = $1 THEN declined_at ELSE NULL END,
+               requester_id = $1, addressee_id = $2
+           WHERE ${langasFrPair} AND status = 'cancelled'`,
           [langasFrMe, langasFrOther]
         );
+        if (!langasFrBack.rowCount) {
+          await pool.query(
+            `INSERT INTO langas_friends (requester_id, addressee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+            [langasFrMe, langasFrOther]
+          );
+        }
+        await pool.query(`INSERT INTO langas_friend_request_log (user_id, to_id) VALUES ($1, $2)`,
+          [langasFrMe, langasFrOther]);
       } else if (langasFrNow === "incoming") {
         // They already asked: asking back means yes.
         await pool.query(
@@ -1776,13 +1807,18 @@ router.post("/friends/:id/:action", langasRateLimit(30), langasRequireAuth, asyn
         );
       }
     } else if (langasFrAction === "decline") {
+      // Only the receiver knows: the request moves to her Declined list, the sender still sees "sent".
       if (langasFrNow === "incoming") {
-        await pool.query(`DELETE FROM langas_friends WHERE ${langasFrPair} AND status = 'pending'`,
+        await pool.query(
+          `UPDATE langas_friends SET declined_at = COALESCE(declined_at, NOW())
+           WHERE requester_id = $2 AND addressee_id = $1 AND status = 'pending'`,
           [langasFrMe, langasFrOther]);
       }
     } else if (langasFrAction === "cancel") {
       if (langasFrNow === "sent") {
-        await pool.query(`DELETE FROM langas_friends WHERE ${langasFrPair} AND status = 'pending'`,
+        await pool.query(
+          `UPDATE langas_friends SET status = 'cancelled'
+           WHERE requester_id = $1 AND addressee_id = $2 AND status = 'pending'`,
           [langasFrMe, langasFrOther]);
       }
     } else if (langasFrAction === "remove") {
@@ -1829,7 +1865,7 @@ router.get("/users/search", langasRateLimit(30), langasRequireAuth, async (req, 
         for (const l of data || []) if (l && l.path && l.signedUrl) langasSrLinks[l.path] = l.signedUrl;
       } catch (e) { /* no photos: first letters */ }
     }
-    const langasSrState = x => !x.status ? "none"
+    const langasSrState = x => !x.status || x.status === "cancelled" ? "none"
       : x.status === "accepted" ? "friends"
       : Number(x.requester_id) === Number(langasSrMe) ? "sent" : "incoming";
     return res.status(200).json({
@@ -1940,7 +1976,8 @@ router.get("/messages/unread", langasRateLimit(60), langasRequireAuth, async (re
       `SELECT
          (SELECT COUNT(*) FROM langas_messages m
           WHERE m.receiver_id = $1 AND m.read_at IS NULL AND ${LANGAS_MSG_FROM_FRIEND})::int AS messages,
-         (SELECT COUNT(*) FROM langas_friends WHERE addressee_id = $1 AND status = 'pending')::int AS requests`,
+         (SELECT COUNT(*) FROM langas_friends
+          WHERE addressee_id = $1 AND status = 'pending' AND declined_at IS NULL)::int AS requests`,
       [req.langasUser.id]
     );
     const x = langasMuRow.rows[0] || { messages: 0, requests: 0 };
