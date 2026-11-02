@@ -404,7 +404,7 @@ async function langasMixPick(exId, kind, appVersion) {
     `SELECT q.id FROM langas_questions q
      JOIN langas_exercises s ON s.id = q.exercise_id
      JOIN langas_exercises r ON r.id = $1
-     WHERE q.type <> 'memory' AND q.min_app_version <= $2 AND s.min_app_version <= $2 AND ${LANGAS_MIX_SCOPE}
+     WHERE q.type NOT IN ('memory', 'untangle') AND q.min_app_version <= $2 AND s.min_app_version <= $2 AND ${LANGAS_MIX_SCOPE}
      ORDER BY random() LIMIT $3`,
     [exId, appVersion, kind === "final" ? LANGAS_FINAL_QUESTIONS : LANGAS_REVIEW_QUESTIONS]
   );
@@ -905,7 +905,7 @@ router.post("/exercises/:id/memory", langasRateLimit(60), langasRequireAuth, asy
   }
   try {
     const q = await langasLoadQuestion(langasMmExId, langasMmQid);
-    if (!q || q.type !== "memory") {
+    if (!q || (q.type !== "memory" && q.type !== "untangle")) {
       return res.status(404).json({ resStatus: false, resMessage: "Question not found", resErrorCode: 3 });
     }
     const entry = langasEntry(langasMmProg, langasMmQid);
@@ -1008,6 +1008,12 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
         ? LANGAS_FAST_BONUS
         : 0;
 
+    // Untangle boards (app v9+): skipping one means no crown (best_correct stays under 90%)
+    const langasSubSkipped = langasSubQuestions.rows.some(q => q.type === "untangle" &&
+      !(langasSubProg && langasSubProg[q.id] && langasSubProg[q.id].correct));
+    const langasSubCrownScore = langasSubSkipped
+      ? Math.min(langasSubScore, Math.floor(langasSubMax * 0.89)) : langasSubScore;
+
     const langasSubBest = await pool.query(
       `INSERT INTO langas_scores (user_id, exercise_id, best_score, best_correct, attempts)
        VALUES ($1, $2, $3, $4, 1)
@@ -1016,8 +1022,8 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
                      best_correct = GREATEST(langas_scores.best_correct, EXCLUDED.best_correct),
                      attempts     = langas_scores.attempts + 1,
                      updated_at   = NOW()
-       RETURNING best_score, attempts`,
-      [req.langasUser.id, langasSubExId, langasSubScore + langasSubBonus + langasSubSpeed, langasSubScore]
+       RETURNING best_score, best_correct, attempts`,
+      [req.langasUser.id, langasSubExId, langasSubScore + langasSubBonus + langasSubSpeed, langasSubCrownScore]
     );
 
     await pool.query(
@@ -1062,6 +1068,7 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
       timeBonus: langasSubBonus,
       speedBonus: langasSubSpeed,
       bestScore: langasSubBest.rows[0].best_score,
+      bestCorrect: langasSubBest.rows[0].best_correct,
       kind: langasSubKind,
       passed: langasSubKind !== "final" ||
         langasSubResults.filter(r => r.correct).length >= Math.ceil(langasSubResults.length * LANGAS_FINAL_PASS),
