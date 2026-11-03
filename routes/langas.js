@@ -685,6 +685,7 @@ router.post("/exercises/:id/check", langasRateLimit(120), langasRequireAuth, asy
     }
     if (req.body?.giveUp) {
       entry.done = true;
+      entry.skipped = true; // no crown for this lesson
       return res.status(200).json({ resStatus: true, correct: false, done: true, ...langasReveal(q) });
     }
 
@@ -818,6 +819,7 @@ router.post("/exercises/:id/match", langasRateLimit(120), langasRequireAuth, asy
     }
     if (req.body?.giveUp) {
       entry.done = true;
+      entry.skipped = true; // no crown for this lesson
       return res.status(200).json({ resStatus: true, correct: false, done: true, wrongCount: 0, correctChips: key });
     }
     const chips = Array.isArray(req.body?.chips) ? req.body.chips.map(Number) : [];
@@ -849,8 +851,8 @@ router.post("/exercises/:id/match", langasRateLimit(120), langasRequireAuth, asy
 //  Pictures: langas_pictures/0001.png … (number = langas_memory_words.id).
 //  Lesson 1: words 1–10. Later lessons: 7 new words (continuing, wraps around) + 3 earlier ones.
 // ══════════════════════════════════════════════════════════════════════════
-const LANGAS_MEMORY_PAIRS = 10;
-const LANGAS_MEMORY_NEW = 7;
+const LANGAS_MEMORY_PAIRS = 8;
+const LANGAS_MEMORY_NEW = 6;
 const LANGAS_MEMORY_POINTS = 10; // all or nothing: finish = 10, skip = 0
 
 async function langasMemoryCards(exId, appVersion) {
@@ -913,6 +915,7 @@ router.post("/exercises/:id/memory", langasRateLimit(60), langasRequireAuth, asy
       entry.done = true;
       entry.correct = !!req.body?.completed;
       entry.points = entry.correct ? LANGAS_MEMORY_POINTS : 0;
+      entry.skipped = !entry.correct; // SKIP: no crown for this lesson
     }
     return res.status(200).json({ resStatus: true, correct: entry.correct, done: true, points: entry.points });
   } catch (err) {
@@ -1008,9 +1011,12 @@ router.post("/exercises/:id/submit", langasRateLimit(30), langasRequireAuth, asy
         ? LANGAS_FAST_BONUS
         : 0;
 
-    // Untangle boards (app v9+): skipping one means no crown (best_correct stays under 90%)
-    const langasSubSkipped = langasSubQuestions.rows.some(q => q.type === "untangle" &&
-      !(langasSubProg && langasSubProg[q.id] && langasSubProg[q.id].correct));
+    // Any skipped question (SKIP, "Continue" instead of a hint, "Can't speak now") or one never answered
+    // means no crown (best_correct stays under 90%). Wrong answers only lower the score.
+    const langasSubSkipped = langasSubQuestions.rows.some(q => {
+      const e = langasSubProg ? langasSubProg[q.id] : null;
+      return !e || !e.done || e.skipped;
+    });
     const langasSubCrownScore = langasSubSkipped
       ? Math.min(langasSubScore, Math.floor(langasSubMax * 0.89)) : langasSubScore;
 
