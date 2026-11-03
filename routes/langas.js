@@ -611,14 +611,8 @@ function langasLetterHint(answer) {
   if (!letters.length) return String(answer || "");
   const first = letters[0];
   const last = letters[letters.length - 1];
-  const shown = chars
-    .map((c, i) => {
-      if (c === " ") return " ";
-      if (!isLetter(c)) return c;
-      return i === first || i === last ? c : "_";
-    })
-    .join(" ");
-  return shown + "   (" + letters.length + " letters)";
+  // first and last letter only (no letter count): "S … i"
+  return letters.length === 1 ? chars[first] : chars[first] + " … " + chars[last];
 }
 
 // Listening hint: "Es runāju latviski." -> "E _   r u _ _ _ u   l _ _ _ _ _ _ _ ."  (~30% of letters)
