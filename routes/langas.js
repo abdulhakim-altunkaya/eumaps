@@ -525,7 +525,7 @@ router.get("/exercises/:id", langasRateLimit(60), langasRequireAuth, async (req,
     let langasExQuestions;
     if (langasExKind === "lesson") {
       langasExQuestions = await pool.query(
-        `SELECT id, type, prompt, options, media_url, instruction, accepted_answers
+        `SELECT id, type, prompt, options, media_url, instruction, accepted_answers, correct_index
          FROM langas_questions WHERE exercise_id = $1 AND min_app_version <= $2 ORDER BY sort_order`,
         [langasExId, langasAppVersion(req)]
       );
@@ -535,7 +535,7 @@ router.get("/exercises/:id", langasRateLimit(60), langasRequireAuth, async (req,
       if (langasMixes.size > 20000) langasMixes.clear();
       langasMixes.set(req.langasUser.id + ":" + langasExId, langasExMix);
       langasExQuestions = await pool.query(
-        `SELECT id, type, prompt, options, media_url, instruction, accepted_answers
+        `SELECT id, type, prompt, options, media_url, instruction, accepted_answers, correct_index
          FROM langas_questions WHERE id::bigint = ANY($1::bigint[])
          ORDER BY array_position($1::bigint[], id::bigint)`,
         [langasExMix]
@@ -567,7 +567,8 @@ router.get("/exercises/:id", langasRateLimit(60), langasRequireAuth, async (req,
           options: q.type === "memory" ? langasExMemory : (Array.isArray(q.options) ? q.options : []),
           mediaUrl: q.media_url || "",
           instruction: q.instruction || "",
-          given: langasIsTyping(q) ? langasSplitTyping(q.accepted_answers[0]).tail : ""
+          given: langasIsTyping(q) ? langasSplitTyping(q.accepted_answers[0]).tail : "",
+          decoy: langasDecoy(q)
         }))
       }
     });
@@ -575,6 +576,13 @@ router.get("/exercises/:id", langasRateLimit(60), langasRequireAuth, async (req,
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
   }
 });
+
+// One random wrong option of a choice question (the app's mascot clicks it). -1 = none.
+function langasDecoy(q) {
+  if (q.correct_index === null || q.correct_index === undefined || !Array.isArray(q.options)) return -1;
+  const wrong = q.options.map((_, i) => i).filter(i => i !== q.correct_index);
+  return wrong.length ? wrong[Math.floor(Math.random() * wrong.length)] : -1;
+}
 
 // ══════════════════════════════════════════════════════════════════════════
 //  INSTANT CHECK + HINTS (app version 4+)
