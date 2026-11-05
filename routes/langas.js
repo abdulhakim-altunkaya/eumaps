@@ -397,14 +397,17 @@ const langasMixes = new Map();          // "userId:exerciseId" -> [questionId, .
 
 // Which lessons a review / final draws from (r = review/final row, s = source lesson)
 const LANGAS_MIX_SCOPE = `s.kind = 'lesson' AND s.is_active = TRUE AND s.level_id = r.level_id AND (
-  (r.kind = 'review' AND s.sort_order BETWEEN r.sort_order - 6 AND r.sort_order - 1) OR r.kind = 'final')`;
+  (r.kind = 'review' AND s.sort_order < r.sort_order AND s.sort_order > COALESCE(
+     (SELECT MAX(p.sort_order) FROM langas_exercises p
+      WHERE p.level_id = r.level_id AND p.kind = 'review' AND p.is_active = TRUE AND p.sort_order < r.sort_order), 0))
+  OR r.kind = 'final')`;
 
 async function langasMixPick(exId, kind, appVersion) {
   const r = await pool.query(
     `SELECT q.id FROM langas_questions q
      JOIN langas_exercises s ON s.id = q.exercise_id
      JOIN langas_exercises r ON r.id = $1
-     WHERE q.type NOT IN ('memory', 'untangle') AND q.min_app_version <= $2 AND s.min_app_version <= $2 AND ${LANGAS_MIX_SCOPE}
+     WHERE q.type NOT IN ('memory', 'untangle', 'fill_dialogue') AND q.min_app_version <= $2 AND s.min_app_version <= $2 AND ${LANGAS_MIX_SCOPE}
      ORDER BY random() LIMIT $3`,
     [exId, appVersion, kind === "final" ? LANGAS_FINAL_QUESTIONS : LANGAS_REVIEW_QUESTIONS]
   );
@@ -909,7 +912,7 @@ router.post("/exercises/:id/memory", langasRateLimit(60), langasRequireAuth, asy
   }
   try {
     const q = await langasLoadQuestion(langasMmExId, langasMmQid);
-    if (!q || (q.type !== "memory" && q.type !== "untangle")) {
+    if (!q || (q.type !== "memory" && q.type !== "untangle" && q.type !== "fill_dialogue")) {
       return res.status(404).json({ resStatus: false, resMessage: "Question not found", resErrorCode: 3 });
     }
     const entry = langasEntry(langasMmProg, langasMmQid);
