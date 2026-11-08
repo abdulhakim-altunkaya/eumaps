@@ -128,6 +128,10 @@ app.use(express.static(__dirname));
 
 //import and then mount masters master routes
 //Mounting routes must come after cors and other imports
+const langasRoutes = require("./routes/langas");
+app.use("/api/langas", langasRoutes);
+const sudokuRoutes = require("./routes/sudoku");
+app.use("/api/sudoku", sudokuRoutes);
 const mastersLTRoutes = require("./routes/masters_LT");
 app.use("/api/master-lithuania", mastersLTRoutes);
 const mastersLVRoutes = require("./routes/masters_LV");
@@ -140,8 +144,6 @@ const grillsLVRoutes = require("./routes/grills_LV");
 app.use("/", grillsLVRoutes);
 const filebeefRoutes = require("./routes/filebeef");
 app.use("/", filebeefRoutes);
-const langasRoutes = require("./routes/langas");
-app.use("/api/langas", langasRoutes);
 const langasOnlineRoutes = require("./routes/langas_online");
 app.use("/api/langas-web", langasOnlineRoutes);
 
