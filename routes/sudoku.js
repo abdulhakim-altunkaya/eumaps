@@ -22,6 +22,8 @@ const SUDOKU_MAX_PENDING_OUT   = 20;                 // open friend requests a p
 const SUDOKU_FRIEND_ACTIONS    = ["request", "accept", "decline", "cancel", "remove"];
 const SUDOKU_MIN_SOLVE_SEC     = 10;
 const SUDOKU_MAX_SOLVE_SEC     = 24 * 60 * 60;
+const SUDOKU_SOLVE_REWARD      = { easy: 1, medium: 2, hard: 4, ultra_hard: 8 }; // palladium grams, first solve only
+const SUDOKU_TZ                = "Europe/Riga";      // weekly leaderboard resets Monday 00:00 here
 
 // ── HELPERS ────────────────────────────────────────────────────────────────
 function sudokuGetIp(req) {
@@ -316,7 +318,9 @@ async function sudokuFriendLists(me) {
 //  PUZZLES + SOLVES
 // ══════════════════════════════════════════════════════════════════════════
 
-// GET /puzzle?difficulty=easy -> a random puzzle the player hasn't solved yet
+// GET /puzzle?difficulty=easy -> a random puzzle the player hasn't solved yet.
+// The handout time is saved: a solve only earns palladium for a puzzle the server gave out,
+// and never faster than the time since it was given out.
 router.get("/puzzle", sudokuRateLimit(60), sudokuRequireAuth, async (req, res) => {
   const difficulty = String(req.query.difficulty || "");
   if (!SUDOKU_DIFFICULTIES.includes(difficulty)) {
@@ -343,6 +347,11 @@ router.get("/puzzle", sudokuRateLimit(60), sudokuRequireAuth, async (req, res) =
       return res.status(404).json({ resStatus: false, resMessage: "No puzzles", resErrorCode: 2 });
     }
     const p = r.rows[0];
+    await pool.query(
+      `INSERT INTO sudoku_puzzle_issues (user_id, puzzle_id, issued_at) VALUES ($1, $2, NOW())
+       ON CONFLICT (user_id, puzzle_id) DO UPDATE SET issued_at = NOW()`,
+      [req.sudokuUser.id, p.id]
+    );
     return res.status(200).json({
       resStatus: true,
       puzzle: { id: p.id, difficulty: p.difficulty, initial: p.initial_board, solution: p.solution_board }
@@ -352,31 +361,156 @@ router.get("/puzzle", sudokuRateLimit(60), sudokuRequireAuth, async (req, res) =
   }
 });
 
-// POST /solve { puzzleId, seconds } -> one row per player per puzzle, keeps the best time
+// POST /solve { puzzleId, seconds } -> one row per player per puzzle, keeps the best time.
+// First solve of a server-given puzzle earns palladium (Easy 1 g, Medium 2, Hard 4, Ultra Hard 8).
 router.post("/solve", sudokuRateLimit(30), sudokuRequireAuth, async (req, res) => {
+  const me = req.sudokuUser.id;
   const puzzleId = Number(req.body?.puzzleId);
   const seconds = Number(req.body?.seconds);
   if (!Number.isInteger(puzzleId) || puzzleId <= 0 ||
       !Number.isInteger(seconds) || seconds < SUDOKU_MIN_SOLVE_SEC || seconds > SUDOKU_MAX_SOLVE_SEC) {
     return res.status(400).json({ resStatus: false, resMessage: "Invalid solve", resErrorCode: 1 });
   }
+  const client = await pool.connect();
   try {
-    const seed = await pool.query(`SELECT id FROM sudoku_seeds WHERE id = $1`, [puzzleId]);
+    const seed = await client.query(`SELECT id, difficulty FROM sudoku_seeds WHERE id = $1`, [puzzleId]);
     if (!seed.rowCount) {
       return res.status(404).json({ resStatus: false, resMessage: "Puzzle not found", resErrorCode: 2 });
     }
-    const r = await pool.query(
+    const difficulty = seed.rows[0].difficulty;
+
+    // Given out by the server, and the claimed time fits since then (+60 s slack)?
+    const issue = await client.query(
+      `SELECT EXTRACT(EPOCH FROM (NOW() - issued_at))::int AS since
+       FROM sudoku_puzzle_issues WHERE user_id = $1 AND puzzle_id = $2`,
+      [me, puzzleId]
+    );
+    const issued = issue.rowCount > 0;
+    if (issued && seconds > issue.rows[0].since + 60) {
+      return res.status(400).json({ resStatus: false, resMessage: "Invalid solve", resErrorCode: 3 });
+    }
+
+    await client.query("BEGIN");
+    const r = await client.query(
       `INSERT INTO sudoku_solved_logs (user_id, puzzle_id, time_seconds)
        VALUES ($1, $2, $3)
        ON CONFLICT (user_id, puzzle_id)
        DO UPDATE SET time_seconds = LEAST(sudoku_solved_logs.time_seconds, EXCLUDED.time_seconds)
        RETURNING time_seconds, (xmax = 0) AS first`,
-      [req.sudokuUser.id, puzzleId, seconds]
+      [me, puzzleId, seconds]
     );
+    const first = r.rows[0].first;
+    let reward = 0;
+    if (first && issued) {
+      reward = SUDOKU_SOLVE_REWARD[difficulty] || 0;
+      await client.query(`UPDATE sudoku_profiles SET palladium_grams = palladium_grams + $2 WHERE id = $1`, [me, reward]);
+      await client.query(
+        `INSERT INTO sudoku_palladium_ledger (user_id, amount, source, puzzle_id) VALUES ($1, $2, 'solve', $3)`,
+        [me, reward, puzzleId]
+      );
+      await client.query(
+        `UPDATE sudoku_solved_logs SET reward_claimed = TRUE WHERE user_id = $1 AND puzzle_id = $2`,
+        [me, puzzleId]
+      );
+    }
+    const bal = await client.query(`SELECT palladium_grams FROM sudoku_profiles WHERE id = $1`, [me]);
+    await client.query("COMMIT");
+
     return res.status(200).json({
       resStatus: true,
-      first: r.rows[0].first,
-      best: r.rows[0].time_seconds
+      first,
+      best: r.rows[0].time_seconds,
+      reward,
+      palladium: bal.rows[0].palladium_grams
+    });
+  } catch (err) {
+    try { await client.query("ROLLBACK"); } catch (e) { /* not in a transaction */ }
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  } finally {
+    client.release();
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+//  LEADERBOARD: palladium earned from solves this week (Mon 00:00 Riga time)
+// ══════════════════════════════════════════════════════════════════════════
+const SUDOKU_WEEK_START = `(date_trunc('week', NOW() AT TIME ZONE '${SUDOKU_TZ}') AT TIME ZONE '${SUDOKU_TZ}')`;
+
+function sudokuEndsIn(sec) {
+  const s = Math.max(0, Math.floor(sec));
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+  if (d > 0) return d + " d " + h + " h";
+  if (h > 0) return h + " h " + m + " m";
+  return m + " m";
+}
+
+// GET /leaderboard?scope=everyone|friends -> { rows (top 100), me, endsIn }
+router.get("/leaderboard", sudokuRateLimit(30), sudokuRequireAuth, async (req, res) => {
+  const me = req.sudokuUser.id;
+  const scope = req.query.scope === "friends" ? "friends" : "everyone";
+  try {
+    let rows;
+    if (scope === "everyone") {
+      const r = await pool.query(
+        `WITH earned AS (
+           SELECT user_id, SUM(amount)::int AS grams
+           FROM sudoku_palladium_ledger
+           WHERE source = 'solve' AND created_at >= ${SUDOKU_WEEK_START}
+           GROUP BY user_id
+         ), ranked AS (
+           SELECT user_id, grams, RANK() OVER (ORDER BY grams DESC)::int AS rnk FROM earned
+         )
+         SELECT r.user_id, r.grams, r.rnk, u.username, u.avatar_path
+         FROM ranked r JOIN sudoku_profiles u ON u.id = r.user_id
+         WHERE r.rnk <= 100 OR r.user_id = $1
+         ORDER BY r.rnk, u.username`,
+        [me]
+      );
+      rows = r.rows;
+    } else {
+      const r = await pool.query(
+        `WITH ppl AS (
+           SELECT $1::uuid AS id
+           UNION
+           SELECT CASE WHEN user_id = $1 THEN friend_id ELSE user_id END
+           FROM sudoku_friendships WHERE status = 'accepted' AND (user_id = $1 OR friend_id = $1)
+         ), earned AS (
+           SELECT user_id, SUM(amount)::int AS grams
+           FROM sudoku_palladium_ledger
+           WHERE source = 'solve' AND created_at >= ${SUDOKU_WEEK_START}
+             AND user_id IN (SELECT id FROM ppl)
+           GROUP BY user_id
+         )
+         SELECT p.id AS user_id, COALESCE(e.grams, 0) AS grams,
+                RANK() OVER (ORDER BY COALESCE(e.grams, 0) DESC)::int AS rnk,
+                u.username, u.avatar_path
+         FROM ppl p JOIN sudoku_profiles u ON u.id = p.id
+         LEFT JOIN earned e ON e.user_id = p.id
+         ORDER BY rnk, u.username`,
+        [me]
+      );
+      rows = r.rows;
+    }
+
+    const links = await sudokuAvatarLinks(rows.map(x => x.avatar_path));
+    const dto = x => ({
+      rank: x.rnk, userId: x.user_id, name: x.username, avatarUrl: links[x.avatar_path] || "",
+      grams: x.grams, isMe: x.user_id === me
+    });
+    const all = rows.map(dto);
+    const mine = all.find(x => x.isMe) || null;
+    const top = all.filter(x => x.rank <= 100);
+
+    const ends = await pool.query(
+      `SELECT EXTRACT(EPOCH FROM (${SUDOKU_WEEK_START} + INTERVAL '7 days' - NOW()))::int AS sec`
+    );
+
+    return res.status(200).json({
+      resStatus: true,
+      scope,
+      rows: top,
+      me: mine || { rank: 0, userId: me, name: "", avatarUrl: "", grams: 0, isMe: true },
+      endsIn: sudokuEndsIn(ends.rows[0].sec)
     });
   } catch (err) {
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
