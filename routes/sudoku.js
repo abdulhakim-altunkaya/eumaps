@@ -23,6 +23,14 @@ const SUDOKU_FRIEND_ACTIONS    = ["request", "accept", "decline", "cancel", "rem
 const SUDOKU_MIN_SOLVE_SEC     = 10;
 const SUDOKU_MAX_SOLVE_SEC     = 24 * 60 * 60;
 const SUDOKU_SOLVE_REWARD      = { easy: 1, medium: 2, hard: 4, ultra_hard: 8 }; // palladium grams, first solve only
+// Slow solves earn less: Easy 0 after 20 min, Medium/Hard/Ultra Hard half after 30/50/60 min.
+const SUDOKU_SLOW_AFTER_SEC    = { easy: 20 * 60, medium: 30 * 60, hard: 50 * 60, ultra_hard: 60 * 60 };
+
+function sudokuSolveReward(difficulty, seconds) {
+  const full = SUDOKU_SOLVE_REWARD[difficulty] || 0;
+  if (seconds <= (SUDOKU_SLOW_AFTER_SEC[difficulty] || Infinity)) return full;
+  return difficulty === "easy" ? 0 : Math.floor(full / 2);
+}
 const SUDOKU_TZ                = "Europe/Riga";      // weekly leaderboard resets Monday 00:00 here
 
 // ── HELPERS ────────────────────────────────────────────────────────────────
@@ -402,7 +410,7 @@ router.post("/solve", sudokuRateLimit(30), sudokuRequireAuth, async (req, res) =
     const first = r.rows[0].first;
     let reward = 0;
     if (first && issued) {
-      reward = SUDOKU_SOLVE_REWARD[difficulty] || 0;
+      reward = sudokuSolveReward(difficulty, seconds);
       await client.query(`UPDATE sudoku_profiles SET palladium_grams = palladium_grams + $2 WHERE id = $1`, [me, reward]);
       await client.query(
         `INSERT INTO sudoku_palladium_ledger (user_id, amount, source, puzzle_id) VALUES ($1, $2, 'solve', $3)`,
@@ -415,6 +423,7 @@ router.post("/solve", sudokuRateLimit(30), sudokuRequireAuth, async (req, res) =
     }
     const bal = await client.query(`SELECT palladium_grams FROM sudoku_profiles WHERE id = $1`, [me]);
     await client.query("COMMIT");
+    if (issued) await sudokuWeekAddPoints(me, reward); // joins the weekly group, even with 0 points
 
     return res.status(200).json({
       resStatus: true,
@@ -432,9 +441,125 @@ router.post("/solve", sudokuRateLimit(30), sudokuRequireAuth, async (req, res) =
 });
 
 // ══════════════════════════════════════════════════════════════════════════
-//  LEADERBOARD: palladium earned from solves this week (Mon 00:00 Riga time)
+//  WEEKLY RACE (same as Langas): groups of 38, Monday 00:00 Riga reset,
+//  palladium prizes. Race points = palladium earned from solves this week.
 // ══════════════════════════════════════════════════════════════════════════
-const SUDOKU_WEEK_START = `(date_trunc('week', NOW() AT TIME ZONE '${SUDOKU_TZ}') AT TIME ZONE '${SUDOKU_TZ}')`;
+const SUDOKU_WEEK_GROUP = 38;  // Monday: groups fill up to 38, then a new group opens
+const SUDOKU_WEEK_SQL = `date_trunc('week', NOW() AT TIME ZONE '${SUDOKU_TZ}')::date`; // this Monday
+
+// Palladium (grams) for a place in the group. Needs at least 1 point.
+function sudokuWeekReward(rank) {
+  if (rank === 1) return 7;
+  if (rank === 2) return 6;
+  if (rank === 3) return 5;
+  if (rank === 4) return 4;
+  if (rank <= 10) return 3;
+  if (rank <= 20) return 2;
+  if (rank <= 30) return 1;
+  return 0;
+}
+
+// Adds race points. The first solve of the week puts the player in a group:
+// Monday = first group with room (< 38) or a new one; from Tuesday = the smallest group.
+async function sudokuWeekAddPoints(userId, points) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(7201)"); // one join at a time
+    const wk = (await client.query(
+      `SELECT to_char(${SUDOKU_WEEK_SQL}, 'YYYY-MM-DD') AS w,
+              (NOW() AT TIME ZONE '${SUDOKU_TZ}') < (${SUDOKU_WEEK_SQL} + 1) AS monday`
+    )).rows[0];
+    const mem = await client.query(
+      `SELECT group_id FROM sudoku_week_members WHERE week_start = $1 AND user_id = $2`,
+      [wk.w, userId]
+    );
+    if (!mem.rowCount) {
+      const groups = await client.query(
+        `SELECT g.id, COUNT(m.user_id)::int AS n
+         FROM sudoku_week_groups g
+         LEFT JOIN sudoku_week_members m ON m.group_id = g.id
+         WHERE g.week_start = $1
+         GROUP BY g.id ORDER BY g.id`,
+        [wk.w]
+      );
+      let gid = null;
+      if (wk.monday) {
+        const open = groups.rows.find(g => g.n < SUDOKU_WEEK_GROUP);
+        if (open) gid = open.id;
+      } else if (groups.rowCount) {
+        gid = groups.rows.reduce((a, b) => (b.n < a.n ? b : a)).id;
+      }
+      if (!gid) {
+        gid = (await client.query(
+          `INSERT INTO sudoku_week_groups (week_start) VALUES ($1) RETURNING id`, [wk.w]
+        )).rows[0].id;
+      }
+      await client.query(
+        `INSERT INTO sudoku_week_members (week_start, user_id, group_id, points) VALUES ($1, $2, $3, $4)`,
+        [wk.w, userId, gid, points]
+      );
+    } else if (points > 0) {
+      await client.query(
+        `UPDATE sudoku_week_members SET points = points + $3, reached_at = NOW()
+         WHERE week_start = $1 AND user_id = $2`,
+        [wk.w, userId, points]
+      );
+    }
+    await client.query("COMMIT");
+  } catch (e) {
+    try { await client.query("ROLLBACK"); } catch (e2) { /* ignore */ }
+    console.error("Sudoku week points error:", e.message);
+  } finally {
+    client.release();
+  }
+}
+
+// Ends finished weeks: ranks every group, saves the results, adds the palladium.
+async function sudokuWeekFinish() {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(7202)");
+    const groups = await client.query(
+      `SELECT id, to_char(week_start, 'YYYY-MM-DD') AS w FROM sudoku_week_groups
+       WHERE finalized = FALSE AND week_start < ${SUDOKU_WEEK_SQL} ORDER BY id`
+    );
+    for (const g of groups.rows) {
+      const m = await client.query(
+        `SELECT user_id, points FROM sudoku_week_members WHERE group_id = $1
+         ORDER BY points DESC, reached_at ASC, user_id ASC`,
+        [g.id]
+      );
+      let rank = 0;
+      for (const r of m.rows) {
+        rank++;
+        const pd = r.points >= 1 ? sudokuWeekReward(rank) : 0;
+        const ins = await client.query(
+          `INSERT INTO sudoku_week_results (week_start, user_id, group_id, rank, group_size, points, palladium)
+           VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING`,
+          [g.w, r.user_id, g.id, rank, m.rowCount, r.points, pd]
+        );
+        if (ins.rowCount && pd > 0) {
+          await client.query(`UPDATE sudoku_profiles SET palladium_grams = palladium_grams + $2 WHERE id = $1`, [r.user_id, pd]);
+          await client.query(
+            `INSERT INTO sudoku_palladium_ledger (user_id, amount, source) VALUES ($1, $2, 'race')`,
+            [r.user_id, pd]
+          );
+        }
+      }
+      await client.query(`UPDATE sudoku_week_groups SET finalized = TRUE WHERE id = $1`, [g.id]);
+    }
+    await client.query("COMMIT");
+  } catch (e) {
+    try { await client.query("ROLLBACK"); } catch (e2) { /* ignore */ }
+    console.error("Sudoku week finish error:", e.message);
+  } finally {
+    client.release();
+  }
+}
+setTimeout(sudokuWeekFinish, 90 * 1000);
+setInterval(sudokuWeekFinish, 10 * 60 * 1000);
 
 function sudokuEndsIn(sec) {
   const s = Math.max(0, Math.floor(sec));
@@ -444,73 +569,96 @@ function sudokuEndsIn(sec) {
   return m + " m";
 }
 
-// GET /leaderboard?scope=everyone|friends -> { rows (top 100), me, endsIn }
+// Monday popup: last week's result, once (marked as seen when sent).
+router.get("/week/last", sudokuRateLimit(30), sudokuRequireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `UPDATE sudoku_week_results SET seen = TRUE
+       WHERE user_id = $1 AND seen = FALSE
+       RETURNING week_start, rank, group_size, points, palladium`,
+      [req.sudokuUser.id]
+    );
+    if (!r.rowCount) return res.status(200).json({ resStatus: true, has: false });
+    const last = r.rows.reduce((a, b) => (b.week_start > a.week_start ? b : a));
+    const tot = await pool.query(`SELECT palladium_grams FROM sudoku_profiles WHERE id = $1`, [req.sudokuUser.id]);
+    return res.status(200).json({
+      resStatus: true,
+      has: true,
+      rank: last.rank,
+      groupSize: last.group_size,
+      points: last.points,
+      palladium: last.palladium,
+      total: tot.rowCount ? tot.rows[0].palladium_grams : 0
+    });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
+// GET /leaderboard?scope=group|friends
+//  group:   your group of 38 this week, with the palladium each place would win now
+//  friends: you + your friends, by this week's race points
 router.get("/leaderboard", sudokuRateLimit(30), sudokuRequireAuth, async (req, res) => {
   const me = req.sudokuUser.id;
-  const scope = req.query.scope === "friends" ? "friends" : "everyone";
+  const scope = req.query.scope === "friends" ? "friends" : "group";
   try {
-    let rows;
-    if (scope === "everyone") {
-      const r = await pool.query(
-        `WITH earned AS (
-           SELECT user_id, SUM(amount)::int AS grams
-           FROM sudoku_palladium_ledger
-           WHERE source = 'solve' AND created_at >= ${SUDOKU_WEEK_START}
-           GROUP BY user_id
-         ), ranked AS (
-           SELECT user_id, grams, RANK() OVER (ORDER BY grams DESC)::int AS rnk FROM earned
-         )
-         SELECT r.user_id, r.grams, r.rnk, u.username, u.avatar_path
-         FROM ranked r JOIN sudoku_profiles u ON u.id = r.user_id
-         WHERE r.rnk <= 100 OR r.user_id = $1
-         ORDER BY r.rnk, u.username`,
-        [me]
-      );
-      rows = r.rows;
+    const wk = (await pool.query(
+      `SELECT GREATEST(0, EXTRACT(EPOCH FROM
+                (((${SUDOKU_WEEK_SQL} + 7)::timestamp AT TIME ZONE '${SUDOKU_TZ}') - NOW())))::int AS ends,
+              (SELECT group_id FROM sudoku_week_members
+               WHERE week_start = ${SUDOKU_WEEK_SQL} AND user_id = $1) AS gid`,
+      [me]
+    )).rows[0];
+
+    let rows = [];
+    if (scope === "group") {
+      if (wk.gid) {
+        rows = (await pool.query(
+          `SELECT m.user_id, m.points, u.username, u.avatar_path,
+                  ROW_NUMBER() OVER (ORDER BY m.points DESC, m.reached_at ASC, m.user_id ASC)::int AS rnk
+           FROM sudoku_week_members m JOIN sudoku_profiles u ON u.id = m.user_id
+           WHERE m.group_id = $1
+           ORDER BY rnk`,
+          [wk.gid]
+        )).rows;
+      }
     } else {
-      const r = await pool.query(
+      rows = (await pool.query(
         `WITH ppl AS (
            SELECT $1::uuid AS id
            UNION
            SELECT CASE WHEN user_id = $1 THEN friend_id ELSE user_id END
            FROM sudoku_friendships WHERE status = 'accepted' AND (user_id = $1 OR friend_id = $1)
-         ), earned AS (
-           SELECT user_id, SUM(amount)::int AS grams
-           FROM sudoku_palladium_ledger
-           WHERE source = 'solve' AND created_at >= ${SUDOKU_WEEK_START}
-             AND user_id IN (SELECT id FROM ppl)
-           GROUP BY user_id
          )
-         SELECT p.id AS user_id, COALESCE(e.grams, 0) AS grams,
-                RANK() OVER (ORDER BY COALESCE(e.grams, 0) DESC)::int AS rnk,
-                u.username, u.avatar_path
-         FROM ppl p JOIN sudoku_profiles u ON u.id = p.id
-         LEFT JOIN earned e ON e.user_id = p.id
-         ORDER BY rnk, u.username`,
+         SELECT p.id AS user_id, COALESCE(m.points, 0) AS points, u.username, u.avatar_path,
+                ROW_NUMBER() OVER (ORDER BY COALESCE(m.points, 0) DESC, m.reached_at ASC NULLS LAST, p.id ASC)::int AS rnk
+         FROM ppl p
+         JOIN sudoku_profiles u ON u.id = p.id
+         LEFT JOIN sudoku_week_members m ON m.user_id = p.id AND m.week_start = ${SUDOKU_WEEK_SQL}
+         ORDER BY rnk`,
         [me]
-      );
-      rows = r.rows;
+      )).rows;
     }
 
     const links = await sudokuAvatarLinks(rows.map(x => x.avatar_path));
-    const dto = x => ({
-      rank: x.rnk, userId: x.user_id, name: x.username, avatarUrl: links[x.avatar_path] || "",
-      grams: x.grams, isMe: x.user_id === me
-    });
-    const all = rows.map(dto);
-    const mine = all.find(x => x.isMe) || null;
-    const top = all.filter(x => x.rank <= 100);
-
-    const ends = await pool.query(
-      `SELECT EXTRACT(EPOCH FROM (${SUDOKU_WEEK_START} + INTERVAL '7 days' - NOW()))::int AS sec`
-    );
+    const out = rows.map(x => ({
+      rank: x.rnk,
+      userId: x.user_id,
+      name: x.username,
+      avatarUrl: links[x.avatar_path] || "",
+      grams: x.points,
+      prize: scope === "group" && x.points >= 1 ? sudokuWeekReward(x.rnk) : 0,
+      isMe: x.user_id === me
+    }));
 
     return res.status(200).json({
       resStatus: true,
       scope,
-      rows: top,
-      me: mine || { rank: 0, userId: me, name: "", avatarUrl: "", grams: 0, isMe: true },
-      endsIn: sudokuEndsIn(ends.rows[0].sec)
+      joined: !!wk.gid,
+      groupSize: scope === "group" ? out.length : 0,
+      rows: out,
+      me: out.find(x => x.isMe) || { rank: 0, userId: me, name: "", avatarUrl: "", grams: 0, prize: 0, isMe: true },
+      endsIn: sudokuEndsIn(wk.ends)
     });
   } catch (err) {
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
