@@ -1622,11 +1622,7 @@ router.post("/profile/name", langasRateLimit(10), langasRequireAuth, async (req,
 });
 
 // Body: raw image bytes (jpg/png/webp/heic). Saved as a 256×256 JPEG, well under 200 KB, no metadata.
-router.post(
-  "/profile/photo",
-  langasRateLimit(6),
-  langasRequireAuth,
-  express.raw({ type: () => true, limit: "8mb" }),
+router.post("/profile/photo", langasRateLimit(6), langasRequireAuth, express.raw({ type: () => true, limit: "8mb" }),
   async (req, res) => {
     if (!Buffer.isBuffer(req.body) || req.body.length < 100) {
       return res.status(400).json({ resStatus: false, resMessage: "No photo", resErrorCode: 1 });
