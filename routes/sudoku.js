@@ -697,11 +697,15 @@ async function sudokuSendProfile(req, res, userId) {
     );
     const byDiff = {};
     for (const row of st.rows) byDiff[row.difficulty] = row;
+    const pc = await pool.query(`SELECT difficulty, COUNT(*)::int AS n FROM sudoku_seeds GROUP BY difficulty`);
+    const poolSize = {};
+    for (const row of pc.rows) poolSize[row.difficulty] = row.n;
     const stats = SUDOKU_DIFFICULTIES.map(d => ({
       difficulty: d,
       solved: byDiff[d] ? byDiff[d].solved : 0,
       bestSeconds: byDiff[d] ? byDiff[d].best : 0,
-      totalSeconds: byDiff[d] ? byDiff[d].total : 0
+      totalSeconds: byDiff[d] ? byDiff[d].total : 0,
+      puzzles: poolSize[d] || 0
     }));
 
     const state = await sudokuFriendState(me, p.id);
