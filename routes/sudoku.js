@@ -715,6 +715,7 @@ async function sudokuSendProfile(req, res, userId) {
 
     const state = await sudokuFriendState(me, p.id);
     const lists = state === "me" ? await sudokuFriendLists(p.id) : { friends: [], requests: [], declined: [] };
+    if (state === "me") await sudokuAwardAchievements(p.id); // own profile: award anything already earned
     const ach = await sudokuProfileAchievements(p.id, me);
 
     return res.status(200).json({
