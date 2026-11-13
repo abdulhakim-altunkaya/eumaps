@@ -432,13 +432,15 @@ router.post("/solve", sudokuRateLimit(30), sudokuRequireAuth, async (req, res) =
     const bal = await client.query(`SELECT palladium_grams FROM sudoku_profiles WHERE id = $1`, [me]);
     await client.query("COMMIT");
     if (issued) await sudokuWeekAddPoints(me, reward); // joins the weekly group, even with 0 points
+    const achievements = await sudokuAwardAchievements(me);
 
     return res.status(200).json({
       resStatus: true,
       first,
       best: r.rows[0].time_seconds,
       reward,
-      palladium: bal.rows[0].palladium_grams
+      palladium: bal.rows[0].palladium_grams,
+      achievements
     });
   } catch (err) {
     try { await client.query("ROLLBACK"); } catch (e) { /* not in a transaction */ }
@@ -526,6 +528,7 @@ async function sudokuWeekAddPoints(userId, points) {
 // Ends finished weeks: ranks every group, saves the results, adds the palladium.
 async function sudokuWeekFinish() {
   const client = await pool.connect();
+  const finished = []; // players with a new result: check race achievements after saving
   try {
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(7202)");
@@ -548,6 +551,7 @@ async function sudokuWeekFinish() {
            VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING`,
           [g.w, r.user_id, g.id, rank, m.rowCount, r.points, pd]
         );
+        if (ins.rowCount) finished.push(r.user_id);
         if (ins.rowCount && pd > 0) {
           await client.query(`UPDATE sudoku_profiles SET palladium_grams = palladium_grams + $2 WHERE id = $1`, [r.user_id, pd]);
           await client.query(
@@ -559,6 +563,7 @@ async function sudokuWeekFinish() {
       await client.query(`UPDATE sudoku_week_groups SET finalized = TRUE WHERE id = $1`, [g.id]);
     }
     await client.query("COMMIT");
+    for (const u of finished) sudokuAchCheck(u);
   } catch (e) {
     try { await client.query("ROLLBACK"); } catch (e2) { /* ignore */ }
     console.error("Sudoku week finish error:", e.message);
@@ -710,6 +715,7 @@ async function sudokuSendProfile(req, res, userId) {
 
     const state = await sudokuFriendState(me, p.id);
     const lists = state === "me" ? await sudokuFriendLists(p.id) : { friends: [], requests: [], declined: [] };
+    const ach = await sudokuProfileAchievements(p.id, me);
 
     return res.status(200).json({
       resStatus: true,
@@ -726,7 +732,10 @@ async function sudokuSendProfile(req, res, userId) {
         friendState: state,
         friends: lists.friends,
         requests: lists.requests,
-        declined: lists.declined
+        declined: lists.declined,
+        achievements: ach.list,
+        achievementCount: ach.count,
+        achievementTotal: ach.total
       }
     });
   } catch (err) {
@@ -757,7 +766,8 @@ router.post("/profile/name", sudokuRateLimit(10), sudokuRequireAuth, async (req,
     if (same.rows[0].n >= SUDOKU_NAME_MAX_SAME) {
       return res.status(409).json({ resStatus: false, resMessage: "Too many players use this name. Try another one", resErrorCode: 2 });
     }
-    await pool.query(`UPDATE sudoku_profiles SET username = $1 WHERE id = $2`, [name, req.sudokuUser.id]);
+    await pool.query(`UPDATE sudoku_profiles SET username = $1, name_changed = TRUE WHERE id = $2`, [name, req.sudokuUser.id]);
+    sudokuAchCheck(req.sudokuUser.id);
     return res.status(200).json({ resStatus: true, resMessage: "Saved", name });
   } catch (err) {
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
@@ -803,6 +813,7 @@ router.post(
       }
       const old = await pool.query(`SELECT avatar_path FROM sudoku_profiles WHERE id = $1`, [req.sudokuUser.id]);
       await pool.query(`UPDATE sudoku_profiles SET avatar_path = $1 WHERE id = $2`, [filePath, req.sudokuUser.id]);
+      sudokuAchCheck(req.sudokuUser.id);
       await sudokuRemoveAvatar(old.rows[0]?.avatar_path);
       return res.status(200).json({ resStatus: true, resMessage: "Saved", avatarUrl: await sudokuAvatarLink(filePath) });
     } catch (err) {
@@ -904,6 +915,8 @@ router.post("/friends/:id/:action", sudokuRateLimit(30), sudokuRequireAuth, asyn
     } else if (action === "remove" && now === "friends") {
       await pool.query(`DELETE FROM sudoku_friendships WHERE ${pair} AND status = 'accepted'`, [me, other]);
     }
+    sudokuAchCheck(me);
+    sudokuAchCheck(other);
     return res.status(200).json({ resStatus: true, state: await sudokuFriendState(me, other) });
   } catch (err) {
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
@@ -1106,7 +1119,321 @@ router.post("/messages/:id", sudokuRateLimit(30), sudokuRequireAuth, async (req,
        RETURNING id, sender_id, body, to_char(created_at AT TIME ZONE '${SUDOKU_TZ}', 'HH24:MI') AS t`,
       [me, other, text]
     );
+    sudokuAchCheck(me);
     return res.status(200).json({ resStatus: true, message: sudokuMsgDto(ins.rows[0], me) });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+//  ACHIEVEMENTS (same as Langas): earned automatically, friends can congratulate
+// ══════════════════════════════════════════════════════════════════════════
+// color: sun | coral | ink | mint | teal (badge colour in the app). Order = easy first.
+const SUDOKU_LEVEL_NAMES = { easy: "Easy", medium: "Medium", hard: "Hard", ultra_hard: "Ultra Hard" };
+const SUDOKU_LEVEL_ICONS = { easy: "house", medium: "building", hard: "skyscraper", ultra_hard: "castle" };
+const SUDOKU_SPEED = { // seconds, slow → fast
+  easy: [300, 180, 120], medium: [480, 360, 240], hard: [900, 720, 480], ultra_hard: [1800, 1200, 900]
+};
+
+const SUDOKU_ACHIEVEMENTS = (() => {
+  const A = [];
+  const add = (code, title, text, icon, color) => A.push({ code, title, text, icon, color });
+  const plural = n => (n === 1 ? "puzzle" : "puzzles");
+
+  for (const n of [1, 5, 10, 25, 50, 100, 200, 250, 500, 750, 1000, 2000, 3000, 4000]) {
+    add("solved_" + n, n === 1 ? "First puzzle" : n + " puzzles", "Solve " + n + " " + plural(n),
+      n >= 100 ? "trophy" : "star", n >= 2000 ? "ink" : n >= 500 ? "coral" : "sun");
+  }
+  for (const d of SUDOKU_DIFFICULTIES) {
+    add("first_" + d, "First " + SUDOKU_LEVEL_NAMES[d], "Solve your first " + SUDOKU_LEVEL_NAMES[d] + " puzzle",
+      SUDOKU_LEVEL_ICONS[d], "mint");
+  }
+  for (const n of [10, 100, 500]) {
+    for (const d of SUDOKU_DIFFICULTIES) {
+      add("level_" + d + "_" + n, SUDOKU_LEVEL_NAMES[d] + " " + n, "Solve " + n + " " + SUDOKU_LEVEL_NAMES[d] + " puzzles",
+        SUDOKU_LEVEL_ICONS[d], n >= 500 ? "ink" : n >= 100 ? "teal" : "mint");
+    }
+  }
+  for (const d of SUDOKU_DIFFICULTIES) {
+    add("master_" + d, SUDOKU_LEVEL_NAMES[d] + " master", "Solve every " + SUDOKU_LEVEL_NAMES[d] + " puzzle", "crown", "coral");
+  }
+  add("grand_master", "Grand master", "Solve every puzzle in Sudoku Town", "crown", "ink");
+  for (const d of SUDOKU_DIFFICULTIES) {
+    SUDOKU_SPEED[d].forEach((sec, i) => {
+      add("speed_" + d + "_" + (i + 1), SUDOKU_LEVEL_NAMES[d] + " in " + sec / 60 + " min",
+        "Solve " + SUDOKU_LEVEL_NAMES[d] + " in under " + sec / 60 + " minutes", "bolt", ["sun", "coral", "ink"][i]);
+    });
+  }
+  add("patience", "Patience", "Finish a puzzle that took over 1 hour", "turtle", "teal");
+  for (const n of [3, 7, 14, 30, 60, 100, 200, 365]) {
+    add("streak_" + n, n + "-day streak", "Solve puzzles " + n + " days in a row", "flame", n >= 60 ? "ink" : "coral");
+  }
+  for (const h of [1, 5, 10, 25, 50, 100]) {
+    add("time_" + h, h === 1 ? "1 hour" : h + " hours", "Solve for " + h + (h === 1 ? " hour" : " hours") + " in total",
+      "clock", h >= 25 ? "ink" : "teal");
+  }
+  add("day_5", "Busy day", "Solve 5 puzzles in one day", "calendar", "mint");
+  add("day_10", "Marathon", "Solve 10 puzzles in one day", "calendar", "coral");
+  add("day_20", "Super marathon", "Solve 20 puzzles in one day", "calendar", "ink");
+  add("all_rounder", "All-rounder", "Solve all 4 levels in one day", "star", "teal");
+  add("early_bird", "Early bird", "Solve a puzzle before 08:00", "sun", "sun");
+  add("night_owl", "Night owl", "Solve a puzzle after 23:00", "clock", "ink");
+  add("midnight", "Midnight solver", "Solve a puzzle between 00:00 and 01:00", "hourglass", "ink");
+  add("weekend", "Weekend warrior", "Solve on Saturday and Sunday of the same weekend", "calendar", "sun");
+  add("comeback", "Comeback", "Solve again after 30 days away", "arrow", "mint");
+  for (const n of [1, 5, 10, 25, 50]) {
+    add("friend_" + n, n === 1 ? "First friend" : n + " friends", n === 1 ? "Make your first friend" : "Have " + n + " friends",
+      "friends", n >= 25 ? "teal" : "mint");
+  }
+  add("message_1", "First message", "Send a message to a friend", "chat", "sun");
+  add("message_100", "Chatterbox", "Send 100 messages", "chat", "teal");
+  add("cheer_1", "Cheerleader", "Congratulate someone's achievement", "thumb", "sun");
+  add("cheer_10", "Big fan", "Congratulate 10 achievements", "thumb", "coral");
+  add("cheer_50", "Super fan", "Congratulate 50 achievements", "thumb", "ink");
+  add("popular_10", "Popular", "Get 10 congratulations", "heart", "coral");
+  add("popular_50", "Star", "Get 50 congratulations", "heart", "ink");
+  add("photo_1", "Say cheese", "Add a profile photo", "camera", "mint");
+  add("name_1", "New name", "Change your name", "pencil", "sun");
+  for (const g of [1, 10, 50, 100, 250, 500]) {
+    add("pd_" + g, g === 1 ? "First palladium" : g + " g palladium",
+      g === 1 ? "Earn your first palladium" : "Collect " + g + " g of palladium", "palladium",
+      g >= 250 ? "coral" : g >= 50 ? "teal" : "ink");
+  }
+  add("top10_1", "Top 10", "Finish top 10 in your weekly group", "trophy", "mint");
+  add("podium_1", "Podium", "Finish top 3 in your weekly group", "trophy", "sun");
+  add("podium_5", "Podium regular", "Finish top 3 five times", "trophy", "coral");
+  add("champion_1", "Champion", "Finish #1 in your weekly group", "trophy", "coral");
+  add("champion_5", "Town legend", "Finish #1 five times", "crown", "ink");
+  for (const n of [4, 12, 26, 52]) {
+    add("racer_" + n, n === 4 ? "Racer" : n + " races", "Finish " + n + " weekly races", "flag", n >= 26 ? "ink" : "mint");
+  }
+  return A;
+})();
+const SUDOKU_ACH_BY_CODE = Object.fromEntries(SUDOKU_ACHIEVEMENTS.map(a => [a.code, a]));
+
+function sudokuAchDto(code, date) {
+  const a = SUDOKU_ACH_BY_CODE[code];
+  return a ? { code: a.code, title: a.title, text: a.text, icon: a.icon, color: a.color, date: date || "" } : null;
+}
+
+// Saves every achievement the player now qualifies for, returns only the new ones. Never throws.
+// Speed and patience count only puzzles the server gave out (no made-up times).
+async function sudokuAwardAchievements(userId) {
+  try {
+    const r = await pool.query(
+      `WITH l AS (
+         SELECT l.time_seconds AS t, s.difficulty AS d, COALESCE(l.reward_claimed, FALSE) AS fair,
+                l.solved_at AT TIME ZONE '${SUDOKU_TZ}' AS at
+         FROM sudoku_solved_logs l JOIN sudoku_seeds s ON s.id = l.puzzle_id
+         WHERE l.user_id = $1
+       ), days AS (
+         SELECT DISTINCT at::date AS day FROM l WHERE at IS NOT NULL
+       ), lvl AS (
+         SELECT d, COUNT(*)::int AS n, MIN(t) FILTER (WHERE fair)::int AS best FROM l GROUP BY d
+       ), pool AS (
+         SELECT difficulty AS d, COUNT(*)::int AS n FROM sudoku_seeds GROUP BY difficulty
+       )
+       SELECT
+         (SELECT COUNT(*) FROM l)::int AS solved,
+         (SELECT json_object_agg(d, n) FROM lvl) AS per_level,
+         (SELECT json_object_agg(d, best) FROM lvl) AS best,
+         (SELECT json_object_agg(d, n) FROM pool) AS pool,
+         EXISTS (SELECT 1 FROM l WHERE fair AND t > 3600) AS patience,
+         (SELECT COALESCE(SUM(t), 0) FROM l)::bigint AS secs,
+         (SELECT COALESCE(MAX(c), 0) FROM (SELECT COUNT(*) AS c FROM l GROUP BY at::date) x)::int AS day_max,
+         EXISTS (SELECT 1 FROM l GROUP BY at::date HAVING COUNT(DISTINCT d) >= 4) AS all_rounder,
+         EXISTS (SELECT 1 FROM l WHERE EXTRACT(HOUR FROM at) < 8) AS early,
+         EXISTS (SELECT 1 FROM l WHERE EXTRACT(HOUR FROM at) >= 23) AS night,
+         EXISTS (SELECT 1 FROM l WHERE EXTRACT(HOUR FROM at) = 0) AS midnight,
+         EXISTS (SELECT 1 FROM days a JOIN days b ON b.day = a.day + 1 WHERE EXTRACT(ISODOW FROM a.day) = 6) AS weekend,
+         EXISTS (SELECT 1 FROM (SELECT day - LAG(day) OVER (ORDER BY day) AS gap FROM days) g WHERE g.gap >= 30) AS comeback,
+         (SELECT COALESCE(MAX(c), 0) FROM (
+            SELECT COUNT(*) AS c FROM (SELECT day, day - (ROW_NUMBER() OVER (ORDER BY day))::int AS grp FROM days) z
+            GROUP BY grp) y)::int AS streak,
+         (SELECT COUNT(*) FROM sudoku_friendships
+          WHERE status = 'accepted' AND (user_id = $1 OR friend_id = $1))::int AS friends,
+         (SELECT COUNT(*) FROM sudoku_messages WHERE sender_id = $1)::int AS messages,
+         (SELECT COUNT(*) FROM sudoku_achievement_cheers WHERE user_id = $1)::int AS cheers_given,
+         (SELECT COUNT(*) FROM sudoku_achievement_cheers c JOIN sudoku_achievements a ON a.id = c.achievement_id
+          WHERE a.user_id = $1)::int AS cheers_got,
+         (SELECT avatar_path IS NOT NULL FROM sudoku_profiles WHERE id = $1) AS photo,
+         (SELECT name_changed FROM sudoku_profiles WHERE id = $1) AS named,
+         (SELECT COALESCE(SUM(amount), 0) FROM sudoku_palladium_ledger
+          WHERE user_id = $1 AND source IN ('solve', 'race'))::int AS pd,
+         (SELECT COUNT(*) FROM sudoku_week_results WHERE user_id = $1 AND rank <= 10 AND points >= 1)::int AS top10,
+         (SELECT COUNT(*) FROM sudoku_week_results WHERE user_id = $1 AND rank <= 3 AND points >= 1)::int AS podiums,
+         (SELECT COUNT(*) FROM sudoku_week_results WHERE user_id = $1 AND rank = 1 AND points >= 1)::int AS champions,
+         (SELECT COUNT(*) FROM sudoku_week_results WHERE user_id = $1)::int AS races`,
+      [userId]
+    );
+    const st = r.rows[0] || {};
+    const per = st.per_level || {}, best = st.best || {}, pool_ = st.pool || {};
+    const secs = Number(st.secs || 0);
+    const earned = [];
+    const add = (cond, code) => { if (cond) earned.push(code); };
+
+    for (const n of [1, 5, 10, 25, 50, 100, 200, 250, 500, 750, 1000, 2000, 3000, 4000]) add(st.solved >= n, "solved_" + n);
+    for (const d of SUDOKU_DIFFICULTIES) add((per[d] || 0) >= 1, "first_" + d);
+    for (const n of [10, 100, 500]) for (const d of SUDOKU_DIFFICULTIES) add((per[d] || 0) >= n, "level_" + d + "_" + n);
+    let masters = 0;
+    for (const d of SUDOKU_DIFFICULTIES) {
+      const all = (pool_[d] || 0) > 0 && (per[d] || 0) >= pool_[d];
+      if (all) masters++;
+      add(all, "master_" + d);
+    }
+    add(masters === SUDOKU_DIFFICULTIES.length, "grand_master");
+    for (const d of SUDOKU_DIFFICULTIES) {
+      SUDOKU_SPEED[d].forEach((sec, i) => add(best[d] != null && best[d] < sec, "speed_" + d + "_" + (i + 1)));
+    }
+    add(st.patience, "patience");
+    for (const n of [3, 7, 14, 30, 60, 100, 200, 365]) add(st.streak >= n, "streak_" + n);
+    for (const h of [1, 5, 10, 25, 50, 100]) add(secs >= h * 3600, "time_" + h);
+    add(st.day_max >= 5, "day_5");
+    add(st.day_max >= 10, "day_10");
+    add(st.day_max >= 20, "day_20");
+    add(st.all_rounder, "all_rounder");
+    add(st.early, "early_bird");
+    add(st.night, "night_owl");
+    add(st.midnight, "midnight");
+    add(st.weekend, "weekend");
+    add(st.comeback, "comeback");
+    for (const n of [1, 5, 10, 25, 50]) add(st.friends >= n, "friend_" + n);
+    add(st.messages >= 1, "message_1");
+    add(st.messages >= 100, "message_100");
+    add(st.cheers_given >= 1, "cheer_1");
+    add(st.cheers_given >= 10, "cheer_10");
+    add(st.cheers_given >= 50, "cheer_50");
+    add(st.cheers_got >= 10, "popular_10");
+    add(st.cheers_got >= 50, "popular_50");
+    add(st.photo, "photo_1");
+    add(st.named, "name_1");
+    for (const g of [1, 10, 50, 100, 250, 500]) add(st.pd >= g, "pd_" + g);
+    add(st.top10 >= 1, "top10_1");
+    add(st.podiums >= 1, "podium_1");
+    add(st.podiums >= 5, "podium_5");
+    add(st.champions >= 1, "champion_1");
+    add(st.champions >= 5, "champion_5");
+    for (const n of [4, 12, 26, 52]) add(st.races >= n, "racer_" + n);
+    if (!earned.length) return [];
+
+    const ins = await pool.query(
+      `INSERT INTO sudoku_achievements (user_id, code)
+       SELECT $1, unnest($2::text[])
+       ON CONFLICT (user_id, code) DO NOTHING
+       RETURNING code`,
+      [userId, earned]
+    );
+    const fresh = new Set(ins.rows.map(x => x.code));
+    // List order (easy ones first): the app shows the last new one as the biggest.
+    return SUDOKU_ACHIEVEMENTS.filter(a => fresh.has(a.code)).map(a => sudokuAchDto(a.code, ""));
+  } catch (e) {
+    return [];
+  }
+}
+
+// After a friend / message / cheer / photo / name / weekly reset: check in the background.
+function sudokuAchCheck(userId) {
+  if (userId) sudokuAwardAchievements(userId).catch(() => {});
+}
+
+// Latest 7 for a profile, with congratulations (cheered = the viewer congratulated).
+async function sudokuProfileAchievements(userId, viewerId) {
+  const r = await pool.query(
+    `SELECT a.id, a.code, to_char(a.earned_at AT TIME ZONE '${SUDOKU_TZ}', 'FMDD Mon') AS d,
+            (SELECT COUNT(*) FROM sudoku_achievement_cheers c WHERE c.achievement_id = a.id)::int AS cheers,
+            EXISTS (SELECT 1 FROM sudoku_achievement_cheers c
+                    WHERE c.achievement_id = a.id AND c.user_id = $2) AS cheered
+     FROM sudoku_achievements a WHERE a.user_id = $1
+     ORDER BY a.earned_at DESC, a.id DESC LIMIT 7`,
+    [userId, viewerId]
+  );
+  const n = await pool.query(`SELECT COUNT(*)::int AS n FROM sudoku_achievements WHERE user_id = $1`, [userId]);
+  return {
+    list: r.rows
+      .map(a => {
+        const dto = sudokuAchDto(a.code, a.d);
+        return dto ? { ...dto, id: Number(a.id), cheers: a.cheers, cheered: a.cheered } : null;
+      })
+      .filter(Boolean),
+    count: n.rows[0].n,
+    total: SUDOKU_ACHIEVEMENTS.length
+  };
+}
+
+// "5 min ago" · "3 h ago" · "2 d ago" · "14 Oct"
+function sudokuAgo(date) {
+  const s = Math.max(0, Math.floor((Date.now() - new Date(date).getTime()) / 1000));
+  if (s < 60) return "just now";
+  if (s < 3600) return Math.floor(s / 60) + " min ago";
+  if (s < 86400) return Math.floor(s / 3600) + " h ago";
+  if (s < 7 * 86400) return Math.floor(s / 86400) + " d ago";
+  return new Date(date).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: SUDOKU_TZ });
+}
+
+// Who congratulated one of your achievements.
+router.get("/achievements/:id/cheers", sudokuRateLimit(60), sudokuRequireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid achievement", resErrorCode: 1 });
+  }
+  try {
+    const own = await pool.query(`SELECT user_id FROM sudoku_achievements WHERE id = $1`, [id]);
+    if (!own.rowCount) {
+      return res.status(404).json({ resStatus: false, resMessage: "Achievement not found", resErrorCode: 2 });
+    }
+    if (own.rows[0].user_id !== req.sudokuUser.id) {
+      return res.status(403).json({ resStatus: false, resMessage: "Only for your own achievements", resErrorCode: 3 });
+    }
+    const r = await pool.query(
+      `SELECT u.id, u.username AS name, u.avatar_path, c.created_at
+       FROM sudoku_achievement_cheers c JOIN sudoku_profiles u ON u.id = c.user_id
+       WHERE c.achievement_id = $1
+       ORDER BY c.created_at DESC
+       LIMIT 100`,
+      [id]
+    );
+    const links = await sudokuAvatarLinks(r.rows.map(x => x.avatar_path));
+    return res.status(200).json({
+      resStatus: true,
+      people: r.rows.map(x => ({
+        userId: x.id, name: x.name, avatarUrl: links[x.avatar_path] || "", ago: sudokuAgo(x.created_at)
+      }))
+    });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
+// Congratulate another player's achievement; calling it again takes it back.
+router.post("/achievements/:id/cheer", sudokuRateLimit(60), sudokuRequireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  const me = req.sudokuUser.id;
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid achievement", resErrorCode: 1 });
+  }
+  try {
+    const own = await pool.query(`SELECT user_id FROM sudoku_achievements WHERE id = $1`, [id]);
+    if (!own.rowCount) {
+      return res.status(404).json({ resStatus: false, resMessage: "Achievement not found", resErrorCode: 2 });
+    }
+    if (own.rows[0].user_id === me) {
+      return res.status(400).json({ resStatus: false, resMessage: "You can't congratulate yourself", resErrorCode: 3 });
+    }
+    const del = await pool.query(
+      `DELETE FROM sudoku_achievement_cheers WHERE achievement_id = $1 AND user_id = $2`, [id, me]
+    );
+    if (!del.rowCount) {
+      await pool.query(
+        `INSERT INTO sudoku_achievement_cheers (achievement_id, user_id) VALUES ($1, $2)
+         ON CONFLICT (achievement_id, user_id) DO NOTHING`,
+        [id, me]
+      );
+      sudokuAchCheck(me);                  // Cheerleader
+      sudokuAchCheck(own.rows[0].user_id); // Popular
+    }
+    const n = await pool.query(`SELECT COUNT(*)::int AS n FROM sudoku_achievement_cheers WHERE achievement_id = $1`, [id]);
+    return res.status(200).json({ resStatus: true, cheered: del.rowCount === 0, cheers: n.rows[0].n });
   } catch (err) {
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
   }
