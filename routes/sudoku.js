@@ -1174,6 +1174,49 @@ router.post("/messages/:id", sudokuRateLimit(30), sudokuRequireAuth, async (req,
 });
 
 // ══════════════════════════════════════════════════════════════════════════
+//  FREEZE: pay 1 g palladium to keep the game in progress (the app saves it on the phone)
+// ══════════════════════════════════════════════════════════════════════════
+const SUDOKU_FREEZE_COST = 1;
+
+// Body: { puzzleId } -> { palladium } (new balance). Spending never lowers titles (they use palladium earned).
+router.post("/freeze", sudokuRateLimit(20), sudokuRequireAuth, async (req, res) => {
+  const me = req.sudokuUser.id;
+  const puzzleId = Number(req.body?.puzzleId);
+  if (!Number.isInteger(puzzleId) || puzzleId <= 0) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid puzzle", resErrorCode: 1 });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const paid = await client.query(
+      `UPDATE sudoku_profiles SET palladium_grams = palladium_grams - $2
+       WHERE id = $1 AND palladium_grams >= $2
+       RETURNING palladium_grams`,
+      [me, SUDOKU_FREEZE_COST]
+    );
+    if (!paid.rowCount) {
+      await client.query("ROLLBACK");
+      return res.status(402).json({
+        resStatus: false, resErrorCode: 2,
+        resMessage: "You need " + SUDOKU_FREEZE_COST + " g palladium to freeze a game"
+      });
+    }
+    await client.query(
+      `INSERT INTO sudoku_palladium_spends (user_id, amount, reason, puzzle_id)
+       VALUES ($1, $2, 'freeze', (SELECT id FROM sudoku_seeds WHERE id = $3))`,
+      [me, SUDOKU_FREEZE_COST, puzzleId]
+    );
+    await client.query("COMMIT");
+    return res.status(200).json({ resStatus: true, palladium: paid.rows[0].palladium_grams });
+  } catch (err) {
+    try { await client.query("ROLLBACK"); } catch (e) { /* already closed */ }
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  } finally {
+    client.release();
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════
 //  ACHIEVEMENTS (same as Langas): earned automatically, friends can congratulate
 // ══════════════════════════════════════════════════════════════════════════
 // color: sun | coral | ink | mint | teal (badge colour in the app). Order = easy first.
