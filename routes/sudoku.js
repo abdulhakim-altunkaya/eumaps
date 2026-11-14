@@ -26,6 +26,41 @@ const SUDOKU_SOLVE_REWARD      = { easy: 1, medium: 2, hard: 4, ultra_hard: 8 };
 // Slow solves earn less: Easy 0 after 20 min, Medium/Hard/Ultra Hard half after 30/50/60 min.
 const SUDOKU_SLOW_AFTER_SEC    = { easy: 20 * 60, medium: 30 * 60, hard: 50 * 60, ultra_hard: 60 * 60 };
 
+// Titles: earned with all-time palladium from solves + weekly races (spending never lowers a title).
+// rank 1 = lowest. short = what the badge shows (a letter, or the full word for the top three).
+const SUDOKU_TITLES = [
+  { code: "g", name: "G class Warrior", short: "G", min: 1 },
+  { code: "f", name: "F class Warrior", short: "F", min: 20 },
+  { code: "d", name: "D class Warrior", short: "D", min: 60 },
+  { code: "c", name: "C class Warrior", short: "C", min: 150 },
+  { code: "b", name: "B class Warrior", short: "B", min: 300 },
+  { code: "a", name: "A class Warrior", short: "A", min: 700 },
+  { code: "s", name: "S class Warrior", short: "S", min: 1300 },
+  { code: "king", name: "King", short: "KING", min: 2000 },
+  { code: "emperor", name: "Emperor", short: "EMPEROR", min: 3000 },
+  { code: "leviathan", name: "Leviathan", short: "LEVIATHAN", min: 6000 }
+];
+
+// { title, titleName, titleShort, titleRank, titleFrom, titleNext } for an all-time palladium total.
+function sudokuTitleInfo(earned) {
+  let rank = 0;
+  for (let i = 0; i < SUDOKU_TITLES.length; i++) if (earned >= SUDOKU_TITLES[i].min) rank = i + 1;
+  const t = rank > 0 ? SUDOKU_TITLES[rank - 1] : null;
+  const next = rank < SUDOKU_TITLES.length ? SUDOKU_TITLES[rank] : null;
+  return {
+    title: t ? t.code : "",
+    titleName: t ? t.name : "",
+    titleShort: t ? t.short : "",
+    titleRank: rank,
+    titleFrom: t ? t.min : 0,
+    titleNext: next ? next.min : 0   // 0 = top title reached
+  };
+}
+
+// All-time palladium from solves + weekly races (SQL, per player id column).
+const SUDOKU_EARNED_SQL = col => `(SELECT COALESCE(SUM(e.amount), 0) FROM sudoku_palladium_ledger e
+   WHERE e.user_id = ${col} AND e.source IN ('solve', 'race'))::int`;
+
 function sudokuSolveReward(difficulty, seconds) {
   const full = SUDOKU_SOLVE_REWARD[difficulty] || 0;
   if (seconds <= (SUDOKU_SLOW_AFTER_SEC[difficulty] || Infinity)) return full;
@@ -619,7 +654,11 @@ router.get("/leaderboard", sudokuRateLimit(30), sudokuRequireAuth, async (req, r
       `SELECT GREATEST(0, EXTRACT(EPOCH FROM
                 (((${SUDOKU_WEEK_SQL} + 7)::timestamp AT TIME ZONE '${SUDOKU_TZ}') - NOW())))::int AS ends,
               (SELECT group_id FROM sudoku_week_members
-               WHERE week_start = ${SUDOKU_WEEK_SQL} AND user_id = $1) AS gid`,
+               WHERE week_start = ${SUDOKU_WEEK_SQL} AND user_id = $1) AS gid,
+              (SELECT COUNT(*) FROM sudoku_week_groups g
+               WHERE g.week_start = ${SUDOKU_WEEK_SQL}
+                 AND g.id <= (SELECT group_id FROM sudoku_week_members
+                              WHERE week_start = ${SUDOKU_WEEK_SQL} AND user_id = $1))::int AS gno`,
       [me]
     )).rows[0];
 
@@ -627,7 +666,7 @@ router.get("/leaderboard", sudokuRateLimit(30), sudokuRequireAuth, async (req, r
     if (scope === "group") {
       if (wk.gid) {
         rows = (await pool.query(
-          `SELECT m.user_id, m.points, u.username, u.avatar_path,
+          `SELECT m.user_id, m.points, u.username, u.avatar_path, ${SUDOKU_EARNED_SQL("u.id")} AS earned,
                   ROW_NUMBER() OVER (ORDER BY m.points DESC, m.reached_at ASC, m.user_id ASC)::int AS rnk
            FROM sudoku_week_members m JOIN sudoku_profiles u ON u.id = m.user_id
            WHERE m.group_id = $1
@@ -644,6 +683,7 @@ router.get("/leaderboard", sudokuRateLimit(30), sudokuRequireAuth, async (req, r
            FROM sudoku_friendships WHERE status = 'accepted' AND (user_id = $1 OR friend_id = $1)
          )
          SELECT p.id AS user_id, COALESCE(m.points, 0) AS points, u.username, u.avatar_path,
+                ${SUDOKU_EARNED_SQL("u.id")} AS earned,
                 ROW_NUMBER() OVER (ORDER BY COALESCE(m.points, 0) DESC, m.reached_at ASC NULLS LAST, p.id ASC)::int AS rnk
          FROM ppl p
          JOIN sudoku_profiles u ON u.id = p.id
@@ -661,7 +701,9 @@ router.get("/leaderboard", sudokuRateLimit(30), sudokuRequireAuth, async (req, r
       avatarUrl: links[x.avatar_path] || "",
       grams: x.points,
       prize: scope === "group" && x.points >= 1 ? sudokuWeekReward(x.rnk) : 0,
-      isMe: x.user_id === me
+      isMe: x.user_id === me,
+      title: sudokuTitleInfo(x.earned).title,
+      titleShort: sudokuTitleInfo(x.earned).titleShort
     }));
 
     return res.status(200).json({
@@ -669,6 +711,7 @@ router.get("/leaderboard", sudokuRateLimit(30), sudokuRequireAuth, async (req, r
       scope,
       joined: !!wk.gid,
       groupSize: scope === "group" ? out.length : 0,
+      groupNo: wk.gno || 0,
       rows: out,
       me: out.find(x => x.isMe) || { rank: 0, userId: me, name: "", avatarUrl: "", grams: 0, prize: 0, isMe: true },
       endsIn: sudokuEndsIn(wk.ends)
@@ -717,6 +760,7 @@ async function sudokuSendProfile(req, res, userId) {
     const lists = state === "me" ? await sudokuFriendLists(p.id) : { friends: [], requests: [], declined: [] };
     if (state === "me") await sudokuAwardAchievements(p.id); // own profile: award anything already earned
     const ach = await sudokuProfileAchievements(p.id, me);
+    const earned = (await pool.query(`SELECT ${SUDOKU_EARNED_SQL("$1")} AS n`, [p.id])).rows[0].n;
 
     return res.status(200).json({
       resStatus: true,
@@ -736,7 +780,9 @@ async function sudokuSendProfile(req, res, userId) {
         declined: lists.declined,
         achievements: ach.list,
         achievementCount: ach.count,
-        achievementTotal: ach.total
+        achievementTotal: ach.total,
+        earned,
+        ...sudokuTitleInfo(earned)
       }
     });
   } catch (err) {
