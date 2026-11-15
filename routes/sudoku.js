@@ -450,7 +450,42 @@ router.post("/solve", sudokuRateLimit(30), sudokuRequireAuth, async (req, res) =
     );
     const first = r.rows[0].first;
     let reward = 0;
-    if (first && issued) {
+
+    // Beat me: an unfinished challenge of this puzzle pays once, solved before = half
+    let challenge = null;
+    const code = String(req.body?.challenge || "").toUpperCase();
+    if (code && issued) {
+      const ch = await client.query(
+        `SELECT p.id, c.sender_seconds FROM sudoku_challenge_plays p
+         JOIN sudoku_challenges c ON c.id = p.challenge_id
+         WHERE c.code = $1 AND p.receiver_id = $2 AND p.puzzle_id = $3 AND p.finished_at IS NULL
+         FOR UPDATE OF p`,
+        [code, me, puzzleId]
+      );
+      if (ch.rowCount) {
+        const won = seconds <= ch.rows[0].sender_seconds;
+        reward = sudokuChallengeReward(difficulty, !first);
+        await client.query(
+          `UPDATE sudoku_challenge_plays SET finished_at = NOW(), seconds = $2, won = $3, reward = $4 WHERE id = $1`,
+          [ch.rows[0].id, seconds, won, reward]
+        );
+        challenge = { won, senderSeconds: ch.rows[0].sender_seconds };
+      }
+    }
+
+    if (challenge) {
+      await client.query(`UPDATE sudoku_profiles SET palladium_grams = palladium_grams + $2 WHERE id = $1`, [me, reward]);
+      await client.query(
+        `INSERT INTO sudoku_palladium_ledger (user_id, amount, source, puzzle_id) VALUES ($1, $2, 'solve', $3)`,
+        [me, reward, puzzleId]
+      );
+      if (first) {
+        await client.query(
+          `UPDATE sudoku_solved_logs SET reward_claimed = TRUE WHERE user_id = $1 AND puzzle_id = $2`,
+          [me, puzzleId]
+        );
+      }
+    } else if (first && issued) {
       reward = sudokuSolveReward(difficulty, seconds);
       if (reward > 0) {
         await client.query(`UPDATE sudoku_profiles SET palladium_grams = palladium_grams + $2 WHERE id = $1`, [me, reward]);
@@ -475,7 +510,9 @@ router.post("/solve", sudokuRateLimit(30), sudokuRequireAuth, async (req, res) =
       best: r.rows[0].time_seconds,
       reward,
       palladium: bal.rows[0].palladium_grams,
-      achievements
+      achievements,
+      challengePlayed: !!challenge,
+      challengeWon: challenge ? challenge.won : false
     });
   } catch (err) {
     try { await client.query("ROLLBACK"); } catch (e) { /* not in a transaction */ }
@@ -1213,6 +1250,238 @@ router.post("/freeze", sudokuRateLimit(20), sudokuRequireAuth, async (req, res) 
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
   } finally {
     client.release();
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+//  BEAT ME: challenge links. The sender shares the puzzle they just solved; up to 10 players
+//  try to beat the sender's time within 30 days. Rewards are paid in /solve.
+// ══════════════════════════════════════════════════════════════════════════
+const SUDOKU_CHALLENGE_URL      = "https://vilnius-riga.app/sudoku-town/c/";
+const SUDOKU_CHALLENGE_DAYS     = 30;
+const SUDOKU_CHALLENGE_MAX      = 10;
+const SUDOKU_CHALLENGE_CODE_RE  = /^[A-Z2-9]{8}$/;
+const SUDOKU_CHALLENGE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O, 1/I
+
+function sudokuChallengeCode() {
+  const bytes = crypto.randomBytes(8);
+  let s = "";
+  for (let i = 0; i < 8; i++) s += SUDOKU_CHALLENGE_ALPHABET[bytes[i] % SUDOKU_CHALLENGE_ALPHABET.length];
+  return s;
+}
+
+// Challenge reward: like a first solve (no "slow = half"); already solved = half, at least 1 g.
+function sudokuChallengeReward(difficulty, alreadySolved) {
+  const full = SUDOKU_SOLVE_REWARD[difficulty] || 0;
+  return alreadySolved ? Math.max(1, Math.floor(full / 2)) : full;
+}
+
+// POST /challenge { puzzleId, seconds } -> { code, url }. Only for a puzzle the sender has solved.
+// The same puzzle again returns the same link.
+router.post("/challenge", sudokuRateLimit(20), sudokuRequireAuth, async (req, res) => {
+  const me = req.sudokuUser.id;
+  const puzzleId = Number(req.body?.puzzleId);
+  const seconds = Number(req.body?.seconds);
+  if (!Number.isInteger(puzzleId) || puzzleId <= 0 ||
+      !Number.isInteger(seconds) || seconds < SUDOKU_MIN_SOLVE_SEC || seconds > SUDOKU_MAX_SOLVE_SEC) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid challenge", resErrorCode: 1 });
+  }
+  try {
+    const solved = await pool.query(
+      `SELECT time_seconds FROM sudoku_solved_logs WHERE user_id = $1 AND puzzle_id = $2`,
+      [me, puzzleId]
+    );
+    if (!solved.rowCount) {
+      return res.status(400).json({ resStatus: false, resMessage: "Solve this puzzle first", resErrorCode: 2 });
+    }
+    const old = await pool.query(
+      `SELECT code FROM sudoku_challenges WHERE sender_id = $1 AND puzzle_id = $2`,
+      [me, puzzleId]
+    );
+    if (old.rowCount) {
+      return res.status(200).json({ resStatus: true, code: old.rows[0].code, url: SUDOKU_CHALLENGE_URL + old.rows[0].code });
+    }
+    const time = Math.max(seconds, solved.rows[0].time_seconds); // never faster than the saved time
+    for (let tries = 0; tries < 5; tries++) {
+      const code = sudokuChallengeCode();
+      const ins = await pool.query(
+        `INSERT INTO sudoku_challenges (code, sender_id, puzzle_id, sender_seconds, expires_at)
+         VALUES ($1, $2, $3, $4, NOW() + INTERVAL '${SUDOKU_CHALLENGE_DAYS} days')
+         ON CONFLICT DO NOTHING RETURNING code`,
+        [code, me, puzzleId, time]
+      );
+      if (ins.rowCount) {
+        return res.status(200).json({ resStatus: true, code, url: SUDOKU_CHALLENGE_URL + code });
+      }
+      const again = await pool.query(
+        `SELECT code FROM sudoku_challenges WHERE sender_id = $1 AND puzzle_id = $2`,
+        [me, puzzleId]
+      );
+      if (again.rowCount) {
+        return res.status(200).json({ resStatus: true, code: again.rows[0].code, url: SUDOKU_CHALLENGE_URL + again.rows[0].code });
+      }
+    }
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
+// Why a player can't accept (null = can). r = challenge row + counts for this player.
+function sudokuChallengeBlock(r, me) {
+  if (r.sender_id === me) return "This is your own challenge. Share it with friends!";
+  if (r.my_play && r.my_finished) return "You already played this challenge.";
+  if (r.my_play) return null;                      // accepted but not finished: can go back in
+  if (r.played_puzzle) return "You already played this puzzle as a challenge.";
+  if (r.expired) return "This challenge has expired.";
+  if (r.plays >= SUDOKU_CHALLENGE_MAX) return "This challenge is full (" + SUDOKU_CHALLENGE_MAX + " players).";
+  return null;
+}
+
+const SUDOKU_CHALLENGE_SELECT = `
+  SELECT c.id, c.code, c.sender_id, c.puzzle_id, c.sender_seconds, u.username AS sender_name,
+         s.difficulty, s.initial_board, s.solution_board,
+         c.expires_at < NOW() AS expired,
+         (SELECT COUNT(*) FROM sudoku_challenge_plays p WHERE p.challenge_id = c.id)::int AS plays,
+         EXISTS (SELECT 1 FROM sudoku_challenge_plays p WHERE p.challenge_id = c.id AND p.receiver_id = $2) AS my_play,
+         EXISTS (SELECT 1 FROM sudoku_challenge_plays p WHERE p.challenge_id = c.id AND p.receiver_id = $2
+                 AND p.finished_at IS NOT NULL) AS my_finished,
+         EXISTS (SELECT 1 FROM sudoku_challenge_plays p WHERE p.receiver_id = $2 AND p.puzzle_id = c.puzzle_id) AS played_puzzle,
+         EXISTS (SELECT 1 FROM sudoku_solved_logs l WHERE l.user_id = $2 AND l.puzzle_id = c.puzzle_id) AS already_solved
+  FROM sudoku_challenges c
+  JOIN sudoku_profiles u ON u.id = c.sender_id
+  JOIN sudoku_seeds s ON s.id = c.puzzle_id
+  WHERE c.code = $1`;
+
+// GET /challenge/:code -> what the "Accept challenge?" popup shows.
+router.get("/challenge/:code", sudokuRateLimit(60), sudokuRequireAuth, async (req, res) => {
+  const me = req.sudokuUser.id;
+  const code = String(req.params.code || "").toUpperCase();
+  if (!SUDOKU_CHALLENGE_CODE_RE.test(code)) {
+    return res.status(404).json({ resStatus: false, resMessage: "Challenge not found", resErrorCode: 2 });
+  }
+  try {
+    const r = await pool.query(SUDOKU_CHALLENGE_SELECT, [code, me]);
+    if (!r.rowCount) {
+      return res.status(404).json({ resStatus: false, resMessage: "Challenge not found", resErrorCode: 2 });
+    }
+    const c = r.rows[0];
+    const block = sudokuChallengeBlock(c, me);
+    return res.status(200).json({
+      resStatus: true,
+      code: c.code,
+      senderName: c.sender_name,
+      difficulty: c.difficulty,
+      seconds: c.sender_seconds,
+      alreadySolved: c.already_solved,
+      reward: sudokuChallengeReward(c.difficulty, c.already_solved),
+      resume: c.my_play && !c.my_finished,
+      blocked: block || ""
+    });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
+// POST /challenge/:code/accept -> { puzzle, seconds, startedAgo }.
+// Going back into an unfinished challenge keeps the clock from the first accept.
+router.post("/challenge/:code/accept", sudokuRateLimit(30), sudokuRequireAuth, async (req, res) => {
+  const me = req.sudokuUser.id;
+  const code = String(req.params.code || "").toUpperCase();
+  if (!SUDOKU_CHALLENGE_CODE_RE.test(code)) {
+    return res.status(404).json({ resStatus: false, resMessage: "Challenge not found", resErrorCode: 2 });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const lock = await client.query(`SELECT id FROM sudoku_challenges WHERE code = $1 FOR UPDATE`, [code]);
+    if (!lock.rowCount) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ resStatus: false, resMessage: "Challenge not found", resErrorCode: 2 });
+    }
+    const c = (await client.query(SUDOKU_CHALLENGE_SELECT, [code, me])).rows[0];
+    const block = sudokuChallengeBlock(c, me);
+    if (block) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ resStatus: false, resMessage: block, resErrorCode: 3 });
+    }
+    let startedAgo = 0;
+    if (c.my_play) {
+      const p = await client.query(
+        `SELECT EXTRACT(EPOCH FROM (NOW() - accepted_at))::int AS ago
+         FROM sudoku_challenge_plays WHERE challenge_id = $1 AND receiver_id = $2`,
+        [c.id, me]
+      );
+      startedAgo = p.rows[0].ago;
+    } else {
+      await client.query(
+        `INSERT INTO sudoku_challenge_plays (challenge_id, receiver_id, puzzle_id) VALUES ($1, $2, $3)`,
+        [c.id, me, c.puzzle_id]
+      );
+      await client.query(
+        `INSERT INTO sudoku_puzzle_issues (user_id, puzzle_id, issued_at) VALUES ($1, $2, NOW())
+         ON CONFLICT (user_id, puzzle_id) DO UPDATE SET issued_at = NOW()`,
+        [me, c.puzzle_id]
+      );
+    }
+    await client.query("COMMIT");
+    return res.status(200).json({
+      resStatus: true,
+      code: c.code,
+      senderName: c.sender_name,
+      seconds: c.sender_seconds,
+      startedAgo: Math.min(startedAgo, SUDOKU_MAX_SOLVE_SEC),
+      alreadySolved: c.already_solved,
+      reward: sudokuChallengeReward(c.difficulty, c.already_solved),
+      puzzle: { id: c.puzzle_id, difficulty: c.difficulty, initial: c.initial_board, solution: c.solution_board }
+    });
+  } catch (err) {
+    try { await client.query("ROLLBACK"); } catch (e) { /* already closed */ }
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  } finally {
+    client.release();
+  }
+});
+
+// GET /challenges/results -> finished plays of my links that I haven't seen yet (oldest first).
+router.get("/challenges/results", sudokuRateLimit(60), sudokuRequireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT p.id, u.username AS name, p.seconds, p.won, c.sender_seconds
+       FROM sudoku_challenge_plays p
+       JOIN sudoku_challenges c ON c.id = p.challenge_id
+       JOIN sudoku_profiles u ON u.id = p.receiver_id
+       WHERE c.sender_id = $1 AND p.finished_at IS NOT NULL AND p.sender_seen = FALSE
+       ORDER BY p.finished_at ASC LIMIT 20`,
+      [req.sudokuUser.id]
+    );
+    return res.status(200).json({
+      resStatus: true,
+      results: r.rows.map(x => ({
+        id: Number(x.id), name: x.name, seconds: x.seconds, senderSeconds: x.sender_seconds, won: x.won
+      }))
+    });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+  }
+});
+
+// POST /challenges/results/seen { upTo } -> marks results up to this id as seen.
+router.post("/challenges/results/seen", sudokuRateLimit(60), sudokuRequireAuth, async (req, res) => {
+  const upTo = Number(req.body?.upTo);
+  if (!Number.isInteger(upTo) || upTo <= 0) {
+    return res.status(400).json({ resStatus: false, resMessage: "Invalid id", resErrorCode: 1 });
+  }
+  try {
+    await pool.query(
+      `UPDATE sudoku_challenge_plays p SET sender_seen = TRUE
+       FROM sudoku_challenges c
+       WHERE c.id = p.challenge_id AND c.sender_id = $1 AND p.id <= $2 AND p.finished_at IS NOT NULL`,
+      [req.sudokuUser.id, upTo]
+    );
+    return res.status(200).json({ resStatus: true });
+  } catch (err) {
+    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
   }
 });
 
