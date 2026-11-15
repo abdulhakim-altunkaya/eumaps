@@ -88,12 +88,13 @@ function sudokuProfileDto(p) {
     noAds: p.has_no_ads,
     equippedTheme: p.equipped_theme,
     equippedPen: p.equipped_pen,
-    equippedSfx: p.equipped_sfx
+    equippedSfx: p.equipped_sfx,
+    pro: p.is_pro === true
   };
 }
 
 const SUDOKU_PROFILE_COLS = `id, username, palladium_grams, friend_capacity, has_no_ads,
-  equipped_theme, equipped_pen, equipped_sfx`;
+  equipped_theme, equipped_pen, equipped_sfx, is_pro`;
 
 // ── RATE LIMITER ───────────────────────────────────────────────────────────
 const sudokuRateStore = Object.create(null);
@@ -454,7 +455,14 @@ router.post("/solve", sudokuRateLimit(30), sudokuRequireAuth, async (req, res) =
     // Beat me: an unfinished challenge of this puzzle pays once, solved before = half
     let challenge = null;
     const code = String(req.body?.challenge || "").toUpperCase();
-    if (code && issued) {
+    if (code.startsWith("TH:") && issued) {
+      // Town Hall game ("TH:<post id>"): paid in sudoku_townhall.js
+      const th = await sudokuTownHallApi.solve(client, me, puzzleId, seconds, difficulty, first, Number(code.slice(3)));
+      if (th) {
+        reward = th.reward + th.prize;
+        challenge = { won: th.won, prize: th.prize, townhall: true };
+      }
+    } else if (code && issued) {
       const ch = await client.query(
         `SELECT p.id, c.sender_seconds FROM sudoku_challenge_plays p
          JOIN sudoku_challenges c ON c.id = p.challenge_id
@@ -473,7 +481,9 @@ router.post("/solve", sudokuRateLimit(30), sudokuRequireAuth, async (req, res) =
       }
     }
 
-    if (challenge) {
+    if (challenge && challenge.townhall) {
+      // already paid
+    } else if (challenge) {
       await client.query(`UPDATE sudoku_profiles SET palladium_grams = palladium_grams + $2 WHERE id = $1`, [me, reward]);
       await client.query(
         `INSERT INTO sudoku_palladium_ledger (user_id, amount, source, puzzle_id) VALUES ($1, $2, 'solve', $3)`,
@@ -512,7 +522,8 @@ router.post("/solve", sudokuRateLimit(30), sudokuRequireAuth, async (req, res) =
       palladium: bal.rows[0].palladium_grams,
       achievements,
       challengePlayed: !!challenge,
-      challengeWon: challenge ? challenge.won : false
+      challengeWon: challenge ? challenge.won : false,
+      prize: challenge && challenge.prize ? challenge.prize : 0
     });
   } catch (err) {
     try { await client.query("ROLLBACK"); } catch (e) { /* not in a transaction */ }
@@ -1287,6 +1298,9 @@ router.post("/challenge", sudokuRateLimit(20), sudokuRequireAuth, async (req, re
     return res.status(400).json({ resStatus: false, resMessage: "Invalid challenge", resErrorCode: 1 });
   }
   try {
+    if (!(await sudokuTownHallApi.isPro(me))) {
+      return res.status(403).json({ resStatus: false, resMessage: "Beat me links are for Pro players.", resErrorCode: 3 });
+    }
     const solved = await pool.query(
       `SELECT time_seconds FROM sudoku_solved_logs WHERE user_id = $1 AND puzzle_id = $2`,
       [me, puzzleId]
@@ -1796,6 +1810,12 @@ router.post("/achievements/:id/cheer", sudokuRateLimit(60), sudokuRequireAuth, a
   } catch (err) {
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
   }
+});
+
+// Town Hall (sudoku_townhall.js): Pro posts with palladium prizes
+const sudokuTownHallApi = require("./sudoku_townhall")({
+  router, pool, sudokuRateLimit, sudokuRequireAuth, sudokuChallengeReward,
+  sudokuAvatarLinks, sudokuTitleInfo, SUDOKU_EARNED_SQL, SUDOKU_TZ, SUDOKU_MAX_SOLVE_SEC
 });
 
 module.exports = router;
