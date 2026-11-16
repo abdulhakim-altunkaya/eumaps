@@ -1,20 +1,27 @@
-// Sudoku Town: TOWN HALL. A Pro player posts the puzzle they just solved (solved in 50 min or less) with a
-// palladium prize of 5–25 g (taken from their palladium right away). Anyone can play it once, against the
-// poster's time. The first 5 who beat the time each win prize ÷ 5, on top of the normal puzzle reward.
-// Posts end after 7 days: unpaid prize goes back to the poster (1 g kept when nobody won a prize).
+// Sudoku Town: TOWN HALL + Beat me link payments.
+// Town Hall: a Pro player posts the puzzle they just solved (solved in 50 min or less) with a prize of 5–25 g.
+// The post costs prize + 1 g fee (taken right away, the fee is never returned). Up to 20 players, once each,
+// against the poster's time. The first 5 who beat the time each win prize ÷ 5, on top of the normal reward.
+// A post ends after 7 days or when all 20 players have finished: the unpaid prize goes back to the poster.
+// Beat me link: 1 player, costs the sender 1 g (3 links a day). Receiver beats the time = gets that 1 g;
+// otherwise (or nobody finishes in 30 days) the sender gets it back.
 // Loaded from routes/sudoku.js: require("./sudoku_townhall")({ ...helpers }).
 
 module.exports = function sudokuTownHall(h) {
   const {
-    router, pool, sudokuRateLimit, sudokuRequireAuth, sudokuChallengeReward,
-    sudokuAvatarLinks, sudokuTitleInfo, SUDOKU_EARNED_SQL, SUDOKU_TZ, SUDOKU_MAX_SOLVE_SEC
+    router, pool, sudokuRateLimit, sudokuRequireAuth, sudokuChallengeReward, sudokuChallengeCode,
+    sudokuAvatarLinks, sudokuTitleInfo, SUDOKU_EARNED_SQL, SUDOKU_TZ, SUDOKU_MAX_SOLVE_SEC, SUDOKU_CHALLENGE_DAYS
   } = h;
 
   const TH_AMOUNTS     = [5, 10, 15, 20, 25];
   const TH_WINNERS     = 5;                 // prizes for the first 5 who beat the time
   const TH_DAYS        = 7;
   const TH_MAX_SECONDS = 50 * 60;           // only puzzles solved in 50 min or less
-  const TH_FEE         = 1;                 // kept when nobody won a prize
+  const TH_FEE         = 1;                 // posting fee, never returned
+  const TH_PER_DAY     = 3;                 // posts per day (Riga)
+  const TH_MAX_PLAYERS = 20;
+  const LINK_STAKE     = 1;                 // Beat me link: 1 g from the sender
+  const LINK_PER_DAY   = 3;
   const TH_TODAY_SQL   = `(NOW() AT TIME ZONE '${SUDOKU_TZ}')::date`;
 
   const err = (res, code, msg, n) => res.status(code).json({ resStatus: false, resMessage: msg, resErrorCode: n });
@@ -49,6 +56,7 @@ module.exports = function sudokuTownHall(h) {
       prizeEach: x.prize_total / TH_WINNERS,
       prizesLeft: Math.max(0, TH_WINNERS - x.winners),
       plays: x.plays,
+      maxPlayers: TH_MAX_PLAYERS,
       endsIn: x.ends,
       mine: x.user_id === me
     };
@@ -77,12 +85,12 @@ module.exports = function sudokuTownHall(h) {
       await client.query("BEGIN");
       await client.query("SELECT pg_advisory_xact_lock(7301)"); // one post at a time (daily limit)
       const today = await client.query(
-        `SELECT 1 FROM sudoku_townhall_posts
+        `SELECT COUNT(*)::int AS n FROM sudoku_townhall_posts
          WHERE user_id = $1 AND (created_at AT TIME ZONE '${SUDOKU_TZ}')::date = ${TH_TODAY_SQL}`, [me]
       );
-      if (today.rowCount) {
+      if (today.rows[0].n >= TH_PER_DAY) {
         await client.query("ROLLBACK");
-        return err(res, 429, "You can post once a day. Come back tomorrow!", 6);
+        return err(res, 429, "You can post " + TH_PER_DAY + " times a day. Come back tomorrow!", 6);
       }
       const dup = await client.query(
         `SELECT 1 FROM sudoku_townhall_posts WHERE user_id = $1 AND puzzle_id = $2`, [me, puzzleId]
@@ -91,17 +99,18 @@ module.exports = function sudokuTownHall(h) {
         await client.query("ROLLBACK");
         return err(res, 409, "This puzzle is already in the Town Hall.", 7);
       }
+      const cost = amount + TH_FEE;
       const paid = await client.query(
         `UPDATE sudoku_profiles SET palladium_grams = palladium_grams - $2
-         WHERE id = $1 AND palladium_grams >= $2 RETURNING palladium_grams`, [me, amount]
+         WHERE id = $1 AND palladium_grams >= $2 RETURNING palladium_grams`, [me, cost]
       );
       if (!paid.rowCount) {
         await client.query("ROLLBACK");
-        return err(res, 402, "You need " + amount + " g palladium for this prize.", 8);
+        return err(res, 402, "You need " + cost + " g palladium (" + amount + " g prize + " + TH_FEE + " g fee).", 8);
       }
       await client.query(
         `INSERT INTO sudoku_palladium_spends (user_id, amount, reason, puzzle_id) VALUES ($1, $2, 'townhall', $3)`,
-        [me, amount, puzzleId]
+        [me, cost, puzzleId]
       );
       const post = await client.query(
         `INSERT INTO sudoku_townhall_posts (user_id, puzzle_id, poster_seconds, prize_total, expires_at)
@@ -125,9 +134,11 @@ module.exports = function sudokuTownHall(h) {
     try {
       const r = await pool.query(
         mine
-          ? `${POST_SELECT} WHERE t.user_id = $1 AND t.expires_at > NOW() ORDER BY t.created_at DESC LIMIT 30`
-          : `${POST_SELECT} WHERE t.user_id <> $1 AND t.expires_at > NOW()
+          ? `${POST_SELECT} WHERE t.user_id = $1 AND t.expires_at > NOW() AND t.settled = FALSE
+             ORDER BY t.created_at DESC LIMIT 30`
+          : `${POST_SELECT} WHERE t.user_id <> $1 AND t.expires_at > NOW() AND t.settled = FALSE
                AND NOT EXISTS (SELECT 1 FROM sudoku_townhall_plays p WHERE p.post_id = t.id AND p.user_id = $1)
+               AND (SELECT COUNT(*) FROM sudoku_townhall_plays p WHERE p.post_id = t.id) < ${TH_MAX_PLAYERS}
              ORDER BY random() LIMIT 30`,
         [me]
       );
@@ -145,7 +156,8 @@ module.exports = function sudokuTownHall(h) {
     try {
       const r = await pool.query(
         `SELECT COUNT(*)::int AS n FROM sudoku_townhall_posts t
-         WHERE t.user_id <> $1 AND t.expires_at > NOW()
+         WHERE t.user_id <> $1 AND t.expires_at > NOW() AND t.settled = FALSE
+           AND (SELECT COUNT(*) FROM sudoku_townhall_plays p WHERE p.post_id = t.id) < ${TH_MAX_PLAYERS}
            AND t.created_at > COALESCE((SELECT townhall_seen_at FROM sudoku_profiles WHERE id = $1), 'epoch')
            AND NOT EXISTS (SELECT 1 FROM sudoku_townhall_plays p WHERE p.post_id = t.id AND p.user_id = $1)`,
         [me]
@@ -200,15 +212,16 @@ module.exports = function sudokuTownHall(h) {
     try {
       await client.query("BEGIN");
       const r = await client.query(
-        `SELECT t.id, t.user_id, t.puzzle_id, t.poster_seconds, t.prize_total, t.winners, u.username,
+        `SELECT t.id, t.user_id, t.puzzle_id, t.poster_seconds, t.prize_total, t.winners, u.username, t.settled,
                 GREATEST(0, EXTRACT(EPOCH FROM (t.expires_at - NOW())))::int AS ends,
+                (SELECT COUNT(*) FROM sudoku_townhall_plays p WHERE p.post_id = t.id)::int AS plays,
                 s.difficulty, s.initial_board, s.solution_board
          FROM sudoku_townhall_posts t
          JOIN sudoku_profiles u ON u.id = t.user_id
          JOIN sudoku_seeds s ON s.id = t.puzzle_id
          WHERE t.id = $1 FOR UPDATE OF t`, [id]
       );
-      if (!r.rowCount || r.rows[0].ends <= 0) {
+      if (!r.rowCount || r.rows[0].ends <= 0 || r.rows[0].settled) {
         await client.query("ROLLBACK");
         return err(res, 404, "This challenge has ended.", 2);
       }
@@ -224,6 +237,10 @@ module.exports = function sudokuTownHall(h) {
       if (play.rowCount && play.rows[0].done) {
         await client.query("ROLLBACK");
         return err(res, 409, "You already played this challenge.", 4);
+      }
+      if (!play.rowCount && x.plays >= TH_MAX_PLAYERS) {
+        await client.query("ROLLBACK");
+        return err(res, 409, "This challenge is full (" + TH_MAX_PLAYERS + " players).", 5);
       }
       let startedAgo = 0;
       if (play.rowCount) {
@@ -266,7 +283,8 @@ module.exports = function sudokuTownHall(h) {
   // else { reward, prize, won }. reward = normal puzzle reward (half when solved before), prize = poster's share.
   async function solve(client, me, puzzleId, seconds, difficulty, first, postId) {
     const p = await client.query(
-      `SELECT p.id, t.id AS post_id, t.poster_seconds, t.prize_total, t.winners, t.expires_at > NOW() AS live
+      `SELECT p.id, t.id AS post_id, t.poster_seconds, t.prize_total, t.winners,
+              t.expires_at > NOW() AND t.settled = FALSE AS live
        FROM sudoku_townhall_plays p JOIN sudoku_townhall_posts t ON t.id = p.post_id
        WHERE p.post_id = $1 AND p.user_id = $2 AND p.puzzle_id = $3 AND p.finished_at IS NULL
        FOR UPDATE OF p, t`,
@@ -362,18 +380,21 @@ module.exports = function sudokuTownHall(h) {
     }
   });
 
-  // Ended posts: unpaid prize back to the poster (1 g kept when nobody won), every 10 minutes.
+  // Ended posts (7 days, or all 20 players finished): unpaid prize back to the poster. Expired Beat me links:
+  // the sender's 1 g back. Every 10 minutes.
   async function settle() {
     const client = await pool.connect();
     const touched = [];
     try {
       await client.query("BEGIN");
       const due = await client.query(
-        `SELECT id, user_id, prize_total, prize_paid, winners FROM sudoku_townhall_posts
-         WHERE settled = FALSE AND expires_at <= NOW() ORDER BY id LIMIT 200 FOR UPDATE SKIP LOCKED`
+        `SELECT t.id, t.user_id, t.prize_total, t.prize_paid, t.winners FROM sudoku_townhall_posts t
+         WHERE t.settled = FALSE AND (t.expires_at <= NOW() OR (
+           (SELECT COUNT(*) FROM sudoku_townhall_plays p WHERE p.post_id = t.id AND p.finished_at IS NOT NULL) >= ${TH_MAX_PLAYERS}))
+         ORDER BY t.id LIMIT 200 FOR UPDATE SKIP LOCKED`
       );
       for (const p of due.rows) {
-        const refund = Math.max(0, p.prize_total - p.prize_paid - (p.winners === 0 ? TH_FEE : 0));
+        const refund = Math.max(0, p.prize_total - p.prize_paid);
         if (refund > 0) {
           await client.query(`UPDATE sudoku_profiles SET palladium_grams = palladium_grams + $2 WHERE id = $1`, [p.user_id, refund]);
           await client.query(
@@ -383,6 +404,11 @@ module.exports = function sudokuTownHall(h) {
         await client.query(`UPDATE sudoku_townhall_posts SET settled = TRUE, refund = $2 WHERE id = $1`, [p.id, refund]);
         touched.push(p.id);
       }
+      const links = await client.query(
+        `UPDATE sudoku_challenges SET settled = TRUE
+         WHERE settled = FALSE AND stake > 0 AND expires_at <= NOW() RETURNING sender_id, stake`
+      );
+      for (const l of links.rows) await refundLink(client, l.sender_id, l.stake);
       await client.query("COMMIT");
     } catch (e) {
       try { await client.query("ROLLBACK"); } catch (e2) { /* ignore */ }
@@ -395,5 +421,72 @@ module.exports = function sudokuTownHall(h) {
   setTimeout(settle, 120 * 1000);
   setInterval(settle, 10 * 60 * 1000);
 
-  return { solve, isPro, settle };
+  // ---------- Beat me link payments ----------
+  async function refundLink(client, senderId, stake) {
+    await client.query(`UPDATE sudoku_profiles SET palladium_grams = palladium_grams + $2 WHERE id = $1`, [senderId, stake]);
+    await client.query(
+      `INSERT INTO sudoku_palladium_ledger (user_id, amount, source) VALUES ($1, $2, 'other')`, [senderId, stake]
+    );
+  }
+
+  // New link: 1 g from the sender, 3 a day (Riga). -> { linkCode, palladium } or { error, status, code }
+  async function createLink(me, puzzleId, seconds) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(7302)");
+      const today = await client.query(
+        `SELECT COUNT(*)::int AS n FROM sudoku_challenges
+         WHERE sender_id = $1 AND (created_at AT TIME ZONE '${SUDOKU_TZ}')::date = ${TH_TODAY_SQL}`, [me]
+      );
+      if (today.rows[0].n >= LINK_PER_DAY) {
+        await client.query("ROLLBACK");
+        return { error: "You can send " + LINK_PER_DAY + " Beat me links a day. Come back tomorrow!", status: 429, code: 6 };
+      }
+      const paid = await client.query(
+        `UPDATE sudoku_profiles SET palladium_grams = palladium_grams - $2
+         WHERE id = $1 AND palladium_grams >= $2 RETURNING palladium_grams`, [me, LINK_STAKE]
+      );
+      if (!paid.rowCount) {
+        await client.query("ROLLBACK");
+        return { error: "You need " + LINK_STAKE + " g palladium to send a Beat me link.", status: 402, code: 8 };
+      }
+      await client.query(
+        `INSERT INTO sudoku_palladium_spends (user_id, amount, reason, puzzle_id) VALUES ($1, $2, 'beatme', $3)`,
+        [me, LINK_STAKE, puzzleId]
+      );
+      for (let tries = 0; tries < 5; tries++) {
+        const linkCode = sudokuChallengeCode();
+        const ins = await client.query(
+          `INSERT INTO sudoku_challenges (code, sender_id, puzzle_id, sender_seconds, stake, expires_at)
+           VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '${SUDOKU_CHALLENGE_DAYS} days')
+           ON CONFLICT (code) DO NOTHING RETURNING code`,
+          [linkCode, me, puzzleId, seconds, LINK_STAKE]
+        );
+        if (ins.rowCount) {
+          await client.query("COMMIT");
+          return { linkCode, palladium: paid.rows[0].palladium_grams };
+        }
+      }
+      await client.query("ROLLBACK");
+      return { error: "Server error", status: 500, code: 99 };
+    } catch (e) {
+      try { await client.query("ROLLBACK"); } catch (e2) { /* not in a transaction */ }
+      return { error: "Server error", status: 500, code: 99 };
+    } finally {
+      client.release();
+    }
+  }
+
+  // Link finished (inside /solve). row = { cid, sender_id, stake, settled }.
+  // Won: the stake goes to the receiver (returned, added to their reward). Lost: back to the sender (returns 0).
+  async function settleLink(client, row, won) {
+    if (row.settled || !row.stake) return 0;
+    await client.query(`UPDATE sudoku_challenges SET settled = TRUE WHERE id = $1`, [row.cid]);
+    if (won) return row.stake;
+    await refundLink(client, row.sender_id, row.stake);
+    return 0;
+  }
+
+  return { solve, isPro, settle, createLink, settleLink };
 };

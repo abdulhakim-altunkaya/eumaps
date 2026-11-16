@@ -464,15 +464,17 @@ router.post("/solve", sudokuRateLimit(30), sudokuRequireAuth, async (req, res) =
       }
     } else if (code && issued) {
       const ch = await client.query(
-        `SELECT p.id, c.sender_seconds FROM sudoku_challenge_plays p
+        `SELECT p.id, c.sender_seconds, c.id AS cid, c.sender_id, c.stake, c.settled FROM sudoku_challenge_plays p
          JOIN sudoku_challenges c ON c.id = p.challenge_id
          WHERE c.code = $1 AND p.receiver_id = $2 AND p.puzzle_id = $3 AND p.finished_at IS NULL
-         FOR UPDATE OF p`,
+         FOR UPDATE OF p, c`,
         [code, me, puzzleId]
       );
       if (ch.rowCount) {
         const won = seconds <= ch.rows[0].sender_seconds;
         reward = sudokuChallengeReward(difficulty, !first);
+        // the sender's 1 g: to the receiver when they win, back to the sender when they don't
+        reward += await sudokuTownHallApi.settleLink(client, ch.rows[0], won);
         await client.query(
           `UPDATE sudoku_challenge_plays SET finished_at = NOW(), seconds = $2, won = $3, reward = $4 WHERE id = $1`,
           [ch.rows[0].id, seconds, won, reward]
@@ -1270,7 +1272,7 @@ router.post("/freeze", sudokuRateLimit(20), sudokuRequireAuth, async (req, res) 
 // ══════════════════════════════════════════════════════════════════════════
 const SUDOKU_CHALLENGE_URL      = "https://vilnius-riga.app/sudoku-town/c/";
 const SUDOKU_CHALLENGE_DAYS     = 30;
-const SUDOKU_CHALLENGE_MAX      = 10;
+const SUDOKU_CHALLENGE_MAX      = 1;    // one player per link
 const SUDOKU_CHALLENGE_CODE_RE  = /^[A-Z2-9]{8}$/;
 const SUDOKU_CHALLENGE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O, 1/I
 
@@ -1308,34 +1310,15 @@ router.post("/challenge", sudokuRateLimit(20), sudokuRequireAuth, async (req, re
     if (!solved.rowCount) {
       return res.status(400).json({ resStatus: false, resMessage: "Solve this puzzle first", resErrorCode: 2 });
     }
-    const old = await pool.query(
-      `SELECT code FROM sudoku_challenges WHERE sender_id = $1 AND puzzle_id = $2`,
-      [me, puzzleId]
-    );
-    if (old.rowCount) {
-      return res.status(200).json({ resStatus: true, code: old.rows[0].code, url: SUDOKU_CHALLENGE_URL + old.rows[0].code });
-    }
     const time = Math.max(seconds, solved.rows[0].time_seconds); // never faster than the saved time
-    for (let tries = 0; tries < 5; tries++) {
-      const code = sudokuChallengeCode();
-      const ins = await pool.query(
-        `INSERT INTO sudoku_challenges (code, sender_id, puzzle_id, sender_seconds, expires_at)
-         VALUES ($1, $2, $3, $4, NOW() + INTERVAL '${SUDOKU_CHALLENGE_DAYS} days')
-         ON CONFLICT DO NOTHING RETURNING code`,
-        [code, me, puzzleId, time]
-      );
-      if (ins.rowCount) {
-        return res.status(200).json({ resStatus: true, code, url: SUDOKU_CHALLENGE_URL + code });
-      }
-      const again = await pool.query(
-        `SELECT code FROM sudoku_challenges WHERE sender_id = $1 AND puzzle_id = $2`,
-        [me, puzzleId]
-      );
-      if (again.rowCount) {
-        return res.status(200).json({ resStatus: true, code: again.rows[0].code, url: SUDOKU_CHALLENGE_URL + again.rows[0].code });
-      }
+    // New link: 1 g from the sender, 3 a day (sudoku_townhall.js)
+    const made = await sudokuTownHallApi.createLink(me, puzzleId, time);
+    if (made.error) {
+      return res.status(made.status).json({ resStatus: false, resMessage: made.error, resErrorCode: made.code });
     }
-    return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
+    return res.status(200).json({
+      resStatus: true, code: made.linkCode, url: SUDOKU_CHALLENGE_URL + made.linkCode, palladium: made.palladium
+    });
   } catch (err) {
     return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
   }
@@ -1348,12 +1331,13 @@ function sudokuChallengeBlock(r, me) {
   if (r.my_play) return null;                      // accepted but not finished: can go back in
   if (r.played_puzzle) return "You already played this puzzle as a challenge.";
   if (r.expired) return "This challenge has expired.";
-  if (r.plays >= SUDOKU_CHALLENGE_MAX) return "This challenge is full (" + SUDOKU_CHALLENGE_MAX + " players).";
+  if (r.plays >= SUDOKU_CHALLENGE_MAX) return "Someone already took this challenge.";
   return null;
 }
 
 const SUDOKU_CHALLENGE_SELECT = `
-  SELECT c.id, c.code, c.sender_id, c.puzzle_id, c.sender_seconds, u.username AS sender_name,
+  SELECT c.id, c.code, c.sender_id, c.puzzle_id, c.sender_seconds, c.stake, u.username AS sender_name,
+         u.avatar_path AS sender_avatar, ${SUDOKU_EARNED_SQL("u.id")} AS sender_earned,
          s.difficulty, s.initial_board, s.solution_board,
          c.expires_at < NOW() AS expired,
          (SELECT COUNT(*) FROM sudoku_challenge_plays p WHERE p.challenge_id = c.id)::int AS plays,
@@ -1381,12 +1365,18 @@ router.get("/challenge/:code", sudokuRateLimit(60), sudokuRequireAuth, async (re
     }
     const c = r.rows[0];
     const block = sudokuChallengeBlock(c, me);
+    const links = await sudokuAvatarLinks([c.sender_avatar]);
+    const t = sudokuTitleInfo(c.sender_earned);
     return res.status(200).json({
       resStatus: true,
       code: c.code,
       senderName: c.sender_name,
+      senderAvatar: links[c.sender_avatar] || "",
+      senderTitle: t.title,
+      senderTitleShort: t.titleShort,
       difficulty: c.difficulty,
       seconds: c.sender_seconds,
+      stake: c.stake,
       alreadySolved: c.already_solved,
       reward: sudokuChallengeReward(c.difficulty, c.already_solved),
       resume: c.my_play && !c.my_finished,
@@ -1444,6 +1434,7 @@ router.post("/challenge/:code/accept", sudokuRateLimit(30), sudokuRequireAuth, a
       code: c.code,
       senderName: c.sender_name,
       seconds: c.sender_seconds,
+      stake: c.stake,
       startedAgo: Math.min(startedAgo, SUDOKU_MAX_SOLVE_SEC),
       alreadySolved: c.already_solved,
       reward: sudokuChallengeReward(c.difficulty, c.already_solved),
@@ -1814,8 +1805,8 @@ router.post("/achievements/:id/cheer", sudokuRateLimit(60), sudokuRequireAuth, a
 
 // Town Hall (sudoku_townhall.js): Pro posts with palladium prizes
 const sudokuTownHallApi = require("./sudoku_townhall")({
-  router, pool, sudokuRateLimit, sudokuRequireAuth, sudokuChallengeReward,
-  sudokuAvatarLinks, sudokuTitleInfo, SUDOKU_EARNED_SQL, SUDOKU_TZ, SUDOKU_MAX_SOLVE_SEC
+  router, pool, sudokuRateLimit, sudokuRequireAuth, sudokuChallengeReward, sudokuChallengeCode,
+  sudokuAvatarLinks, sudokuTitleInfo, SUDOKU_EARNED_SQL, SUDOKU_TZ, SUDOKU_MAX_SOLVE_SEC, SUDOKU_CHALLENGE_DAYS
 });
 
 module.exports = router;
