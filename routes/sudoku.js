@@ -93,7 +93,7 @@ function sudokuProfileDto(p) {
   };
 }
 
-const SUDOKU_PROFILE_COLS = `id, username, palladium_grams, friend_capacity, has_no_ads,
+const SUDOKU_PROFILE_COLS = `id, username, palladium_grams, (CASE WHEN is_pro THEN 100 ELSE 10 END) AS friend_capacity, has_no_ads,
   equipped_theme, equipped_pen, equipped_sfx, is_pro`;
 
 // ── RATE LIMITER ───────────────────────────────────────────────────────────
@@ -316,15 +316,16 @@ async function sudokuFriendCount(userId) {
 // Both players must have a free friend slot.
 async function sudokuCheckCapacity(me, other) {
   const r = await pool.query(
-    `SELECT id, friend_capacity FROM sudoku_profiles WHERE id = ANY($1::uuid[])`,
+    `SELECT id, is_pro, (CASE WHEN is_pro THEN 100 ELSE 10 END) AS friend_capacity FROM sudoku_profiles WHERE id = ANY($1::uuid[])`,
     [[me, other]]
   );
   for (const row of r.rows) {
     const n = await sudokuFriendCount(row.id);
     if (n >= row.friend_capacity) {
-      return row.id === me
-        ? `Your friends list is full (${row.friend_capacity})`
-        : "Their friends list is full";
+      if (row.id !== me) return { text: "Their friends list is full", pro: false };
+      return row.is_pro
+        ? { text: `Your friends list is full (${row.friend_capacity})`, pro: false }
+        : { text: `Free players can have ${row.friend_capacity} friends. PRO players can have 100.`, pro: true };
     }
   }
   return null;
@@ -377,6 +378,31 @@ router.get("/puzzle", sudokuRateLimit(60), sudokuRequireAuth, async (req, res) =
     return res.status(400).json({ resStatus: false, resMessage: "Invalid difficulty", resErrorCode: 1 });
   }
   try {
+    // Free players: only the first 10 puzzles of each level (sudoku_pro.js)
+    if (!(await sudokuProApi.isPro(req.sudokuUser.id))) {
+      const free = await pool.query(
+        `SELECT s.id, s.difficulty, s.initial_board, s.solution_board
+         FROM sudoku_seeds s
+         WHERE s.id IN ${sudokuProApi.FREE_IDS_SQL("$1")}
+           AND NOT EXISTS (SELECT 1 FROM sudoku_solved_logs l WHERE l.user_id = $2 AND l.puzzle_id = s.id)
+         ORDER BY s.id LIMIT 1`,
+        [difficulty, req.sudokuUser.id]
+      );
+      if (!free.rowCount) {
+        return sudokuProApi.proError(res, "You solved all " + sudokuProApi.FREE_PUZZLES +
+          " free puzzles of this level. PRO opens all 2,000.");
+      }
+      const fp = free.rows[0];
+      await pool.query(
+        `INSERT INTO sudoku_puzzle_issues (user_id, puzzle_id, issued_at) VALUES ($1, $2, NOW())
+         ON CONFLICT (user_id, puzzle_id) DO UPDATE SET issued_at = NOW()`,
+        [req.sudokuUser.id, fp.id]
+      );
+      return res.status(200).json({
+        resStatus: true,
+        puzzle: { id: fp.id, difficulty: fp.difficulty, initial: fp.initial_board, solution: fp.solution_board }
+      });
+    }
     let r = await pool.query(
       `SELECT s.id, s.difficulty, s.initial_board, s.solution_board
        FROM sudoku_seeds s
@@ -716,7 +742,7 @@ router.get("/leaderboard", sudokuRateLimit(30), sudokuRequireAuth, async (req, r
     if (scope === "group") {
       if (wk.gid) {
         rows = (await pool.query(
-          `SELECT m.user_id, m.points, u.username, u.avatar_path, ${SUDOKU_EARNED_SQL("u.id")} AS earned,
+          `SELECT m.user_id, m.points, u.username, u.avatar_path, u.is_pro, ${SUDOKU_EARNED_SQL("u.id")} AS earned,
                   ROW_NUMBER() OVER (ORDER BY m.points DESC, m.reached_at ASC, m.user_id ASC)::int AS rnk
            FROM sudoku_week_members m JOIN sudoku_profiles u ON u.id = m.user_id
            WHERE m.group_id = $1
@@ -732,7 +758,7 @@ router.get("/leaderboard", sudokuRateLimit(30), sudokuRequireAuth, async (req, r
            SELECT CASE WHEN user_id = $1 THEN friend_id ELSE user_id END
            FROM sudoku_friendships WHERE status = 'accepted' AND (user_id = $1 OR friend_id = $1)
          )
-         SELECT p.id AS user_id, COALESCE(m.points, 0) AS points, u.username, u.avatar_path,
+         SELECT p.id AS user_id, COALESCE(m.points, 0) AS points, u.username, u.avatar_path, u.is_pro,
                 ${SUDOKU_EARNED_SQL("u.id")} AS earned,
                 ROW_NUMBER() OVER (ORDER BY COALESCE(m.points, 0) DESC, m.reached_at ASC NULLS LAST, p.id ASC)::int AS rnk
          FROM ppl p
@@ -752,6 +778,7 @@ router.get("/leaderboard", sudokuRateLimit(30), sudokuRequireAuth, async (req, r
       grams: x.points,
       prize: scope === "group" && x.points >= 1 ? sudokuWeekReward(x.rnk) : 0,
       isMe: x.user_id === me,
+      pro: x.is_pro === true,
       title: sudokuTitleInfo(x.earned).title,
       titleShort: sudokuTitleInfo(x.earned).titleShort
     }));
@@ -777,7 +804,8 @@ router.get("/leaderboard", sudokuRateLimit(30), sudokuRequireAuth, async (req, r
 async function sudokuSendProfile(req, res, userId) {
   try {
     const u = await pool.query(
-      `SELECT id, username, avatar_path, palladium_grams, friend_capacity FROM sudoku_profiles WHERE id = $1`,
+      `SELECT id, username, avatar_path, palladium_grams, is_pro, (CASE WHEN is_pro THEN 100 ELSE 10 END) AS friend_capacity
+       FROM sudoku_profiles WHERE id = $1`,
       [userId]
     );
     if (!u.rowCount) {
@@ -820,6 +848,10 @@ async function sudokuSendProfile(req, res, userId) {
         avatarUrl: await sudokuAvatarLink(p.avatar_path),
         isMe: state === "me",
         palladium: p.palladium_grams,
+        pro: p.is_pro === true,
+        // own profile only: free puzzles left per level + can the palladium pack be bought today (sudoku_pro.js)
+        freeLeft: state === "me" ? await sudokuProApi.freeLeft(p.id) : [],
+        canBuyPalladium: state === "me" ? await sudokuProApi.canBuyPalladium(p.id) : false,
         friendCapacity: p.friend_capacity,
         friendCount: await sudokuFriendCount(p.id),
         totalSolved: stats.reduce((a, s) => a + s.solved, 0),
@@ -969,7 +1001,7 @@ router.post("/friends/:id/:action", sudokuRateLimit(30), sudokuRequireAuth, asyn
         });
       }
       const full = await sudokuCheckCapacity(me, other);
-      if (full) return res.status(403).json({ resStatus: false, resMessage: full, resErrorCode: 5 });
+      if (full) return res.status(403).json({ resStatus: false, resMessage: full.text, resErrorCode: full.pro ? 77 : 5 });
       // A withdrawn request comes back (if they declined it, it stays declined); otherwise a new row
       const back = await pool.query(
         `UPDATE sudoku_friendships
@@ -989,7 +1021,7 @@ router.post("/friends/:id/:action", sudokuRateLimit(30), sudokuRequireAuth, asyn
     } else if ((action === "request" || action === "accept") && now === "incoming") {
       // They already asked: asking back means yes. Works for declined requests too.
       const full = await sudokuCheckCapacity(me, other);
-      if (full) return res.status(403).json({ resStatus: false, resMessage: full, resErrorCode: 5 });
+      if (full) return res.status(403).json({ resStatus: false, resMessage: full.text, resErrorCode: full.pro ? 77 : 5 });
       await pool.query(
         `UPDATE sudoku_friendships SET status = 'accepted', accepted_at = NOW(), declined_at = NULL
          WHERE user_id = $2 AND friend_id = $1 AND status = 'pending' AND cancelled_at IS NULL`,
@@ -1200,6 +1232,9 @@ router.post("/messages/:id", sudokuRateLimit(30), sudokuRequireAuth, async (req,
     return res.status(400).json({ resStatus: false, resMessage: "Max 200 characters", resErrorCode: 4 });
   }
   try {
+    if (!(await sudokuProApi.isPro(me))) {
+      return sudokuProApi.proError(res, "Free players can read messages. PRO players can write to friends.");
+    }
     if (await sudokuFriendState(me, other) !== "friends") {
       return res.status(403).json({ resStatus: false, resMessage: "Only friends can send messages", resErrorCode: 2 });
     }
@@ -1234,6 +1269,9 @@ router.post("/freeze", sudokuRateLimit(20), sudokuRequireAuth, async (req, res) 
   const puzzleId = Number(req.body?.puzzleId);
   if (!Number.isInteger(puzzleId) || puzzleId <= 0) {
     return res.status(400).json({ resStatus: false, resMessage: "Invalid puzzle", resErrorCode: 1 });
+  }
+  if (!(await sudokuProApi.isPro(me))) {
+    return sudokuProApi.proError(res, "Freezing a game is for PRO players.");
   }
   const client = await pool.connect();
   try {
@@ -1300,9 +1338,6 @@ router.post("/challenge", sudokuRateLimit(20), sudokuRequireAuth, async (req, re
     return res.status(400).json({ resStatus: false, resMessage: "Invalid challenge", resErrorCode: 1 });
   }
   try {
-    if (!(await sudokuTownHallApi.isPro(me))) {
-      return res.status(403).json({ resStatus: false, resMessage: "Beat me links are for Pro players.", resErrorCode: 3 });
-    }
     const solved = await pool.query(
       `SELECT time_seconds FROM sudoku_solved_logs WHERE user_id = $1 AND puzzle_id = $2`,
       [me, puzzleId]
@@ -1311,7 +1346,7 @@ router.post("/challenge", sudokuRateLimit(20), sudokuRequireAuth, async (req, re
       return res.status(400).json({ resStatus: false, resMessage: "Solve this puzzle first", resErrorCode: 2 });
     }
     const time = Math.max(seconds, solved.rows[0].time_seconds); // never faster than the saved time
-    // New link: 1 g from the sender, 3 a day (sudoku_townhall.js)
+    // New link: 2 g from the sender; free 1 a day, PRO 3 a day (sudoku_townhall.js)
     const made = await sudokuTownHallApi.createLink(me, puzzleId, time);
     if (made.error) {
       return res.status(made.status).json({ resStatus: false, resMessage: made.error, resErrorCode: made.code });
@@ -1409,6 +1444,18 @@ router.post("/challenge/:code/accept", sudokuRateLimit(30), sudokuRequireAuth, a
       await client.query("ROLLBACK");
       return res.status(409).json({ resStatus: false, resMessage: block, resErrorCode: 3 });
     }
+    // Free players: 1 new Beat me link a day (going back into an unfinished one is fine)
+    if (!c.my_play && !(await sudokuProApi.isPro(me))) {
+      const today = await client.query(
+        `SELECT COUNT(*)::int AS n FROM sudoku_challenge_plays
+         WHERE receiver_id = $1 AND (accepted_at AT TIME ZONE '${SUDOKU_TZ}')::date = (NOW() AT TIME ZONE '${SUDOKU_TZ}')::date`,
+        [me]
+      );
+      if (today.rows[0].n >= 1) {
+        await client.query("ROLLBACK");
+        return sudokuProApi.proError(res, "Free players can play 1 Beat me link a day. PRO players can play them all.");
+      }
+    }
     let startedAgo = 0;
     if (c.my_play) {
       const p = await client.query(
@@ -1452,7 +1499,7 @@ router.post("/challenge/:code/accept", sudokuRateLimit(30), sudokuRequireAuth, a
 router.get("/challenges/results", sudokuRateLimit(60), sudokuRequireAuth, async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT p.id, u.username AS name, p.seconds, p.won, c.sender_seconds
+      `SELECT p.id, u.username AS name, p.seconds, p.won, c.sender_seconds, c.stake
        FROM sudoku_challenge_plays p
        JOIN sudoku_challenges c ON c.id = p.challenge_id
        JOIN sudoku_profiles u ON u.id = p.receiver_id
@@ -1463,7 +1510,8 @@ router.get("/challenges/results", sudokuRateLimit(60), sudokuRequireAuth, async 
     return res.status(200).json({
       resStatus: true,
       results: r.rows.map(x => ({
-        id: Number(x.id), name: x.name, seconds: x.seconds, senderSeconds: x.sender_seconds, won: x.won
+        id: Number(x.id), name: x.name, seconds: x.seconds, senderSeconds: x.sender_seconds, won: x.won,
+        stake: x.stake || 0
       }))
     });
   } catch (err) {
@@ -1803,10 +1851,14 @@ router.post("/achievements/:id/cheer", sudokuRateLimit(60), sudokuRequireAuth, a
   }
 });
 
+// FREE vs PRO + Google Play purchases (sudoku_pro.js)
+const sudokuProApi = require("./sudoku_pro")({ router, pool, sudokuRateLimit, sudokuRequireAuth, SUDOKU_TZ });
+
 // Town Hall (sudoku_townhall.js): Pro posts with palladium prizes
 const sudokuTownHallApi = require("./sudoku_townhall")({
   router, pool, sudokuRateLimit, sudokuRequireAuth, sudokuChallengeReward, sudokuChallengeCode,
-  sudokuAvatarLinks, sudokuTitleInfo, SUDOKU_EARNED_SQL, SUDOKU_TZ, SUDOKU_MAX_SOLVE_SEC, SUDOKU_CHALLENGE_DAYS
+  sudokuAvatarLinks, sudokuTitleInfo, SUDOKU_EARNED_SQL, SUDOKU_TZ, SUDOKU_MAX_SOLVE_SEC, SUDOKU_CHALLENGE_DAYS,
+  sudokuProApi
 });
 
 // Invite links (sudoku_invite.js): 10 g to the inviter for each brand-new player

@@ -3,14 +3,15 @@
 // The post costs prize + 1 g fee (taken right away, the fee is never returned). Up to 20 players, once each,
 // against the poster's time. The first 5 who beat the time each win prize ÷ 5, on top of the normal reward.
 // A post ends after 7 days or when all 20 players have finished: the unpaid prize goes back to the poster.
-// Beat me link: 1 player, costs the sender 1 g (3 links a day). Receiver beats the time = gets that 1 g;
+// Beat me link: 1 player, costs the sender 2 g (free 1 link a day, PRO 3). Receiver beats the time = gets those 2 g;
 // otherwise (or nobody finishes in 30 days) the sender gets it back.
 // Loaded from routes/sudoku.js: require("./sudoku_townhall")({ ...helpers }).
 
 module.exports = function sudokuTownHall(h) {
   const {
     router, pool, sudokuRateLimit, sudokuRequireAuth, sudokuChallengeReward, sudokuChallengeCode,
-    sudokuAvatarLinks, sudokuTitleInfo, SUDOKU_EARNED_SQL, SUDOKU_TZ, SUDOKU_MAX_SOLVE_SEC, SUDOKU_CHALLENGE_DAYS
+    sudokuAvatarLinks, sudokuTitleInfo, SUDOKU_EARNED_SQL, SUDOKU_TZ, SUDOKU_MAX_SOLVE_SEC, SUDOKU_CHALLENGE_DAYS,
+    sudokuProApi
   } = h;
 
   const TH_AMOUNTS     = [5, 10, 15, 20, 25];
@@ -20,8 +21,9 @@ module.exports = function sudokuTownHall(h) {
   const TH_FEE         = 1;                 // posting fee, never returned
   const TH_PER_DAY     = 3;                 // posts per day (Riga)
   const TH_MAX_PLAYERS = 20;
-  const LINK_STAKE     = 1;                 // Beat me link: 1 g from the sender
-  const LINK_PER_DAY   = 3;
+  const LINK_STAKE     = 2;                 // Beat me link: 2 g from the sender
+  const LINK_PER_DAY_PRO  = 3;
+  const LINK_PER_DAY_FREE = 1;
   const TH_TODAY_SQL   = `(NOW() AT TIME ZONE '${SUDOKU_TZ}')::date`;
 
   const err = (res, code, msg, n) => res.status(code).json({ resStatus: false, resMessage: msg, resErrorCode: n });
@@ -74,7 +76,7 @@ module.exports = function sudokuTownHall(h) {
     if (!TH_AMOUNTS.includes(amount)) return err(res, 400, "Choose 5, 10, 15, 20 or 25 g", 2);
     const client = await pool.connect();
     try {
-      if (!(await isPro(me))) return err(res, 403, "Town Hall posts are for Pro players.", 3);
+      if (!(await isPro(me))) return sudokuProApi.proError(res, "Posting to the Town Hall is for PRO players.");
       const solved = await client.query(
         `SELECT time_seconds FROM sudoku_solved_logs WHERE user_id = $1 AND puzzle_id = $2`, [me, puzzleId]
       );
@@ -229,6 +231,11 @@ module.exports = function sudokuTownHall(h) {
       if (x.user_id === me) {
         await client.query("ROLLBACK");
         return err(res, 409, "This is your own challenge.", 3);
+      }
+      // Free players: Town Hall for the first 30 days after their first sign-in (sudoku_pro.js)
+      if (!(await sudokuProApi.townHallOpen(me))) {
+        await client.query("ROLLBACK");
+        return sudokuProApi.proError(res, "Free players can play the Town Hall for their first 30 days. PRO players can always play.");
       }
       const play = await client.query(
         `SELECT finished_at IS NOT NULL AS done, EXTRACT(EPOCH FROM (NOW() - accepted_at))::int AS ago
@@ -429,8 +436,10 @@ module.exports = function sudokuTownHall(h) {
     );
   }
 
-  // New link: 1 g from the sender, 3 a day (Riga). -> { linkCode, palladium } or { error, status, code }
+  // New link: 2 g from the sender; free 1 a day, PRO 3 a day (Riga). -> { linkCode, palladium } or { error, status, code }
   async function createLink(me, puzzleId, seconds) {
+    const pro = await isPro(me);
+    const LINK_PER_DAY = pro ? LINK_PER_DAY_PRO : LINK_PER_DAY_FREE;
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -441,6 +450,9 @@ module.exports = function sudokuTownHall(h) {
       );
       if (today.rows[0].n >= LINK_PER_DAY) {
         await client.query("ROLLBACK");
+        if (!pro) {
+          return { error: "Free players can send 1 Beat me link a day. PRO players can send 3.", status: 403, code: 77 };
+        }
         return { error: "You can send " + LINK_PER_DAY + " Beat me links a day. Come back tomorrow!", status: 429, code: 6 };
       }
       const paid = await client.query(
