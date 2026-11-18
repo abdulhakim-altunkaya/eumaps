@@ -29,16 +29,16 @@ const SUDOKU_SLOW_AFTER_SEC    = { easy: 20 * 60, medium: 30 * 60, hard: 50 * 60
 // Titles: earned with all-time palladium from solves + weekly races (spending never lowers a title).
 // rank 1 = lowest. short = what the badge shows (a letter, or the full word for the top three).
 const SUDOKU_TITLES = [
-  { code: "g", name: "G class Warrior", short: "G", min: 1 },
-  { code: "f", name: "F class Warrior", short: "F", min: 20 },
+  { code: "g", name: "G class Warrior", short: "G", min: 3 },
+  { code: "f", name: "F class Warrior", short: "F", min: 30 },
   { code: "d", name: "D class Warrior", short: "D", min: 60 },
   { code: "c", name: "C class Warrior", short: "C", min: 150 },
   { code: "b", name: "B class Warrior", short: "B", min: 300 },
-  { code: "a", name: "A class Warrior", short: "A", min: 700 },
-  { code: "s", name: "S class Warrior", short: "S", min: 1300 },
-  { code: "king", name: "King", short: "KING", min: 2000 },
-  { code: "emperor", name: "Emperor", short: "EMPEROR", min: 3000 },
-  { code: "leviathan", name: "Leviathan", short: "LEVIATHAN", min: 6000 }
+  { code: "a", name: "A class Warrior", short: "A", min: 900 },
+  { code: "s", name: "S class Warrior", short: "S", min: 1800 },
+  { code: "king", name: "King", short: "KING", min: 3000 },
+  { code: "emperor", name: "Emperor", short: "EMPEROR", min: 5000 },
+  { code: "leviathan", name: "Leviathan", short: "LEVIATHAN", min: 12000 }
 ];
 
 // { title, titleName, titleShort, titleRank, titleFrom, titleNext } for an all-time palladium total.
@@ -197,8 +197,8 @@ router.post("/auth/google", sudokuRateLimit(10), async (req, res) => {
   try {
     // Username is set from Google only on first login; later renames are kept.
     const profile = await pool.query(
-      `INSERT INTO sudoku_profiles (google_play_id, username)
-       VALUES ($1, $2)
+      `INSERT INTO sudoku_profiles (google_play_id, username, invite_until)
+       VALUES ($1, $2, NOW() + INTERVAL '7 days')
        ON CONFLICT (google_play_id)
        DO UPDATE SET last_login_at = NOW()
        RETURNING ${SUDOKU_PROFILE_COLS}`,
@@ -1808,5 +1808,8 @@ const sudokuTownHallApi = require("./sudoku_townhall")({
   router, pool, sudokuRateLimit, sudokuRequireAuth, sudokuChallengeReward, sudokuChallengeCode,
   sudokuAvatarLinks, sudokuTitleInfo, SUDOKU_EARNED_SQL, SUDOKU_TZ, SUDOKU_MAX_SOLVE_SEC, SUDOKU_CHALLENGE_DAYS
 });
+
+// Invite links (sudoku_invite.js): 10 g to the inviter for each brand-new player
+require("./sudoku_invite")({ router, pool, sudokuRateLimit, sudokuRequireAuth, sudokuParseUuid, SUDOKU_TZ });
 
 module.exports = router;
