@@ -23,7 +23,8 @@ module.exports = function sudokuContact(h) {
     if (!TOPICS.includes(topic)) return err(res, 400, "Choose what it is about.", 1);
     if (message.length < 5) return err(res, 400, "Please write a little more.", 2);
     if (message.length > MAX_MESSAGE) return err(res, 400, "Message is too long.", 3);
-    if (email && !EMAIL_RE.test(email)) return err(res, 400, "That email doesn't look right.", 4);
+    if (!email) return err(res, 400, "Please write your email.", 4);
+    if (!EMAIL_RE.test(email)) return err(res, 400, "That email doesn't look right.", 4);
 
     try {
       const today = await pool.query(
