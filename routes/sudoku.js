@@ -1812,4 +1812,7 @@ const sudokuTownHallApi = require("./sudoku_townhall")({
 // Invite links (sudoku_invite.js): 10 g to the inviter for each brand-new player
 require("./sudoku_invite")({ router, pool, sudokuRateLimit, sudokuRequireAuth, sudokuParseUuid, SUDOKU_TZ });
 
+// Contact form (sudoku_contact.js): signed-in players, saved in sudoku_contact_messages
+require("./sudoku_contact")({ router, pool, sudokuRateLimit, sudokuRequireAuth, SUDOKU_TZ });
+
 module.exports = router;
