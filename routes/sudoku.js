@@ -1453,7 +1453,7 @@ router.post("/challenge/:code/accept", sudokuRateLimit(30), sudokuRequireAuth, a
       );
       if (today.rows[0].n >= 1) {
         await client.query("ROLLBACK");
-        return sudokuProApi.proError(res, "Free players can play 1 Beat me link a day. PRO players can play them all.");
+        return sudokuProApi.proError(res, "Free players can play 1 challenge link a day. PRO players can play them all.");
       }
     }
     let startedAgo = 0;

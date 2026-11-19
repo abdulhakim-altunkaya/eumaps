@@ -451,9 +451,9 @@ module.exports = function sudokuTownHall(h) {
       if (today.rows[0].n >= LINK_PER_DAY) {
         await client.query("ROLLBACK");
         if (!pro) {
-          return { error: "Free players can send 1 Beat me link a day. PRO players can send 3.", status: 403, code: 77 };
+          return { error: "Free players can send 1 challenge link a day. PRO players can send 3.", status: 403, code: 77 };
         }
-        return { error: "You can send " + LINK_PER_DAY + " Beat me links a day. Come back tomorrow!", status: 429, code: 6 };
+        return { error: "You can send " + LINK_PER_DAY + " challenge links a day. Come back tomorrow!", status: 429, code: 6 };
       }
       const paid = await client.query(
         `UPDATE sudoku_profiles SET palladium_grams = palladium_grams - $2
@@ -461,7 +461,7 @@ module.exports = function sudokuTownHall(h) {
       );
       if (!paid.rowCount) {
         await client.query("ROLLBACK");
-        return { error: "You need " + LINK_STAKE + " g palladium to send a Beat me link.", status: 402, code: 8 };
+        return { error: "You need " + LINK_STAKE + " g palladium to send a challenge link.", status: 402, code: 8 };
       }
       await client.query(
         `INSERT INTO sudoku_palladium_spends (user_id, amount, reason, puzzle_id) VALUES ($1, $2, 'beatme', $3)`,
