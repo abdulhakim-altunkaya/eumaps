@@ -342,7 +342,8 @@ async function sudokuFriendLists(me) {
        FROM sudoku_friendships
        WHERE (user_id = $1 OR friend_id = $1) AND cancelled_at IS NULL
      )
-     SELECT p.other AS id, p.status, p.mine, p.declined, u.username AS name, u.avatar_path,
+     SELECT p.other AS id, p.status, p.mine, p.declined, u.username AS name, u.avatar_path, u.is_pro,
+            ${SUDOKU_EARNED_SQL("u.id")} AS earned,
             (SELECT COUNT(*) FROM sudoku_solved_logs l WHERE l.user_id = u.id)::int AS solved,
             (SELECT COUNT(*) FROM sudoku_messages m
              WHERE m.sender_id = u.id AND m.receiver_id = $1 AND m.read_at IS NULL)::int AS unread
@@ -356,7 +357,10 @@ async function sudokuFriendLists(me) {
   const dto = x => ({
     userId: x.id, name: x.name, avatarUrl: links[x.avatar_path] || "",
     solved: x.solved || 0, unread: x.unread || 0,
-    friendState: x.status === "accepted" ? "friends" : "incoming"
+    friendState: x.status === "accepted" ? "friends" : "incoming",
+    pro: x.is_pro === true,
+    title: sudokuTitleInfo(x.earned).title,
+    titleShort: sudokuTitleInfo(x.earned).titleShort
   });
   return {
     friends: r.rows.filter(x => x.status === "accepted").map(dto),
@@ -1499,7 +1503,7 @@ router.post("/challenge/:code/accept", sudokuRateLimit(30), sudokuRequireAuth, a
 router.get("/challenges/results", sudokuRateLimit(60), sudokuRequireAuth, async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT p.id, u.username AS name, p.seconds, p.won, c.sender_seconds, c.stake
+      `SELECT p.id, u.username AS name, u.avatar_path, p.seconds, p.won, c.sender_seconds, c.stake
        FROM sudoku_challenge_plays p
        JOIN sudoku_challenges c ON c.id = p.challenge_id
        JOIN sudoku_profiles u ON u.id = p.receiver_id
@@ -1507,11 +1511,12 @@ router.get("/challenges/results", sudokuRateLimit(60), sudokuRequireAuth, async 
        ORDER BY p.finished_at ASC LIMIT 20`,
       [req.sudokuUser.id]
     );
+    const links = await sudokuAvatarLinks(r.rows.map(x => x.avatar_path));
     return res.status(200).json({
       resStatus: true,
       results: r.rows.map(x => ({
         id: Number(x.id), name: x.name, seconds: x.seconds, senderSeconds: x.sender_seconds, won: x.won,
-        stake: x.stake || 0
+        stake: x.stake || 0, avatarUrl: links[x.avatar_path] || ""
       }))
     });
   } catch (err) {
