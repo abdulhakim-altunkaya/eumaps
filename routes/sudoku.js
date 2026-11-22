@@ -89,12 +89,13 @@ function sudokuProfileDto(p) {
     equippedTheme: p.equipped_theme,
     equippedPen: p.equipped_pen,
     equippedSfx: p.equipped_sfx,
-    pro: p.is_pro === true
+    pro: p.is_pro === true,
+    admin: p.is_admin === true
   };
 }
 
 const SUDOKU_PROFILE_COLS = `id, username, palladium_grams, (CASE WHEN is_pro THEN 100 ELSE 10 END) AS friend_capacity, has_no_ads,
-  equipped_theme, equipped_pen, equipped_sfx, is_pro`;
+  equipped_theme, equipped_pen, equipped_sfx, is_pro, is_admin`;
 
 // ── RATE LIMITER ───────────────────────────────────────────────────────────
 const sudokuRateStore = Object.create(null);
@@ -1869,7 +1870,7 @@ const sudokuTownHallApi = require("./sudoku_townhall")({
 // Invite links (sudoku_invite.js): 10 g to the inviter for each brand-new player
 require("./sudoku_invite")({ router, pool, sudokuRateLimit, sudokuRequireAuth, sudokuParseUuid, SUDOKU_TZ });
 
-// Contact form (sudoku_contact.js): signed-in players, saved in sudoku_contact_messages
-require("./sudoku_contact")({ router, pool, sudokuRateLimit, sudokuRequireAuth, SUDOKU_TZ });
+// Support chat (sudoku_support.js): players write to the team, admins (is_admin) answer
+require("./sudoku_support")({ router, pool, sudokuRateLimit, sudokuRequireAuth, sudokuParseUuid, sudokuAvatarLinks, SUDOKU_TZ });
 
 module.exports = router;
