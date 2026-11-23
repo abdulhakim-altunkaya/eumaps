@@ -2,6 +2,8 @@
 // Free: 10 puzzles per level, Town Hall play for the first 30 days, 1 Beat me link sent + 1 accepted a day,
 // 10 friends, read messages only, no freeze. PRO (€4, one-time): everything, 100 friends.
 // Palladium pack: 20 g for €8, 1 a day (the app blocks a 2nd one). A free player who buys it also becomes PRO.
+// Gift PRO (€4, pro_gift, can be bought many times): any player gives PRO to a free player and they become
+// friends (if the giver's list has room). Receiver already PRO by then = the payment is refunded at once.
 // Purchases are checked with Google (service account) before anything is granted. Refunds arrive from Google
 // (Real-time developer notifications → Pub/Sub push → POST /shop/rtdn) and are taken back right away.
 // Loaded from routes/sudoku.js: const sudokuProApi = require("./sudoku_pro")({ ...helpers }).
@@ -10,11 +12,12 @@ const https = require("https");
 const crypto = require("crypto");
 
 module.exports = function sudokuPro(h) {
-  const { router, pool, sudokuRateLimit, sudokuRequireAuth, SUDOKU_TZ } = h;
+  const { router, pool, sudokuRateLimit, sudokuRequireAuth, sudokuParseUuid, SUDOKU_TZ } = h;
 
   const PACKAGE           = "com.sudokutown.app";
   const PRO_PRODUCT       = "pro_unlock";
   const PALLADIUM_PRODUCT = "palladium_20";
+  const GIFT_PRODUCT      = "pro_gift";
   const PALLADIUM_GRAMS   = 20;
   const FREE_PUZZLES      = 10;      // per level: the 10 lowest puzzle ids
   const FREE_TOWNHALL_DAYS = 30;     // free players can play Town Hall posts this long after first sign-in
@@ -105,8 +108,8 @@ module.exports = function sudokuPro(h) {
   async function accessToken() {
     const now = Math.floor(Date.now() / 1000);
     if (tokenCache.value && tokenCache.exp > now + 60) return tokenCache.value;
-    const email = process.env.GOOGLE_PLAY_CLIENT_EMAIL;
-    const key = (process.env.GOOGLE_PLAY_PRIVATE_KEY || "").replace(/\\n/g, "\n");
+    const email = process.env.SUDOKU_GOOGLE_PLAY_CLIENT_EMAIL;
+    const key = (process.env.SUDOKU_GOOGLE_PLAY_PRIVATE_KEY || "").replace(/\\n/g, "\n");
     if (!email || !key) throw new Error("Google Play service account is not set");
     const head = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
     const claims = b64url(JSON.stringify({
@@ -133,6 +136,20 @@ module.exports = function sudokuPro(h) {
                 `/purchases/products/${encodeURIComponent(productId)}/tokens/${encodeURIComponent(token)}`;
     const r = await request("GET", url, { Authorization: "Bearer " + t });
     return r.status === 200 ? r.json : null;
+  }
+
+  // Cancels and refunds an order (gift for someone who is PRO already). true = done.
+  async function googleRefund(orderId) {
+    if (!orderId) return false;
+    try {
+      const t = await accessToken();
+      const url = `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${PACKAGE}` +
+                  `/orders/${encodeURIComponent(orderId)}:refund?revoke=true`;
+      const r = await request("POST", url, { Authorization: "Bearer " + t, "Content-Length": 0 });
+      return r.status >= 200 && r.status < 300;
+    } catch (e) {
+      return false;
+    }
   }
 
   // Unity receipt → { token, productId }. Unity wraps Google's purchase JSON in "Payload" → "json".
@@ -170,8 +187,13 @@ module.exports = function sudokuPro(h) {
     const asked = String(req.body?.productId || "");
     const { token, productId: fromReceipt } = readReceipt(String(req.body?.receipt || ""), String(req.body?.transactionId || ""));
     const productId = fromReceipt || asked;
-    if (!token || (productId !== PRO_PRODUCT && productId !== PALLADIUM_PRODUCT)) {
+    if (!token || (productId !== PRO_PRODUCT && productId !== PALLADIUM_PRODUCT && productId !== GIFT_PRODUCT)) {
       return err(res, 400, "Invalid purchase", 1);
+    }
+    let giftTo = null;
+    if (productId === GIFT_PRODUCT) {
+      giftTo = sudokuParseUuid(req.body?.giftTo);
+      if (!giftTo || giftTo === me) return err(res, 400, "Who is the gift for?", 6);
     }
 
     let g;
@@ -182,6 +204,8 @@ module.exports = function sudokuPro(h) {
     }
     if (!g) return err(res, 400, "Google doesn't know this purchase.", 3);
     if (g.purchaseState !== 0) return err(res, 409, "This payment isn't finished yet.", 4);
+
+    if (giftTo) return verifyGift(res, me, giftTo, token, g);
 
     const client = await pool.connect();
     try {
@@ -225,6 +249,173 @@ module.exports = function sudokuPro(h) {
     }
   });
 
+  // ---------- GIFT PRO ----------
+  // Both friends lists have room? Then the giver and the receiver become friends (any old request row is reused).
+  async function giftFriends(client, giver, receiver) {
+    const pair = await client.query(
+      `SELECT id, status FROM sudoku_friendships
+       WHERE LEAST(user_id, friend_id) = LEAST($1::uuid, $2::uuid)
+         AND GREATEST(user_id, friend_id) = GREATEST($1::uuid, $2::uuid)`,
+      [giver, receiver]
+    );
+    if (pair.rowCount && pair.rows[0].status === "accepted") return true;
+    const room = await client.query(
+      `SELECT u.id, ${CAPACITY_SQL("u")} AS cap,
+              (SELECT COUNT(*) FROM sudoku_friendships f
+               WHERE f.status = 'accepted' AND (f.user_id = u.id OR f.friend_id = u.id))::int AS n
+       FROM sudoku_profiles u WHERE u.id = ANY($1::uuid[])`,
+      [[giver, receiver]]
+    );
+    if (room.rows.some(r => r.n >= r.cap)) return false;
+    if (pair.rowCount) {
+      await client.query(
+        `UPDATE sudoku_friendships SET status = 'accepted', accepted_at = NOW(), declined_at = NULL, cancelled_at = NULL
+         WHERE id = $1`, [pair.rows[0].id]
+      );
+    } else {
+      await client.query(
+        `INSERT INTO sudoku_friendships (user_id, friend_id, status, accepted_at) VALUES ($1, $2, 'accepted', NOW())`,
+        [giver, receiver]
+      );
+    }
+    return true;
+  }
+
+  // g = Google's purchase record (already checked). Answers { ...shop, gift: { name, friends, refunded } }.
+  async function verifyGift(res, me, giftTo, token, g) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const old = await client.query(
+        `SELECT p.user_id, p.refunded_at, gf.friends, u.username
+         FROM sudoku_purchases p
+         LEFT JOIN sudoku_gifts gf ON gf.purchase_id = p.id
+         LEFT JOIN sudoku_profiles u ON u.id = p.gift_to
+         WHERE p.purchase_token = $1`, [token]
+      );
+      if (old.rowCount) {
+        // Already handled (the app retries until Google is told it's done)
+        await client.query("ROLLBACK");
+        const o = old.rows[0];
+        if (o.user_id !== me) return err(res, 409, "This purchase belongs to another player.", 5);
+        return res.status(200).json({
+          resStatus: true, ...(await shopState(me)),
+          gift: { name: o.username || "", friends: o.friends === true, refunded: !!o.refunded_at }
+        });
+      }
+      const rec = await client.query(
+        `SELECT username, is_pro, deletion_requested FROM sudoku_profiles WHERE id = $1 FOR UPDATE`, [giftTo]
+      );
+      if (!rec.rowCount) {
+        await client.query("ROLLBACK");
+        return err(res, 404, "Player not found", 7);
+      }
+      const r = rec.rows[0];
+
+      if (r.is_pro || r.deletion_requested) {
+        // Became PRO meanwhile: no gift, the payment goes back
+        const back = await googleRefund(g.orderId);
+        await client.query(
+          `INSERT INTO sudoku_purchases (user_id, product_id, purchase_token, order_id, gift_to, refunded_at)
+           VALUES ($1, $2, $3, $4, $5, ${back ? "NOW()" : "NULL"})`,
+          [me, GIFT_PRODUCT, token, g.orderId || null, giftTo]
+        );
+        await client.query("COMMIT");
+        return res.status(200).json({
+          resStatus: true, ...(await shopState(me)),
+          gift: { name: r.username, friends: false, refunded: true, refundFailed: !back }
+        });
+      }
+
+      const ins = await client.query(
+        `INSERT INTO sudoku_purchases (user_id, product_id, purchase_token, order_id, gift_to, made_pro)
+         VALUES ($1, $2, $3, $4, $5, TRUE) RETURNING id`,
+        [me, GIFT_PRODUCT, token, g.orderId || null, giftTo]
+      );
+      await client.query(`UPDATE sudoku_profiles SET is_pro = TRUE WHERE id = $1`, [giftTo]);
+      const friends = await giftFriends(client, me, giftTo);
+      await client.query(
+        `INSERT INTO sudoku_gifts (purchase_id, giver_id, receiver_id, friends) VALUES ($1, $2, $3, $4)`,
+        [ins.rows[0].id, me, giftTo, friends]
+      );
+      await client.query("COMMIT");
+      return res.status(200).json({
+        resStatus: true, ...(await shopState(me)),
+        gift: { name: r.username, friends, refunded: false }
+      });
+    } catch (e) {
+      try { await client.query("ROLLBACK"); } catch (e2) { /* closed */ }
+      return err(res, 500, "Server error", 99);
+    } finally {
+      client.release();
+    }
+  }
+
+  // GET /shop/gift/:id -> { name, pro } checked right before paying
+  router.get("/shop/gift/:id", sudokuRateLimit(30), sudokuRequireAuth, async (req, res) => {
+    const id = sudokuParseUuid(req.params.id);
+    if (!id || id === req.sudokuUser.id) return err(res, 400, "Invalid player", 1);
+    try {
+      const r = await pool.query(
+        `SELECT username, is_pro, deletion_requested FROM sudoku_profiles WHERE id = $1`, [id]
+      );
+      if (!r.rowCount || r.rows[0].deletion_requested) return err(res, 404, "Player not found", 2);
+      return res.status(200).json({ resStatus: true, name: r.rows[0].username, pro: r.rows[0].is_pro === true });
+    } catch (e) {
+      return err(res, 500, "Server error", 99);
+    }
+  });
+
+  // GET /shop/gifts -> popups when the app opens:
+  //  received: PRO gifts you got · full: gifts you gave while your friends list was full
+  router.get("/shop/gifts", sudokuRateLimit(30), sudokuRequireAuth, async (req, res) => {
+    const me = req.sudokuUser.id;
+    try {
+      const got = await pool.query(
+        `SELECT g.id, g.giver_id, u.username AS name,
+                EXISTS (SELECT 1 FROM sudoku_friendships f WHERE f.status = 'accepted'
+                        AND LEAST(f.user_id, f.friend_id) = LEAST(g.giver_id, g.receiver_id)
+                        AND GREATEST(f.user_id, f.friend_id) = GREATEST(g.giver_id, g.receiver_id)) AS friends
+         FROM sudoku_gifts g
+         JOIN sudoku_purchases p ON p.id = g.purchase_id AND p.refunded_at IS NULL
+         JOIN sudoku_profiles u ON u.id = g.giver_id
+         WHERE g.receiver_id = $1 AND NOT g.receiver_seen
+         ORDER BY g.id`, [me]
+      );
+      const full = await pool.query(
+        `SELECT g.id, u.username AS name
+         FROM sudoku_gifts g
+         JOIN sudoku_profiles u ON u.id = g.receiver_id
+         JOIN sudoku_profiles me ON me.id = g.giver_id
+         WHERE g.giver_id = $1 AND NOT g.friends AND NOT g.giver_seen AND NOT me.is_pro
+         ORDER BY g.id`, [me]
+      );
+      return res.status(200).json({
+        resStatus: true,
+        received: got.rows.map(x => ({ id: Number(x.id), fromId: x.giver_id, fromName: x.name, friends: x.friends })),
+        full: full.rows.map(x => ({ id: Number(x.id), name: x.name }))
+      });
+    } catch (e) {
+      return err(res, 500, "Server error", 99);
+    }
+  });
+
+  // POST /shop/gifts/seen { received: [ids], full: [ids] }
+  router.post("/shop/gifts/seen", sudokuRateLimit(30), sudokuRequireAuth, async (req, res) => {
+    const me = req.sudokuUser.id;
+    const ids = v => (Array.isArray(v) ? v.map(Number).filter(n => Number.isInteger(n) && n > 0).slice(0, 50) : []);
+    try {
+      const a = ids(req.body?.received), b = ids(req.body?.full);
+      if (a.length) await pool.query(
+        `UPDATE sudoku_gifts SET receiver_seen = TRUE WHERE receiver_id = $1 AND id = ANY($2::bigint[])`, [me, a]);
+      if (b.length) await pool.query(
+        `UPDATE sudoku_gifts SET giver_seen = TRUE WHERE giver_id = $1 AND id = ANY($2::bigint[])`, [me, b]);
+      return res.status(200).json({ resStatus: true });
+    } catch (e) {
+      return err(res, 500, "Server error", 99);
+    }
+  });
+
   // Refund → take it back: palladium (not below 0) and PRO if this purchase gave it (and no other one did).
   async function refund(token) {
     const client = await pool.connect();
@@ -233,7 +424,7 @@ module.exports = function sudokuPro(h) {
       const r = await client.query(
         `UPDATE sudoku_purchases SET refunded_at = NOW()
          WHERE purchase_token = $1 AND refunded_at IS NULL
-         RETURNING user_id, product_id, grams, made_pro`, [token]
+         RETURNING user_id, product_id, grams, made_pro, gift_to`, [token]
       );
       if (!r.rowCount) { await client.query("ROLLBACK"); return; }
       const p = r.rows[0];
@@ -244,10 +435,14 @@ module.exports = function sudokuPro(h) {
         );
       }
       if (p.made_pro) {
+        // A gift's PRO belongs to the receiver. Still PRO if another purchase or gift (not refunded) made them PRO.
+        const owner = p.gift_to || p.user_id;
         const other = await client.query(
-          `SELECT 1 FROM sudoku_purchases WHERE user_id = $1 AND made_pro AND refunded_at IS NULL`, [p.user_id]
+          `SELECT 1 FROM sudoku_purchases
+           WHERE made_pro AND refunded_at IS NULL
+             AND ((user_id = $1 AND gift_to IS NULL) OR gift_to = $1)`, [owner]
         );
-        if (!other.rowCount) await client.query(`UPDATE sudoku_profiles SET is_pro = FALSE WHERE id = $1`, [p.user_id]);
+        if (!other.rowCount) await client.query(`UPDATE sudoku_profiles SET is_pro = FALSE WHERE id = $1`, [owner]);
       } else if (p.product_id === PRO_PRODUCT) {
         // PRO bought while already PRO through a palladium pack: refund of that one changes nothing
       }

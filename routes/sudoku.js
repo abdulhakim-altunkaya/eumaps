@@ -1864,7 +1864,7 @@ router.post("/achievements/:id/cheer", sudokuRateLimit(60), sudokuRequireAuth, a
 });
 
 // FREE vs PRO + Google Play purchases (sudoku_pro.js)
-const sudokuProApi = require("./sudoku_pro")({ router, pool, sudokuRateLimit, sudokuRequireAuth, SUDOKU_TZ });
+const sudokuProApi = require("./sudoku_pro")({ router, pool, sudokuRateLimit, sudokuRequireAuth, sudokuParseUuid, SUDOKU_TZ });
 
 // Town Hall (sudoku_townhall.js): Pro posts with palladium prizes
 const sudokuTownHallApi = require("./sudoku_townhall")({
