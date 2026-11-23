@@ -206,6 +206,11 @@ router.post("/auth/google", sudokuRateLimit(10), async (req, res) => {
       [playerId, displayName]
     );
     const userId = profile.rows[0].id;
+    const del = await pool.query(`SELECT deletion_requested FROM sudoku_profiles WHERE id = $1`, [userId]);
+    if (del.rows[0].deletion_requested) {
+      return res.status(403).json({ resStatus: false, resErrorCode: 10,
+        resMessage: "This account is scheduled for deletion. Write to drysoftware1@gmail.com to restore it." });
+    }
 
     await pool.query(`DELETE FROM sudoku_sessions WHERE user_id = $1 AND expires_at < NOW()`, [userId]);
 
@@ -349,7 +354,7 @@ async function sudokuFriendLists(me) {
             (SELECT COUNT(*) FROM sudoku_messages m
              WHERE m.sender_id = u.id AND m.receiver_id = $1 AND m.read_at IS NULL)::int AS unread
      FROM pairs p JOIN sudoku_profiles u ON u.id = p.other
-     WHERE p.status = 'accepted' OR (p.status = 'pending' AND NOT p.mine)
+     WHERE (p.status = 'accepted' OR (p.status = 'pending' AND NOT p.mine)) AND NOT u.deletion_requested
      ORDER BY (p.status = 'accepted'), solved DESC, p.at DESC
      LIMIT 200`,
     [me]
@@ -750,7 +755,7 @@ router.get("/leaderboard", sudokuRateLimit(30), sudokuRequireAuth, async (req, r
           `SELECT m.user_id, m.points, u.username, u.avatar_path, u.is_pro, ${SUDOKU_EARNED_SQL("u.id")} AS earned,
                   ROW_NUMBER() OVER (ORDER BY m.points DESC, m.reached_at ASC, m.user_id ASC)::int AS rnk
            FROM sudoku_week_members m JOIN sudoku_profiles u ON u.id = m.user_id
-           WHERE m.group_id = $1
+           WHERE m.group_id = $1 AND NOT u.deletion_requested
            ORDER BY rnk`,
           [wk.gid]
         )).rows;
@@ -767,7 +772,7 @@ router.get("/leaderboard", sudokuRateLimit(30), sudokuRequireAuth, async (req, r
                 ${SUDOKU_EARNED_SQL("u.id")} AS earned,
                 ROW_NUMBER() OVER (ORDER BY COALESCE(m.points, 0) DESC, m.reached_at ASC NULLS LAST, p.id ASC)::int AS rnk
          FROM ppl p
-         JOIN sudoku_profiles u ON u.id = p.id
+         JOIN sudoku_profiles u ON u.id = p.id AND NOT u.deletion_requested
          LEFT JOIN sudoku_week_members m ON m.user_id = p.id AND m.week_start = ${SUDOKU_WEEK_SQL}
          ORDER BY rnk`,
         [me]
@@ -809,11 +814,12 @@ router.get("/leaderboard", sudokuRateLimit(30), sudokuRequireAuth, async (req, r
 async function sudokuSendProfile(req, res, userId) {
   try {
     const u = await pool.query(
-      `SELECT id, username, avatar_path, palladium_grams, is_pro, (CASE WHEN is_pro THEN 100 ELSE 10 END) AS friend_capacity
+      `SELECT id, username, avatar_path, palladium_grams, is_pro, deletion_requested,
+              (CASE WHEN is_pro THEN 100 ELSE 10 END) AS friend_capacity
        FROM sudoku_profiles WHERE id = $1`,
       [userId]
     );
-    if (!u.rowCount) {
+    if (!u.rowCount || (u.rows[0].deletion_requested && userId !== req.sudokuUser.id)) {
       return res.status(404).json({ resStatus: false, resMessage: "Player not found", resErrorCode: 2 });
     }
     const p = u.rows[0];
@@ -1072,7 +1078,7 @@ router.get("/users/search", sudokuRateLimit(30), sudokuRequireAuth, async (req, 
        LEFT JOIN sudoku_friendships f
          ON LEAST(f.user_id, f.friend_id) = LEAST(u.id, $3::uuid)
         AND GREATEST(f.user_id, f.friend_id) = GREATEST(u.id, $3::uuid)
-       WHERE u.id <> $3 AND u.username ILIKE $1
+       WHERE u.id <> $3 AND u.username ILIKE $1 AND NOT u.deletion_requested
        ORDER BY (u.username ILIKE $2) DESC, solved DESC, u.id
        LIMIT 20`,
       ["%" + esc + "%", esc + "%", me]
@@ -1146,7 +1152,7 @@ router.get("/messages", sudokuRateLimit(60), sudokuRequireAuth, async (req, res)
               (SELECT COUNT(*) FROM sudoku_messages x
                WHERE x.sender_id = fr.other AND x.receiver_id = $1 AND x.read_at IS NULL)::int AS unread
        FROM fr
-       JOIN sudoku_profiles u ON u.id = fr.other
+       JOIN sudoku_profiles u ON u.id = fr.other AND NOT u.deletion_requested
        LEFT JOIN last l ON l.other = fr.other
        ORDER BY l.id DESC NULLS LAST, name
        LIMIT 200`,
@@ -1872,5 +1878,10 @@ require("./sudoku_invite")({ router, pool, sudokuRateLimit, sudokuRequireAuth, s
 
 // Support chat (sudoku_support.js): players write to the team, admins (is_admin) answer
 require("./sudoku_support")({ router, pool, sudokuRateLimit, sudokuRequireAuth, sudokuParseUuid, sudokuAvatarLinks, SUDOKU_TZ });
+
+// Delete account (sudoku_account.js): marks the account, the developer deletes it after 7 days
+require("./sudoku_account")({
+  router, pool, sudokuRateLimit, sudokuRequireAuth, sudokuParseUuid, sudokuAvatarLinks, sudokuRemoveAvatar, SUDOKU_TZ
+});
 
 module.exports = router;
