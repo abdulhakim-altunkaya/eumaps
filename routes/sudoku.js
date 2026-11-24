@@ -30,15 +30,15 @@ const SUDOKU_SLOW_AFTER_SEC    = { easy: 20 * 60, medium: 30 * 60, hard: 50 * 60
 // rank 1 = lowest. short = what the badge shows (a letter, or the full word for the top three).
 const SUDOKU_TITLES = [
   { code: "g", name: "G class Warrior", short: "G", min: 3 },
-  { code: "f", name: "F class Warrior", short: "F", min: 30 },
-  { code: "d", name: "D class Warrior", short: "D", min: 60 },
+  { code: "f", name: "F class Warrior", short: "F", min: 40 },
+  { code: "d", name: "D class Warrior", short: "D", min: 80 },
   { code: "c", name: "C class Warrior", short: "C", min: 150 },
-  { code: "b", name: "B class Warrior", short: "B", min: 300 },
-  { code: "a", name: "A class Warrior", short: "A", min: 900 },
-  { code: "s", name: "S class Warrior", short: "S", min: 1800 },
-  { code: "king", name: "King", short: "KING", min: 3000 },
-  { code: "emperor", name: "Emperor", short: "EMPEROR", min: 5000 },
-  { code: "leviathan", name: "Leviathan", short: "LEVIATHAN", min: 12000 }
+  { code: "b", name: "B class Warrior", short: "B", min: 400 },
+  { code: "a", name: "A class Warrior", short: "A", min: 1200 },
+  { code: "s", name: "S class Warrior", short: "S", min: 2500 },
+  { code: "king", name: "King", short: "KING", min: 4000 },
+  { code: "emperor", name: "Emperor", short: "EMPEROR", min: 8000 },
+  { code: "leviathan", name: "Leviathan", short: "LEVIATHAN", min: 18000 }
 ];
 
 // { title, titleName, titleShort, titleRank, titleFrom, titleNext } for an all-time palladium total.
@@ -893,8 +893,10 @@ async function sudokuSendProfile(req, res, userId) {
   }
 }
 
-router.get("/profile", sudokuRateLimit(30), sudokuRequireAuth, (req, res) =>
-  sudokuSendProfile(req, res, req.sudokuUser.id));
+router.get("/profile", sudokuRateLimit(30), sudokuRequireAuth, async (req, res) => {
+  await sudokuAwardAchievements(req.sudokuUser.id);   // ones earned outside a solve (Town Hall, links, gifts, ...)
+  return sudokuSendProfile(req, res, req.sudokuUser.id);
+});
 
 router.get("/profile/:id", sudokuRateLimit(60), sudokuRequireAuth, (req, res) => {
   const id = sudokuParseUuid(req.params.id);
@@ -1773,6 +1775,9 @@ async function sudokuAwardAchievements(userId) {
     add(st.champions >= 1, "champion_1");
     add(st.champions >= 5, "champion_5");
     for (const n of [4, 12, 26, 52]) add(st.races >= n, "racer_" + n);
+    try {
+      earned.push(...(await sudokuAchMore.earned(userId, st)));   // the other 100 (sudoku_achievements_more.js)
+    } catch (e) { /* the first 100 still count */ }
     if (!earned.length) return [];
 
     const ins = await pool.query(
@@ -1916,6 +1921,13 @@ require("./sudoku_support")({ router, pool, sudokuRateLimit, sudokuRequireAuth, 
 // Delete account (sudoku_account.js): marks the account, the developer deletes it after 7 days
 require("./sudoku_account")({
   router, pool, sudokuRateLimit, sudokuRequireAuth, sudokuParseUuid, sudokuAvatarLinks, sudokuRemoveAvatar, SUDOKU_TZ
+});
+
+// 100 more achievements, 200 in total (sudoku_achievements_more.js)
+const sudokuAchMore = require("./sudoku_achievements_more")({
+  router, sudokuRateLimit, sudokuRequireAuth, sudokuParseUuid,
+  pool, SUDOKU_ACHIEVEMENTS, SUDOKU_ACH_BY_CODE, SUDOKU_TITLES, SUDOKU_DIFFICULTIES,
+  SUDOKU_LEVEL_NAMES, SUDOKU_LEVEL_ICONS, SUDOKU_TZ
 });
 
 // Sudoku of the Day (sudoku_daily.js): one puzzle a day for everyone, paid in /solve
