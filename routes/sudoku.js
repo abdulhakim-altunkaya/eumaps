@@ -871,6 +871,8 @@ async function sudokuSendProfile(req, res, userId) {
         friends: lists.friends,
         requests: lists.requests,
         declined: lists.declined,
+        blocked: state === "me" ? await sudokuReportApi.blockedList(p.id) : [],   // players you blocked
+        iBlocked: state !== "me" && await sudokuReportApi.iBlocked(me, p.id),
         achievements: ach.list,
         achievementCount: ach.count,
         achievementTotal: ach.total,
@@ -892,6 +894,14 @@ router.get("/profile/:id", sudokuRateLimit(60), sudokuRequireAuth, (req, res) =>
   return sudokuSendProfile(req, res, id);
 });
 
+// An admin locked this player's name and photo (sudoku_report.js)
+async function sudokuEditLocked(userId) {
+  const r = await pool.query(`SELECT edit_locked FROM sudoku_profiles WHERE id = $1`, [userId]);
+  return r.rowCount > 0 && r.rows[0].edit_locked === true;
+}
+const sudokuLockedError = res =>
+  res.status(403).json({ resStatus: false, resMessage: "Your name and photo are locked by an admin", resErrorCode: 20 });
+
 // Body: { name }. 3–20 letters/digits (space . _ - inside). Max 10 players per name.
 router.post("/profile/name", sudokuRateLimit(10), sudokuRequireAuth, async (req, res) => {
   const name = sudokuCleanName(req.body?.name);
@@ -899,6 +909,7 @@ router.post("/profile/name", sudokuRateLimit(10), sudokuRequireAuth, async (req,
     return res.status(400).json({ resStatus: false, resMessage: "Use 3–20 letters or numbers", resErrorCode: 1 });
   }
   try {
+    if (await sudokuEditLocked(req.sudokuUser.id)) return sudokuLockedError(res);
     const same = await pool.query(
       `SELECT COUNT(*)::int AS n FROM sudoku_profiles WHERE lower(username) = lower($1) AND id <> $2`,
       [name, req.sudokuUser.id]
@@ -923,6 +934,11 @@ router.post(
   async (req, res) => {
     if (!Buffer.isBuffer(req.body) || req.body.length < 100) {
       return res.status(400).json({ resStatus: false, resMessage: "No photo", resErrorCode: 1 });
+    }
+    try {
+      if (await sudokuEditLocked(req.sudokuUser.id)) return sudokuLockedError(res);
+    } catch (err) {
+      return res.status(500).json({ resStatus: false, resMessage: "Server error", resErrorCode: 99 });
     }
     let jpg;
     try {
@@ -996,6 +1012,13 @@ router.post("/friends/:id/:action", sudokuRateLimit(30), sudokuRequireAuth, asyn
       return res.status(404).json({ resStatus: false, resMessage: "Player not found", resErrorCode: 3 });
     }
     const now = await sudokuFriendState(me, other);
+    if (action === "request" || action === "accept") {
+      const blocked = await sudokuReportApi.blockState(me, other);
+      if (blocked) {
+        return res.status(403).json({ resStatus: false, resErrorCode: 6,
+          resMessage: blocked === "me" ? "You blocked this player. Unblock them first." : "This player can't be added." });
+      }
+    }
 
     if (action === "request" && now === "none") {
       const log = await pool.query(
@@ -1373,6 +1396,7 @@ router.post("/challenge", sudokuRateLimit(20), sudokuRequireAuth, async (req, re
 // Why a player can't accept (null = can). r = challenge row + counts for this player.
 function sudokuChallengeBlock(r, me) {
   if (r.sender_id === me) return "This is your own challenge. Share it with friends!";
+  if (r.blocked_pair) return "You can't play this challenge.";
   if (r.my_play && r.my_finished) return "You already played this challenge.";
   if (r.my_play) return null;                      // accepted but not finished: can go back in
   if (r.played_puzzle) return "You already played this puzzle as a challenge.";
@@ -1391,7 +1415,9 @@ const SUDOKU_CHALLENGE_SELECT = `
          EXISTS (SELECT 1 FROM sudoku_challenge_plays p WHERE p.challenge_id = c.id AND p.receiver_id = $2
                  AND p.finished_at IS NOT NULL) AS my_finished,
          EXISTS (SELECT 1 FROM sudoku_challenge_plays p WHERE p.receiver_id = $2 AND p.puzzle_id = c.puzzle_id) AS played_puzzle,
-         EXISTS (SELECT 1 FROM sudoku_solved_logs l WHERE l.user_id = $2 AND l.puzzle_id = c.puzzle_id) AS already_solved
+         EXISTS (SELECT 1 FROM sudoku_solved_logs l WHERE l.user_id = $2 AND l.puzzle_id = c.puzzle_id) AS already_solved,
+         EXISTS (SELECT 1 FROM sudoku_blocks b WHERE (b.blocker_id = c.sender_id AND b.blocked_id = $2)
+                 OR (b.blocker_id = $2 AND b.blocked_id = c.sender_id)) AS blocked_pair
   FROM sudoku_challenges c
   JOIN sudoku_profiles u ON u.id = c.sender_id
   JOIN sudoku_seeds s ON s.id = c.puzzle_id
@@ -1882,6 +1908,12 @@ require("./sudoku_support")({ router, pool, sudokuRateLimit, sudokuRequireAuth, 
 // Delete account (sudoku_account.js): marks the account, the developer deletes it after 7 days
 require("./sudoku_account")({
   router, pool, sudokuRateLimit, sudokuRequireAuth, sudokuParseUuid, sudokuAvatarLinks, sudokuRemoveAvatar, SUDOKU_TZ
+});
+
+// Report + block players (sudoku_report.js): admins remove photos, rename, lock name and photo
+const sudokuReportApi = require("./sudoku_report")({
+  router, pool, sudokuRateLimit, sudokuRequireAuth, sudokuParseUuid, sudokuAvatarLinks, sudokuRemoveAvatar,
+  sudokuTitleInfo, SUDOKU_EARNED_SQL, SUDOKU_TZ
 });
 
 module.exports = router;

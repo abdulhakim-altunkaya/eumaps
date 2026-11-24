@@ -232,6 +232,14 @@ module.exports = function sudokuTownHall(h) {
         await client.query("ROLLBACK");
         return err(res, 409, "This is your own challenge.", 3);
       }
+      const blocked = await client.query(
+        `SELECT 1 FROM sudoku_blocks WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1)`,
+        [x.user_id, me]
+      );
+      if (blocked.rowCount) {
+        await client.query("ROLLBACK");
+        return err(res, 403, "You can't play this challenge.", 8);
+      }
       // Free players: Town Hall for the first 30 days after their first sign-in (sudoku_pro.js)
       if (!(await sudokuProApi.townHallOpen(me))) {
         await client.query("ROLLBACK");

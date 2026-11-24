@@ -259,6 +259,11 @@ module.exports = function sudokuPro(h) {
       [giver, receiver]
     );
     if (pair.rowCount && pair.rows[0].status === "accepted") return true;
+    const blocked = await client.query(
+      `SELECT 1 FROM sudoku_blocks WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1)`,
+      [giver, receiver]
+    );
+    if (blocked.rowCount) return false;   // blocked meanwhile (sudoku_report.js): the gift stays, no friendship
     const room = await client.query(
       `SELECT u.id, ${CAPACITY_SQL("u")} AS cap,
               (SELECT COUNT(*) FROM sudoku_friendships f
@@ -360,6 +365,11 @@ module.exports = function sudokuPro(h) {
         `SELECT username, is_pro, deletion_requested FROM sudoku_profiles WHERE id = $1`, [id]
       );
       if (!r.rowCount || r.rows[0].deletion_requested) return err(res, 404, "Player not found", 2);
+      const blocked = await pool.query(
+        `SELECT 1 FROM sudoku_blocks WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1)`,
+        [req.sudokuUser.id, id]
+      );
+      if (blocked.rowCount) return err(res, 403, "You can't send a gift to this player.", 3);
       return res.status(200).json({ resStatus: true, name: r.rows[0].username, pro: r.rows[0].is_pro === true });
     } catch (e) {
       return err(res, 500, "Server error", 99);
