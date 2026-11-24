@@ -498,6 +498,13 @@ router.post("/solve", sudokuRateLimit(30), sudokuRequireAuth, async (req, res) =
         reward = th.reward + th.prize;
         challenge = { won: th.won, prize: th.prize, townhall: true };
       }
+    } else if (code.startsWith("DAY:") && issued) {
+      // Sudoku of the Day ("DAY:<YYYY-MM-DD>"): paid in sudoku_daily.js
+      const dy = await sudokuDailyApi.solve(client, me, puzzleId, seconds, difficulty, first, code.slice(4));
+      if (dy) {
+        reward = dy.reward;
+        challenge = { won: false, daily: true };
+      }
     } else if (code && issued) {
       const ch = await client.query(
         `SELECT p.id, c.sender_seconds, c.id AS cid, c.sender_id, c.stake, c.settled FROM sudoku_challenge_plays p
@@ -519,7 +526,7 @@ router.post("/solve", sudokuRateLimit(30), sudokuRequireAuth, async (req, res) =
       }
     }
 
-    if (challenge && challenge.townhall) {
+    if (challenge && (challenge.townhall || challenge.daily)) {
       // already paid
     } else if (challenge) {
       await client.query(`UPDATE sudoku_profiles SET palladium_grams = palladium_grams + $2 WHERE id = $1`, [me, reward]);
@@ -559,7 +566,8 @@ router.post("/solve", sudokuRateLimit(30), sudokuRequireAuth, async (req, res) =
       reward,
       palladium: bal.rows[0].palladium_grams,
       achievements,
-      challengePlayed: !!challenge,
+      challengePlayed: !!challenge && !challenge.daily,
+      daily: !!(challenge && challenge.daily),
       challengeWon: challenge ? challenge.won : false,
       prize: challenge && challenge.prize ? challenge.prize : 0
     });
@@ -1908,6 +1916,12 @@ require("./sudoku_support")({ router, pool, sudokuRateLimit, sudokuRequireAuth, 
 // Delete account (sudoku_account.js): marks the account, the developer deletes it after 7 days
 require("./sudoku_account")({
   router, pool, sudokuRateLimit, sudokuRequireAuth, sudokuParseUuid, sudokuAvatarLinks, sudokuRemoveAvatar, SUDOKU_TZ
+});
+
+// Sudoku of the Day (sudoku_daily.js): one puzzle a day for everyone, paid in /solve
+const sudokuDailyApi = require("./sudoku_daily")({
+  router, pool, sudokuRateLimit, sudokuRequireAuth, sudokuAvatarLinks, sudokuSolveReward,
+  SUDOKU_SLOW_AFTER_SEC, SUDOKU_MAX_SOLVE_SEC, SUDOKU_TZ
 });
 
 // Report + block players (sudoku_report.js): admins remove photos, rename, lock name and photo
