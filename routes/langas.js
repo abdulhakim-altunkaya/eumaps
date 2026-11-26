@@ -553,6 +553,9 @@ router.get("/exercises/:id", langasRateLimit(60), langasRequireAuth, async (req,
     langasStartTimes.set(req.langasUser.id + ":" + langasExId, { at: Date.now(), limitSec: langasExLimitSec });
     if (langasProgress.size > 20000) langasProgress.clear();
     langasProgress.set(req.langasUser.id + ":" + langasExId, {});
+    const langasExDev = (await pool.query(
+      `SELECT is_dev FROM langas_users WHERE id = $1`, [req.langasUser.id]
+    )).rows[0]?.is_dev === true;
 
     return res.status(200).json({
       resStatus: true,
@@ -561,6 +564,7 @@ router.get("/exercises/:id", langasRateLimit(60), langasRequireAuth, async (req,
         title: langasExRow.rows[0].title,
         kind: langasExKind,
         passPercent: langasExKind === "final" ? Math.round(LANGAS_FINAL_PASS * 100) : 0,
+        dev: langasExDev, // developer accounts: the app shows a SKIP button
         timeLimitSec: langasExLimitSec,
         rule: langasRuleDto(langasExRow.rows[0].rule),
         questions: langasExQuestions.rows.map(q => ({
@@ -861,8 +865,17 @@ const LANGAS_MEMORY_NEW = 6;
 const LANGAS_MEMORY_POINTS = 10; // all or nothing: finish = 10, skip = 0
 
 async function langasMemoryCards(exId, appVersion) {
+  // The lesson's own words first: picture = file name in langas_pictures (or the id)
+  const langasMwOwn = await pool.query(
+    `SELECT id, word, picture FROM langas_memory_words
+     WHERE is_active = TRUE AND exercise_id = $1 ORDER BY id LIMIT ${LANGAS_MEMORY_PAIRS}`,
+    [exId]
+  );
+  if (langasMwOwn.rowCount) {
+    return langasMwOwn.rows.map(w => (w.picture || String(w.id).padStart(4, "0")) + "|" + w.word);
+  }
   const langasMwRows = await pool.query(
-    `SELECT id, word FROM langas_memory_words WHERE is_active = TRUE ORDER BY id`
+    `SELECT id, word FROM langas_memory_words WHERE is_active = TRUE AND exercise_id IS NULL ORDER BY id`
   );
   const words = langasMwRows.rows;
   const n = words.length;
