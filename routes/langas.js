@@ -90,7 +90,8 @@ function langasRuleDto(r) {
     title: String(o.title || ""),
     intro: String(o.intro || ""),
     rows: Array.isArray(o.rows) ? o.rows.map(String) : [],
-    note: String(o.note || "")
+    note: String(o.note || ""),
+    audio: String(o.audio || "")   // optional 🔊 on the first grammar card
   };
 }
 // ── RATE LIMITER ───────────────────────────────────────────────────────────
